@@ -330,3 +330,17 @@
 - Anna `course_names` has a run-together entry, "Algorithmsforvlsiphysicaldesignautomation".
 - The three advanced chapters run 917–947 words (slightly above the 900 target). All programs run and traces checked by script. From memory: matrix-multiplication exponent just below 2.372, AlphaTensor 47 multiplications (4×4 mod 2), Karatsuba 1960, Harvey–van der Hoeven 2019.
 
+
+## c-algo-u4
+
+- Anna Univ: "Knapsack 0" is "Knapsack 0/1" cut at the slash; its unit lists no Floyd–Warshall or TSP, yet Anna is credited for 4.6 and 4.8; `course_names` includes the run-together "Algorithmsforvlsiphysicaldesignautomation".
+- SRM: its unit lists no Floyd–Warshall or TSP but SRM is credited for both; first item is three topics run together; "Prims algorithm Introduction to dynamic programming" is two items fused.
+- NITK: the row is the whole course (25 items); credited for 0/1 knapsack and Floyd–Warshall, but its "Knapsack Problem" sits under Greedy (likely fractional) and its graph items are Bellman–Ford and Dijkstra, not Floyd.
+- Manipal: TSP and the second "Knapsack Problem" sit under Branch and Bound (Unit 5), yet Manipal is credited for 4.8; unit title "Conquer, Decrease and Conquer" is a fragment and the list spans most of the course.
+- Christ: "optimal parameterization" should be "optimal parenthesization"; Christ is credited for 0/1 knapsack, which its list does not name.
+- NITC: credited for TSP, but no TSP item appears in its list.
+- Whole course as "unit 1": NITC (40 items), IITD, IITB.
+- NITT: "longest common subsequence Multistage graphs" is two items fused.
+- IITM has no `where` row.
+- From memory: Roy 1959, Warshall 1962, Floyd 1962, Held–Karp/Bellman 1962, CLRS 3e ch. 15 and 25. All numbers computed by script; C programs compiled and run (gcc 13.3).
+
