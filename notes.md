@@ -354,3 +354,15 @@
 - Christ's Unit 5 also lists random number generators and primality testing (Units 6 and 7).
 - Web search: 27-queens count computed at TU Dresden (2016); Concorde's optimal pla85900 tour (2005–06). From memory: Knuth 1975, Kuhn 1955, Land and Doig 1960. N-Queens C program compiled and run; all bounds and counts checked by script against brute force.
 
+
+## c-algo-u6
+
+- Anna Univ: the row is Unit 4 (string matching and convex hull) and supports only 6.7–6.9; its convex hull (Unit 2) and multithreaded-algorithms items belong elsewhere. Nothing supports Anna's marks on 6.2–6.6 (possibly an Anna unit missing from the packet).
+- SRM: the row is Unit 5 (randomized, approximation, NP-completeness = Unit 7 material); only Rabin–Karp fits. The BFS/DFS mark seems to come from the lab list pasted in as the last topic.
+- NITK: course code MA251N looks like a maths course — check it is the right one. The row (Unit 2, "Recurrences") lists the whole course; only FFT and Rabin–Karp fit; nothing supports its marks on 6.1, 6.2, 6.3, 6.5, 6.6.
+- NITC: whole course as Unit 1, in Dasgupta–Papadimitriou–Vazirani chapter order; supports 6.8 and 6.9; flows (6.5, 6.6) appear only indirectly via "Linear Programming and Reductions".
+- Manipal: title "Conquer, Decrease and Conquer" is truncated; its string-matching item is Horspool's input enhancement, not naive or Rabin–Karp (short Horspool section added to 6.7); the list also carries Unit 3–5 topics.
+- Christ: "Lower Bound Theory" belongs to Unit 7; "Essential" is a stray fragment; Christ is marked for 6.9 with no matching item.
+- 6.6 (push-relabel and min-cost flow): no college list names either topic.
+- 6.1 (advanced) runs 939 words, slightly above the 900 target. From memory: AKS (IIT Kanpur, 2002), Cooley–Tukey 1965 and Gauss ~1805, Lamé's bound, push-relabel bounds, the 2022 almost-linear max-flow result, ML-KEM using the NTT. All numbers and code outputs computed/run in Python.
+
