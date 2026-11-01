@@ -227,3 +227,14 @@
 - "Toy problems" is tagged advanced only because its match phrases are narrow; these are standard textbook examples (Russell and Norvig class TSP as a real-world problem).
 - From memory: R1/XCON 1980, Lisp-machine collapse 1987, Bhashini, AskDISHA, DigiYatra, IndiaAI Mission 2024, NIST AI RMF and ISO/IEC 42001 (2023), Rich & Knight's production-system table.
 
+
+## c-dbms-u1
+
+- Christ: course used is AI433 "Data Management for Machine Learning" (unit-2 list = ETL and data cleaning); nothing supports Christ's marks on 1.1–1.5 and 1.7. Mapping should use Christ's own "Database Management System" course.
+- Anna Univ: the row is unit 3 of CS25C13 with a "title" that is a fragment of the topic list; the same row is reused for Unit 2. Anna is credited for 1.1–1.4 but no Anna row lists database concepts (earlier units missing). SRM same gap: row is unit 2 (ER only, empty title), yet credited for 1.1–1.4.
+- IITM is in `taught_at` and `main_course_at` but has no `where` row, is not in `syllabi_compared` and has no marks. IITD is in `syllabi_compared` but has no Unit 1 row, though its whole-course list starts with "Data modeling; database design".
+- Whole course listed as "unit 1": IITB (fragments like "and transaction processing"), NITC (25 items), Manipal (37 items). NITK's list also has relational algebra and aggregate functions (Units 2–3); NITK `course_used` "Systems and Databases (MA300N)" is not among its `course_names`.
+- Missing marks: 1.6 missing NITT ("relationships; relationship types"), IITB and Manipal; 1.7, 1.8 ("Extended E-R Features") and 1.9 ("Reduction to Relational Schemas") missing Manipal.
+- Overlap: 1.5's keys overlap Unit 2's "Keys: super, candidate, primary and foreign keys" (book covers entity-set keys, points to Unit 2).
+- Checked by web search only: NPTEL 106105175, CODASYL DBTG report (1971), ISO GQL (2024). From memory: IMS for Apollo (late 1960s); Silberschatz 7e notation details.
+
