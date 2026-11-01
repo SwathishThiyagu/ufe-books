@@ -197,3 +197,12 @@
 - Christ: "Rules based deduction system" suggests Christ should also be marked for 4.6 (forward/backward chaining), but it is not.
 - Prolog programs not run (no Prolog installed); SWI-Prolog output punctuation in 4.8 from memory. From memory: 3-SAT ratio ≈4.3, Cook 1971, Coq→Rocq rename. Web search confirmed AIMA 4e (US) ch. 7–10; Wumpus model count (3 of 128) checked by script.
 
+
+## c-data-u5
+
+- IITD (COL2010) and IITB (EE 353) rows are whole-course topic lists filed as "Unit 1" (crosswalk shows only the relevant part).
+- Manipal's row (CES 2103 Unit 1, Introduction to Analytics) is mostly Unit 1–4 material (analytics types, cleaning, hypothesis tests, ANOVA); only "Dimensionality reduction; PCA" belongs here.
+- Christ's row (AI742E0 Unit 3: Hive, Pig, Impala, big-data visualization tools) belongs to Unit 6; only "Introduction to Machine Learning on Big Data" fits Unit 5.
+- College topics with no universal subtopic: NITT's anomaly detection (distance/density-based outliers, LOF) — covered briefly in 5.1 and 5.6; NITT's feature-selection items — belong to Unit 2; NITK's autoencoder — covered in 5.5 and 5.7; Anna's survival analysis — only in 5.9's Beyond box.
+- From memory: Rosenblatt 1958, Minsky–Papert 1969, backpropagation 1986, ID3 1986, CART 1984, Pearson 1901, Hotelling 1933, Fisher 1936, ImageNet 2012, transformers 2017; claim that Anna's AD3491 unit follows Downey's Think Stats. All numbers computed in Python; NumPy/pandas snippets run.
+
