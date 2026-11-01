@@ -184,3 +184,16 @@
 - Division has no subtopic (implied by NITK's "Additional operators"); covered in 2.6 with the "for all" query.
 - From memory: Codd 1970 paper, Codd's theorem (1972), Codd's rules (1985, Computerworld), QBE (Zloof, IBM), Ingres/QUEL.
 
+
+## c-ai-u4
+
+- Anna Univ: marked on 6 of 8 subtopics but has no `where` row; its `course_used` CS3491 (as recalled) has no logic unit — check which Anna course these marks come from.
+- Manipal: marked on 5 subtopics but has no `where` row; its `course_used` "Computational Intelligence for Mechatronics (MET 3104)" is not in its `course_names`.
+- IITM: `course_names` entry "Artificial Intelligence DAXXXX" has a dummy code.
+- NITK (MA301N unit 3): its list names neither propositional logic, frames/nets/rules, logic programming, natural deduction nor forward chaining, yet it is marked for 4.2, 4.3, 4.7, 4.8; the list also includes Unit 5 topics (conditional independence, variable elimination, fuzzy sets).
+- NITT unit 2: marked for 4.3, 4.5, 4.6 with no matching item; the list mixes Unit 3 (game playing, alpha-beta), Unit 1 (goal-based agents) and lab exercises; its items follow Russell–Norvig 1st ed.'s FOL chapter ("representation change" = situation calculus, covered in 4.4).
+- SRM unit 4 ends with "Uncertain Knowledge and reasoning Methods" (Unit 5); SRM is marked for forward and backward chaining but lists neither.
+- NITC: the whole 40-item course is listed as "unit 1".
+- Christ: "Rules based deduction system" suggests Christ should also be marked for 4.6 (forward/backward chaining), but it is not.
+- Prolog programs not run (no Prolog installed); SWI-Prolog output punctuation in 4.8 from memory. From memory: 3-SAT ratio ≈4.3, Cook 1971, Coq→Rocq rename. Web search confirmed AIMA 4e (US) ch. 7–10; Wumpus model count (3 of 128) checked by script.
+
