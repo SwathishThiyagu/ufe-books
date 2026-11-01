@@ -366,3 +366,14 @@
 - 6.6 (push-relabel and min-cost flow): no college list names either topic.
 - 6.1 (advanced) runs 939 words, slightly above the 900 target. From memory: AKS (IIT Kanpur, 2002), Cooley–Tukey 1965 and Gauss ~1805, Lamé's bound, push-relabel bounds, the 2022 almost-linear max-flow result, ML-KEM using the NTT. All numbers and code outputs computed/run in Python.
 
+
+## c-dbms-u6
+
+- NITK is in `taught_at` and credited on 6 of these subtopics but has no `where` row; IITM has none either. NITK's `course_used` "Systems and Databases (MA300N)" looks like a maths-department course rather than its DBMS course.
+- SRM's Unit 4 list mixes in Units 2–5 material (Codd's rules, normalization, PL/SQL, ACID); only "Indexing: Primary, Secondary, Multilevel; ISAM, B-Trees" belongs here.
+- IITD, IITB, NITC and Manipal rows are whole-course topic lists labelled "unit 1".
+- IITB's list covers key-value stores, distributed storage, replication and MapReduce, but IITB is missing from 6.8 and 6.9; IITD lists NoSQL but is missing from 6.9.
+- Christ's row is AI433 Data Management for ML (nothing on indexing, hashing or distributed databases), yet Christ is credited for 6.3, 6.5, 6.8 — probably matched from another Christ course.
+- Manipal's 6.1 (RAID) credit seems to come from "Data Storage and Querying" and "Storage" (recovery), not RAID; its "Measure of Query Cost" fits 6.7, but Manipal is not credited there.
+- From memory (no lookups): RAID 1988, Bayer–McCreight 1972, Fagin 1979, Litwin 1980, Selinger 1979, CAP/Gilbert–Lynch 2002, MongoDB 4.0 transactions (2018), GQL (2024).
+
