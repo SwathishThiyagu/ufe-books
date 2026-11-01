@@ -137,3 +137,14 @@
 - NITK unit 5 lists no estimation topic, yet it is marked on 4.3. SRM and NITC have no `where` row but are marked on several chapters.
 - SciPy was not available to the writer; the orchestrator later ran the three SciPy blocks (ttest_1samp, chi2_contingency, f_oneway) with SciPy 1.18.1 and the printed outputs match exactly. From memory: Gosset's 1908 "Student" paper; the 2016 ASA statement on p-values.
 
+
+## c-data-u3
+
+- IITD, IITB and Manipal: each "unit 1" lists the whole course (SQL/ER, SVMs, neural nets, ANOVA, PCA…), not this unit's topics.
+- NITC unit 4: includes its practical-session list with numbering fused into names ("Normalizing a database to normal form 3", "Parsing XML in Python 5"), plus Unit 2 topics (indexing, slicing, reshaping) and Unit 1's "scraping online/website data".
+- Anna Univ unit 2 also lists regression, least squares, standard error of estimate, multiple regression and regression toward the mean, which belong to Unit 5.
+- NITT is marked on 3.2 and 3.4 but has no `where` row; Christ is in `taught_at` but has no `where` row and no subtopic marks.
+- 3.1 is tagged "advanced" with Anna only, but Manipal's "data tabulation" and "distributions" cover the same topic, so coverage looks under-counted.
+- Topics with no match phrase: IITB's QQ plots, error bars and bubble charts; NITC's KDE plots (covered in 3.3, 3.7, 3.8).
+- The Matplotlib, Seaborn and Plotly code was not run (libraries not installed); the page says so. pandas outputs come from real runs.
+
