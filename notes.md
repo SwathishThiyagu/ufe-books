@@ -95,3 +95,14 @@
 - NITC `course_used` "Computer Architecture and Processors (EC2003E)" is an EC course not in NITC's course names; SRM, IITM, IITB and NITC have no unit mapping.
 - Checked by web search only: Wilkes 1951 microprogramming / EDSAC 2 in 1958; 68000 microcode plus nanocode; Intel 2018 microcode updates for Spectre v2.
 
+
+## c-coa-u3
+
+- SRM: the row is Unit 1 "Introduction" of a combined architecture and OS course and lists only "Number System" from this unit, yet SRM is tagged on six subtopics (add/subtract, multiplication, division, IEEE 754, ALU, number representation).
+- NITC is tagged on all 9 subtopics but has no row for this unit; its course used, EC2003E, is an ECE course.
+- Christ Unit 5 mixes Booth and division with Unit 4 and 5 material (hardwired and microprogrammed control, multiple-bus organization, pipelining, data hazards); Christ is tagged on add/subtract, carry lookahead, multiplication and ALU, but its list shows none of them.
+- Anna Univ Unit 3 includes digital-logic topics (combinational circuits, multiplexers, decoders) and a cut-off item, "Sequential".
+- IITD and IITB rows are each course's whole topic list (unit 1, no title); IITB strings still contain week numbers ("FSMs 4 FSM").
+- NITT, NITK and Manipal Unit 2 mix instruction-set topics (universal Unit 2) with arithmetic.
+- Worked examples and quiz answers verified by script (Booth, restoring/non-restoring traces, IEEE 754 hex, CLA gate delays); FP16/bfloat16 layouts and IEEE 754-2019 confirmed by web search.
+
