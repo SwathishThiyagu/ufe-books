@@ -43,3 +43,13 @@
 - Christ: `course_names` has a stray prefix, "1 Object Oriented Programming Using C++".
 - From memory (web blocked): JEP 513 final in JDK 25; `typing.override` added in Python 3.12. All code examples were compiled and run (g++ 13.3, OpenJDK 21, Python 3.13).
 
+
+## c-oop-u5
+
+- NITC: course used is "Object Oriented Programming (EC2021E)"; the EC code suggests an electronics course — check it is the right one for CSE.
+- Christ: course used is the Python course, yet it is credited for "STL containers" and "Generics in Java", which that unit does not list; `course_names` has a stray prefix "1 Object Oriented Programming Using C++"; its "Decorators and metaclasses" has no subtopic anywhere in the syllabus.
+- Anna Univ: credited for "Generics in Java", but its C++ unit does not list generics.
+- Anna Univ and NITC: both list "String" (no subtopic covers it), "IO streams" (belongs to Unit 6) and "hashes" (covered as `unordered_map` in 5.4).
+- SRM: Unit 4 mixes in inline, friend and virtual functions (Units 2 and 4) and its unit title is empty. Manipal: unit includes multithreading and JavaFX (Unit 6). NITK: its "unit" is the whole course description cut into fragments, including Factory and Abstract Factory (Unit 6).
+- From memory (web blocked): Java 5/7 feature dates, Python 3.11/3.12 features, C++23 items (`flat_map`, `std::generator`), Project Valhalla, textbook editions. All programs compiled and run (g++ 13.3, Java 21, Python 3.13).
+
