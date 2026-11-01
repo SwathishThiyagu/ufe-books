@@ -84,3 +84,14 @@
 - Mixed units: Manipal unit 2 and Christ unit 5 mix Unit 3, 4 and 6 content (Booth's algorithm, control unit, cache) with pipelining; NITT unit 3 includes building the datapath (Unit 4).
 - From memory (web blocked): Core i7 920 ~14 stages and 130 W, Cortex-A8 ~2 W, Hamacher stage names, MIPS Cause codes 10 and 12, handler address 0x80000180. Cortex-A8 13-stage dual-issue in-order pipeline confirmed by web search.
 
+
+## c-coa-u4
+
+- Subtopic 4.2 ("Register transfers and executing a complete instruction") is tagged advanced and limited to Manipal and Christ, but it is core basic-processing-unit material that hardwired and microprogrammed control depend on; it should probably carry 4.1's universities and lose the tag.
+- NITT is listed for hardwired (4.5) and microprogrammed (4.6) control, but its own list (datapath plus pipelining) names neither.
+- IITD (Unit 1, no title, 13 topics), NITK (Unit 3, 27 topics) and Manipal (Unit 2, 21 topics) are whole-course lists, not unit lists; NITK's title "Example RISC ISA" does not match its topics.
+- Anna Univ Unit 5 also lists universal Unit 2 (ISA, RISC vs CISC, addressing modes) and Unit 5 (pipelining) material.
+- Merged strings: Christ "Restoring and Non Restoring algorithms-Fundamental concepts"; NITT "…Matrix Multiply Hardware Design language". Christ's unit title "Arithmetic & Logic Unit" covers only half its topics.
+- NITC `course_used` "Computer Architecture and Processors (EC2003E)" is an EC course not in NITC's course names; SRM, IITM, IITB and NITC have no unit mapping.
+- Checked by web search only: Wilkes 1951 microprogramming / EDSAC 2 in 1958; 68000 microcode plus nanocode; Intel 2018 microcode updates for Spectre v2.
+
