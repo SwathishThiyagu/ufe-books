@@ -62,3 +62,15 @@
 - SRM and NITK have no `where` rows but are credited with subtopics (SRM 6.2–6.5, NITK 6.4).
 - The JavaFX listing in 6.6 was not compiled (JavaFX not installed); all other C++/Java programs were compiled and run (GCC 13, OpenJDK 21).
 
+
+## c-oop-u4
+
+- Manipal: mapped unit is ICT 2122 Unit 3 (exceptions, threads, generics, JavaFX), which matches Units 5 and 6, not polymorphism.
+- SRM: Unit 3 row has an empty title and mostly covers constructors, static members and inheritance (Units 2 and 3); only overloading, operator overloading and abstract classes belong here.
+- NITK: Unit 1 lists the whole course, down to design patterns, with oddly split items ("and message passing").
+- Duck-typing subtopic: its `unis` include Anna, SRM, NITK and NITC, which teach in C++; only Christ lists duck typing — the match was probably made on "dynamic method".
+- "Base class pointers to derived class objects" is tagged advanced because only Anna lists it on its own, but every course needs it before virtual functions.
+- Christ: `course_names` has a stray "1 " prefix ("1 Object Oriented Programming Using C++").
+- Anna and NITC put the this pointer and virtual base classes in this unit; the book sends readers to Units 2 and 3 for those.
+- All programs compiled and run (g++ 13.3 C++17, Python 3.13, OpenJDK 21); CS2023 mention in 4.1 is from memory.
+
