@@ -160,3 +160,15 @@
 - IITD (marked on 2.1, 2.2, 2.8) and IITM (in taught_at) have no `where` row.
 - From memory: the 3.5 modified z-score cut-off; one-line summary of the DPDP Act 2023. All code run (NumPy 2.5.3, pandas 3.0.5).
 
+
+## c-ai-u5
+
+- IITB and NITC have no `where` row yet are marked on 5.1, 5.2, 5.5 (IITB) and 5.1–5.4 (NITC). IITB's course_used "AI and Data Science (CL 205)" carries what looks like a Chemical Engineering code.
+- SRM: its row is Unit 4 "Knowledge Representation" (logic); only "Uncertain Knowledge and reasoning Methods" belongs here, but SRM is marked on 5.1, 5.2, 5.4, 5.7.
+- NITT: its unit 4 is machine learning (decision trees, SVM, perceptron, MLP) = universal Unit 6; only "Bayesian belief networks" fits, yet NITT is marked on 5.1, 5.2, 5.7.
+- NITK: unit 3 "First order logic" is mostly Unit 4 material; marked on 5.8 (non-monotonic and temporal reasoning) but lists neither.
+- Manipal: the course is a mechatronics one (MET 3104) with the whole course listed as unit 1; it supports only fuzzy logic (5.7), yet Manipal is marked on 5.1–5.4.
+- Anna Univ: marked on 5.7 (fuzzy), but the CS3491 unit 2 list has no fuzzy item.
+- IITM: course name "Artificial Intelligence DAXXXX" has a dummy code (book prints "Artificial Intelligence").
+- From memory: dates for Reiter, McCarthy, Doyle, Allen, Dempster, Shafer, Zadeh; Rich & Knight contents. Web search confirmed AIMA 4e ch. 12–13 titles and the Sendai fuzzy subway (1987).
+
