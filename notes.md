@@ -148,3 +148,15 @@
 - Topics with no match phrase: IITB's QQ plots, error bars and bubble charts; NITC's KDE plots (covered in 3.3, 3.7, 3.8).
 - The Matplotlib, Seaborn and Plotly code was not run (libraries not installed); the page says so. pandas outputs come from real runs.
 
+
+## c-data-u2
+
+- Anna Univ: the packet maps AD3491 Unit 1 (data science process); nothing in it backs Anna's marks on 2.1, 2.2, 2.4, 2.7, 2.8. From memory (check): AD3491 Unit 4 "Python libraries for data wrangling" (NumPy, pandas, missing data, hierarchical indexing, combining datasets, pivot tables) is this unit's true home.
+- SRM: its unit-2 list has no NumPy or pandas basics, so its marks on 2.1 and 2.2 must come from another unit.
+- Subtopic 2.6 is tagged advanced but is core pandas (and Anna's Unit 4 lists it, from memory); consider removing the tag.
+- Whole-course lists: IITB EE 353 "unit 1" is the entire course; Manipal unit 1 mixes Units 1, 3, 4 and 5 (hypothesis tests, ANOVA, PCA).
+- NITT unit 5 is mostly time-series forecasting and PCA (Unit 5); only anomaly detection and feature selection fit, so nothing supports NITT's marks on 2.3 and 2.5.
+- NITK unit 3's plotting items (heatmaps, pair plots, Seaborn, Plotly) belong in Unit 3; Christ unit 2 is Hadoop, NoSQL and Spark (Unit 6), only its ETL item fits 2.9.
+- IITD (marked on 2.1, 2.2, 2.8) and IITM (in taught_at) have no `where` row.
+- From memory: the 3.5 modified z-score cut-off; one-line summary of the DPDP Act 2023. All code run (NumPy 2.5.3, pandas 3.0.5).
+
