@@ -118,3 +118,12 @@
 - Parsing: merged items ("Data Science Process Introduction to Numpy: Numpy", "Index Hierarchy Data Acquisition: …") and fragments ("and transforming data", "and unstructured data"); NITT unit title empty.
 - IITM's "Algorithms for Data Science" (not in `syllabi_compared`) looks like a different course; IITD `course_names` include "Modern Data Analytics in Materials Science".
 
+
+## c-data-u6
+
+- Coverage marks without support: only NITC and Christ have `where` rows; Anna Univ, SRM, NITT, NITK and Manipal are marked on all 6–8 subtopics with no unit list behind the marks.
+- NITC: its unit 2 ("Database for Data Science", EC2023E) supports only 6.1 (big data characteristics) and 6.5 (NoSQL models and architecture), yet NITC is marked on all eight subtopics (Hadoop, MapReduce, YARN/Hive/Pig, Spark, warehouses, security). Most of its list (relational databases, keys, 1NF–3NF, SQL, parsing XML in Python) has no home in any unit of this subject.
+- Christ: its list (AI742E0 unit 2) has no Hive, Pig, HBase, warehouse/lake or security/privacy items, yet Christ is marked on 6.4, 6.5, 6.7 and 6.8; its "Big Data Integration and ETL Processes" belongs to Unit 2 (data integration and ETL).
+- IITM is in `taught_at` and `main_course_at` but missing from `syllabi_compared`.
+- From memory (web blocked): NameNode ~150 bytes per file/block, dead-DataNode timeout ~10 min, Laney's three Vs (2001), Hadoop defaults (128 MB blocks, replication 3, 3 s heartbeat). DPDP Act ₹250 crore penalty confirmed by web search.
+
