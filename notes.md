@@ -206,3 +206,13 @@
 - College topics with no universal subtopic: NITT's anomaly detection (distance/density-based outliers, LOF) — covered briefly in 5.1 and 5.6; NITT's feature-selection items — belong to Unit 2; NITK's autoencoder — covered in 5.5 and 5.7; Anna's survival analysis — only in 5.9's Beyond box.
 - From memory: Rosenblatt 1958, Minsky–Papert 1969, backpropagation 1986, ID3 1986, CART 1984, Pearson 1901, Hotelling 1933, Fisher 1936, ImageNet 2012, transformers 2017; claim that Anna's AD3491 unit follows Downey's Think Stats. All numbers computed in Python; NumPy/pandas snippets run.
 
+
+## c-ai-u3
+
+- IITB is marked for 3.1 but has no `where` row; its course_used "AI and Data Science (CL 205)" looks like a chemical-engineering code. Manipal is in `syllabi_compared` with no `where` row; its course_used MET 3104 is a mechatronics course.
+- IITM's course name has the dummy code "DAXXXX".
+- Marks not supported by lists: Anna marked for 3.3 and 3.6 but lists only "adversarial search; constraint satisfaction problems (CSP)"; NITT marked for 3.5 and 3.6 but its unit-2 list has no CSP item; NITC marked for 3.1 with no game-playing phrase.
+- Likely missing marks: 3.2 Minimax — Anna, NITT, Christ (they list games and alpha-beta); 3.4 — Christ ("Bounded Look-ahead Strategy and use of Evaluation Functions") and NITC ("Stochastic Games"); 3.6 — NITC and Christ.
+- Lists reaching other units: NITT's and NITK's unit-2 lists are half logic (Unit 4); SRM unit 3 adds agents and rationality (Unit 1); NITC's and Christ's rows are whole-course or multi-unit lists; NITK fuses "Expectimax search Knowledge and Reasoning".
+- Game trees, alpha-beta prunes, FC/AC-3 traces, 4-queens counts and cryptarithm answers computed by script. From memory: R&N 4e names and chapters, Knuth–Moore 1975, Mackworth 1977, Appel–Haken 1976, checkers solved 2007, Libratus 2017.
+
