@@ -261,3 +261,15 @@
 - No subtopic of their own: memory-bounded search (IDA*, RBFS, SMA*; NITT, NITK, Christ) — covered in 2.5; local beam search (NITK) — in 2.6; NITC's "searching with nondeterministic actions" — short paragraph in 2.1.
 - From memory: Dijkstra 1959, A* 1968, simulated annealing 1983, Korf 1985, NASA ST5 evolved antenna, NSGA-II from Kalyanmoy Deb's group (IIT Kanpur). 8-queens hill-climbing rates (~14%, ~94% with sideways moves) computed by script.
 
+
+## c-dbms-u3
+
+- Joins (3.5): only SRM is marked and the chapter is tagged advanced, but Anna Univ ("join and its types"), NITK ("JOIN operations") and Manipal ("Join Expressions") list joins too — a core topic. The book follows the tag but names all four.
+- PL/SQL (3.9): Anna and SRM are marked, but neither list has PL/SQL, cursors, procedures or triggers; SRM is also marked for views but lists none. These marks probably come from units not in the packet. (3.9 runs 1,015 words, mostly code, above the 900-word advanced target.)
+- SRM: its unit-3 list includes relational algebra (Unit 2) and functional dependencies (Unit 4).
+- NITT: marked for set operations and nested subqueries, but its list only says "Querying in SQL". NITT and NITK both list embedded SQL, which no subtopic covers (short note in the 3.9 lead).
+- Christ: marked for 3.1, 3.2, 3.6, 3.8 but has no `where` row; its course (AI433, "Data Management for Machine Learning") is not a DBMS course.
+- IITM, IITD, IITB and NITC: no `where` rows and no coverage on any chapter, though IITB's CS 317 lists SQL.
+- NITK's row is its Unit 2 "Normalization" from MA300N (mixes Unit 4 with SQL; MA300N is not among NITK's course names). Manipal's row is its whole course.
+- Web search: MySQL ignored CHECK before 8.0.16. From memory: SQL*Plus exit commits, ADD_MONTHS end-of-month rule, MOD sign with negatives, quoted Oracle error messages, SQL Server allowing one NULL in a UNIQUE column.
+
