@@ -74,3 +74,13 @@
 - Anna and NITC put the this pointer and virtual base classes in this unit; the book sends readers to Units 2 and 3 for those.
 - All programs compiled and run (g++ 13.3 C++17, Python 3.13, OpenJDK 21); CS2023 mention in 4.1 is from memory.
 
+
+## c-coa-u5
+
+- SRM: the `where` row (21CSC211J unit 3, "Process Management") is operating-systems content (scheduling, IPC, synchronisation), matched only through "Multi threading Models" (software threads); SRM's coverage of 5.1, 5.3, 5.7 and 5.9 needs checking.
+- IITB and IITD: both rows are the whole course flattened into "unit 1"; IITB's items are mangled weekly-schedule strings ("computer organization 6 Instruction pipelining 7 Mid-sem Week 8 Superscalar processors…").
+- NITC: `course_used` is "Computer Architecture and Processors (EC2003E)", an ECE code not in NITC's `course_names`; NITC has no `where` row.
+- Anna: credited with all nine subtopics, but its row (CS25C06 unit 6) lists only stages, the timing diagram and hazards.
+- Mixed units: Manipal unit 2 and Christ unit 5 mix Unit 3, 4 and 6 content (Booth's algorithm, control unit, cache) with pipelining; NITT unit 3 includes building the datapath (Unit 4).
+- From memory (web blocked): Core i7 920 ~14 stages and 130 W, Cortex-A8 ~2 W, Hamacher stage names, MIPS Cause codes 10 and 12, handler address 0x80000180. Cortex-A8 13-stage dual-issue in-order pipeline confirmed by web search.
+
