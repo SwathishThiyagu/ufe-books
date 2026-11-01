@@ -216,3 +216,14 @@
 - Lists reaching other units: NITT's and NITK's unit-2 lists are half logic (Unit 4); SRM unit 3 adds agents and rationality (Unit 1); NITC's and Christ's rows are whole-course or multi-unit lists; NITK fuses "Expectimax search Knowledge and Reasoning".
 - Game trees, alpha-beta prunes, FC/AC-3 traces, 4-queens counts and cryptarithm answers computed by script. From memory: R&N 4e names and chapters, Knuth–Moore 1975, Mackworth 1977, Appel–Haken 1976, checkers solved 2007, Libratus 2017.
 
+
+## c-ai-u1
+
+- IITB: CL 205 is a Chemical Engineering probability/statistics course, listed whole as "unit 1"; nothing in it supports IITB's marks on 1.1–1.3.
+- Marks with no support in that college's own list: SRM 1.1–1.5; Anna 1.4, 1.5; NITT 1.2, 1.4, 1.7 (1.4 matched "Measure of performance … of search algorithms"); NITK 1.2, 1.7; NITC 1.5. Christ looks unmarked on 1.6 ("General Problem Solving; Characteristics of Problem").
+- Lists running into other units: NITC lists its whole 40-item course; Anna, NITT, NITK and Christ include Unit 2–3 search, games and CSP; NITT has lab items pasted in ("Lab Component…", "etc"); SRM's items are run-on strings.
+- IITM's course name "Artificial Intelligence DAXXXX" has a dummy code.
+- IITM and IITD have no `where` rows; Manipal has none either yet is marked on 1.1, 1.2, 1.3, 1.5, 1.7; its `course_used` (MET 3104, mechatronics) is not in its `course_names`.
+- "Toy problems" is tagged advanced only because its match phrases are narrow; these are standard textbook examples (Russell and Norvig class TSP as a real-world problem).
+- From memory: R1/XCON 1980, Lisp-machine collapse 1987, Bhashini, AskDISHA, DigiYatra, IndiaAI Mission 2024, NIST AI RMF and ISO/IEC 42001 (2023), Rich & Knight's production-system table.
+
