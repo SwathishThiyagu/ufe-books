@@ -53,3 +53,12 @@
 - SRM: Unit 4 mixes in inline, friend and virtual functions (Units 2 and 4) and its unit title is empty. Manipal: unit includes multithreading and JavaFX (Unit 6). NITK: its "unit" is the whole course description cut into fragments, including Factory and Abstract Factory (Unit 6).
 - From memory (web blocked): Java 5/7 feature dates, Python 3.11/3.12 features, C++23 items (`flat_map`, `std::generator`), Project Valhalla, textbook editions. All programs compiled and run (g++ 13.3, Java 21, Python 3.13).
 
+
+## c-oop-u6
+
+- NITC: its row is Unit 6 "Templates" (templates, STL, iterators, hashes), which belongs to Unit 5; only "iostreams and other types" maps to 6.1.
+- Christ: its row is Python "Advanced OOP Concepts" (packages, exceptions, iterators, decorators, metaclasses), which belongs to Units 3 and 5; only "design patterns" maps to 6.7. Christ is credited with multithreading, events and JavaFX, which its Python course does not list — probably from its "Java Programming" course.
+- Manipal: its row lists exceptions and generics (Unit 5) beside threads and JavaFX; Manipal is credited with 6.2 and 6.3 (file streams, binary files) though its row lists no file topics.
+- SRM and NITK have no `where` rows but are credited with subtopics (SRM 6.2–6.5, NITK 6.4).
+- The JavaFX listing in 6.6 was not compiled (JavaFX not installed); all other C++/Java programs were compiled and run (GCC 13, OpenJDK 21).
+
