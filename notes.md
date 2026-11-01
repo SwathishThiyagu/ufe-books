@@ -286,3 +286,14 @@
 - Whole course listed as "unit 1": IITD, IITB, NITC, Manipal.
 - Web search: Armstrong 1974, BCNF 1974, Fagin's 4NF paper (1977). From memory: Fagin's 5NF paper (1979), Kent 1983.
 
+
+## c-algo-u3
+
+- Fractional knapsack: NITT ("Knapsack problem" in its greedy unit 2) and NITK ("Knapsack Problem" right after "Elements of Greedy Strategy") are probably missing from this subtopic's `unis`.
+- Anna Univ: credited for MST, Dijkstra and optimal merge patterns, but its CS25C12 unit 3 list names none of them; "Knapsack 0" is a cut-off "0/1"; `course_names` has the fused "Algorithmsforvlsiphysicaldesignautomation".
+- IITM: in `taught_at` and `main_course_at` but has no `where` row and is not in `syllabi_compared`.
+- Whole-course lists: IITD and IITB as unit 1 with empty titles; NITK's unit 2 title "Recurrences, Analyzing recurrences" does not match a list running to FFT and NP-completeness; NITC's unit 1 is its whole course; Manipal's unit 3 title "Conquer, Decrease and Conquer" is cut off and its list spans Units 2 and 4–7.
+- SRM: unit 3 includes "Tree traversals" (not greedy) and dynamic-programming topics (Unit 4), with items run together ("Prims algorithm Introduction to dynamic programming").
+- Topics no subtopic owns: NITK's Bellman–Ford (covered briefly in 3.6); NITC's Horn formulas (in 3.1).
+- Web search: Duan et al. O(m log^(2/3) n) shortest paths, STOC 2025 best paper. From memory: Huffman 1952, Dijkstra 1959, Borůvka 1926. C and Python programs compiled and run (gcc 13.3, Python 3.13).
+
