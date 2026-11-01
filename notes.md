@@ -238,3 +238,15 @@
 - Overlap: 1.5's keys overlap Unit 2's "Keys: super, candidate, primary and foreign keys" (book covers entity-set keys, points to Unit 2).
 - Checked by web search only: NPTEL 106105175, CODASYL DBTG report (1971), ISO GQL (2024). From memory: IMS for Apollo (late 1960s); Silberschatz 7e notation details.
 
+
+## c-ai-u6
+
+- IITM's course name "Artificial Intelligence DAXXXX" has an unfilled code. IITM, IITD and NITK have no `where` rows (NITK has a `course_used`, MA301N).
+- Anna Univ's row is CS3491 Unit 5 (neural networks), with lab exercises and outcome text mixed in ("45 PERIODS PRACTICAL EXERCISES", "OUTCOMES"…); nothing in it supports Anna's marks on 6.4, 6.5, 6.7, 6.8.
+- IITB's CL 205 row is a probability/statistics unit from a chemical-engineering course; only "Introduction to supervised learning" fits, so its marks on 6.1 and 6.5–6.7 are unsupported.
+- NITC and Manipal rows each list the whole course as "Unit 1"; Manipal's course is mechatronics (MET 3104) and its marks on 6.1, 6.8, 6.9 (MYCIN, DART) are not in its list (nearest: "rule-based decision-making").
+- Christ's row (Unit 4, Planning and Learning) has no expert-system, MYCIN or DART item, so its 6.8 and 6.9 marks are unsupported; it also lists genetic algorithms (a Unit 2 subtopic).
+- SRM topic strings are run together ("Mean Ends analysis Learning", "…models Introduction to expert system").
+- NITT's unit lists SVMs (no AI subtopic covers them) and Bayesian belief networks (Unit 5).
+- Web search: DART (Stanford with IBM, ~1981). From memory: MYCIN ~450 rules and 0.2 CF threshold, EMYCIN → PUFF and SACON, CLIPS (NASA, 1985).
+
