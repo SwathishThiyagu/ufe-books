@@ -127,3 +127,13 @@
 - IITM is in `taught_at` and `main_course_at` but missing from `syllabi_compared`.
 - From memory (web blocked): NameNode ~150 bytes per file/block, dead-DataNode timeout ~10 min, Laney's three Vs (2001), Hadoop defaults (128 MB blocks, replication 3, 3 s heartbeat). DPDP Act ₹250 crore penalty confirmed by web search.
 
+
+## c-data-u4
+
+- IITB: the EE 353 unit 1 list covers the whole course (charts, regression, SVM, neural networks); only "Hypothesis testing; t-test; chi-squared test; non-parametric tests" belong here. It lists "chi-squared test" but is not marked on 4.6 because the match phrase "chi square" misses "chi-squared". Nothing supports its marks on 4.2 and 4.3.
+- NITT: unit 5 list is time series, anomaly detection and feature selection (Units 5 and 2); its only link here is "chi-square based filtering", the source of its 4.6 mark.
+- Manipal: unit 1 list spans Units 1–3 and 5; only sampling distributions, hypothesis tests, ANOVA and confidence intervals belong here. No subtopic owns confidence intervals (covered in 4.2).
+- Anna Univ: the `where` row shows only unit 4 (t-tests, F-tests, ANOVA); its marks on 4.1–4.3 must come from another unit — from memory, AD3491 Unit 3 "Inferential Statistics".
+- NITK unit 5 lists no estimation topic, yet it is marked on 4.3. SRM and NITC have no `where` row but are marked on several chapters.
+- SciPy was not available to the writer; the orchestrator later ran the three SciPy blocks (ttest_1samp, chi2_contingency, f_oneway) with SciPy 1.18.1 and the printed outputs match exactly. From memory: Gosset's 1908 "Student" paper; the 2016 ASA statement on p-values.
+
