@@ -319,3 +319,14 @@
 - Course codes to check: Christ's `course_used` is a BCA course (BCA433) in a B.Tech-scope subject; NITK's MA251N looks like a maths-department code.
 - Web search: CLRS 4e (2022) has Akra–Bazzi in Section 4.7; KeY Timsort bug 2015. From memory: Knuth's five properties, notation history, Bentley–Haken–Saxe 1980, 2008 Gödel Prize (smoothed analysis), 2011 hash-flooding, quicksort ≈1.39 n log₂ n. C programs compiled and run (gcc 13.3).
 
+
+## c-algo-u2
+
+- NITC is missing from two `unis` lists: its "Multiplication of two numbers" belongs in 2.6 (now Anna only) and "Maximum Sum Contiguous Subsequence" in 2.7 (now SRM only, listed under both D&C and DP).
+- Topics no universal subtopic covers: SRM's "closest pair problem"; NITC's "Medians", "Order statistics" and "Selection in expected/worst-case linear time".
+- Anna CS25C12 unit 2 lists only merge sort, long integer multiplication, Strassen, master method and job sequencing; its marks on 2.2, 2.4, 2.8, 2.9 and quick sort are unsupported. Job sequencing belongs in Unit 3 and the master method in Unit 1 (SRM also lists a master theorem proof).
+- Other unbacked marks: NITT on 2.2 and 2.3 (list has only "Divide and Conquer method" and Strassen); NITK on 2.4 (no max-min item).
+- IITD, IITB and NITC rows are whole-course lists under "unit 1" with empty titles; NITK unit 2 is also whole-course; Manipal unit 3 ("Conquer, Decrease and Conquer", title looks truncated) lists the rest of its course.
+- Anna `course_names` has a run-together entry, "Algorithmsforvlsiphysicaldesignautomation".
+- The three advanced chapters run 917–947 words (slightly above the 900 target). All programs run and traces checked by script. From memory: matrix-multiplication exponent just below 2.372, AlphaTensor 47 multiplications (4×4 mod 2), Karatsuba 1960, Harvey–van der Hoeven 2019.
+
