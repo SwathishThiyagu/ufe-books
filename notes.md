@@ -307,3 +307,15 @@
 - Whole-course lists: IITD, IITB and NITC rows are each a whole course filed under "unit 1".
 - From memory: default isolation levels (PostgreSQL and Oracle READ COMMITTED, InnoDB REPEATABLE READ), PostgreSQL deadlock_timeout 1 s and error 40P01, MySQL error 1213 and InnoDB victim choice, paper years (Härder–Reuter 1983, Eswaran et al. 1976, Kung–Robinson 1981, ARIES 1992, Berenson 1995).
 
+
+## c-algo-u1
+
+- IITM is in `taught_at` and `main_course_at` but has no `where` row, no `course_used`, and is missing from `syllabi_compared`.
+- `course_names` mixes in other courses: a garbled Anna name ("Algorithmsforvlsiphysicaldesignautomation"), IITB Game Theory, NITT/NITK Randomized Algorithms, NITK Approximation Algorithms, NITC Algorithmic Graph Theory; Christ appears twice (singular "Algorithm").
+- Whole course as one unit: IITD, IITB and NITC rows are whole courses as "unit 1" with empty titles (NITC's follows Dasgupta–Papadimitriou–Vazirani's chapters); NITK's row is its unit 2, running from divide and conquer to NP; Manipal's list is cut off at "Divide and".
+- Coverage dots the rows do not support: Anna on 1.1, 1.2, 1.4, 1.6, 1.8; SRM on 1.8 (no master theorem listed); NITK on 1.1 and 1.3–1.6 (its unit 1 row looks missing); NITC on 1.1 and 1.4–1.6; Manipal on 1.1 and 1.2 (probably its unit 1); Christ on 1.1.
+- Topics belonging elsewhere: Anna "probabilistic analysis" and IITB/NITC "lower bounds" belong in Unit 7; NITT "Tournament method" belongs with Unit 2's "Finding maximum and minimum"; NITT "pre-processing of coefficients" has no subtopic (covered briefly with Horner's rule in 1.6).
+- Typos: SRM "O, O, Ө, ω, Ω" (second O should be little o); SRM "Solution of recurrence relations" appears three times; SRM lists little-omega, which the 1.5 title omits (chapter covers it); Christ items split mid-phrase ("Polynomial Vs" / "Exponential Algorithms", "Average" / "Best and Worst case complexity").
+- Course codes to check: Christ's `course_used` is a BCA course (BCA433) in a B.Tech-scope subject; NITK's MA251N looks like a maths-department code.
+- Web search: CLRS 4e (2022) has Akra–Bazzi in Section 4.7; KeY Timsort bug 2015. From memory: Knuth's five properties, notation history, Bentley–Haken–Saxe 1980, 2008 Gödel Prize (smoothed analysis), 2011 hash-flooding, quicksort ≈1.39 n log₂ n. C programs compiled and run (gcc 13.3).
+
