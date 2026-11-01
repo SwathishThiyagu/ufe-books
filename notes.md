@@ -22,3 +22,13 @@
 - Lists reaching into later units: NITT unit 1 includes Patterson–Hennessy ch. 2 topics (operations, operands, representing instructions, logical ops, decisions) = universal Units 2–3; Christ unit 4 includes memory addresses, signed add/subtract, fast adders, multiplication (Units 2–3).
 - Fact to check: the book gives TIFRAC as commissioned in 1960; sources differ (1960 or 1962).
 
+
+## c-coa-u6
+
+- Christ: its `where` row is Unit 1 "Combinational Circuits" (K-maps, adders, PAL/PLA), matched only on "ROM", yet Christ is marked as teaching 6.1, 6.2, 6.5, 6.7 and 6.8.
+- SRM: the course is an operating-systems one (21CSC211J, Unit 5 "Memory Management"); its last topic is a run-on string of lab experiments pasted from the lab list.
+- NITC: the row is an ECE 8086 course (EC2003E, Unit 1); only memory read/write cycles and memory-mapped vs peripheral I/O relate to this unit.
+- Whole course listed as one unit: IITD, IITB, NITK and Manipal. NITK's title "Example RISC ISA" does not match its list. IITB's items have week numbers merged in ("SMTs 10 Memory hierarchy including virtual memory 11 More on Caches").
+- Likely missing coverage dots: IITB lists "Storage and I/O" but is not marked for 6.6 or 6.7; Manipal lists "Magnetic hard disk" but is not marked for 6.6.
+- Standard values written from memory (no web): typical access times in Fig 6.1.1, EEPROM endurance 10⁵–10⁶ cycles, 64 ms DRAM refresh, ~600 MB/s SATA limit.
+
