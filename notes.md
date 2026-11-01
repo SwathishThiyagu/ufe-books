@@ -106,3 +106,15 @@
 - NITT, NITK and Manipal Unit 2 mix instruction-set topics (universal Unit 2) with arithmetic.
 - Worked examples and quiz answers verified by script (Booth, restoring/non-restoring traces, IEEE 754 hex, CLA gate delays); FP16/bfloat16 layouts and IEEE 754-2019 confirmed by web search.
 
+
+## c-data-u1
+
+- NITK: marked on 1.1, 1.2 and 1.5 but has no Unit 1 `where` row; its course MA255N lists only statistics, EDA, hypothesis tests and dimensionality reduction, so nothing supports these marks.
+- NITC: its row is unit 2 "Database for Data Science"; only the first 6 items fit this unit. Keys, normal forms (1NF–3NF) and SQL table operations belong to no unit of this subject; the NoSQL and big-data models belong to Unit 6. Nothing supports its 1.5 mark. Course code EC2023E looks like an ECE course.
+- 1.4 "Types of analytics": only Manipal's list names it. Anna, SRM and NITT marks are not supported by their unit-1 lists (Anna matches only through its unit titles "Descriptive Analytics"/"Predictive Analytics"); NITT's mark on 1.2 is also unsupported.
+- Whole-course lists: Manipal unit 1 (sampling, hypothesis tests, ANOVA, PCA), IITB's 40-item list and IITD's 25-item list are reused as `where` rows for Units 2–5. IITD's list starts with "Introduction to data science", yet IITD has no Unit 1 row or mark.
+- Christ: unit 1 (big data, data lakes and warehouses, ecosystem) overlaps Unit 6.1 and 6.7; its 1.1 mark is weak. Unit 6.1 also overlaps chapters 1.2 and 1.5 (the book cross-references rather than re-teaches).
+- SRM: unit 1 is mostly NumPy and Pandas (Unit 2 content).
+- Parsing: merged items ("Data Science Process Introduction to Numpy: Numpy", "Index Hierarchy Data Acquisition: …") and fragments ("and transforming data", "and unstructured data"); NITT unit title empty.
+- IITM's "Algorithms for Data Science" (not in `syllabi_compared`) looks like a different course; IITD `course_names` include "Modern Data Analytics in Materials Science".
+
