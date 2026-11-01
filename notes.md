@@ -172,3 +172,15 @@
 - IITM: course name "Artificial Intelligence DAXXXX" has a dummy code (book prints "Artificial Intelligence").
 - From memory: dates for Reiter, McCarthy, Doyle, Allen, Dempster, Shafer, Zadeh; Rich & Knight contents. Web search confirmed AIMA 4e ch. 12–13 titles and the Sendai fuzzy subway (1987).
 
+
+## c-dbms-u2
+
+- 2.2 Keys is tagged `advanced` but is core: lists only anna and nitt, yet NITK and Manipal both list "Keys" (the match phrases miss the plain word "Keys").
+- 2.5 Set operations / product / joins is tagged `advanced` but is core: lists only nitt, yet NITK ("Complete set of operators", "Additional operators") and Manipal ("Set Operations", "Join Expressions") teach it, as does every algebra course. Both chapters were still written at advanced length (≤900 words) as the standard requires.
+- Anna's `where` row (Anna Unit 3) is mostly ER material (participation, weak entities, ER-to-relations, ISA/EER) belonging to Unit 1; only its title's keys belong here.
+- SRM's row (its Unit 4) mixes four units: Codd rules and referential integrity fit, but it also lists normalization (Unit 4), indexing and B-trees (Unit 6), PL/SQL (Unit 3) and ACID (Unit 5).
+- NITK `course_used` "Systems and Databases (MA300N)" looks like a maths-department course rather than its "Database Systems".
+- IITM and Christ have no `where` row; Christ's course shown is "Data Management for Machine Learning".
+- Division has no subtopic (implied by NITK's "Additional operators"); covered in 2.6 with the "for all" query.
+- From memory: Codd 1970 paper, Codd's theorem (1972), Codd's rules (1985, Computerworld), QBE (Zloof, IBM), Ingres/QUEL.
+
