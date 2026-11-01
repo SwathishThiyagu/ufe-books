@@ -273,3 +273,16 @@
 - NITK's row is its Unit 2 "Normalization" from MA300N (mixes Unit 4 with SQL; MA300N is not among NITK's course names). Manipal's row is its whole course.
 - Web search: MySQL ignored CHECK before 8.0.16. From memory: SQL*Plus exit commits, ADD_MONTHS end-of-month rule, MOD sign with negatives, quoted Oracle error messages, SQL Server allowing one NULL in a UNIQUE column.
 
+
+## c-dbms-u4
+
+- IITM: in `taught_at` and `main_course_at` but has no `where` row and is missing from `syllabi_compared`.
+- SRM: its Unit 4 mixes in Codd rules and referential integrity (Unit 2), indexing, ISAM and B-trees (Unit 6), PL/SQL (Unit 3) and ACID (Unit 5); unit title empty. Credited for 4.2 and 4.6 but its list names no FDs or decomposition.
+- Probably missing coverage dots: IITB lists "Relational database design and normalization" but is credited only for 4.1; NITC lists "Normal Forms" but is not credited for 4.4 or 4.5.
+- Manipal: credited for 4.2, 4.6, 4.7, but its list has only "Features of Good Relational Design" and "Atomic Domains and Normalization" (credit probably from another course or unit).
+- Christ: course used is an AI course (AI433) whose only matching item is "Schema design and data normalization", yet Christ is credited for 4.2, 4.4, 4.5.
+- Anna Univ: the CS25C13 row names no minimal cover, MVD/4NF or JD/5NF, yet Anna is credited for 4.3, 4.7, 4.8.
+- NITK: course used "Systems and Databases (MA300N)" has a maths code and is not in NITK's `course_names`; its Unit 2 also lists SQL topics (Unit 3).
+- Whole course listed as "unit 1": IITD, IITB, NITC, Manipal.
+- Web search: Armstrong 1974, BCNF 1974, Fagin's 4NF paper (1977). From memory: Fagin's 5NF paper (1979), Kent 1983.
+
