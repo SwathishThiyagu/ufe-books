@@ -32,3 +32,14 @@
 - Likely missing coverage dots: IITB lists "Storage and I/O" but is not marked for 6.6 or 6.7; Manipal lists "Magnetic hard disk" but is not marked for 6.6.
 - Standard values written from memory (no web): typical access times in Fig 6.1.1, EEPROM endurance 10⁵–10⁶ cycles, 64 ms DRAM refresh, ~600 MB/s SATA limit.
 
+
+## c-oop-u3
+
+- SRM: its unit-3 list is mostly Unit 2 and Unit 4 material (constructors, static members, overloading, operator overloading); only the last three items are inheritance, and its abstract-class item belongs to Unit 4.
+- NITK: the row is its Unit 1 "Fundamentals of OOP", a whole-course list (exceptions, generics, STL, Factory patterns), with comma-split fragments like "and message passing".
+- Manipal: the row is Unit 1 (Java basics, ending at "Inheritance basics"), yet Manipal is credited with virtual bases, interfaces and packages; the Manipal unit that covers packages and interfaces looks missing.
+- Anna Univ: the row lists no overriding, interfaces, packages or aggregation, but chapters 3.5 and 3.7–3.9 credit Anna; its title "Inheritance and Compile Time Polymorphism" also covers Unit 4 overloading. Check which Anna course the credit comes from.
+- NITC: the course used is EC2021E, which looks like an ECE course code; check it is the right course.
+- Christ: `course_names` has a stray prefix, "1 Object Oriented Programming Using C++".
+- From memory (web blocked): JEP 513 final in JDK 25; `typing.override` added in Python 3.12. All code examples were compiled and run (g++ 13.3, OpenJDK 21, Python 3.13).
+
