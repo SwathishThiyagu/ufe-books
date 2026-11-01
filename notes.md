@@ -250,3 +250,14 @@
 - NITT's unit lists SVMs (no AI subtopic covers them) and Bayesian belief networks (Unit 5).
 - Web search: DART (Stanford with IBM, ~1981). From memory: MYCIN ~450 rules and 0.2 CF threshold, EMYCIN → PUFF and SACON, CLIPS (NASA, 1985).
 
+
+## c-ai-u2
+
+- 2.7 Genetic algorithms: SRM, NITT and Christ are marked but their listed units have no GA item; NITC lists "Evolutionary Computation" but is not marked.
+- 2.6 Local search: SRM is marked, but its unit lists no local search or hill climbing.
+- IITB (marked 2.1, 2.6) and Manipal (marked 2.1, 2.5) have no `where` row; IITB's course used is CL 205 (a Chemical Engineering code); Manipal's "Computational Intelligence for Mechatronics (MET 3104)" is not in its course names.
+- IITM's course name carries a stub code, "Artificial Intelligence DAXXXX".
+- College lists: NITC's row is its whole 40-item course; NITT includes lab fragments ("Lab Component (Exercises similar to the following)", "etc"); NITK's "(RBFS SMA*" has an unbalanced parenthesis; Christ lists "Introduction" twice; Anna's unit also covers adversarial search and CSP (Unit 3).
+- No subtopic of their own: memory-bounded search (IDA*, RBFS, SMA*; NITT, NITK, Christ) — covered in 2.5; local beam search (NITK) — in 2.6; NITC's "searching with nondeterministic actions" — short paragraph in 2.1.
+- From memory: Dijkstra 1959, A* 1968, simulated annealing 1983, Korf 1985, NASA ST5 evolved antenna, NSGA-II from Kalyanmoy Deb's group (IIT Kanpur). 8-queens hill-climbing rates (~14%, ~94% with sideways moves) computed by script.
+
