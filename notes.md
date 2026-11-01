@@ -297,3 +297,13 @@
 - Topics no subtopic owns: NITK's Bellman–Ford (covered briefly in 3.6); NITC's Horn formulas (in 3.1).
 - Web search: Duan et al. O(m log^(2/3) n) shortest paths, STOC 2025 best paper. From memory: Huffman 1952, Dijkstra 1959, Borůvka 1926. C and Python programs compiled and run (gcc 13.3, Python 3.13).
 
+
+## c-dbms-u5
+
+- No `where` row, but credited: Manipal for 5.1 and 5.3–5.6; Christ for 5.1, 5.3, 5.4, 5.8, 5.9 (including ARIES) — Christ's course used, "Data Management for Machine Learning (AI433)", is an unlikely source for ARIES. IITM has no row either.
+- Likely missing coverage dots: NITK lists "database recovery management" and NITC lists "Database recovery concepts and techniques", but neither is credited for 5.8 or 5.9; NITC lists "Optimistic Concurrency Control" (covered in 5.5) but is not credited there.
+- Dots the lists do not support: NITT credited for 5.6 deadlocks but lists none; SRM credited for 5.1, 5.2, 5.5 but its list has no states, no ACID (in its Unit 4) and no timestamps; Anna credited for 5.7 granularity and 5.9 but its list has only "Isolation Levels" and a cut-off "Log-Based".
+- SRM's row mixes in PL/SQL items (Unit 3) and database security, mandatory access control and multilevel security, which no subtopic in the universal syllabus covers; its item "Two-Phase Control Commit" confuses two-phase locking with two-phase commit (the book flags this in a trap).
+- Whole-course lists: IITD, IITB and NITC rows are each a whole course filed under "unit 1".
+- From memory: default isolation levels (PostgreSQL and Oracle READ COMMITTED, InnoDB REPEATABLE READ), PostgreSQL deadlock_timeout 1 s and error 40P01, MySQL error 1213 and InnoDB victim choice, paper years (Härder–Reuter 1983, Eswaran et al. 1976, Kung–Robinson 1981, ARIES 1992, Berenson 1995).
+
