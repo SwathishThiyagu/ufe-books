@@ -344,3 +344,13 @@
 - IITM has no `where` row.
 - From memory: Roy 1959, Warshall 1962, Floyd 1962, Held–Karp/Bellman 1962, CLRS 3e ch. 15 and 25. All numbers computed by script; C programs compiled and run (gcc 13.3).
 
+
+## c-algo-u5
+
+- Anna Univ's Unit 5 ("Solvability and Tractability") mixes P, NP and NP-complete topics (this subject's Unit 7) with backtracking and branch and bound; it is effectively Units 5 and 7 combined.
+- SRM's Unit 4 list includes graph searches (DFS/BFS, Unit 6) and Floyd–Warshall (Unit 4), and repeats "Travelling salesman problem using branch and bound example" three times.
+- NITT's row (Unit 5, "NP Problems") is the NP-completeness unit and belongs to Unit 7; NITT is credited on the Hamiltonian-cycles chapter only because "Hamiltonian cycle" appears there as an NP-complete problem, not as backtracking.
+- Manipal's Unit 3 list ("Conquer, Decrease and Conquer") covers the whole course, insertion sort to TSP; the title looks wrong.
+- Christ's Unit 5 also lists random number generators and primality testing (Units 6 and 7).
+- Web search: 27-queens count computed at TU Dresden (2016); Concorde's optimal pla85900 tour (2005–06). From memory: Knuth 1975, Kuhn 1955, Land and Doig 1960. N-Queens C program compiled and run; all bounds and counts checked by script against brute force.
+
