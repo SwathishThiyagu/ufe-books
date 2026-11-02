@@ -2,6 +2,8 @@
 
 You are writing one book of the University free n easy series: one unit of one subject, for students at any Indian university. The series follows the universal syllabus built from 10 universities' curricula (Anna Univ, SRM, IIT Madras, IIT Delhi, IIT Bombay, NIT Trichy, NIT Surathkal, NIT Calicut, Manipal MIT, Christ). Students reach a chapter from the v6 student site by its anchor, so the chapter list, order, ids and titles are fixed by the packet. Everything else is yours to write well.
 
+**No college names anywhere in the book** (the channel's rule, 2 Nov 2026). The packet names the universities so you can set the depth and the exam wording, but the book never names one of them: not in the header, the about section, a chapter, the question bank or the sources. Write "some syllabi call this …" or "only a few universities teach this". Scientific history and publishers are not syllabus colleges (the Ramachandran plot was worked out at the University of Madras; Oxford University Press). The checker refuses a book that names one of the ten.
+
 ## Inputs you are given
 
 - The **packet** (`packet.json`, made by `make_packet.py`): `subject` (name, aka, group, departments, taught_at, course_names per university, course_used), `unit` (n, name, `subtopics` in order, each with `t` text, `id` anchor, `unis` that cover it, `match` phrases, `tags`), `where` (per university: its course, which unit number this is there, that unit's title and the topics it lists), `other_units` (the subject's other units and their subtopics, for cross-references), `universities`, `order`, `out` (the book's path in the channel folder).
@@ -16,8 +18,8 @@ A student in the semester that teaches this unit, at any of the 10 universities,
 ## Read the packet before planning
 
 1. The subtopics in order: these are your chapters, exactly as given.
-2. `where[].topics`: what each college lists for this unit. These lists set the depth and the exam wording. Where a college uses another name for the same thing, give that name in the chapter ("Anna Univ lists this as 'ADT operations'"). Where a college's list goes deeper than the universal subtopic, cover that depth in the chapter that owns it.
-3. `tags`: `advanced` = only one or two universities teach it: write it shorter (650–900 words) and say who teaches it. `added` = standard topic no syllabus lists: write it as a normal chapter and say in one line that it completes the subject.
+2. `where[].topics`: what each college lists for this unit. These lists set the depth and the exam wording. Where a college uses another name for the same thing, give that name in the chapter without naming the college ("some syllabi call this 'ADT operations'"). Where a college's list goes deeper than the universal subtopic, cover that depth in the chapter that owns it.
+3. `tags`: `advanced` = only one or two universities teach it: write it shorter (650–900 words) and say that only a few universities teach it (never which). `added` = standard topic no syllabus lists: write it as a normal chapter and say in one line that it completes the subject.
 4. `other_units`: cross-reference them ("see Unit 4, Binary search trees"); never re-teach their content.
 
 Then plan each chapter in a few lines: the one idea, the figure, the worked example, the trap, what goes beyond.
@@ -31,15 +33,15 @@ Placeholders:
 - `__EYEBROW__`: `Universal syllabus · <Subject> · taught at <k> of 10 universities`
 - `__SUBJECT__`, `__UNIT_NO__`, `__UNIT_NAME__`
 - `__LEAD__`: two or three sentences: what the unit is about and what the student can do after it.
-- `__CHIPS__`: `<span class="chip tier">Taught at k of 10</span>`, `<span class="chip">Usually Sem s</span>`, `<span class="chip">n chapters</span>`, and `<span class="chip main">Main course at m</span>` when `main_course_at` is non-empty.
+- `__CHIPS__`: `<span class="chip tier">Taught at k of 10</span>`, `<span class="chip">Usually Sem s</span>`, `<span class="chip">n chapters</span>` (no "Main course at" chip: it names colleges).
 - `__FOOT__`: `Built for the University free n easy YouTube channel from the universal syllabus of <Subject> (Oct 2026). Written with top universities' syllabi and standard textbooks; check a formula against your prescribed book before an exam, and report mistakes on the channel.`
 - `__MAIN__`: the sections below, in this order.
 
 ### `<section id="about">` — About this unit
 
 - `<h2>About this unit</h2>`, one short paragraph on what the unit covers and how the chapters build on each other.
-- **Where this unit sits at your university**: `<div class="tablewrap"><table>` with columns University | Course | Unit there | What it lists. One row per entry of `where` (topics joined with `; `, trimmed to about 12 items with "…"). Universities in `taught_at` that have no `where` row still get a row: their first `course_names` entry, "unit mapping not available". Use the university's short name from `universities`.
-- **Chapters**: an ordered list, each chapter name linked to its anchor, followed by the coverage squares `<span class="cov">` of ten `<i class="dot d-<uni>"></i>` (or `<i class="dot off"></i>`) in the `order` given, and `<span class="tag">advanced</span>` / `added` where tagged. Then a `<div class="legend">` naming the ten colours.
+- No table of universities, no coverage squares and no colour legend (they name colleges).
+- **Chapters**: an ordered list, each chapter name linked to its anchor, with `<span class="tag">advanced</span>` / `added` where tagged.
 - **How to use this book**: three bullets (read the idea, do the worked example yourself, answer the questions before opening them).
 
 ### One `<section class="ch" id="<packet id>" data-n="<k>">` per subtopic, in packet order
@@ -59,9 +61,9 @@ Length: 900–1600 words per chapter (650–900 when tagged advanced). The check
 ### Unit-level sections
 
 - `<section id="summary">`: `<h2>Unit summary</h2>`; a `<div class="keybox">` with a table of key terms and formulas (Term | Meaning or formula | Chapter); a unit-map `<figure class="fig">` (SVG) showing how the chapters connect; six to ten numbered takeaway lines.
-- `<section id="question-bank">`: `<h2>Exam question bank</h2>`; 10–16 long-answer questions (8–16 marks) as `<details data-level="…">` grouped under `<h3>` Remember and understand / Apply / Analyze and evaluate, each with an answer outline (the points an examiner looks for); at least two questions that span chapters. Where `where[].topics` shows a college emphasises something, say so in a `<p class="note">`.
+- `<section id="question-bank">`: `<h2>Exam question bank</h2>`; 10–16 long-answer questions (8–16 marks) as `<details data-level="…">` grouped under `<h3>` Remember and understand / Apply / Analyze and evaluate, each with an answer outline (the points an examiner looks for); at least two questions that span chapters. Where `where[].topics` shows the syllabi stress something, say so in a `<p class="note">` without naming any college ("most syllabi ask for the structure and function of each polysaccharide").
 - `<section id="glossary">`: `<h2>Glossary</h2>`, `<dl class="gloss">` of 15–30 terms.
-- `<section id="sources">`: `<h2>Sources and further reading</h2>`: the standard textbooks of the subject (title, author, edition only when sure; chapter pointers only when sure; never page numbers you have not seen), two to six open web resources you actually opened, with links, then one line: "Syllabi: the universal syllabus and the course documents of <universities in where>". Mark anything taken from memory "(from memory; check)".
+- `<section id="sources">`: `<h2>Sources and further reading</h2>`: the standard textbooks of the subject (title, author, edition only when sure; chapter pointers only when sure; never page numbers you have not seen), two to six open web resources you actually opened, with links, then one line: "Syllabus: the University free n easy universal syllabus, built from top universities' syllabi." Mark anything taken from memory "(from memory; check)".
 
 ## Figures
 

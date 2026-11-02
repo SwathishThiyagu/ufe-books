@@ -101,9 +101,13 @@ def main():
         if s['beyond'] < 1: probs.append(f'{name}: needs a <div class="beyond"> section')
     for sec in ('about', 'summary', 'question-bank', 'glossary', 'sources'):
         if sec not in w.sections: probs.append(f'missing unit section id="{sec}"')
-    if 'about' in w.sections:
-        for u in P['subject']['taught_at']:
-            if P['universities'][u]['short'] not in raw: probs.append(f'the crosswalk must mention {P["universities"][u]["short"]}')
+    # no college names anywhere (the channel's rule, 2 Nov 2026): visible text and title/aria-label/alt attributes
+    vis = re.sub(r'<style.*?</style>|<script.*?</script>', '', raw, flags=re.S)
+    vis = ' '.join(re.findall(r'(?:title|aria-label|alt)="([^"]*)"', vis)) + ' ' + html.unescape(re.sub(r'<[^>]+>', ' ', vis))
+    college = re.compile(r"Anna Univ(?:ersity|\.)?|\bSRM(?: IST| University)?\b|\bIIT[ -]?(?:Madras|Delhi|Bombay)\b|\bIIT[MDB]\b"
+                         r"|\bNIT[ -]?(?:Trichy|Tiruchirappalli|Surathkal|Karnataka|Calicut)\b|\bNIT[TKC]\b|\bManipal\b|\bChrist University\b|\bChrist\b(?! ?(?:mas|ian))")
+    named = sorted(set(m.group(0) for m in college.finditer(vis)))
+    if named: probs.append(f'no college names anywhere in the book; found: {", ".join(named)} (write "some syllabi", "a few universities")')
     if 'question-bank' in w.sections and w.sections['question-bank']['details'] < 8: probs.append('question bank needs at least 8 questions')
     if 'sources' in w.sections and w.sections['sources']['words'] < 40: probs.append('sources section is too thin')
     svgs = re.findall(r'<svg[^>]*>', raw)
