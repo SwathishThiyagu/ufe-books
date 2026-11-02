@@ -32,7 +32,7 @@ Placeholders:
 - `__SUBJECT__`, `__UNIT_NO__`, `__UNIT_NAME__`
 - `__LEAD__`: two or three sentences: what the unit is about and what the student can do after it.
 - `__CHIPS__`: `<span class="chip tier">Taught at k of 10</span>`, `<span class="chip">Usually Sem s</span>`, `<span class="chip">n chapters</span>`, and `<span class="chip main">Main course at m</span>` when `main_course_at` is non-empty.
-- `__FOOT__`: `Built for the University free n easy YouTube channel from the universal syllabus of <Subject> (Oct 2026). Written with AI from the 10 universities' syllabi and standard textbooks; check a formula against your prescribed book before an exam, and report mistakes on the channel.`
+- `__FOOT__`: `Built for the University free n easy YouTube channel from the universal syllabus of <Subject> (Oct 2026). Written with top universities' syllabi and standard textbooks; check a formula against your prescribed book before an exam, and report mistakes on the channel.`
 - `__MAIN__`: the sections below, in this order.
 
 ### `<section id="about">` — About this unit
