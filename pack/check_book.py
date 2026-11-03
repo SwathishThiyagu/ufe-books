@@ -108,6 +108,9 @@ def main():
                          r"|\bNIT[ -]?(?:Trichy|Tiruchirappalli|Surathkal|Karnataka|Calicut)\b|\bNIT[TKC]\b|\bManipal\b|\bChrist University\b|\bChrist\b(?! ?(?:mas|ian))")
     named = sorted(set(m.group(0) for m in college.finditer(vis)))
     if named: probs.append(f'no college names anywhere in the book; found: {", ".join(named)} (write "some syllabi", "a few universities")')
+    # no count of the syllabus universities either (3 Nov 2026): no "taught at 8 of 10 universities" and no "Taught at k of 10" chip
+    counted = sorted(set(m.group(0) for m in re.finditer(r'\b(?:taught at|covered by|in) \d+ of (?:the )?(?:10|ten)\b(?: (?:universities|syllabi))?', vis, flags=re.I)))
+    if counted or 'chip tier' in raw: probs.append(f'do not count the universities that teach a topic; found: {", ".join(counted) or "the Taught at chip"} (header: "Universal syllabus · <Subject>")')
     if 'question-bank' in w.sections and w.sections['question-bank']['details'] < 8: probs.append('question bank needs at least 8 questions')
     if 'sources' in w.sections and w.sections['sources']['words'] < 40: probs.append('sources section is too thin')
     svgs = re.findall(r'<svg[^>]*>', raw)

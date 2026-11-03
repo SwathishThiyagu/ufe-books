@@ -2,7 +2,7 @@
 
 You are writing one book of the University free n easy series: one unit of one subject, for students at any Indian university. The series follows the universal syllabus built from 10 universities' curricula (Anna Univ, SRM, IIT Madras, IIT Delhi, IIT Bombay, NIT Trichy, NIT Surathkal, NIT Calicut, Manipal MIT, Christ). Students reach a chapter from the v6 student site by its anchor, so the chapter list, order, ids and titles are fixed by the packet. Everything else is yours to write well.
 
-**No college names anywhere in the book** (the channel's rule, 2 Nov 2026). The packet names the universities so you can set the depth and the exam wording, but the book never names one of them: not in the header, the about section, a chapter, the question bank or the sources. Write "some syllabi call this …" or "only a few universities teach this". Scientific history and publishers are not syllabus colleges (the Ramachandran plot was worked out at the University of Madras; Oxford University Press). The checker refuses a book that names one of the ten.
+**No college names anywhere in the book** (the channel's rule, 2 Nov 2026). The packet names the universities so you can set the depth and the exam wording, but the book never names one of them: not in the header, the about section, a chapter, the question bank or the sources. Write "some syllabi call this …" or "only a few universities teach this". Scientific history and publishers are not syllabus colleges (the Ramachandran plot was worked out at the University of Madras; Oxford University Press). The checker refuses a book that names one of the ten. Nor does the book count them (the channel's rule, 3 Nov 2026): no "taught at 8 of 10 universities" in the header, a chip or a sentence.
 
 ## Inputs you are given
 
@@ -30,10 +30,10 @@ Placeholders:
 
 - `__TITLE__`: `<Subject> · Unit <N>: <Unit name> · University free n easy`
 - `__CRUMB__`: `<Department label> · <Subject> · Unit <N> of <total units>`
-- `__EYEBROW__`: `Universal syllabus · <Subject> · taught at <k> of 10 universities`
+- `__EYEBROW__`: `Universal syllabus · <Subject>` (no count of universities)
 - `__SUBJECT__`, `__UNIT_NO__`, `__UNIT_NAME__`
 - `__LEAD__`: two or three sentences: what the unit is about and what the student can do after it.
-- `__CHIPS__`: `<span class="chip tier">Taught at k of 10</span>`, `<span class="chip">Usually Sem s</span>`, `<span class="chip">n chapters</span>` (no "Main course at" chip: it names colleges).
+- `__CHIPS__`: `<span class="chip">Usually Sem s</span>`, `<span class="chip">n chapters</span>` (no "Main course at" chip, it names colleges; no "Taught at k of 10" chip, it counts them).
 - `__FOOT__`: `Built for the University free n easy YouTube channel from the universal syllabus of <Subject> (Oct 2026). Written with top universities' syllabi and standard textbooks; check a formula against your prescribed book before an exam, and report mistakes on the channel.`
 - `__MAIN__`: the sections below, in this order.
 
