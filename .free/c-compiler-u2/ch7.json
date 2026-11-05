@@ -1,0 +1,306 @@
+{
+ "lead": "A predictive parser reads tokens with a stack and a table. If M[X, a] is empty, or the top terminal X ≠ a, the input cannot continue. The parser reports an error. Programmers want several mistakes per run, so recovery resumes near the fault using FOLLOW sets, token skipping and small grammar changes, without looping or discarding good input.",
+ "prereq": "You need: FIRST and FOLLOW sets (<a href=\"#first-and-follow-sets\">2.5</a>) and the LL(1) table and its algorithm (<a href=\"#predictive-ll-1-parsing-tables\">2.6</a>).",
+ "sections": [
+  {
+   "h3": "Detection: the empty table entry",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The parser of <a href=\"#predictive-ll-1-parsing-tables\">2.6</a> works on X, the symbol on top of the stack, and a, the current lookahead token. M[X, a] is the table entry for that pair."
+    },
+    {
+     "type": "p",
+     "text": "A production in M[X, a] replaces X by its right side. An empty M[X, a] means no production of X can start with a, so the input cannot be derived from X. Report the error at a."
+    },
+    {
+     "type": "p",
+     "text": "When X is a terminal and X ≠ a, the parser expected X and got a. That is also an error."
+    },
+    {
+     "type": "p",
+     "text": "LL(1) detects errors early: one lookahead token fixes the production, so the parser stops at the first token with no table entry and never reads past it. Detection is easy; the rest is recovery."
+    }
+   ]
+  },
+  {
+   "h3": "Panic mode: FOLLOW sets and skipping",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Panic mode discards input until a token that can legally come next, then carries on. FOLLOW(X) holds terminals that may follow X, so it is the stopping rule."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Report the error at the lookahead a.",
+      "Let X be the top of the stack. If X is a nonterminal and a is in FOLLOW(X), pop X; a is not consumed.",
+      "If X is a terminal b, FOLLOW does not apply: discard tokens until the lookahead is b, then match b and continue; if no usable token appears, give up on the statement and restart at the next ; or end of file.",
+      "Otherwise discard a, read the next token, and repeat.",
+      "Stop after a fixed number of errors, so one bad file does not flood the screen."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "In the expression grammar, FOLLOW(T) = {+, ), $}. A parser inside T that sees * knows * cannot follow T, so it drops * and checks the next token."
+    },
+    {
+     "type": "p",
+     "text": "Some implementations also stop skipping when the lookahead is in FIRST(Y) for the topmost nonterminal Y on the stack, because the parser is about to need a token that Y can start with."
+    }
+   ]
+  },
+  {
+   "h3": "Phrase-level recovery and error productions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Panic mode resumes parsing but repairs nothing. Phrase-level recovery makes one local fix, as if one token were typed wrongly."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Insert a token. The parser wants terminal b and sees a. It prints \"missing b\", matches b as if present, and continues with a untouched.",
+      "Delete a token. It prints \"unexpected a\", discards a, and continues."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Take S → id = E ; . The input x = 1 y = 2 has no semicolon. The parser finishes x = 1 expecting ; and sees id. It reports \"missing ;\", inserts the semicolon and matches it, then parses y = 2 normally. One message, no real token lost."
+    },
+    {
+     "type": "p",
+     "text": "Error productions move the repair into the grammar. Add A → error α, where error matches no input. The table entry for A → error α is filled only for lookaheads a in FIRST(α) (plus FOLLOW(A)); for any other a the parser falls back to panic mode. At such an entry the parser prints a message and pushes α. The grammar and table grow, but the recovery point is written once by the grammar author."
+    },
+    {
+     "type": "p",
+     "text": "Global correction finds the shortest insertions and deletions that turn the input into a valid string. It needs a search over many strings and is too slow for a compiler, so it is named here and not used."
+    }
+   ]
+  },
+  {
+   "h3": "Recovery must make progress",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A recovery step can loop for ever. If it removes nothing from the stack and consumes no token, the next iteration reads the same M[X, a], fails the same way, and repeats."
+    },
+    {
+     "type": "p",
+     "text": "Every step must change the stack or the input: popping X changes the stack, skipping a changes the input position, and inserting a token lets the parser match the expected terminal without reading input, so that terminal leaves the stack. Taking an error production A → error α pushes α, which also changes the stack."
+    },
+    {
+     "type": "p",
+     "text": "The second rule: never discard a token the parser can use. Skipping while a is in FIRST(Y) for the topmost nonterminal Y on the stack throws away good input and sets off false errors."
+    },
+    {
+     "type": "p",
+     "text": "A debug build checks both rules cheaply: assert that the pair (stack contents, input position) differs from the previous iteration."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "An empty entry becomes an error message. The parser pops the nonterminal only when the lookahead is in its FOLLOW set; otherwise it drops the lookahead and checks the next token.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Panic-mode recovery",
+   "nodes": [
+    {
+     "id": "empty",
+     "label": "Empty M[X,a]",
+     "style": "accent"
+    },
+    {
+     "id": "rep",
+     "label": "Report syntax error",
+     "style": "live"
+    },
+    {
+     "id": "chk",
+     "label": "a in FOLLOW(X)?"
+    },
+    {
+     "id": "pop",
+     "label": "Pop X"
+    },
+    {
+     "id": "skip",
+     "label": "Skip token a"
+    },
+    {
+     "id": "res",
+     "label": "Resume parse",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "empty",
+     "to": "rep"
+    },
+    {
+     "from": "rep",
+     "to": "chk"
+    },
+    {
+     "from": "chk",
+     "to": "pop",
+     "label": "yes"
+    },
+    {
+     "from": "chk",
+     "to": "skip",
+     "label": "no"
+    },
+    {
+     "from": "pop",
+     "to": "res"
+    },
+    {
+     "from": "skip",
+     "to": "chk",
+     "label": "next token",
+     "style": "dashed"
+    }
+   ],
+   "aria": "An empty table entry triggers an error report; the parser pops the nonterminal if the lookahead is in its FOLLOW set, otherwise it skips tokens and checks again."
+  }
+ },
+ "examples": [
+  {
+   "question": "Grammar: E → T E′, E′ → + T E′ | ε, T → F T′, T′ → * F T′ | ε, F → ( E ) | id, with FIRST(T) = {id, (} and FOLLOW(T) = {+, ), $}. Parse id + * id $ with the LL(1) table and panic mode. Show the error and how parsing resumes.",
+   "steps": [
+    "M[E, id] = E → T E′; then T → F T′, F → id, match id, T′ → ε, E′ → + T E′, match +. Stack $E′T, input * id $.",
+    "M[T, *] is empty, so report a syntax error at *.",
+    "* is not in FOLLOW(T) = {+, ), $}, so discard it. Input becomes id $. Now M[T, id] = T → F T′, so push F T′ and continue normally.",
+    "Accept: F → id, match id, T′ → ε at $, E′ → ε at $, final $ matches $."
+   ],
+   "answer": "The parser reports one error and discards one token, the stray *. The repaired input is id + id $; the part still to read, id $, is parsed normally and the input is accepted.",
+   "check": "table = {\n ('E','id'): ('T','E1'), ('E','('): ('T','E1'),\n ('E1','+'): ('+','T','E1'), ('E1',')'): (), ('E1','$'): (),\n ('T','id'): ('F','T1'), ('T','('): ('F','T1'),\n ('T1','+'): (), ('T1','*'): ('*','F','T1'), ('T1',')'): (), ('T1','$'): (),\n ('F','id'): ('id',), ('F','('): ('(','E',')'),\n}\nnonterms = {'E','E1','T','T1','F'}\nfollow = {'E':{')','$'}, 'E1':{')','$'}, 'T':{'+',')','$'}, 'T1':{'+',')','$'}, 'F':{'+','*',')','$'}}\nstack = ['$','E']\ntokens = ['id','+','*','id','$']\ni = 0; errors = 0; skipped = 0; guard = 0\nwhile stack and guard < 1000:\n    guard += 1\n    X = stack[-1]; a = tokens[i]\n    if X == a:\n        stack.pop(); i += 1\n    elif X in nonterms:\n        rule = table.get((X,a))\n        if rule is None:\n            errors += 1\n            if a in follow[X]:\n                stack.pop()\n            else:\n                i += 1; skipped += 1\n        else:\n            stack.pop()\n            for s in reversed(rule):\n                stack.append(s)\n    else:\n        break\nprint(errors)\nprint(skipped)",
+   "values": [
+    1,
+    1
+   ],
+   "dry_run": {
+    "head": [
+     "Step",
+     "Stack",
+     "Input",
+     "Action"
+    ],
+    "rows": [
+     [
+      "1",
+      "$E",
+      "id + * id $",
+      "E → T E′"
+     ],
+     [
+      "2",
+      "$E′T",
+      "* id $",
+      "M[T,*] empty: error"
+     ],
+     [
+      "3",
+      "$E′T",
+      "* id $",
+      "* ∉ FOLLOW(T): skip *"
+     ],
+     [
+      "4",
+      "$E′T",
+      "id $",
+      "M[T,id] = T → F T′"
+     ],
+     [
+      "5",
+      "$E′T′F",
+      "id $",
+      "F → id"
+     ],
+     [
+      "6",
+      "$E′T′id",
+      "id $",
+      "match id"
+     ],
+     [
+      "7",
+      "$E′T′",
+      "$",
+      "T′ → ε"
+     ],
+     [
+      "8",
+      "$E′",
+      "$",
+      "E′ → ε"
+     ],
+     [
+      "9",
+      "$",
+      "$",
+      "accept"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Skipping a token without changing the stack or input, so the same empty entry repeats for ever.",
+  "Using FIRST(X) instead of FOLLOW(X) to pop X; panic mode uses FOLLOW(X).",
+  "Skipping a token in FIRST of a nonterminal still on the stack, losing valid input and causing false errors.",
+  "Mixing panic mode (skip input, no repair) with phrase-level recovery (insert or delete one token).",
+  "Treating the recovered tree as correct; a skipped token is missing, so suppress code generation for that construct."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does an empty entry M[X, a] mean in an LL(1) table?",
+   "marks": 2,
+   "a": "No production of X can begin with terminal a, so the lookahead a is a syntax error at that point."
+  },
+  {
+   "level": "remember",
+   "q": "Which set decides whether the parser pops X during panic mode?",
+   "marks": 2,
+   "a": "FOLLOW(X). If the lookahead is in FOLLOW(X), X is popped and a is not consumed."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an LL(1) parser report the error at the first bad token and not later?",
+   "marks": 3,
+   "a": "One lookahead token fixes the production to apply, so the parser stops at the first token a for which M[X, a] is empty and never reads past it. The error is detected at a; a itself may be a valid token, since a token missing just before it can leave this one with no legal table entry."
+  },
+  {
+   "level": "apply",
+   "q": "The stack is $E′T and the input is * id $. FIRST(T) = {id, (} and FOLLOW(T) = {+, ), $}. Trace the recovery up to the next successful table move.",
+   "marks": 5,
+   "a": "M[T, *] is empty, so report an error. * is not in FOLLOW(T), so skip * and the input becomes id $. Now M[T, id] = T → F T′, so push F T′ and continue."
+  },
+  {
+   "level": "apply",
+   "q": "The grammar is S → id = E ; . The input has tokens x = 1 y = 2 $. The parser finishes x = 1 expecting ; but sees id. Give a phrase-level repair and its message.",
+   "marks": 4,
+   "a": "Report \"missing ;\", insert ; and match it, then continue parsing the statement that starts at y. No token of the real input is discarded."
+  },
+  {
+   "level": "analyze",
+   "q": "A recovery step removes nothing from the stack and consumes no token. Why is that fatal, and which two rules prevent it?",
+   "marks": 5,
+   "a": "Rule one prevents the loop: every step must change the stack or the input position. Rule two keeps the recovery sound: never skip a token that a nonterminal still on the stack can start with, or good input is lost and false errors follow."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare panic mode with error productions, and say when each is preferred.",
+   "marks": 6,
+   "a": "Panic mode needs no grammar change, skips input, and can lose later errors inside the skipped region. Error productions encode the repair in the grammar, so they are precise but enlarge the grammar and the table. Use panic mode for a general-purpose parser; use an error production when one mistake is common, such as a missing semicolon."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers rarely use table-driven recovery; they use recursive descent with hand-written synchronisation and print messages such as \"expected ; after expression\". Modern front ends go further: they build a partial syntax tree, mark the places they could not parse, and carry on, and some later phase turns those marks into a suggested fix. Error-correcting parsers that minimise edit distance are studied again for source-code repair and refactoring tools. Search for parser error recovery, error nodes in tree-sitter, and syntax error repair."
+}

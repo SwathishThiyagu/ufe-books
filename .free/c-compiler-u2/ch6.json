@@ -1,0 +1,254 @@
+{
+ "lead": "An LL(1) parser is a stack machine with a two-dimensional table. The table M[A,a] says which production to apply when the stack top is nonterminal A and the next input token is a. The parser needs no backtracking: one token is enough to choose. This chapter builds that table from FIRST and FOLLOW sets and runs the parser on the expression grammar. The same idea drives hand-written predictive parsers and table-driven front ends in compilers, query engines, and configuration-file readers.",
+ "prereq": "You need: <a href=\"#first-and-follow-sets\">2.5 FIRST and FOLLOW sets</a>, <a href=\"#writing-a-grammar-ambiguity-left-recursion-left-factoring\">2.3 repaired grammar</a>, and <a href=\"#top-down-parsing-and-recursive-descent-parsers\">2.4 procedure view</a>.",
+ "sections": [
+  {
+   "h3": "The parser loop",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An LL(1) parser reads input left to right, builds a leftmost derivation, and uses one lookahead token. It keeps a stack and a table M[A,a]. A is a nonterminal; a is a terminal or $. Entry M[A,a] is the production to apply, or it is empty for an error. The stack starts with $S, where S is the start symbol and $ marks the bottom. Input ends with $."
+    },
+    {
+     "type": "p",
+     "text": "At each move X is the stack top and a is the lookahead. If X = a = $, accept. If X = a, pop X and advance the input. If X is a nonterminal and M[X,a] = X → α, pop X and push α reversed so its first symbol is on top. If X is a terminal and X ≠ a, report a syntax error. An empty entry for a nonterminal is a syntax error; recovery is in <a href=\"#error-recovery-in-predictive-parsing\">2.7</a>. The stack is written bottom to top, so the top symbol is on the right."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set the stack to $S and the input to w$, where w is the token string.",
+      "Let X be the stack top and a the current input token.",
+      "If X = a = $, accept.",
+      "If X = a, pop X and advance the input.",
+      "If X is a nonterminal and M[X,a] = X → α, pop X and push α reversed.",
+      "If X is a terminal and X ≠ a, report a syntax error.",
+      "If X is a nonterminal and M[X,a] is empty, report a syntax error."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi call this a predictive parser, an LL(1) parser, or a table-driven parser. “Predictive” means the table predicts the production from one token; the parser never backtracks."
+    }
+   ]
+  },
+  {
+   "h3": "Building the table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For each production A → α, fill cells from FIRST(α). If α can derive ε, also fill cells from FOLLOW(A). A cell must receive at most one production. Two different productions in one cell is a conflict, and the grammar is not LL(1)."
+    },
+    {
+     "type": "formula",
+     "text": "M[A,a] = {A → α | a ∈ FIRST(α)} ∪ {A → α | α is nullable and a ∈ FOLLOW(A)}",
+     "where": "M[A,a] is the table entry; A is a nonterminal; a is a terminal or $; α is a production right side; nullable means α derives ε."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "For A → α, put A → α in M[A,a] for every terminal a in FIRST(α).",
+      "If α is nullable, put A → α in M[A,b] for every b in FOLLOW(A), including $.",
+      "Do not use ε as an input column. ε is not a token; nullable productions go under terminals from FOLLOW(A).",
+      "If the same production arrives from both rules, it is not a conflict.",
+      "If two different productions arrive in one cell, stop: the grammar is not LL(1)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A grammar is LL(1) when every cell has at most one production. Ambiguous grammars cannot be LL(1). Left recursion and common prefixes that are not left factored usually create conflicts, so repair the grammar first (2.3)."
+    }
+   ]
+  },
+  {
+   "h3": "Conflicts and what they mean",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A conflict means the parser cannot choose with one lookahead token. Common causes are a common prefix not left factored, left recursion, and a nullable production whose FOLLOW set overlaps the FIRST set of another production for the same nonterminal. Rewriting the grammar often removes the conflict; some languages need a stronger parser."
+    },
+    {
+     "type": "p",
+     "text": "The table is small: its width is the number of terminals plus $, and its height is the number of nonterminals. A programming language may need a few hundred rows, which is easy to store. An empty M[X,a] also gives a precise error message: the parser expected a token that can begin some production of X (or, if X is nullable, a token in FIRST(X) ∪ FOLLOW(X)), but saw a. A recursive descent parser stores the same choices in code; the table stores them as data."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The parser checks the stack top X first. If X is a terminal, it compares X with the lookahead a: equal means pop and advance (accept when both are $), unequal means error. If X is a nonterminal, it looks up M[X,a] to expand, or reports an error when the entry is empty.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "LL(1) parser loop",
+   "nodes": [
+    {
+     "id": "st",
+     "label": "Stack $S",
+     "note": "top X"
+    },
+    {
+     "id": "la",
+     "label": "Lookahead a"
+    },
+    {
+     "id": "term",
+     "label": "X is a terminal?",
+     "style": "accent"
+    },
+    {
+     "id": "tb",
+     "label": "M[X,a]"
+    },
+    {
+     "id": "push",
+     "label": "Push RHS reversed"
+    },
+    {
+     "id": "match",
+     "label": "Pop X, advance"
+    },
+    {
+     "id": "ok",
+     "label": "Accept",
+     "style": "next"
+    },
+    {
+     "id": "bad",
+     "label": "Error",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "st",
+     "to": "term",
+     "label": "top X"
+    },
+    {
+     "from": "la",
+     "to": "term",
+     "label": "a"
+    },
+    {
+     "from": "term",
+     "to": "tb",
+     "label": "nonterminal"
+    },
+    {
+     "from": "term",
+     "to": "match",
+     "label": "X = a"
+    },
+    {
+     "from": "term",
+     "to": "bad",
+     "label": "X ≠ a"
+    },
+    {
+     "from": "tb",
+     "to": "push",
+     "label": "production"
+    },
+    {
+     "from": "push",
+     "to": "la",
+     "label": "next",
+     "style": "dashed"
+    },
+    {
+     "from": "match",
+     "to": "ok",
+     "label": "both $"
+    },
+    {
+     "from": "match",
+     "to": "la",
+     "label": "not $",
+     "style": "dashed"
+    },
+    {
+     "from": "tb",
+     "to": "bad",
+     "label": "empty"
+    }
+   ],
+   "aria": "The parser checks the stack top X first. If X is a terminal, it compares X with the lookahead a: equal means pop and advance (accept when both are $), unequal means error. If X is a nonterminal, it looks up M[X,a] to expand, or reports an error when the entry is empty."
+  }
+ },
+ "examples": [
+  {
+   "question": "Grammar: E → T E′, E′ → + T E′ | ε, T → F T′, T′ → * F T′ | ε, F → id | ( E ). (a) Compute FIRST and FOLLOW. (b) Construct the LL(1) table. (c) Parse id + id * id $ and give the first six rows of stack, remaining input, and action.",
+   "steps": [
+    "FIRST sets: FIRST(E) = FIRST(T) = FIRST(F) = {id, (}; FIRST(E′) = {+, ε}; FIRST(T′) = {*, ε}.",
+    "FOLLOW sets: FOLLOW(E) = {$, )}; FOLLOW(E′) = {$, )}; FOLLOW(T) = {+, $, )}; FOLLOW(T′) = {+, $, )}; FOLLOW(F) = {+, *, ), $}.",
+    "Filled cells (13): M[E,id] = M[E,(] = E → T E′; M[E′,+] = E′ → + T E′; M[E′,)] = M[E′,$] = E′ → ε; M[T,id] = M[T,(] = T → F T′; M[T′,*] = T′ → * F T′; M[T′,+] = M[T′,)] = M[T′,$] = T′ → ε; M[F,id] = F → id; M[F,(] = F → ( E ). All other cells are empty; conflicts = 0.",
+    "Trace rows, stack bottom to top with top at right. In every row the stack is shown before the action of that row is applied; the input column is the unconsumed input, ending in $.",
+    "1. Stack $E; input id + id * id $; action output E → T E′.",
+    "2. Stack $E′T; input id + id * id $; action output T → F T′.",
+    "3. Stack $E′T′F; input id + id * id $; action output F → id.",
+    "4. Stack $E′T′id; input id + id * id $; action match id, pop, advance.",
+    "5. Stack $E′T′; input + id * id $; action output T′ → ε.",
+    "6. Stack $E′; input + id * id $; action output E′ → + T E′."
+   ],
+   "answer": "FIRST and FOLLOW are as listed, the table has 13 filled entries and 0 conflicts, so the grammar is LL(1); the first six moves are rows 1–6 above.",
+   "check": "nonterms = ['E','Ep','T','Tp','F']\nterms = ['id','+','*','(',')','$']\nfirst = {'E': {'id','('}, 'Ep': {'+','eps'}, 'T': {'id','('}, 'Tp': {'*','eps'}, 'F': {'id','('}}\nfollow = {'E': {'$',')'}, 'Ep': {'$',')'}, 'T': {'+','$',')'}, 'Tp': {'+','$',')'}, 'F': {'+','*','$',')'}}\nprods = [\n ('E', ('T','Ep'), 'E -> T Ep'),\n ('Ep', ('+','T','Ep'), 'Ep -> + T Ep'),\n ('Ep', (), 'Ep -> epsilon'),\n ('T', ('F','Tp'), 'T -> F Tp'),\n ('Tp', ('*','F','Tp'), 'Tp -> * F Tp'),\n ('Tp', (), 'Tp -> epsilon'),\n ('F', ('id',), 'F -> id'),\n ('F', ('(', 'E', ')'), 'F -> ( E )')\n]\ndef first_seq(seq):\n    res = set()\n    nullable = True\n    for X in seq:\n        if X in terms:\n            res.add(X)\n            nullable = False\n            break\n        else:\n            res |= (first[X] - {'eps'})\n            if 'eps' not in first[X]:\n                nullable = False\n                break\n    if nullable:\n        res.add('eps')\n    return res\nM = {}\nconflicts = 0\nfor A, rhs, name in prods:\n    fs = first_seq(rhs)\n    for a in fs - {'eps'}:\n        key = (A, a)\n        if key in M and M[key] != name:\n            conflicts += 1\n        M[key] = name\n    if 'eps' in fs:\n        for b in follow[A]:\n            key = (A, b)\n            if key in M and M[key] != name:\n                conflicts += 1\n            M[key] = name\nprint(len(M))\nprint(conflicts)",
+   "values": [
+    13,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Put a nullable production under FIRST only and forget FOLLOW(A); then M[A,b] stays empty for b ∈ FOLLOW(A), and valid input fails.",
+  "Write two different productions into M[A,a] and ignore the conflict. An LL(1) table must have at most one production per cell.",
+  "Use ε as an input column. ε is not a token; nullable productions go under terminals from FOLLOW(A), including $.",
+  "Forget $ in FOLLOW of the start symbol, so an input ending after a nullable tail has no table entry.",
+  "Assume every context-free grammar has an LL(1) table. Ambiguous or left-recursive grammars must be rewritten first (see 2.3)."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does entry M[A,a] contain in an LL(1) parsing table?",
+   "marks": 2,
+   "a": "It contains the production A → α to apply when the stack top is nonterminal A and the lookahead token is a, or it is empty for an error."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a nullable production A → ε use FOLLOW(A) when filling the table?",
+   "marks": 3,
+   "a": "Because A can vanish, so the next input token comes from whatever can follow A. FIRST(ε) has no terminal, so ε cannot be a column; FOLLOW(A) supplies the legal lookahead tokens."
+  },
+  {
+   "level": "apply",
+   "q": "For grammar S → a S b | ε, compute FIRST(S), FOLLOW(S), and the filled table cells.",
+   "marks": 4,
+   "a": "FIRST(S) = {a, ε}; FOLLOW(S) = {b, $}. Cells: M[S,a] = S → a S b; M[S,b] = S → ε; M[S,$] = S → ε. No conflict."
+  },
+  {
+   "level": "analyze",
+   "q": "M[A,a] contains both A → α and A → β, with α and β different. What does this mean, and what two grammar features commonly cause it?",
+   "marks": 4,
+   "a": "The grammar is not LL(1): one lookahead token cannot choose. Common causes are a common prefix not left factored and a nullable production whose FOLLOW set overlaps another production’s FIRST set."
+  },
+  {
+   "level": "apply",
+   "q": "Given M[E,id] = E → T E′, M[T,id] = T → F T′, M[F,id] = F → id, stack $E, input id $, show the first three moves.",
+   "marks": 3,
+   "a": "1. Stack $E, input id $, output E → T E′; stack becomes $E′T. 2. Stack $E′T, output T → F T′; stack becomes $E′T′F. 3. Stack $E′T′F, output F → id; stack becomes $E′T′id."
+  },
+  {
+   "level": "remember",
+   "q": "List the four kinds of move in the predictive parsing algorithm.",
+   "marks": 2,
+   "a": "Accept when X = a = $; match and pop when X = a; expand a nonterminal using M[X,a]; report an error when M[X,a] is empty."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a left-recursive grammar not give a conflict-free LL(1) table without rewriting?",
+   "marks": 4,
+   "a": "A production A → Aα would place A → Aα under FIRST(Aα), which contains FIRST(A). The parser could expand A by Aα again with the same lookahead and loop, so left recursion must be removed first."
+  }
+ ],
+ "beyond": "Not for the exam. Parser generators such as ANTLR use LL(*) and adaptive LL, which extend the one-token table to more lookahead. Hand-written parsers in IDEs and linters often keep a table for fast error messages. Search next for “LL(1) grammar”, “predictive parsing table construction”, and “adaptive LL parsing”."
+}

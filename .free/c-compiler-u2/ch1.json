@@ -1,0 +1,245 @@
+{
+ "lead": "The parser is the compiler phase that checks whether a token stream follows a grammar and builds a parse tree. It exists because later phases need structure, not a flat list of tokens. Its input is the token stream from the lexer; its output is a parse tree or a trace of productions. When the stream breaks the grammar, the parser reports a syntax error and recovers instead of crashing. Every compiler, from a small student project to a production toolchain, has this phase; the same ideas drive editor syntax checkers and query parsers.",
+ "prereq": "You need: Unit 1 for tokens, lexemes and the compiler phase diagram.",
+ "sections": [
+  {
+   "h3": "The parser's two jobs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "After lexical analysis, the source program is a stream of tokens. A token is a pair: a kind (keyword, identifier, number, operator) and a lexeme (the actual characters). The parser is the next phase. Its input is this token stream. Its output is a parse tree, or a trace of the productions used. Some syllabi call this the syntax analyzer."
+    },
+    {
+     "type": "p",
+     "text": "The parser has two jobs. Recognition: decide whether the token stream follows the grammar. Tree building: record which production matched at each step, so later phases can walk the tree. The grammar is a set of rules; a rule like D → type id = num ; says a declaration is a type token, an identifier token, an equals token, a number token, and a semicolon. The parser does not scan characters; it asks the lexer for the next token and matches token kinds. It also consults the symbol table for names, shown as a dashed lookup in the figure. See <a href=\"#context-free-grammars-derivations-and-parse-trees\">2.2</a> for grammars and trees."
+    },
+    {
+     "type": "formula",
+     "text": "D → type id = num ;",
+     "where": "D is a declaration; type, id, =, num and ; are terminal token kinds; the arrow means 'rewrites to'."
+    }
+   ]
+  },
+  {
+   "h3": "Lexical, syntactic and semantic errors",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Errors near the parser fall into three groups. A lexical error is a bad character or a misspelled keyword, for example <code>whle</code> where <code>while</code> is expected. The lexer may return an identifier token for <code>whle</code>; the parser then sees an identifier where a keyword was required. A syntactic error is a token sequence that no rule allows: a missing semicolon, an unmatched parenthesis, or <code>int = 3;</code> where the identifier is missing. A semantic error is a well-formed string with a wrong meaning: <code>int x = \"hi\";</code> may parse if the grammar allows any expression, but the type checker rejects it. Semantic checks belong to Unit 4, not to the parser."
+    },
+    {
+     "type": "p",
+     "text": "Do not call a parser error a compiler crash. The parser should report the error and continue, because one mistake should not hide later mistakes. A parser that silently guesses a missing token is also wrong: it must say what it expected and where."
+    }
+   ]
+  },
+  {
+   "h3": "What error handling must do",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An error handler has three goals. Report clearly: give the line, the column or token position, the token found, and the set of tokens that would have been accepted. Recover: change the state so parsing can continue far enough to find more errors. Make progress: every recovery step must consume a token, insert a token, or pop a grammar symbol. If none of these happens, the parser repeats the same error forever."
+    },
+    {
+     "type": "p",
+     "text": "Recovery should be local. A common rule is to skip tokens until a synchronising token, such as <code>;</code> or <code>}</code>, then resume. The parser must not delete a large block of code to hide one missing comma. The error handler is a separate module called by the parser. Keeping it separate lets the parser stay simple and lets the handler choose the message and the recovery action."
+    }
+   ]
+  },
+  {
+   "h3": "Four recovery strategies",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Four strategies are standard. Panic mode skips tokens until a token in a synchronising set, then resumes at a safe point. Phrase-level recovery makes a small local repair: delete one token, insert one token, or replace one token. Error productions add grammar rules for common mistakes, so the parser recognises the mistake and reports it with a tailored message. Global correction finds the smallest sequence of edits that turns the bad token stream into a valid one; it is expensive and rarely used in production compilers. Details and FOLLOW-set synchronising appear in <a href=\"#error-recovery-in-predictive-parsing\">2.7</a>."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Strategy",
+      "Action",
+      "Cost",
+      "Use"
+     ],
+     "rows": [
+      [
+       "Panic mode",
+       "skip to sync token",
+       "low",
+       "common"
+      ],
+      [
+       "Phrase level",
+       "insert/delete one token",
+       "low",
+       "common"
+      ],
+      [
+       "Error productions",
+       "match known bad pattern",
+       "medium",
+       "selected errors"
+      ],
+      [
+       "Global correction",
+       "minimum edit sequence",
+       "high",
+       "teaching"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The parser reads the token stream, writes a parse tree, calls the error handler on failure, and looks up names in the symbol table.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Where the parser sits",
+   "nodes": [
+    {
+     "id": "src",
+     "label": "Source program",
+     "style": "muted"
+    },
+    {
+     "id": "lex",
+     "label": "Lexical analyzer"
+    },
+    {
+     "id": "tok",
+     "label": "Token stream"
+    },
+    {
+     "id": "par",
+     "label": "Parser",
+     "style": "accent"
+    },
+    {
+     "id": "tree",
+     "label": "Parse tree"
+    },
+    {
+     "id": "err",
+     "label": "Error handler",
+     "style": "live"
+    },
+    {
+     "id": "sym",
+     "label": "Symbol table",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "src",
+     "to": "lex"
+    },
+    {
+     "from": "lex",
+     "to": "tok"
+    },
+    {
+     "from": "tok",
+     "to": "par"
+    },
+    {
+     "from": "par",
+     "to": "tree"
+    },
+    {
+     "from": "par",
+     "to": "err",
+     "label": "on error",
+     "style": "dashed"
+    },
+    {
+     "from": "par",
+     "to": "sym",
+     "label": "lookup",
+     "style": "dashed"
+    }
+   ],
+   "aria": "The parser receives a token stream and produces a parse tree, with a side path to error handling and a dashed lookup into the symbol table."
+  }
+ },
+ "examples": [
+  {
+   "question": "A C declaration fragment is <code>int x = 3;</code>. (a) Write the token stream as (kind, lexeme) pairs. (b) The fragment is changed to <code>int = 3;</code>. Using the declaration grammar D → type id = num ;, give the token position (1-based) where a recursive-descent parser reports the first syntax error and the number of tokens in the bad stream.",
+   "steps": [
+    "Lex the good fragment <code>int x = 3;</code>. Tokens as (kind, lexeme): (type, int), (id, x), (assign, =), (num, 3), (semi, ;). There are 5 tokens.",
+    "Lex the bad fragment <code>int = 3;</code>. Tokens: (type, int), (assign, =), (num, 3), (semi, ;). There are 4 tokens.",
+    "Grammar D → type id = num ; expects five token kinds in order: type, id, =, num, ;.",
+    "Match the bad stream from position 1. Position 1: expected type, found type int: match. Position 2: expected id, found assign =: fail.",
+    "The first error is at token position 2 (1-based). The bad stream has 4 tokens; the parser stops at position 2."
+   ],
+   "answer": "The first syntax error is at token position 2, the <code>=</code> token; the bad token stream has 4 tokens.",
+   "check": "tokens_bad = [\"int\", \"=\", \"3\", \";\"]\ngrammar = [\"type\", \"id\", \"=\", \"num\", \";\"]\nfor pos, (want, got) in enumerate(zip(grammar, tokens_bad), start=1):\n    if want == \"type\" and got != \"int\":\n        print(pos)\n        break\n    if want == \"id\" and got != \"x\":\n        print(pos)\n        break\n    if want == \"=\" and got != \"=\":\n        print(pos)\n        break\n    if want == \"num\" and got != \"3\":\n        print(pos)\n        break\n    if want == \";\" and got != \";\":\n        print(pos)\n        break\nprint(len(tokens_bad))",
+   "values": [
+    2,
+    4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Blaming the parser for a type error such as <code>int x = \"hi\";</code>. The grammar can accept the tokens; the type checker in Unit 4 rejects the meaning.",
+  "Treating a parser error as a compiler crash. A parser must report the error, recover, and keep going far enough to find more errors.",
+  "Confusing a lexical error with a syntactic error. A misspelled keyword may be lexed as an identifier, so the parser reports an unexpected identifier.",
+  "Writing a recovery routine that does not consume a token, insert a token, or pop a symbol. That routine repeats the same error forever.",
+  "Assuming every parser prints a full parse tree. Some parsers only accept or reject, and some print a trace of productions instead."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the parser's input and its output.",
+   "marks": 2,
+   "a": "Input: a token stream from the lexical analyzer. Output: a parse tree, or a trace of productions, or an accept/reject decision."
+  },
+  {
+   "level": "understand",
+   "q": "Why is <code>int x = \"hi\";</code> not a syntax error for a parser whose grammar allows any expression?",
+   "marks": 3,
+   "a": "The token sequence can be derived from the grammar if expression covers a string token. The wrong meaning is a type mismatch, checked in semantic analysis in Unit 4."
+  },
+  {
+   "level": "apply",
+   "q": "Using D → type id = num ;, the token stream is <code>int x 3 ;</code>. Give the 1-based position of the first syntax error.",
+   "marks": 3,
+   "a": "Tokens: int at 1, x at 2, 3 at 3, ; at 4. After type and id, the parser expects = at position 3 but finds num 3. First error: position 3."
+  },
+  {
+   "level": "analyze",
+   "q": "A recovery routine reports an error at token 5 and returns without consuming a token or changing the stack. What happens, and what is the fix?",
+   "marks": 4,
+   "a": "The parser calls the routine again at the same token, so it loops forever. The fix is to make progress: consume tokens up to a synchronising token, insert a token, or pop a symbol."
+  },
+  {
+   "level": "remember",
+   "q": "Name four standard error recovery strategies.",
+   "marks": 2,
+   "a": "Panic mode, phrase-level recovery, error productions, and global correction."
+  },
+  {
+   "level": "understand",
+   "q": "Give one lexical error example and one syntactic error example.",
+   "marks": 3,
+   "a": "Lexical: <code>whle</code> written for <code>while</code>, possibly returned as an identifier. Syntactic: a missing semicolon in <code>int x = 3</code>."
+  },
+  {
+   "level": "apply",
+   "q": "Using D → type id = num ;, the token stream is <code>int x = ;</code>. Give the 1-based position of the first error and the token kind expected there.",
+   "marks": 4,
+   "a": "Tokens: int at 1, x at 2, = at 3, ; at 4. After =, the parser expects num at position 4 but finds ;. Error position 4; expected kind num."
+  },
+  {
+   "level": "analyze",
+   "q": "Why should a parser try to continue after the first syntax error instead of stopping immediately?",
+   "marks": 4,
+   "a": "One mistake can hide later mistakes. Local recovery lets the compiler report several independent errors in one run, but every recovery step must make progress so it does not loop."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers use parser generators and hand-written recursive descent with sophisticated recovery; error messages often list the expected token set. IDEs run parsers continuously on incomplete code, so recovery must be fast and local. Incremental parsing and error-correcting parsing are active topics. Search 'panic mode parser recovery', 'ANTLR error recovery', or 'incremental parsing'."
+}
