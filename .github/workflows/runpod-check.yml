@@ -1,0 +1,34 @@
+name: RunPod check
+# Tests the RunPod server from GitHub and saves the result on the branch free/diag (.free/diag.txt).
+on:
+  push:
+    branches: [main]
+    paths: ["pipeline/check-runpod.txt"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the server
+        env:
+          OPENAI_BASE_URL: ${{ secrets.RUNPOD_BASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.RUNPOD_VLLM_KEY }}
+        run: |
+          python3 - <<'PY' > diag.txt 2>&1
+          import os, sys, json, time
+          sys.path.insert(0, 'pipeline'); import llm
+          base = os.environ.get('OPENAI_BASE_URL', ''); key = os.environ.get('OPENAI_API_KEY', '')
+          print('base set:', bool(base), 'ends with /v1:', base.rstrip('/').endswith('/v1'), 'host:', base.split('/')[2] if '//' in base else base)
+          print('key set:', bool(key), 'length:', len(key), 'starts ufe-:', key.startswith('ufe-'))
+          st, js = llm._openai('GET', base.rstrip('/') + '/models', key, timeout=30); print('models:', st, str(js)[:300])
+          t0 = time.time()
+          st, js = llm._openai('POST', base.rstrip('/') + '/chat/completions', key, {'model': 'openai/gpt-oss-120b', 'max_tokens': 200, 'messages': [{'role': 'user', 'content': 'Reply with the JSON {"ok": true}'}], 'response_format': {'type': 'json_object'}}, timeout=120)
+          print('chat:', st, round(time.time() - t0, 1), 's', str(js)[:500])
+          PY
+          cat diag.txt
+          git config user.name ufe-free-books; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -B free/diag; mkdir -p .free; mv diag.txt .free/diag.txt; git add .free/diag.txt; git commit -qm "diag"; git push -q -f origin free/diag

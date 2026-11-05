@@ -64,6 +64,27 @@ def college_problems(text):
     return p
 
 
+def unescape_code(s):
+    """Open models sometimes double-escape code inside JSON, so a program arrives as one line full of \\n."""
+    if isinstance(s, str) and '\n' not in s.strip() and '\\n' in s:
+        s = s.replace('\\r\\n', '\n').replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
+    return s
+
+
+def normalise(ch):
+    if not isinstance(ch, dict): return ch
+    for sec in ch.get('sections') or []:
+        for b in (sec.get('blocks') or []) if isinstance(sec, dict) else []:
+            if isinstance(b, dict) and b.get('type') == 'code':
+                b['code'] = unescape_code(b.get('code', '')); b['output'] = unescape_code(b.get('output', ''))
+    for ex in ch.get('examples') or []:
+        if not isinstance(ex, dict): continue
+        ex['check'] = unescape_code(ex.get('check', ''))
+        ex['output'] = unescape_code(ex.get('output', ''))
+        if isinstance(ex.get('code'), dict): ex['code']['code'] = unescape_code(ex['code'].get('code', ''))
+    return ch
+
+
 def code_items(ch):
     """Every runnable program in a chapter: (container dict, code key, output key)."""
     for sec in ch.get('sections') or []:
@@ -83,6 +104,7 @@ def check_chapter(P, k, final=False):
     def f(ch):
         p = []
         if not isinstance(ch, dict): return ['reply must be a JSON object']
+        normalise(ch)
         for key in ('lead', 'sections', 'figure', 'examples', 'traps', 'quiz', 'beyond'):
             if not ch.get(key): p.append(f'"{key}" is missing or empty')
         secs = ch.get('sections') or []
@@ -292,6 +314,16 @@ def main():
                             except (F.FigureError, AttributeError, KeyError):
                                 flag(f'figure {i}: labels spill outside the figure')
                     continue
+                m = re.match(r'chapter "([^"]+)": (.*)', pr)
+                if m and 'words' not in pr:
+                    k = next((i for i, s_ in enumerate(subs, 1) if s_['id'] == m.group(1)), None)
+                    if k and not S.get(f'chfix{k}.{rnd}'):
+                        new = ask.json(f'chfix{k}', PR.SYSTEM, PR.revise(P, k, S.get(f'ch{k}'), [{'severity': 'high', 'where': 'whole chapter', 'problem': m.group(2), 'fix': 'meet the requirement exactly'}]), check=check_chapter(P, k))
+                        S.put(f'chfix{k}.{rnd}', True)
+                        if isinstance(new, dict) and not [x for x in check_chapter(P, k)(new) if not x.startswith('~')]:
+                            for mm in settle_code(new, log, k): flag(mm)
+                            S.put(f'ch{k}', new); acted = True
+                        continue
             if not acted:
                 for pr in probs: flag('checker: ' + pr)
                 break
