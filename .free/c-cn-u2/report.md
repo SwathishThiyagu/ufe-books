@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-cn/c-cn-u2.html`
 - Status: ok
-- Model calls so far: 36 (113,431 tokens in, 115,282 out), 5.0 minutes
+- Model calls so far: 37 (115,739 tokens in, 117,494 out), 5.5 minutes
 
 ## Checker
 
 ```
-c-cn-u2.html: 8 chapters, 10477 words, 9 figures, 124 KB
+c-cn-u2.html: 8 chapters, 10477 words, 9 figures, 127 KB
 OK
 ```
 
@@ -21,7 +21,6 @@ OK
 AttributeError: 'float' object has no attribute 'bit_length'
 - chapter 4: give 6 to 8 quiz questions
 - chapter 4: the figure cannot be drawn: a row of the block diagram has more than 5 boxes; use fewer nodes or set "layers"
-- chapter 2: the reviewer found 1 serious problem(s) and the revision did not pass the checks; read the review in the state folder
 
 ## Reviewer notes (after any revision)
 
@@ -30,10 +29,7 @@ AttributeError: 'float' object has no attribute 'bit_length'
 - ch 1 [low] Bullet list under Section 1: Bullet "Discrete‑time ↔ digital" repeats the same misleading equivalence.
 - ch 1 [low] Section 3 (Quantisation and PCM): Step‑size formula Δ = (V_max – V_min)/L omits the common factor (L‑1) used when V_max and V_min are the extreme quantisation levels.
 - ch 1 [low] Section 3 (Quantisation and PCM): The unit for the step size Δ is not mentioned.
-- ch 2 [high] Section 2: Distortion and noise: The statement "Shot noise appears in semiconductor devices and is proportional to the square root of the current" is inaccurate. Shot noise current spectral density is proportional to the current (i.e., i_n² = 2qI·B), and the RMS noise current is proportional to the square root of the product of current and bandwidth.
-- ch 2 [low] Section 1: Attenuation and its measurement: The phrase "expressed in decibels (dB) per kilometre" does not explicitly state the unit dB/km for the attenuation coefficient.
-- ch 2 [low] Worked example 1: The placeholder line "dry run: {'head': [], 'rows': []}" is irrelevant to the explanation and may confuse students.
-- ch 2 [low] Quiz Q4: The term "distortion loss" is not standard; distortion is usually described in terms of waveform alteration, not a dB loss.
+- ch 2 [low] Section 2: Distortion and noise, paragraph on shot noise: The statement "Shot noise appears in semiconductor devices and is proportional to the square root of the current" is inaccurate. Shot‑noise current spectral density is proportional to the square root of the product of charge, average current and bandwidth (i² = 2qI·B). The noise power is proportional to the average current, not its square root.
 - ch 3 [high] Section 3: Comparing Nyquist and Shannon limits: The text says "For a 3 MHz channel with an SNR of 30 dB, the Shannon capacity is about 18 Mbps", which contradicts the correct calculation (≈30 Mbps) shown later.
 - ch 3 [low] Figure description: The caption states "The plot uses the same three points as the worked example", but the worked example provides only one numerical point (the 30 dB case).
 - ch 3 [low] Figure data (spec: series points): The plotted capacity for 10 dB SNR is 9.9 Mbps, but the correct value for a 3 MHz channel is about 10.4 Mbps.
