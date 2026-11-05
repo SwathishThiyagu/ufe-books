@@ -1,0 +1,242 @@
+{
+ "lead": "Media on demand lets a viewer start a stored video at any moment, while live streaming sends one shared timeline to everyone. Neither can wait for a whole file. The server cuts the media into short segments, a client buffer absorbs network variation, and the player fetches each next segment at a rate the link can hold. The same machinery runs YouTube, Netflix and Hotstar cricket; two-way calls use a different path, RTP over UDP, because they cannot wait for HTTP retransmission. This chapter shows the segment arithmetic and the adaptive loop that keeps playout moving.",
+ "prereq": "You need: the split of storage and delivery in <a href=\"#distributed-multimedia-systems\">distributed multimedia systems</a>, the four QoS measures in <a href=\"#qos-issues-in-multimedia-communication\">QoS issues</a>, and compression basics from Unit 4.",
+ "sections": [
+  {
+   "h3": "On demand, live, push and pull",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Video on demand (VOD) serves stored media. The viewer may start, pause and seek to any point. A live stream serves a timeline that is being produced now; every viewer joins near the same edge, and seeking back is limited by what the server keeps."
+    },
+    {
+     "type": "p",
+     "text": "A plain download waits for the whole file before playout; a stream plays while later parts arrive."
+    },
+    {
+     "type": "p",
+     "text": "In server push, the server sends media at a rate it chooses. The client buffer absorbs the difference between arrival and playout. In client pull, the client asks for each piece. Pull fits HTTP: caches can answer, and the client can change quality on the next request."
+    },
+    {
+     "type": "p",
+     "text": "The session is controlled separately from the media. A player may send PLAY, PAUSE or TEARDOWN for a stream. HLS (HTTP Live Streaming) and DASH (Dynamic Adaptive Streaming over HTTP) avoid a separate control protocol: they use HTTP requests and a manifest file."
+    }
+   ]
+  },
+  {
+   "h3": "Segmentation and the segment arithmetic",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Streaming starts by cutting the encoded video into segments. A segment is a fixed-duration chunk, usually 2 s to 10 s, that begins with a keyframe, a frame that decodes without earlier frames. HLS uses a playlist of segment URLs; DASH uses an XML manifest called the Media Presentation Description (MPD). Both are HTTP-friendly: every segment is a normal object that a cache can store."
+    },
+    {
+     "type": "p",
+     "text": "The count and size follow from two formulas."
+    },
+    {
+     "type": "formula",
+     "text": "N = T ÷ L",
+     "where": "N is the number of segments; T is the total duration in seconds; L is the segment duration in seconds."
+    },
+    {
+     "type": "formula",
+     "text": "S = R × L",
+     "where": "S is the segment size in megabits (Mbit); R is the bit rate in megabits per second (Mbit/s); L is the segment duration in seconds. For megabytes (MB), divide S by 8."
+    },
+    {
+     "type": "p",
+     "text": "The whole file size is R × T, which equals N × S when every segment has the same size."
+    }
+   ]
+  },
+  {
+   "h3": "The bit-rate ladder and adaptive switching",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "One encoded copy cannot fit every link. The encoder makes a ladder: the same video at several bit rates and resolutions, for example 240p at 0.3 Mbit/s up to 1080p at 5 Mbit/s. Each rung is segmented separately, and the manifest lists all rungs for each time slot."
+    },
+    {
+     "type": "p",
+     "text": "Adaptive bitrate (ABR) chooses the rung for the next segment. The player estimates throughput from recent downloads and checks buffer health. If the buffer is deep and throughput is high, it climbs; if the buffer is shallow, it drops. Switching happens at a segment boundary, so the decoder never changes format inside a segment. Timestamps keep the shared timeline after a switch."
+    },
+    {
+     "type": "p",
+     "text": "The loop is a control loop. The client buffer reports its health; the player maps that report to a rate request. A wrong choice is visible as a rebuffer (playout stops) or as needless blur (a low rung on a fast link)."
+    }
+   ]
+  },
+  {
+   "h3": "Edge caches, buffers and start-up delay",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A content delivery network (CDN) keeps copies of segments at edge servers near users. The origin or cloud store holds the full library; the edge answers most requests. This cuts delay and backbone traffic. A cloud streaming service adds encoding, packaging and storage as rented services, so a small broadcaster can serve many viewers without owning the whole chain."
+    },
+    {
+     "type": "p",
+     "text": "The client buffer is measured in seconds of playout, not bytes. If it holds k segments of L seconds, the reserve is B = k × L. A larger B survives longer jitter and throughput dips, but the viewer waits longer before the first frame. The start-up delay is the time to fill the initial reserve plus the time to fetch the first segment. A common design keeps a few seconds of reserve and refills it during play."
+    },
+    {
+     "type": "p",
+     "text": "RTSP (Real Time Streaming Protocol) is one session-control protocol. RTP (Real-time Transport Protocol) is used where low delay matters, such as live contribution; it carries sequence numbers and timestamps but does not guarantee delivery. HLS and DASH use HTTP over TCP, where retransmission hides loss but can add delay."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The dashed edge is the adaptive loop: the client buffer reports its health, and the next segment is chosen from a higher or lower rung of the ladder.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Streaming chain with rate feedback",
+   "nodes": [
+    {
+     "id": "enc",
+     "label": "Encoder ladder",
+     "note": "240p to 1080p",
+     "style": "normal"
+    },
+    {
+     "id": "seg",
+     "label": "Segmenter",
+     "note": "4 s chunks",
+     "style": "accent"
+    },
+    {
+     "id": "cdn",
+     "label": "CDN edge",
+     "note": "close to user",
+     "style": "normal"
+    },
+    {
+     "id": "buf",
+     "label": "Client buffer",
+     "note": "absorbs variation",
+     "style": "normal"
+    },
+    {
+     "id": "dec",
+     "label": "Decoder",
+     "style": "normal"
+    },
+    {
+     "id": "disp",
+     "label": "Display",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "enc",
+     "to": "seg",
+     "style": "solid"
+    },
+    {
+     "from": "seg",
+     "to": "cdn",
+     "style": "solid"
+    },
+    {
+     "from": "cdn",
+     "to": "buf",
+     "style": "solid"
+    },
+    {
+     "from": "buf",
+     "to": "dec",
+     "style": "solid"
+    },
+    {
+     "from": "dec",
+     "to": "disp",
+     "style": "solid"
+    },
+    {
+     "from": "buf",
+     "to": "cdn",
+     "label": "request next rung",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A vertical streaming pipeline from encoder ladder to segmenter, CDN edge, client buffer, decoder and display, with a dashed feedback edge from the client buffer back to the CDN edge, labelled request next rung."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 2-minute video is encoded at 3 Mbit/s and cut into 4-second segments. (a) How many segments are made? (b) What is the size of one segment in Mbit and in MB? (c) What is the whole file size? (d) If the client holds three segments, how many seconds of playout are in reserve?",
+   "steps": [
+    "Convert duration: T = 2 min × 60 s/min = 120 s.",
+    "Segment count: N = T ÷ L = 120 s ÷ 4 s = 30 segments.",
+    "One segment in Mbit: S = R × L = 3 Mbit/s × 4 s = 12 Mbit.",
+    "One segment in MB: 12 Mbit ÷ 8 = 1.5 MB.",
+    "Whole file: N × S = 30 × 1.5 MB = 45 MB. Check: R × T = 3 Mbit/s × 120 s = 360 Mbit = 45 MB.",
+    "Buffer reserve: B = k × L = 3 × 4 s = 12 s."
+   ],
+   "answer": "30 segments, each 12 Mbit (1.5 MB); the whole file is 45 MB; 3 segments give 12 s of playout in reserve.",
+   "check": "T = 2 * 60\nR = 3\nL = 4\nk = 3\nN = int(T / L)\nS_mbit = R * L\nS_mb = S_mbit / 8\ntotal_mb = N * S_mb\nB = k * L\nprint(N)\nprint(S_mbit)\nprint(S_mb)\nprint(int(total_mb))\nprint(B)",
+   "values": [
+    30,
+    12,
+    1.5,
+    45,
+    12
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "12 Mbit is 1.5 MB, not 12 MB; divide megabits by 8 before calling it megabytes.",
+  "Segment count uses T ÷ L; 2 minutes is 120 s, so do not divide 2 by 4.",
+  "Segment size is R × L; the whole file is R × T, not R × L unless there is one segment.",
+  "ABR changes the rung at a segment boundary; it does not change quality inside a segment.",
+  "RTSP is session control, not a media transport; RTP carries the timestamped media packets."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a segment in HTTP streaming?",
+   "marks": 2,
+   "a": "A fixed-duration chunk, normally starting with a keyframe, fetched as one HTTP object."
+  },
+  {
+   "level": "remember",
+   "q": "Name the manifest used by HLS and the one used by DASH.",
+   "marks": 2,
+   "a": "HLS uses an .m3u8 playlist; DASH uses an MPD XML document."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a client buffer reduce the effect of jitter?",
+   "marks": 3,
+   "a": "It stores seconds of media, so playout continues while arrival time varies; the buffer drains and refills."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between VOD and live streaming.",
+   "marks": 3,
+   "a": "VOD is stored and lets the viewer seek; live follows a timeline being produced now and limits seeking to a short window."
+  },
+  {
+   "level": "apply",
+   "q": "A 90 s video is encoded at 2.5 Mbit/s and cut into 3 s segments. Find the segment count, one segment in Mbit and MB, and the whole file in MB.",
+   "marks": 4,
+   "a": "N = 90 ÷ 3 = 30 segments. S = 2.5 × 3 = 7.5 Mbit = 7.5 ÷ 8 = 0.9375 MB. Total = 30 × 0.9375 = 28.125 MB, which matches 2.5 × 90 = 225 Mbit = 28.125 MB."
+  },
+  {
+   "level": "apply",
+   "q": "A client holds 4 segments of 6 s each. What reserve does it have? How many segments can play before the reserve is empty?",
+   "marks": 4,
+   "a": "B = 4 × 6 = 24 s. All 4 segments, 24 s of playout, can play before the reserve is empty if no new data arrives."
+  },
+  {
+   "level": "analyze",
+   "q": "The buffer has 2 s of playout, the next segment lasts 4 s, and measured throughput is below the lowest rung. What should ABR do, and what is the risk?",
+   "marks": 5,
+   "a": "Drop to the lowest rung and fetch. Lowering the quality rung is the only action that can shorten the download. If the lowest rung still needs more than 2 s, the buffer empties and playout rebuffers; the player should then re-prime the buffer before resuming."
+  }
+ ],
+ "beyond": "Not for the exam. Modern players use CMAF and low-latency HLS/DASH to cut segment latency, and per-title encoding to choose the ladder from content complexity. Edge computing moves packaging and ad insertion closer to viewers. Researchers study learned ABR controllers that trade rebuffering against quality. Search next for CMAF, LL-HLS, per-title encoding and ABR algorithms."
+}

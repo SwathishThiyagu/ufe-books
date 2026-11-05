@@ -1,0 +1,208 @@
+{
+ "lead": "A distributed multimedia system keeps media on one machine, metadata on another and delivery on a third. The user still expects one film, one song or one lecture to play with a single timeline. Splitting the work lets many clients share storage and lets a nearby cache carry the bytes. This chapter follows a request from the directory lookup to the first playable frame, then shows how separate audio and video servers stay in step. It ends with the link capacity needed for a media server.",
+ "prereq": "You need: <a href=\"#multimedia-system-design-and-architecture\">6.1</a> for the layered pipeline and Unit 4 for compression and synchronisation.",
+ "sections": [
+  {
+   "h3": "Roles and deployment models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A distributed multimedia system is a set of networked computers that share storage, processing and delivery of continuous media. Continuous media are audio and video whose samples must arrive on time. The system hides the split from the user: one title, one play button, one timeline."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "A media server stores encoded files and sends packets. It owns the session state: play, pause and seek.",
+      "A directory server maps a title or ID to a media URL, the address of the media resource. It does not carry the media stream.",
+      "A proxy or cache sits near clients and keeps recently requested chunks. It cuts repeated traffic on the long link.",
+      "A small site may use one server for both roles; a large site separates them."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Client–server puts one media server in charge. Peer-to-peer lets clients exchange chunks directly, so total upload capacity grows as users join, but control and rights management are harder. Cloud models rent storage and delivery and add a directory service in front."
+    }
+   ]
+  },
+  {
+   "h3": "Finding a title and opening a session",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "The client sends the title and user rights to the directory server.",
+      "The directory server checks the catalogue and returns a media URL, a session token and the media type. A token is a short proof of rights.",
+      "The client opens a session with the media server at that URL. A session is the server-side state for one stream: session ID, current position and play or pause.",
+      "The media server reserves link and disk time for the stream, chooses the first segment and returns the session ID and its rate, codec and segment size.",
+      "The media server sends packets; the client buffers them and starts playout when its buffer holds enough media.",
+      "A pause or seek command goes to the same media server, which changes the send position; the session ID keeps the state."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The directory server is consulted once per title, not once per packet. After step 2 the timing contract is between client and media server. A proxy may answer step 3 if it already holds the segment. Keep the two roles separate in an exam answer: the directory does lookup, the media server does delivery."
+    }
+   ]
+  },
+  {
+   "h3": "One timeline across servers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Audio and video may come from different media servers. The client, not the servers, builds the shared timeline. Each packet carries a timestamp from a common clock. The client waits until it has the first complete unit of both streams, then sets one playout start time."
+    },
+    {
+     "type": "formula",
+     "text": "T<sub>play</sub> = max(t<sub>A</sub>, t<sub>B</sub>) + b",
+     "where": "T<sub>play</sub> is the common playout start time in seconds; t<sub>A</sub> and t<sub>B</sub> are the arrival times of the first complete audio and video units in seconds; b is the safety buffer in seconds."
+    },
+    {
+     "type": "p",
+     "text": "Skew is the time difference that grows between two streams. After playout starts, the client compares timestamps with its local clock. If skew passes one video frame, it drops or repeats a frame. For audio it adjusts the resampling rate slightly. This keeps a voice matched to moving lips without restarting the session."
+    }
+   ]
+  },
+  {
+   "h3": "Cloud, edge and link capacity",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Cloud storage keeps the master copy in a data centre. An edge node is a smaller server placed close to users. A request first goes to the directory, which may return an edge URL. On a miss the edge fetches from cloud storage and caches the segment. Start-up delay is the time from pressing play to the first frame. A nearby edge lowers start-up delay because the first packets travel a shorter distance, so propagation delay and round-trip time are smaller. Propagation delay is signal travel time; round-trip time is the time for a request to go and a reply to return. After buffering, throughput matters more than distance."
+    },
+    {
+     "type": "formula",
+     "text": "N = C ÷ (r × (1 + o))",
+     "where": "N is the number of simultaneous clients; C is the link rate in Mbit/s; r is the average stream rate per client in Mbit/s; o is protocol overhead as a fraction."
+    },
+    {
+     "type": "p",
+     "text": "Use the average rate for normal planning and the peak rate for worst-case admission. Protocol overhead adds headers and retransmissions, so the link must carry r × (1 + o) per client. A 25% overhead means multiply by 1.25, not 0.25. The answer is a whole number of clients; round down. A link at 100 Mbit/s is 100 × 10⁶ bit/s; a stream at 2 Mbit/s is 2 × 10⁶ bit/s, so the units cancel."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The directory server only names the media; all timing lives in the session between the client and the media server.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A three-party sequence diagram where the client asks a directory server for a title, gets a URL, then opens and controls a stream with the media server.",
+   "actors": [
+    "Client",
+    "Directory server",
+    "Media server"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Directory server",
+     "label": "1. ask for title",
+     "dashed": false
+    },
+    {
+     "from": "Directory server",
+     "to": "Client",
+     "label": "2. media URL",
+     "dashed": true
+    },
+    {
+     "from": "Client",
+     "to": "Media server",
+     "label": "3. open session",
+     "dashed": false
+    },
+    {
+     "from": "Media server",
+     "to": "Client",
+     "label": "4. stream packets",
+     "dashed": true
+    },
+    {
+     "from": "Client",
+     "to": "Media server",
+     "label": "5. pause or seek",
+     "dashed": false
+    },
+    {
+     "from": "Media server",
+     "to": "Client",
+     "label": "6. resume stream",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A media server sends streams of 2 Mbit/s on average. Its network link is 100 Mbit/s and protocol overhead is 25%. How many clients can it serve at the average rate? If the peak rate is 4 Mbit/s, how many at peak?",
+   "steps": [
+    "Overhead factor = 1 + 0.25 = 1.25.",
+    "Average link rate per client = 2 Mbit/s × 1.25 = 2.5 Mbit/s.",
+    "Average clients N<sub>avg</sub> = 100 Mbit/s ÷ 2.5 Mbit/s = 40.",
+    "Peak link rate per client = 4 Mbit/s × 1.25 = 5 Mbit/s.",
+    "Peak clients N<sub>peak</sub> = 100 Mbit/s ÷ 5 Mbit/s = 20."
+   ],
+   "answer": "The server supports 40 clients at the average rate and 20 clients at the peak rate.",
+   "check": "avg_rate = 2\nlink = 100\noverhead = 0.25\npeak_rate = 4\nper_avg = avg_rate * (1 + overhead)\nn_avg = link / per_avg\nper_peak = peak_rate * (1 + overhead)\nn_peak = link / per_peak\nprint(per_avg)\nprint(n_avg)\nprint(per_peak)\nprint(n_peak)",
+   "values": [
+    2.5,
+    40.0,
+    5.0,
+    20.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using the peak rate when the question says average, or the reverse, and then reporting a different client count.",
+  "Forgetting overhead: 25% overhead gives a factor 1.25, not 0.25, and not 25.",
+  "Confusing Mbit/s with MB/s; multiply or divide by 8 before comparing a link rate with a file size.",
+  "Saying the directory server streams the media or keeps the playout timeline; it only returns the URL and token.",
+  "Treating start-up delay as only bandwidth; distance adds propagation and round-trip delay before the first byte."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the directory server return to the client?",
+   "marks": 2,
+   "a": "A media URL, usually with a session token and media type. It does not send the media stream itself."
+  },
+  {
+   "level": "remember",
+   "q": "What is the role of a proxy cache in distributed multimedia?",
+   "marks": 2,
+   "a": "It stores recently requested media chunks near clients and answers later requests, reducing traffic and delay on the long link."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a client buffer the first units from two servers before playout?",
+   "marks": 3,
+   "a": "The first units arrive at different times. Buffering lets the client choose one playout start after both are present, so audio and video begin together."
+  },
+  {
+   "level": "apply",
+   "q": "A server sends 1.5 Mbit/s average on a 1 Gbit/s link with 20% overhead. How many average clients can it serve?",
+   "marks": 4,
+   "a": "1 Gbit/s = 1000 Mbit/s. Per client = 1.5 × 1.2 = 1.8 Mbit/s. N = 1000 ÷ 1.8 = 555.55, so 555 whole clients."
+  },
+  {
+   "level": "apply",
+   "q": "Same link and overhead, peak rate 3 Mbit/s. How many peak clients?",
+   "marks": 3,
+   "a": "Per client = 3 × 1.2 = 3.6 Mbit/s. N = 1000 ÷ 3.6 = 277.77, so 277 whole clients."
+  },
+  {
+   "level": "analyze",
+   "q": "Audio comes from server A and video from server B. Describe how the client keeps lip sync.",
+   "marks": 5,
+   "a": "Use a common clock timestamp on both streams. Wait for the later first unit plus a safety buffer, then set one playout schedule. Monitor skew; drop or repeat a video frame, or adjust audio resampling, when skew passes one frame. If a server stalls, pause both streams or extend the buffer rather than let one run ahead."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does an edge node cut start-up delay but not always raise average throughput?",
+   "marks": 4,
+   "a": "An edge shortens network distance and round-trip time, which dominate first-packet and session setup delay. After playout starts, throughput depends on the whole path and server capacity; the edge may also have less storage than cloud storage."
+  }
+ ],
+ "beyond": "Not for the exam. Content delivery networks place many edge caches and choose one by client location. WebRTC carries live audio and video between browsers with its own jitter buffer and congestion control. Modern players fetch small segments over HTTP and switch quality, so the media server is often a plain web server plus a manifest. Researchers work on clock sync across data centres and on caching policies for short videos. Search next for CDN request routing, edge caching and WebRTC."
+}

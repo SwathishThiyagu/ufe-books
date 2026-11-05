@@ -1,0 +1,770 @@
+{
+ "lead": "This unit is about the systems that carry multimedia: how a media pipeline is built, spread over a network, indexed, streamed, scheduled and protected. After it you can size storage and bandwidth for a video service, compute jitter and buffer needs, run a real-time schedulability test, and explain how media is searched, watermarked and examined after tampering.",
+ "about": "The unit starts with 6.1, the layered design of a multimedia system: devices, codecs, buffers and a presentation layer. 6.2 puts those layers on several machines, and 6.3 stores what they carry so media can be searched by content instead of exact text. 6.4 links the stored items into a navigable hypermedia web. 6.5 supplies the numbers that decide whether a stream arrives in time: bandwidth, delay, jitter and loss. 6.6 turns those numbers into a streaming service with segments, buffers and adaptive rates. 6.7 drops one level to the operating system and its real-time scheduling. 6.8 applies the whole stack to phone and camera media at scale, and 6.9 closes with the watermarks, hashes and forensic steps that keep media trustworthy.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A multimedia system is a layered pipeline — capture, compress, buffer and synchronise, store, deliver, present — built around the tight timing of continuous media.",
+   "depth": "Non-temporal media (text, still image) that can be shown at any speed versus temporal media (audio, video, animation) that must be played at a fixed rate. The general-purpose architecture for multimedia processing: input devices, codec stage, buffer and synchronisation unit, file system, network interface, presentation layer. Device and data interface standards, with USB and HDMI as everyday examples. How the layers change for a phone, a set-top box and a classroom PC. Some syllabi call this multimedia system architecture.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Layers of a multimedia system",
+    "nodes": [
+     {
+      "id": "cap",
+      "label": "Capture",
+      "note": "mic, camera, file",
+      "style": "normal"
+     },
+     {
+      "id": "cod",
+      "label": "Codec",
+      "note": "compress each media type",
+      "style": "normal"
+     },
+     {
+      "id": "buf",
+      "label": "Buffer and sync",
+      "note": "match audio to video",
+      "style": "accent"
+     },
+     {
+      "id": "fs",
+      "label": "Storage and file system",
+      "note": "blocks, read-ahead",
+      "style": "normal"
+     },
+     {
+      "id": "net",
+      "label": "Network delivery",
+      "note": "packets, QoS",
+      "style": "normal"
+     },
+     {
+      "id": "pres",
+      "label": "Presentation",
+      "note": "play out to user",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cap",
+      "to": "cod",
+      "style": "solid"
+     },
+     {
+      "from": "cod",
+      "to": "buf",
+      "style": "solid"
+     },
+     {
+      "from": "buf",
+      "to": "fs",
+      "style": "solid"
+     },
+     {
+      "from": "fs",
+      "to": "net",
+      "style": "solid"
+     },
+     {
+      "from": "net",
+      "to": "pres",
+      "style": "solid"
+     }
+    ],
+    "caption": "The buffer and synchronisation stage is the one that gives continuous media their timing; every other layer just feeds or drains it.",
+    "aria": "A six-box vertical pipeline from capture through codec, buffer and sync, storage, network, to presentation, with the buffer and sync box highlighted."
+   },
+   "example": "A video is 640 × 480 pixels, 24 bits per pixel, at 30 frames per second, with stereo audio at 44.1 kHz and 16 bits per sample. Find the raw video bit rate, the audio bit rate, the total bit rate and the storage for a 2-minute clip. Video: 640 × 480 × 24 = 7,372,800 bit/frame; × 30 = 221,184,000 bit/s ≈ 221.2 Mbit/s. Audio: 44,100 × 16 × 2 = 1,411,200 bit/s. Total ≈ 222.6 Mbit/s. Over 120 s: 222,595,200 × 120 = 2.67 × 10¹⁰ bit = 3.34 GB.",
+   "trap": "Forgetting that audio adds its own bit rate, and mixing bits with bytes: 640 × 480 × 24 is bits per frame, not bytes.",
+   "prereq": "Unit 4 (media types, compression basics).",
+   "leave": "Codec internals and colour models to Units 1 and 4; network timing to 6.5; OS scheduling to 6.7."
+  },
+  {
+   "k": 2,
+   "idea": "A distributed multimedia system splits storage, processing and delivery across several machines and must still keep one shared timeline for the user.",
+   "depth": "Client–server, peer-to-peer and cloud models. Roles of the media server, the directory (location) server, proxies and caches. How a client finds a title, opens a session and receives packets. Synchronisation between hosts when audio and video come from different servers. Streaming from cloud storage and from an edge node close to the user. Start-up delay versus network distance. Capacity planning for a server link.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "Directory server",
+     "Media server"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "Directory server",
+      "label": "1. ask for title",
+      "dashed": false
+     },
+     {
+      "from": "Directory server",
+      "to": "Client",
+      "label": "2. media URL",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Media server",
+      "label": "3. open session",
+      "dashed": false
+     },
+     {
+      "from": "Media server",
+      "to": "Client",
+      "label": "4. stream packets",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Media server",
+      "label": "5. pause or seek",
+      "dashed": false
+     },
+     {
+      "from": "Media server",
+      "to": "Client",
+      "label": "6. resume stream",
+      "dashed": true
+     }
+    ],
+    "caption": "The directory server only names the media; all timing lives in the session between the client and the media server.",
+    "aria": "A three-party sequence diagram where the client asks a directory server for a title, gets a URL, then opens and controls a stream with the media server."
+   },
+   "example": "A media server sends streams of 2 Mbit/s on average. Its network link is 100 Mbit/s and protocol overhead is 25%. How many clients can it serve at the average rate? Per client the link must carry 2 × 1.25 = 2.5 Mbit/s, so 100 ÷ 2.5 = 40 clients. If the peak rate is 4 Mbit/s, the peak figure is 4 × 1.25 = 5 Mbit/s per client, giving 20 clients.",
+   "trap": "Planning with the peak rate where the average rate is meant, and forgetting the protocol overhead.",
+   "prereq": "6.1 and Unit 4.",
+   "leave": "QoS metrics to 6.5; segmenting and adaptive streaming to 6.6; OS-level scheduling to 6.7."
+  },
+  {
+   "k": 3,
+   "idea": "Multimedia databases keep feature vectors beside metadata so a query is answered by similarity instead of exact match.",
+   "depth": "Metadata search versus content-based retrieval (also called query by example). Features: colour histogram, texture and shape for images; key frames for video; short-term spectra for audio. Distance measures: Euclidean, L1, cosine. Indexing with k-d trees, R-trees and inverted files. Precision and recall as the quality measures. Image and video retrieval, retrieval from digital libraries, and MPEG-7 as a standard way to describe media (its purpose only here).",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Content-based retrieval pipeline",
+    "nodes": [
+     {
+      "id": "q",
+      "label": "Query image",
+      "note": "user's example",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Feature extraction",
+      "note": "colour, texture, shape",
+      "style": "normal"
+     },
+     {
+      "id": "i",
+      "label": "Feature index",
+      "note": "k-d tree, inverted file",
+      "style": "accent"
+     },
+     {
+      "id": "s",
+      "label": "Similarity ranking",
+      "note": "L1 or Euclidean",
+      "style": "normal"
+     },
+     {
+      "id": "r",
+      "label": "Result list",
+      "note": "top-k by distance",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "q",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "i",
+      "style": "solid"
+     },
+     {
+      "from": "i",
+      "to": "s",
+      "style": "solid"
+     },
+     {
+      "from": "s",
+      "to": "r",
+      "style": "solid"
+     }
+    ],
+    "caption": "The index is what makes retrieval fast; without it every stored item is compared with the query.",
+    "aria": "A five-box vertical flow from query image through feature extraction, feature index and similarity ranking to a result list, with the index box highlighted."
+   },
+   "example": "Four-bin colour histograms are compared by L1 distance. Query [0.40, 0.30, 0.20, 0.10]; image A [0.50, 0.20, 0.20, 0.10]; image B [0.10, 0.10, 0.30, 0.50]. Distance to A = 0.10 + 0.10 + 0 + 0 = 0.20. Distance to B = 0.30 + 0.20 + 0.10 + 0.40 = 1.00. A ranks first. If the system returns 20 images and 12 are relevant while the database holds 30 relevant images, precision = 12/20 = 0.60 and recall = 12/30 = 0.40.",
+   "trap": "Swapping precision and recall: precision looks at what was returned, recall at what was missed.",
+   "prereq": "Unit 4 (image and audio features, MPEG-7 overview) and 6.1.",
+   "leave": "Compression and MPEG-7 details to Unit 4; delivering a found item to 6.6."
+  },
+  {
+   "k": 4,
+   "idea": "Hypermedia is a set of media nodes joined by links, and hypermedia messaging carries those links, and their timing, between systems.",
+   "depth": "Node, anchor and link. Hypertext (text only) versus hypermedia (images, audio, video nodes). Static links stored with the document and dynamic links computed at request time. Uni-directional and bi-directional links. Time-based hypermedia, where a link also fixes when the target plays; some syllabi call the structural description the Dexter model. Link integrity, dangling links, and messages that create, update or delete links. A presentation assembled from linked items.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "H",
+      "label": "Home",
+      "x": 0,
+      "y": 1,
+      "style": "accent"
+     },
+     {
+      "id": "C",
+      "label": "Courses",
+      "x": 1,
+      "y": 0,
+      "style": "normal"
+     },
+     {
+      "id": "U",
+      "label": "Unit6",
+      "x": 2,
+      "y": 0,
+      "style": "normal"
+     },
+     {
+      "id": "N",
+      "label": "Notes",
+      "x": 3,
+      "y": 1,
+      "style": "live"
+     },
+     {
+      "id": "K",
+      "label": "Contact",
+      "x": 1,
+      "y": 2,
+      "style": "normal"
+     },
+     {
+      "id": "F",
+      "label": "FAQ",
+      "x": 2,
+      "y": 2,
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "H",
+      "to": "C",
+      "style": "solid"
+     },
+     {
+      "from": "C",
+      "to": "U",
+      "style": "solid"
+     },
+     {
+      "from": "U",
+      "to": "N",
+      "style": "solid"
+     },
+     {
+      "from": "H",
+      "to": "K",
+      "style": "solid"
+     },
+     {
+      "from": "K",
+      "to": "F",
+      "style": "solid"
+     },
+     {
+      "from": "F",
+      "to": "N",
+      "style": "solid"
+     },
+     {
+      "from": "H",
+      "to": "F",
+      "style": "solid"
+     }
+    ],
+    "caption": "The shortest click path from Home to Notes runs through FAQ in two links; the Courses path takes three.",
+    "aria": "A directed link graph with Home at the left, Notes at the right, and a shortcut edge from Home to FAQ that gives a two-link path to Notes."
+   },
+   "example": "A hypermedia site has these links: Home → Courses, Courses → Unit6, Unit6 → Notes, Home → Contact, Contact → FAQ, FAQ → Notes, Home → FAQ. Find the fewest clicks from Home to Notes and list the path. Path Home → FAQ → Notes uses 2 links, so the answer is 2 clicks. The other path Home → Courses → Unit6 → Notes uses 3 links.",
+   "trap": "Counting nodes on the path instead of links: a path through three nodes is two clicks.",
+   "prereq": "6.1 and Unit 5 (authoring and presentation structure).",
+   "leave": "Presentation-level synchronisation to Unit 4; QoS to 6.5."
+  },
+  {
+   "k": 5,
+   "idea": "QoS is four measurable promises — bandwidth, delay, jitter and loss — and the system keeps them by buffering, shaping and admitting traffic.",
+   "depth": "Definitions and units of the four parameters. Computing mean transit delay and delay jitter from send and arrival times. The playout buffer and how its size follows from the jitter spread. Leaky bucket and token bucket shaping; admission control. RTP and RTCP for carrying and reporting timing, RSVP for reserving resources (names and roles only). Best-effort versus guaranteed service. How each parameter shows up to the user as stalls, blur or dropouts.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "Sent",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 2,
+        "style": "muted"
+       },
+       {
+        "label": "P2",
+        "start": 20,
+        "end": 22,
+        "style": "muted"
+       },
+       {
+        "label": "P3",
+        "start": 40,
+        "end": 42,
+        "style": "muted"
+       },
+       {
+        "label": "P4",
+        "start": 60,
+        "end": 62,
+        "style": "muted"
+       },
+       {
+        "label": "P5",
+        "start": 80,
+        "end": 82,
+        "style": "muted"
+       }
+      ]
+     },
+     {
+      "label": "Arrived",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 2,
+        "style": "normal"
+       },
+       {
+        "label": "P2",
+        "start": 22,
+        "end": 24,
+        "style": "normal"
+       },
+       {
+        "label": "P3",
+        "start": 45,
+        "end": 47,
+        "style": "live"
+       },
+       {
+        "label": "P4",
+        "start": 60,
+        "end": 62,
+        "style": "normal"
+       },
+       {
+        "label": "P5",
+        "start": 85,
+        "end": 87,
+        "style": "live"
+       }
+      ]
+     },
+     {
+      "label": "Playout",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 5,
+        "end": 7,
+        "style": "accent"
+       },
+       {
+        "label": "P2",
+        "start": 25,
+        "end": 27,
+        "style": "accent"
+       },
+       {
+        "label": "P3",
+        "start": 45,
+        "end": 47,
+        "style": "accent"
+       },
+       {
+        "label": "P4",
+        "start": 65,
+        "end": 67,
+        "style": "accent"
+       },
+       {
+        "label": "P5",
+        "start": 85,
+        "end": 87,
+        "style": "accent"
+       }
+      ]
+     }
+    ],
+    "caption": "Playout starts a fixed 5 ms after each send time, so the two late packets still arrive just in time for their slot.",
+    "aria": "A three-lane timeline showing send times, arrival times with two delayed packets, and playout slots spaced 20 ms apart starting 5 ms after each send."
+   },
+   "example": "Five packets are sent at 0, 20, 40, 60 and 80 ms and arrive at 0, 22, 45, 60 and 85 ms. Transit times are 0, 2, 5, 0 and 5 ms. Mean transit = 12/5 = 2.4 ms. Mean deviation (jitter) = (2.4 + 0.4 + 2.6 + 2.4 + 2.6)/5 = 10.4/5 = 2.08 ms. The spread is 5 − 0 = 5 ms, so a playout buffer of at least 5 ms removes every late arrival.",
+   "trap": "Reporting the peak-to-peak spread as jitter, and treating delay and jitter as the same number.",
+   "prereq": "6.2 and Unit 4 (synchronisation).",
+   "leave": "Packet header layouts and full protocol state machines; streaming design to 6.6."
+  },
+  {
+   "k": 6,
+   "idea": "On-demand media is cut into segments, buffered at the client and fetched at a rate the network can hold, so playout survives a variable link.",
+   "depth": "Video on demand versus live streaming. Server push and client pull. Segmentation into fixed-duration chunks, with HLS and DASH as examples. The bit-rate ladder and adaptive bitrate switching. CDN edge caching and cloud streaming. Buffer size versus start-up delay. Session control with RTSP and transport with RTP. Computing segment size, segment count and buffer duration.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Streaming chain with rate feedback",
+    "nodes": [
+     {
+      "id": "enc",
+      "label": "Encoder ladder",
+      "note": "240p up to 1080p",
+      "style": "normal"
+     },
+     {
+      "id": "seg",
+      "label": "Segmenter",
+      "note": "4 s chunks",
+      "style": "accent"
+     },
+     {
+      "id": "cdn",
+      "label": "CDN edge",
+      "note": "close to user",
+      "style": "normal"
+     },
+     {
+      "id": "buf",
+      "label": "Client buffer",
+      "note": "absorbs variation",
+      "style": "normal"
+     },
+     {
+      "id": "dec",
+      "label": "Decoder",
+      "style": "normal"
+     },
+     {
+      "id": "disp",
+      "label": "Display",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "enc",
+      "to": "seg",
+      "style": "solid"
+     },
+     {
+      "from": "seg",
+      "to": "cdn",
+      "style": "solid"
+     },
+     {
+      "from": "cdn",
+      "to": "buf",
+      "style": "solid"
+     },
+     {
+      "from": "buf",
+      "to": "dec",
+      "style": "solid"
+     },
+     {
+      "from": "dec",
+      "to": "disp",
+      "style": "solid"
+     },
+     {
+      "from": "buf",
+      "to": "enc",
+      "label": "rate request",
+      "style": "dashed"
+     }
+    ],
+    "caption": "The dashed edge is the adaptive loop: the buffer reports its health and the next segment comes from a higher or lower rung of the ladder.",
+    "aria": "A vertical streaming pipeline from encoder ladder to segmenter, CDN edge, client buffer, decoder and display, with a dashed feedback edge from the buffer back to the encoder ladder."
+   },
+   "example": "A 2-minute video is encoded at 3 Mbit/s and cut into 4-second segments. How many segments are made and how big is each one? Segments = 120 ÷ 4 = 30. Each segment = 3 Mbit/s × 4 s = 12 Mbit = 1.5 MB. The whole file is 30 × 1.5 = 45 MB, which matches 3 Mbit/s × 120 s. A client holding 3 segments has 12 s of playout in reserve.",
+   "trap": "Mbit against MB: 12 Mbit is 1.5 MB, not 12 MB.",
+   "prereq": "6.2, 6.5 and Unit 4.",
+   "leave": "Codec and compression details to Unit 4; OS scheduling of the player to 6.7."
+  },
+  {
+   "k": 7,
+   "idea": "Continuous media need the operating system to schedule CPU, disk and I/O against deadlines instead of against fairness.",
+   "depth": "Only a few universities teach this. The real-time task model: period, execution time, deadline, utilisation. Rate-monotonic (RM) and earliest-deadline-first (EDF) scheduling. The utilisation test U ≤ 1 for EDF and the RM bound n(2^(1/n) − 1). Disk scheduling for media with SCAN and EDF; block layout, double buffering and read-ahead. I/O device management and resource reservation. Why priority inversion stalls a video thread.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "n (tasks)",
+     "min": 1,
+     "max": 10
+    },
+    "y": {
+     "label": "bound on U",
+     "min": 0,
+     "max": 1
+    },
+    "series": [
+     {
+      "name": "RM bound",
+      "expr": "x*(exp(log(2)/x)-1)",
+      "style": "accent"
+     },
+     {
+      "name": "EDF bound",
+      "expr": "1",
+      "style": "muted"
+     },
+     {
+      "name": "example U = 0.9",
+      "points": [
+       [
+        1,
+        0.9
+       ],
+       [
+        10,
+        0.9
+       ]
+      ],
+      "style": "live"
+     }
+    ],
+    "caption": "At three tasks the RM bound is about 0.78, so a task set at 0.9 is safe under EDF but not guaranteed under RM.",
+    "aria": "A plot of the rate-monotonic utilisation bound falling from 1 toward 0.69 as the number of tasks grows, with a flat EDF line at 1 and a line at U = 0.9 for the example."
+   },
+   "example": "Three periodic tasks share one CPU: audio runs 4 ms every 10 ms, video runs 10 ms every 40 ms, network runs 5 ms every 20 ms. Utilisation = 4/10 + 10/40 + 5/20 = 0.40 + 0.25 + 0.25 = 0.90. EDF guarantees the deadlines because 0.90 ≤ 1. The RM bound for n = 3 is 3(2^(1/3) − 1) = 0.7798, and 0.90 > 0.7798, so RM alone cannot guarantee every deadline.",
+   "trap": "Using the RM bound with the wrong number of tasks, and forgetting that the schedule is preemptive.",
+   "prereq": "6.1 and 6.5.",
+   "leave": "General-purpose CPU scheduling (round robin, multilevel queues) belongs to an operating systems course."
+  },
+  {
+   "k": 8,
+   "idea": "Phones and cameras make media faster than people can watch it, so the system detects, describes, indexes and stores it through pipelines.",
+   "depth": "Only a few universities teach this. Social media pipeline: upload, transcoding ladder, perceptual hashing for duplicate detection, tagging, ranking and analytics. Surveillance pipeline: capture, motion gating, detection and tracking, metadata (time, camera id, location), storage tiering and alerting. Retention policy and storage sizing. One line on privacy and consent. Cloud storage and cloud analytics for both cases.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Camera-to-alert pipeline",
+    "nodes": [
+     {
+      "id": "cam",
+      "label": "Camera feed",
+      "note": "64 channels",
+      "style": "normal"
+     },
+     {
+      "id": "mot",
+      "label": "Motion gate",
+      "note": "skip empty frames",
+      "style": "normal"
+     },
+     {
+      "id": "det",
+      "label": "Object detection",
+      "note": "people, vehicles",
+      "style": "normal"
+     },
+     {
+      "id": "meta",
+      "label": "Metadata and features",
+      "note": "time, camera, hash",
+      "style": "accent"
+     },
+     {
+      "id": "idx",
+      "label": "Index and store",
+      "note": "hot then cold",
+      "style": "normal"
+     },
+     {
+      "id": "alr",
+      "label": "Search or alert",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cam",
+      "to": "mot",
+      "style": "solid"
+     },
+     {
+      "from": "mot",
+      "to": "det",
+      "style": "solid"
+     },
+     {
+      "from": "det",
+      "to": "meta",
+      "style": "solid"
+     },
+     {
+      "from": "meta",
+      "to": "idx",
+      "style": "solid"
+     },
+     {
+      "from": "idx",
+      "to": "alr",
+      "style": "solid"
+     }
+    ],
+    "caption": "The metadata stage is what turns raw footage into something searchable; it is also where retention and privacy rules attach.",
+    "aria": "A six-box vertical pipeline from camera feed through a motion gate, object detection, metadata and features, index and store, to search or alert, with the metadata box highlighted."
+   },
+   "example": "A campus keeps 64 cameras at 1080p, each producing 4 Mbit/s, recorded 24 hours a day with 30 days of retention. Per camera per day: 4 × 10⁶ bit/s × 86,400 s = 3.456 × 10¹¹ bit = 43.2 GB. All cameras per day: 64 × 43.2 = 2764.8 GB ≈ 2.76 TB. For 30 days: 30 × 2.76 ≈ 82.9 TB.",
+   "trap": "Forgetting to multiply by the number of cameras, and using 30 days without converting seconds per day.",
+   "prereq": "6.3 and 6.6.",
+   "leave": "Detection and recognition algorithms in detail; watermarking and tamper analysis to 6.9."
+  },
+  {
+   "k": 9,
+   "idea": "Media is protected by embedding a mark that survives processing and authenticated by a hash or signature that changes on any edit, and forensics uses both as evidence.",
+   "depth": "Confidentiality, integrity, authenticity and ownership as separate goals. Encrypting a stream (symmetric and asymmetric, names only). Watermarking versus steganography versus fingerprinting. Spatial LSB embedding and transform-domain (DCT) embedding. The trade-off between capacity, robustness and imperceptibility, measured by PSNR. Hashing and digital signatures for tamper detection. Forensic steps: metadata, copy-move and resave traces, chain of custody.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Watermark embed and detect",
+    "nodes": [
+     {
+      "id": "cov",
+      "label": "Cover media",
+      "note": "original image",
+      "style": "normal"
+     },
+     {
+      "id": "emb",
+      "label": "Embed mark",
+      "note": "LSB or DCT",
+      "style": "accent"
+     },
+     {
+      "id": "wm",
+      "label": "Marked media",
+      "note": "sent to users",
+      "style": "normal"
+     },
+     {
+      "id": "atk",
+      "label": "Attack",
+      "note": "compress, crop, scale",
+      "style": "live"
+     },
+     {
+      "id": "dtc",
+      "label": "Detector",
+      "note": "correlate with mark",
+      "style": "normal"
+     },
+     {
+      "id": "ext",
+      "label": "Extracted mark",
+      "note": "or tamper verdict",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cov",
+      "to": "emb",
+      "style": "solid"
+     },
+     {
+      "from": "emb",
+      "to": "wm",
+      "style": "solid"
+     },
+     {
+      "from": "wm",
+      "to": "atk",
+      "style": "solid"
+     },
+     {
+      "from": "wm",
+      "to": "dtc",
+      "style": "dashed"
+     },
+     {
+      "from": "atk",
+      "to": "dtc",
+      "style": "solid"
+     },
+     {
+      "from": "dtc",
+      "to": "ext",
+      "style": "solid"
+     }
+    ],
+    "caption": "The detector runs on both the clean and the attacked copy; the dashed path shows the clean reference that is needed to judge the mark.",
+    "aria": "A vertical flow from cover media through embedding to marked media, then through an attack to the detector that also receives a dashed clean copy, ending in the extracted mark or verdict."
+   },
+   "example": "The bits 1, 0, 1 are hidden in the least significant bits of pixels 150, 152 and 155. Embedding sets bit 0 of each value: 150 → 151, 152 → 152, 155 → 155. Squared errors are 1, 0, 0, so MSE = 1/3 = 0.333 over all three pixels. PSNR = 10 log₁₀(255² ÷ 0.333) = 10 log₁₀(195,075) ≈ 52.9 dB, which is high, so the change is invisible.",
+   "trap": "Using 20 log₁₀ in PSNR, and averaging only over the pixels that changed instead of all pixels in the block.",
+   "prereq": "Unit 4 (image formats, compression) and 6.3.",
+   "leave": "Full cryptography to a security course; compression details to Unit 4."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the layers of one machine are placed on several hosts"
+  ],
+  [
+   2,
+   5,
+   "delivery over a network raises delay, jitter and loss"
+  ],
+  [
+   3,
+   4,
+   "retrieved items are stitched into linked hypermedia nodes"
+  ],
+  [
+   3,
+   6,
+   "an indexed media library feeds the on-demand catalogue"
+  ],
+  [
+   5,
+   6,
+   "QoS targets fix buffer size and rate switching"
+  ],
+  [
+   6,
+   7,
+   "the player needs OS deadlines and disk scheduling"
+  ],
+  [
+   8,
+   9,
+   "surveillance footage must be authenticated and traced"
+  ]
+ ]
+}

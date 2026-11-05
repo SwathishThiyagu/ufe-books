@@ -1,0 +1,341 @@
+{
+ "lead": "A video call can look perfect on a fast link and still freeze, blur or swallow words. QoS (quality of service) is a set of measurable promises: minimum bandwidth, maximum delay, maximum jitter, maximum loss. Each is a number with a unit, so each can be written into a contract, measured at the receiver, and enforced by buffering, shaping and admission control. Every streaming app, IP phone and live class depends on these four numbers being kept.",
+ "prereq": "You need: <a href=\"#distributed-multimedia-systems\">distributed multimedia systems</a> for the shared timeline across machines, and the synchronisation ideas from Unit 4.",
+ "sections": [
+  {
+   "h3": "The four parameters, each with a unit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A multimedia stream is judged by four independent numbers. None can be traded for another: spare bandwidth does not fix jitter, and low delay does not fix loss."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Parameter",
+      "Unit",
+      "What it limits",
+      "User sees"
+     ],
+     "rows": [
+      [
+       "Bandwidth",
+       "kbit/s or Mbit/s",
+       "average rate the stream needs",
+       "stalls, long buffering"
+      ],
+      [
+       "Delay",
+       "ms",
+       "time from capture to playout",
+       "people talk over each other"
+      ],
+      [
+       "Jitter",
+       "ms",
+       "change in delay between packets",
+       "clicks, gaps, jerky motion"
+      ],
+      [
+       "Loss",
+       "% of packets",
+       "packets that never arrive",
+       "dropouts, blocky frames"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Bandwidth is the only rate; the other three are errors in time or count. The codec sets bandwidth. Compressed voice runs at about 64 kbit/s with a simple waveform codec; compressed video needs a few hundred kbit/s and upwards, depending on frame size and motion."
+    },
+    {
+     "type": "p",
+     "text": "Delay and jitter differ. Delay is how late packet i is. Jitter is how much that lateness changes from packet to packet. A steady 200 ms delay is easy to play — shift everything 200 ms later. A delay swinging between 0 and 200 ms needs a buffer, and that buffer costs interactivity."
+    }
+   ]
+  },
+  {
+   "h3": "Measuring delay and jitter, and sizing the playout buffer",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Let packet i be sent at time s_i and arrive at time a_i, both in milliseconds, both read on the receiver's clock. Its transit delay is:"
+    },
+    {
+     "type": "formula",
+     "text": "d_i = a_i − s_i",
+     "where": "d_i is the transit delay of packet i in ms; s_i is its send time in ms; a_i is its arrival time in ms."
+    },
+    {
+     "type": "p",
+     "text": "The mean transit delay says how late the stream is on average:"
+    },
+    {
+     "type": "formula",
+     "text": "d̄ = (1/n) Σ d_i",
+     "where": "n is the number of packets measured; d̄ is the mean transit delay in ms."
+    },
+    {
+     "type": "p",
+     "text": "One common teaching measure of jitter is the mean distance of each delay from that mean:"
+    },
+    {
+     "type": "formula",
+     "text": "J = (1/n) Σ |d_i − d̄|",
+     "where": "J is the mean deviation, in ms; the bars mean absolute value."
+    },
+    {
+     "type": "p",
+     "text": "Jitter is not the peak-to-peak spread S = d_max − d_min. The spread is the worst case and sizes the buffer; the mean deviation is the smooth figure reported back to the sender. RTP instead smooths the mean of |d_i − d_(i−1)|, so the two numbers are close but not identical."
+    },
+    {
+     "type": "p",
+     "text": "A fixed clock offset adds a constant to every d_i. Jitter and spread are safe; the mean delay is meaningful only if clocks are roughly synchronised, for example by NTP or the RTP timestamp mapping."
+    },
+    {
+     "type": "p",
+     "text": "The buffer must cover the spread. Buffer depth = spread = d_max − d_min. The playout offset from send time is D = d_min + buffer + margin, which is at least d_max. Play packet i at s_i + D; discard any that arrives after its play time."
+    },
+    {
+     "type": "p",
+     "text": "Buffering hides jitter but adds delay, and delay spoils conversation. Telephony practice treats about 150 ms one-way as comfortable and 400 ms as the practical ceiling. That is the trade: a bigger buffer means smoother video and slower replies."
+    }
+   ]
+  },
+  {
+   "h3": "Shaping, reserving and admitting flows",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The network keeps promises in three ways: shape traffic to match what was promised, reserve resources, and admit only as many flows as the link can carry."
+    },
+    {
+     "type": "p",
+     "text": "A leaky bucket pushes traffic out at one fixed rate and holds or drops the excess. Over any window it guarantees:"
+    },
+    {
+     "type": "formula",
+     "text": "bits sent over T ≤ r × T + b",
+     "where": "r is the drain rate in bit/s; T is the window length in s; b is the bucket size in bits, the largest burst allowed."
+    },
+    {
+     "type": "p",
+     "text": "A token bucket is gentler. Tokens arrive at rate r and pile up to a limit b; a packet of L bits leaves only if L tokens are available. Idle time stores tokens, so a flow may burst up to b bits at once — useful after a scene change — while the long-run average stays at r."
+    },
+    {
+     "type": "p",
+     "text": "Admission control is the gate. A new flow is accepted only if the sum of admitted peak rates stays under link capacity; otherwise it is refused or renegotiated. RSVP carries the request: a host asks routers along the path to reserve bandwidth, and each router accepts or rejects."
+    },
+    {
+     "type": "p",
+     "text": "RTP makes measurement possible: it stamps each media packet with a sequence number and timestamp, so the receiver can work out delay, jitter and loss. RTCP reports those figures back. Best-effort service promises nothing; guaranteed service reserves the parameters; priority classes sit in between."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Each bar is one 10 ms packet. Playout is scheduled 5 ms after each send time. Three packets arrive late (by 2, 5 and 5 ms); the two 5 ms ones land exactly on their playout slots and none arrives after its slot.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "Sent",
+     "bars": [
+      {
+       "label": "P1",
+       "start": 0,
+       "end": 10,
+       "style": "muted"
+      },
+      {
+       "label": "P2",
+       "start": 20,
+       "end": 30,
+       "style": "muted"
+      },
+      {
+       "label": "P3",
+       "start": 40,
+       "end": 50,
+       "style": "muted"
+      },
+      {
+       "label": "P4",
+       "start": 60,
+       "end": 70,
+       "style": "muted"
+      },
+      {
+       "label": "P5",
+       "start": 80,
+       "end": 90,
+       "style": "muted"
+      }
+     ]
+    },
+    {
+     "label": "Arrived",
+     "bars": [
+      {
+       "label": "P1",
+       "start": 0,
+       "end": 10,
+       "style": "normal"
+      },
+      {
+       "label": "P2",
+       "start": 22,
+       "end": 32,
+       "style": "normal"
+      },
+      {
+       "label": "P3",
+       "start": 45,
+       "end": 55,
+       "style": "live"
+      },
+      {
+       "label": "P4",
+       "start": 60,
+       "end": 70,
+       "style": "normal"
+      },
+      {
+       "label": "P5",
+       "start": 85,
+       "end": 95,
+       "style": "live"
+      }
+     ]
+    },
+    {
+     "label": "Playout",
+     "bars": [
+      {
+       "label": "P1",
+       "start": 5,
+       "end": 15,
+       "style": "accent"
+      },
+      {
+       "label": "P2",
+       "start": 25,
+       "end": 35,
+       "style": "accent"
+      },
+      {
+       "label": "P3",
+       "start": 45,
+       "end": 55,
+       "style": "accent"
+      },
+      {
+       "label": "P4",
+       "start": 65,
+       "end": 75,
+       "style": "accent"
+      },
+      {
+       "label": "P5",
+       "start": 85,
+       "end": 95,
+       "style": "accent"
+      }
+     ]
+    }
+   ],
+   "aria": "A three-lane timeline in milliseconds: packets sent at 0, 20, 40, 60 and 80, arriving at 0, 22, 45, 60 and 85 with three late packets (by 2, 5 and 5 ms), and playout slots starting 5 ms after each send time."
+  }
+ },
+ "examples": [
+  {
+   "question": "Five packets of a voice stream are sent at 0, 20, 40, 60 and 80 ms and arrive at 0, 22, 45, 60 and 85 ms. Find each transit delay, the mean transit delay, the mean deviation (jitter) and the peak-to-peak spread. State the minimum playout buffer that removes every late arrival, and the play time of each packet.",
+   "steps": [
+    "Transit delays d_i = a_i − s_i: 0, 2, 5, 0 and 5 ms.",
+    "Sum of delays = 12 ms, so mean d̄ = 12 ÷ 5 = 2.4 ms.",
+    "Deviations |d_i − d̄|: 2.4, 0.4, 2.6, 2.4 and 2.6 ms. Sum = 10.4 ms, so jitter J = 10.4 ÷ 5 = 2.08 ms.",
+    "Spread S = 5 − 0 = 5 ms. Largest delay d_max = 5 ms, so buffer depth = 5 ms and playout offset D ≥ d_max = 5 ms.",
+    "With D = 5 ms the play times are s_i + 5 = 5, 25, 45, 65 and 85 ms. Every arrival is at or before its play time, so no packet is late."
+   ],
+   "answer": "Mean transit delay 2.4 ms, jitter 2.08 ms, spread 5 ms, and a playout buffer of at least 5 ms plays all five packets on time.",
+   "check": "s = [0, 20, 40, 60, 80]\na = [0, 22, 45, 60, 85]\nd = [ai - si for si, ai in zip(s, a)]\nmean_d = sum(d) / len(d)\njitter = sum(abs(di - mean_d) for di in d) / len(d)\nspread = max(d) - min(d)\nprint(round(mean_d, 4))\nprint(round(jitter, 4))\nprint(round(spread, 4))\n",
+   "values": [
+    2.4,
+    2.08,
+    5.0
+   ],
+   "output": ""
+  },
+  {
+   "question": "A router shapes a flow with a leaky bucket of drain rate r = 2 Mbit/s and bucket size b = 8000 bits. Over T = 0.5 s, what is the largest number of bits the bucket may release?",
+   "steps": [
+    "Largest release = r × T + b.",
+    "r × T = 2 000 000 bit/s × 0.5 s = 1 000 000 bits.",
+    "Add the burst allowance b = 8000 bits.",
+    "Largest release = 1 008 000 bits in 0.5 s.",
+    "That is an average of 1 008 000 ÷ 0.5 = 2 016 000 bit/s = 2.016 Mbit/s, slightly above r because of the burst."
+   ],
+   "answer": "At most 1 008 000 bits in 0.5 s, i.e. 2.016 Mbit/s with the burst counted.",
+   "check": "r = 2_000_000\nb = 8000\nT = 0.5\nprint(round(r * T + b, 4))\nprint(round((r * T + b) / T, 4))\n",
+   "values": [
+    1008000.0,
+    2016000.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Reporting the peak-to-peak spread as jitter. Jitter is the mean deviation |d_i − d̄|; the spread d_max − d_min is a different, larger number, and it is the spread that sizes the buffer.",
+  "Treating delay and jitter as one number. A link can add 300 ms of steady delay (bad for talk, trivial to play out) or 100 ms of jitter (fine average delay, needs a large buffer).",
+  "Forgetting that a playout buffer buys smoothness with delay. Adding 200 ms of buffer to cure jitter makes a two-way call feel sluggish.",
+  "Mixing units in r × T + b: r in bit/s, T in s, b in bits. Convert kbit/s and bytes before substituting.",
+  "Assuming good bandwidth means good QoS. A link with spare capacity still fails if packets are lost or delayed unevenly."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four QoS parameters and give the unit of each.",
+   "marks": 2,
+   "a": "Bandwidth in kbit/s or Mbit/s, delay in ms, jitter in ms, loss as a percentage of packets."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a playout buffer remove the effect of jitter but not of loss?",
+   "marks": 3,
+   "a": "The buffer holds early packets until a fixed play time, so variation in arrival time never reaches the user. A lost packet never arrives at all, so waiting cannot recover it; the decoder must conceal the gap."
+  },
+  {
+   "level": "apply",
+   "q": "Packets are sent at 0, 10 and 20 ms and arrive at 2, 15 and 24 ms. Find the mean transit delay, the spread, and the minimum playout offset from send time.",
+   "marks": 4,
+   "a": "d = 2, 5 and 4 ms. Mean = 11 ÷ 3 = 3.67 ms. Spread = 5 − 2 = 3 ms, which is the buffering needed beyond the fastest packet. The playout offset from send time must be D ≥ d_max = 5 ms, giving play times 5, 15 and 25 ms."
+  },
+  {
+   "level": "understand",
+   "q": "State the role of RTP and of RTCP in one line each.",
+   "marks": 3,
+   "a": "RTP carries a sequence number and a timestamp with every media packet so timing and loss can be measured. RTCP sends periodic reports carrying loss fraction and jitter back to the sender."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a token bucket allow bursts while a leaky bucket does not?",
+   "marks": 5,
+   "a": "A leaky bucket releases at a fixed rate r, so any burst is spread out or dropped. A token bucket stores unused tokens up to b, and a burst can spend them, so the rate may exceed r briefly while the long-run average stays at r."
+  },
+  {
+   "level": "analyze",
+   "q": "A 10 Mbit/s link already carries admitted flows whose peak rates total 8.5 Mbit/s. A new flow asks for a peak rate of 2 Mbit/s. What does admission control do?",
+   "marks": 5,
+   "a": "Sum = 8.5 + 2 = 10.5 Mbit/s, which exceeds 10 Mbit/s, so the flow is rejected or asked to renegotiate to a peak of at most 1.5 Mbit/s."
+  },
+  {
+   "level": "apply",
+   "q": "Transit delays over a window are 4, 6, 8 and 10 ms. Find the mean, the mean deviation and the spread.",
+   "marks": 3,
+   "a": "Mean = 28 ÷ 4 = 7 ms. Deviations are 3, 1, 1 and 3 ms, summing to 8, so J = 8 ÷ 4 = 2 ms. Spread = 10 − 4 = 6 ms, so the buffer needs at least 6 ms."
+  }
+ ],
+ "beyond": "Not for the exam. Real networks deliver QoS by 5G network slicing, WebRTC congestion control, and adaptive bitrate in DASH and HLS, which trade picture quality for a smaller buffer. Operators track quality of experience — rebuffering ratio, start-up time, mean opinion score — rather than raw jitter. Search for WebRTC congestion control, DASH QoE metrics and 5G network slicing."
+}
