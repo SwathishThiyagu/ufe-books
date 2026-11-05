@@ -236,3 +236,14 @@ Reply with JSON:
   "wikipedia": ["Exact title of an English Wikipedia article on a main topic of this unit"]
 }}
 Counts: 12-20 key terms with their chapter number k; 6-10 takeaways; 12-14 bank questions (8-16 marks) spread over the three groups, at least two of them spanning several chapters; 18-26 glossary terms; 2-4 textbooks you are sure exist; 4-8 web resources whose exact URL you are sure of (each link is opened and checked; wrong ones are dropped); 3-6 Wikipedia article titles."""
+
+
+def quiz(P, k, chapter_text):
+    return f"""Write the "Check yourself" quiz for chapter {P['unit']['n']}.{k} ("{P['unit']['subtopics'][k - 1]['t']}") below.
+Reply with JSON {{"quiz": [{{"level": "remember", "q": "question", "marks": 2, "a": "model answer"}}]}}: 6 to 8 items, at least one of each level
+remember, understand, apply, analyze; marks 2 to 6; for apply, give the key steps and the final value in the answer.
+
+The chapter:
+<<<
+{chapter_text[:9000]}
+>>>"""

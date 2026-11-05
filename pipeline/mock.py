@@ -59,6 +59,8 @@ def answer(P):
                     'glossary': [{'term': f'Word {i}', 'def': 'its meaning in one line'} for i in range(18)],
                     'textbooks': [{'title': 'Operating System Concepts', 'authors': 'Silberschatz, Galvin and Gagne', 'edition': '', 'pointer': ''}],
                     'web': []}
+        if task.startswith('quiz'):
+            return {'quiz': [{'level': l, 'q': 'Q?', 'marks': 2, 'a': 'A.'} for l in ['remember', 'understand', 'apply', 'analyze', 'apply', 'understand']]}
         if task.startswith(('figfix', 'spill')):
             return {'caption': 'Redrawn.', 'spec': FIGS[0]}
         raise ValueError(task)
