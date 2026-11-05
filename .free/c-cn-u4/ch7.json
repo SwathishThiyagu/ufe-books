@@ -1,0 +1,215 @@
+{
+ "lead": "Distance‑vector routing lets each router share the cost of reaching every destination with its directly connected neighbours. The idea is to let routers build a table of shortest‑hop paths by repeatedly applying the Bellman‑Ford rule. It is used in small to medium networks where a simple metric and low configuration overhead are preferred, for example in campus LANs or small ISP edge routers running RIP.",
+ "prereq": "You need: basic routing concepts from <a href=\"#routing-basics-static-vs-dynamic-hierarchical-routing\">Routing basics</a> and IPv4 addressing from <a href=\"#ipv4-addressing-classful-and-classless\">IPv4 addressing</a>.",
+ "sections": [
+  {
+   "h3": "Bellman‑Ford updates in a distance‑vector protocol",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each router keeps a vector D where D(y) is the current estimate of the cost to reach destination y. Cost is measured in hop count for RIP. The vector is sent to every neighbour every 30 seconds."
+    },
+    {
+     "type": "formula",
+     "text": "D_x(y) = min_{v∈N(x)} { c(x,v) + D_v(y) }",
+     "where": "D_x(y) is the cost from router x to destination y; N(x) is the set of neighbours of x; c(x,v) is the cost of the direct link x‑v (1 hop in RIP)."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Router x receives D_v from neighbour v.",
+      "For each destination y, compute candidate = c(x,v) + D_v(y).",
+      "If candidate < D_x(y), replace D_x(y) with candidate and record v as next hop."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The process repeats until no router can improve any entry. This is exactly the Bellman‑Ford algorithm applied to a distributed graph."
+    }
+   ]
+  },
+  {
+   "h3": "RIP specifics and the count‑to‑infinity problem",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "RIP (Routing Information Protocol) is the classic distance‑vector protocol defined in RFC 1058. It limits the metric to a maximum of 15 hops. A metric of 16 is defined as ∞, meaning the destination is unreachable."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Update interval: 30 seconds.",
+      "Hold‑down timer: 180 seconds to suppress flapping routes.",
+      "Triggered updates: sent immediately when a route changes."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "When a link fails, neighbours may still advertise the old cost for one period. Each router adds 1 hop to the advertised cost, so the bad route’s metric climbs slowly: 2, 3, 4 … until it reaches 16. This is the count‑to‑infinity problem."
+    },
+    {
+     "type": "p",
+     "text": "Because RIP caps the metric at 15, the worst‑case convergence time is 15 × 30 s = 450 seconds, which is acceptable for small networks but too slow for larger ones."
+    }
+   ]
+  },
+  {
+   "h3": "Mitigations: split horizon and route poisoning",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Split horizon prevents a router from advertising a route back out the interface on which it learned that route. This stops the immediate formation of a two‑node loop."
+    },
+    {
+     "type": "p",
+     "text": "Route poisoning is a stronger rule. When a router detects that a destination has become unreachable, it advertises the metric 16 for that destination on all interfaces, even on the interface that originally supplied the route."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Detect link failure (e.g., loss of hello messages).",
+      "Set D_x(y) = 16 for the affected destination y.",
+      "Send the poisoned vector to all neighbours immediately."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Together, split horizon and poisoning reduce the count‑to‑infinity convergence time from many minutes to a few seconds in typical campus scenarios."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Linear three‑router topology used to illustrate RIP distance‑vector updates.",
+  "spec": {
+   "type": "graph",
+   "directed": false,
+   "nodes": [
+    {
+     "id": "A",
+     "label": "A",
+     "x": 0,
+     "y": 0,
+     "style": "accent"
+    },
+    {
+     "id": "B",
+     "label": "B",
+     "x": 2,
+     "y": 0,
+     "style": "accent"
+    },
+    {
+     "id": "C",
+     "label": "C",
+     "x": 4,
+     "y": 0,
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "A",
+     "to": "B",
+     "label": "1",
+     "style": "solid"
+    },
+    {
+     "from": "B",
+     "to": "C",
+     "label": "1",
+     "style": "solid"
+    }
+   ],
+   "aria": "Linear topology used for RIP distance‑vector updates."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three routers A‑B‑C are linked as shown. Initially each router knows only the network directly attached to it. After two RIP update rounds, what is the cost to reach C from A?",
+   "steps": [
+    "Round 1: A receives D_B(C)=1 from B and computes candidate = 1 (link A‑B) + 1 = 2. It stores D_A(C)=2.",
+    "Round 2: B receives D_A(C)=2 from A but keeps its own D_B(C)=1 because 1 < 2+1.",
+    "No further changes occur. The final cost from A to C is 2 hops."
+   ],
+   "answer": "Cost = 2 hops; entry A→C with metric 2.",
+   "check": "cost = 1 + 1\nprint(cost)",
+   "values": [
+    2
+   ],
+   "code": {
+    "lang": "python",
+    "code": "A = {'C': None}\nB = {'C': 1}\n# Round 1 update from B to A\ncandidate = 1 + B['C']\nA['C'] = candidate\nprint('A->C metric =', A['C'])",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "router",
+     "metric"
+    ],
+    "rows": [
+     [
+      "A",
+      "2"
+     ],
+     [
+      "B",
+      "1"
+     ]
+    ]
+   },
+   "output": "A->C metric = 2"
+  }
+ ],
+ "traps": [
+  "Treating the RIP metric as link bandwidth instead of hop count leads to wrong path selection.",
+  "Assuming a metric of 0 means unreachable; in RIP 16 means unreachable.",
+  "Ignoring split horizon and believing that RIP converges instantly after a failure."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the maximum hop count allowed by RIP before a route is considered unreachable?",
+   "marks": 2,
+   "a": "15 hops; a metric of 16 denotes unreachable."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a distance‑vector protocol can form a routing loop after a link failure.",
+   "marks": 3,
+   "a": "Each router only knows its neighbour's advertised cost. After a failure, neighbours still advertise the old cost for one period. Each router adds 1 hop to the received cost, so the bad route's metric climbs gradually, creating a temporary loop."
+  },
+  {
+   "level": "apply",
+   "q": "In a network A‑B‑C‑D with unit‑cost links, router B learns a route to D with metric 2. If the link B‑C fails, what metric will B advertise for D after applying route poisoning?",
+   "marks": 4,
+   "a": "B will set the metric for D to 16 (∞) and advertise 16 on all interfaces."
+  },
+  {
+   "level": "apply",
+   "q": "Using the Bellman‑Ford formula, compute the new cost at router A for destination D after receiving D_B(D)=3 from neighbour B, given c(A,B)=1.",
+   "marks": 4,
+   "a": "Candidate = 1 + 3 = 4. If 4 < current D_A(D), replace it with 4."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare split horizon with route poisoning in terms of convergence speed after a single link failure.",
+   "marks": 5,
+   "a": "Split horizon prevents a router from sending back the same route, avoiding immediate two‑node loops but does not stop the metric from increasing slowly. Route poisoning forces the metric to 16 instantly on all interfaces, accelerating convergence to the unreachable state."
+  },
+  {
+   "level": "understand",
+   "q": "Why does RIP use a periodic update interval of 30 seconds instead of sending updates only on change?",
+   "marks": 3,
+   "a": "Periodic updates ensure that routers eventually learn about missed changes due to packet loss and provide a simple timer‑based mechanism suitable for low‑cost hardware."
+  },
+  {
+   "level": "remember",
+   "q": "What is the purpose of the hold‑down timer in RIP?",
+   "marks": 2,
+   "a": "It suppresses acceptance of possibly bad updates for a destination for a fixed period after a route becomes unreachable."
+  }
+ ],
+ "beyond": "Not for the exam. Distance‑vector ideas still appear in modern protocols such as EIGRP, which adds bandwidth and delay metrics. Research explores hybrid approaches that combine fast convergence of link‑state with the low overhead of distance‑vector. For deeper study, look at the concept of path‑vector routing in BGP and the use of Dijkstra’s algorithm in OSPF."
+}

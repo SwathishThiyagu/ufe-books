@@ -1,0 +1,213 @@
+{
+ "lead": "Path‑vector routing lets each autonomous system (AS) announce the complete list of AS numbers a route has traversed. The list, called AS_PATH, stops routing loops because a router discards any update that already contains its own AS number. This mechanism is the core of the Border Gateway Protocol (BGP) which runs the global Internet, connecting ISPs, data‑centers, and even a campus network that uses IP to pay for traffic.",
+ "prereq": "You need: <a href=\"#routing-basics-static-vs-dynamic-hierarchical-routing\">routing basics</a> and <a href=\"#distance-vector-routing-and-rip\">distance‑vector concepts</a>.",
+ "sections": [
+  {
+   "h3": "Path‑vector idea and AS numbers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An autonomous system is a group of IP networks under one administrative control. Each AS is assigned a unique 16‑bit number called an AS number (ASN). Originally AS numbers were 16‑bit (0‑65535). Since 2007, 32‑bit AS numbers (0‑4294967295) are also allocated and used in BGP. For example, the Indian ISP may have ASN 64512. When an AS originates a prefix, it attaches its own ASN to the AS_PATH attribute."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "AS_PATH = [64512] when the prefix is first announced.",
+      "If a neighbour AS 65001 receives the update, it prepends its ASN, forming AS_PATH = [65001,64512].",
+      "A third AS 65100 will see AS_PATH = [65100,65001,64512] after it adds its own number."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Loop avoidance works because an AS discards any UPDATE that already contains its own ASN. This is simpler than distance‑vector protocols that need split‑horizon or poison‑reverse tricks."
+    },
+    {
+     "type": "formula",
+     "text": "Loop condition: ASN_self ∈ AS_PATH",
+     "where": "ASN_self is the receiver's autonomous system number; AS_PATH is the list of AS numbers in the BGP UPDATE."
+    }
+   ]
+  },
+  {
+   "h3": "BGP UPDATE message and key attributes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A BGP UPDATE carries a network prefix, the AS_PATH list, and several optional attributes. The most used attributes are NEXT_HOP, LOCAL_PREF, and MULTI_EXIT_DISC (MED)."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>NEXT_HOP</b>: the IP address of the router that should be used to reach the advertised prefix.",
+      "<b>LOCAL_PREF</b>: a 32‑bit integer that indicates the degree of preference for an exit point; higher value wins.",
+      "<b>MED</b>: a hint to external neighbours about the preferred inbound path; lower value wins."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Receive UPDATE from a neighbour.",
+      "Check loop condition using AS_PATH.",
+      "Store the route with its attributes in the local RIB.",
+      "Run the best‑path selection algorithm."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "def best_path(routes):\n    # routes is a list of dicts with keys 'local_pref' and 'as_path_len'\n    # higher LOCAL_PREF wins, then shorter AS_PATH length\n    routes.sort(key=lambda r: (-r['local_pref'], r['as_path_len']))\n    return routes[0]\n",
+     "stdin": "",
+     "output": ""
+    }
+   ]
+  },
+  {
+   "h3": "Policy‑based selection and real‑world use",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Operators configure policies that modify attributes before advertising a route. For example, an Indian ISP may set LOCAL_PREF = 200 for routes learned from a partner that offers cheaper bandwidth, and LOCAL_PREF = 100 for all other peers."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Prefer customer routes over peer routes (higher LOCAL_PREF).",
+      "Prefer shorter AS_PATH when LOCAL_PREF values are equal.",
+      "Use MED to influence inbound traffic from a specific neighbour."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "During a Chennai power cut, the ISP may temporarily lower the LOCAL_PREF of routes that go through the affected data centre, causing traffic to shift to a backup site without manual re‑routing."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Sequence of BGP UPDATE messages showing how the AS_PATH grows as the prefix moves from AS64512 to AS65100.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "AS64512",
+    "AS65001",
+    "AS65100"
+   ],
+   "messages": [
+    {
+     "from": "AS64512",
+     "to": "AS65001",
+     "label": "Advertise 203.0.113.0/24 AS_PATH=[64512]",
+     "dashed": false
+    },
+    {
+     "from": "AS65001",
+     "to": "AS65100",
+     "label": "Advertise 203.0.113.0/24 AS_PATH=[65001,64512]",
+     "dashed": false
+    }
+   ],
+   "aria": "Shows BGP path‑vector updates across three autonomous systems."
+  }
+ },
+ "examples": [
+  {
+   "question": "AS64512 originates prefix 203.0.113.0/24 with LOCAL_PREF = 150. It sends an UPDATE to AS65001, which adds its own ASN and sets LOCAL_PREF = 200 for its internal decision before forwarding to AS65100 (the LOCAL_PREF attribute is not sent to the external AS). AS65100 also receives a second UPDATE from a different neighbour AS65200 with LOCAL_PREF = 180 and AS_PATH=[65200,64512] (again, the LOCAL_PREF is used only within AS65200). Which route will AS65100 select as best, and what is the final AS_PATH it stores?",
+   "steps": [
+    "Step 1: Build the AS_PATH for the first update. After AS65001 adds its ASN, AS_PATH = [65001,64512].",
+    "Step 2: AS65100 receives this update and prepends its own ASN, giving AS_PATH₁ = [65100,65001,64512] with LOCAL_PREF = 200 used internally.",
+    "Step 3: Build the AS_PATH for the second update. AS65200 already prepended its ASN, so AS_PATH₂ = [65200,64512] before AS65100 adds its own, resulting in AS_PATH₂ = [65100,65200,64512] with LOCAL_PREF = 180 used internally.",
+    "Step 4: Apply BGP best‑path rules. Higher LOCAL_PREF wins, so the route from AS65001 (LOCAL_PREF = 200) is preferred.",
+    "Step 5: Store the selected route. The final AS_PATH stored in AS65100’s RIB is [65100,65001,64512]."
+   ],
+   "answer": "AS65100 selects the route received via AS65001 and stores AS_PATH = [65100,65001,64512].",
+   "check": "asn1 = [64512]\nasn2 = [65001] + asn1\nasn3 = [65100] + asn2\nprint(asn3)\n",
+   "values": [
+    64512,
+    65001,
+    65100
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int as_path[] = {65100,65001,64512};\n    int n = sizeof(as_path)/sizeof(as_path[0]);\n    printf(\"Selected AS_PATH: \");\n    for(int i=0;i<n;i++){\n        printf(\"%d\", as_path[i]);\n        if(i<n-1) printf(\",\");\n    }\n    printf(\"\\n\");\n    return 0;\n}\n"
+   },
+   "stdin": "",
+   "output": "Selected AS_PATH: 65100,65001,64512",
+   "dry_run": {
+    "head": [
+     "Step",
+     "AS_PATH",
+     "LOCAL_PREF"
+    ],
+    "rows": [
+     [
+      "1",
+      "[65001,64512]",
+      "150"
+     ],
+     [
+      "2",
+      "[65100,65001,64512]",
+      "200"
+     ],
+     [
+      "3",
+      "[65100,65200,64512]",
+      "180"
+     ]
+    ]
+   }
+  }
+ ],
+ "traps": [
+  "Assuming the route with the smallest numeric AS number is always chosen; BGP uses LOCAL_PREF first, then AS_PATH length.",
+  "Confusing MED with LOCAL_PREF – MED is considered only after LOCAL_PREF and AS_PATH length.",
+  "Forgetting that an AS must prepend its own number before checking the loop condition, leading to acceptance of a looping update.",
+  "Treating the AS_PATH as a simple sum of numbers; it is a list, and the order matters for loop detection."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does ASN stand for?",
+   "marks": 2,
+   "a": "Autonomous System Number."
+  },
+  {
+   "level": "understand",
+   "q": "Why does BGP attach the full AS_PATH to each UPDATE?",
+   "marks": 3,
+   "a": "To allow every router to detect loops and to let policy decisions be based on the path history."
+  },
+  {
+   "level": "apply",
+   "q": "An AS receives two routes to the same prefix: Route A has LOCAL_PREF = 120 and AS_PATH length = 3. Route B has LOCAL_PREF = 120 and AS_PATH length = 2. Which route is selected?",
+   "marks": 4,
+   "a": "Route B, because when LOCAL_PREF is equal BGP prefers the shorter AS_PATH."
+  },
+  {
+   "level": "apply",
+   "q": "If an UPDATE arrives with AS_PATH = [65001,64512] at AS 65001, what does the router do?",
+   "marks": 4,
+   "a": "It discards the update because its own ASN (65001) is already in the AS_PATH, indicating a loop."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain how changing LOCAL_PREF on a single router can shift traffic across the Internet.",
+   "marks": 6,
+   "a": "Increasing LOCAL_PREF for routes learned from a preferred provider makes those routes win the best‑path selection at that router. The router then advertises the higher LOCAL_PREF to its internal peers, causing them to prefer the same exit point. The effect propagates inward, moving traffic toward the chosen provider without changing any physical links."
+  },
+  {
+   "level": "remember",
+   "q": "Name two optional BGP attributes used for inbound traffic engineering.",
+   "marks": 2,
+   "a": "MED (Multi‑Exit Disc) and BGP community."
+  },
+  {
+   "level": "understand",
+   "q": "What is the purpose of the NEXT_HOP attribute?",
+   "marks": 3,
+   "a": "It tells the receiving router the IP address of the next router to reach the advertised prefix."
+  }
+ ],
+ "beyond": "Not for the exam. BGP today supports extensions such as BGP‑SEC for route validation and MP‑BGP for IPv6 and VPN services. Research is active on scaling BGP with thousands of prefixes and on using machine learning to predict route flaps. Large cloud providers use BGP communities to automate traffic engineering across many data centres. To explore further, search for \"BGP route reflection\" and \"BGP large‑scale deployment\"."
+}
