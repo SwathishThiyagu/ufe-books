@@ -1,0 +1,192 @@
+{
+ "lead": "Regression testing reruns tests that already exist, after a change, to show that behaviour which was not meant to change still works. Software is coupled: fixing a refund bug can quietly break invoice calculation, because both call the same tax function. A regression test suite is the kept set of tests used for this check. Every team that ships a second version does this, whether it reruns everything overnight or picks the twelve tests that touch the code that changed. The choice of what to rerun is the engineering decision.",
+ "prereq": "You need: <a href=\"#testing-principles-defects-and-test-cases\">Chapter 4.1</a> for what a test case and an expected value are, and <a href=\"#system-testing-acceptance-testing-and-debugging\">Chapter 4.6</a> for where debugging starts after a failure.",
+ "sections": [
+  {
+   "h3": "What regression testing is and why it exists",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Regression testing is rerunning tests that already exist, after a change, to check that behaviour which was not meant to change still works. The change may be a bug fix, a new feature, a refactor, an upgraded library or a new database. A fault found this way is a <i>regression defect</i>: something that used to work and now does not."
+    },
+    {
+     "type": "p",
+     "text": "It exists because software is coupled. Invoice generation and refund processing both call the same tax function. A developer changes that function to round down, to settle a refund complaint. Invoice totals now come out one rupee low. Nothing in the refund story mentions invoices, so no new test covers it; only an old invoice test can catch it."
+    },
+    {
+     "type": "p",
+     "text": "A <i>regression test suite</i> is the subset of tests the team keeps, runs and maintains for this purpose. It is not every test ever written; it is the set whose protection is worth its running cost. Tests enter when new behaviour becomes important and leave when the behaviour is removed."
+    },
+    {
+     "type": "p",
+     "text": "Retest-all is the simplest selection strategy: run every test you have. It is safe by construction, because nothing is skipped. Its cost is the full suite. Five hundred tests finishing in six minutes is cheap enough to run on every change; a system suite that takes nine hours is not, and it delays every release."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing which tests to rerun",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Selection has two parts: which tests to rerun, and in what order. Some syllabi call the whole activity <i>regression test selection</i>."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Retest-all</b>: every test, no analysis. Strongest guarantee, highest cost.",
+      "<b>Random selection</b>: k tests picked at random. Cheap and fast, with no guarantee; useful as a research baseline that smarter methods must beat.",
+      "<b>Safe selection</b>: a set guaranteed to contain every test the change could make fail, so fault detection equals retest-all. It needs coverage data (which test runs which line) plus a diff of what changed.",
+      "<b>Impact analysis</b>: read the version diff to find changed modules, walk the call graph upward to their callers, and select the tests that touch any of them. Practical and widely used, but not proven safe."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Order matters when time runs out. Prioritise by risk (money, safety, data loss) and by how often the feature is used. Login, search, add to cart and payment run first; the quarterly report export runs last. If a run is stopped at twenty minutes, the tests that did run should be the valuable ones."
+    }
+   ]
+  },
+  {
+   "h3": "Keeping the suite correct when expected outputs change",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The expected output is part of the test. When a requirement changes on purpose, the old expected output becomes wrong, and a correct program starts to look broken. Updating the test is part of the change, not an afterthought."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Decide whether the old expectation is still a requirement, or was deliberately replaced.",
+      "If it was replaced, change the expected value in the same commit as the code.",
+      "Name the test after the requirement, so the reason for the value is visible, such as invoice_gst_12_percent.",
+      "Add tests for the new behaviour, including boundary values (<a href=\"#black-box-testing-equivalence-partitioning-boundary-values\">Chapter 4.4</a>).",
+      "Delete tests for behaviour that no longer exists; a suite full of stale tests gets ignored."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Smoke testing is a different, smaller thing. A smoke test is a quick check that a new build is not broken: it starts, a user can log in, the main page loads. A passing smoke test says the build deserves deeper testing; it is not a regression suite, and five smoke tests say very little about invoice arithmetic. A failing smoke test means stop and fix the build."
+    },
+    {
+     "type": "p",
+     "text": "Running the suite automatically after every commit, and the version control that makes the diff possible, belong to Unit 5. Here the question is only what to rerun and why."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Each ring narrows the rerun for the GST change: from all 500 tests, to the 80-test regression suite, to the 12 tests that touch invoice calculation. The innermost ring is the one that must run for this change.",
+  "spec": {
+   "type": "sets",
+   "mode": "nested",
+   "aria": "Three nested sets: all 500 tests containing login, GST invoice and refund; the 80-test regression suite containing GST invoice and refund; and the 12 impact-selected tests containing only GST invoice.",
+   "sets": [
+    {
+     "label": "All tests: 500",
+     "items": [
+      "login",
+      "GST invoice",
+      "refund"
+     ]
+    },
+    {
+     "label": "Regression suite: 80",
+     "items": [
+      "GST invoice",
+      "refund"
+     ]
+    },
+    {
+     "label": "Impact-selected: 12",
+     "items": [
+      "GST invoice"
+     ]
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An online store changes the GST rate on invoices from 18% to 12%. The full test suite has 500 tests, the regression suite has 80 tests, and impact analysis selects 12 tests that touch invoice calculation. One regression test uses a taxable amount of ₹1,000 and expects tax of ₹180. (a) Which tests should be rerun for this change, and in what order? (b) Which test must be updated, and to what value? (c) Why is retest-all not always the best choice here?",
+   "steps": [
+    "Classify the change: 18% to 12% is a deliberate requirement change, so failures in tests that hard-code 18% are expected, not defects.",
+    "Old expected tax: 1000 × 0.18 = ₹180. That is the value stored in the old test.",
+    "New expected tax: 1000 × 0.12 = ₹120.",
+    "Old invoice total: 1000 + 180 = ₹1,180. New invoice total: 1000 + 120 = ₹1,120.",
+    "Update the invoice test: expected tax ₹180 → ₹120, expected total ₹1,180 → ₹1,120. This edit ships with the rate change.",
+    "Rerun set: the 12 impact-selected tests, because they touch invoice calculation. Order them by risk: GST invoice, checkout total, payment amount, then refund recalculation.",
+    "If those 12 pass and time allows, run the 80-test regression suite. Retest-all of 500 is the fallback when risk is high or the whole suite is cheap.",
+    "Cost ratio: 500 ÷ 12 = 41.7, so impact selection runs about 41.7 times fewer tests than retest-all."
+   ],
+   "answer": "Rerun the 12 impact-selected tests with the GST invoice test first, update its expected tax from ₹180 to ₹120 and its total from ₹1,180 to ₹1,120, then escalate to the 80-test suite or the full 500 only if risk or a cheap suite justifies it; impact selection runs about 41.7 times fewer tests.",
+   "check": "amount = 1000\nrate_old = 0.18\nrate_new = 0.12\ntax_old = round(amount * rate_old, 2)\ntax_new = round(amount * rate_new, 2)\ntotal_old = amount + tax_old\ntotal_new = amount + tax_new\nfull_suite = 500\nselected = 12\nprint(tax_old)\nprint(tax_new)\nprint(total_old)\nprint(total_new)\nprint(selected)\nprint(round(full_suite / selected, 1))",
+   "values": [
+    180.0,
+    120.0,
+    1180.0,
+    1120.0,
+    12,
+    41.7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Rerunning a stale expected value after a deliberate requirement change, so a correct program is reported as failing. Check whether the expectation or the code is wrong before filing a defect.",
+  "Calling every rerun a regression test without a selection reason. Regression testing is defined by why the test is chosen, not by the fact that it ran twice.",
+  "Treating a passing smoke test as a regression suite. Smoke proves the build is alive; it does not prove invoice arithmetic.",
+  "Assuming impact analysis is safe. It is a practical approximation; only coverage-based safe selection has the same fault-detection power as retest-all.",
+  "Updating the code only and forgetting to add tests for the new behaviour, so the new 12% path is never checked."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define regression testing in one sentence.",
+   "marks": 2,
+   "a": "Regression testing is rerunning existing tests after a change to confirm that behaviour which was not meant to change still works."
+  },
+  {
+   "level": "remember",
+   "q": "What is a regression test suite?",
+   "marks": 2,
+   "a": "The subset of existing test cases that a team keeps, runs and maintains specifically to detect regressions after changes; not every test ever written."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a change to a shared tax function break invoice generation when the change was made for refunds?",
+   "marks": 3,
+   "a": "Both features call the same function. Changing it changes behaviour for every caller, not only for the complaint being fixed. Only tests that exercise the other callers will notice, which is why an existing invoice test is valuable."
+  },
+  {
+   "level": "understand",
+   "q": "State two differences between smoke testing and regression testing.",
+   "marks": 3,
+   "a": "Smoke testing is a very small, fast set run to prove a build is not broken and is worth testing further; regression testing is a larger retained set run to prove unchanged behaviour still works. A smoke pass gives no assurance about detailed rules such as tax arithmetic; a regression pass does, within the tests it contains."
+  },
+  {
+   "level": "apply",
+   "q": "A taxable amount of ₹2,500 is billed at 18% and the rate changes to 12%. What are the old and new expected tax values?",
+   "marks": 4,
+   "a": "Old tax = 2500 × 0.18 = ₹450. New tax = 2500 × 0.12 = ₹300. The test expecting ₹450 must be updated to ₹300."
+  },
+  {
+   "level": "apply",
+   "q": "A full suite has 400 tests, the regression suite has 60 and impact analysis selects 15. How many times fewer tests does impact selection run than retest-all?",
+   "marks": 4,
+   "a": "400 ÷ 15 = 26.7, so impact selection runs about 26.7 times fewer tests than retest-all. Against the regression suite it is 60 ÷ 15 = 4 times fewer."
+  },
+  {
+   "level": "analyze",
+   "q": "After the rate change from 18% to 12%, a team reruns the old suite, sees 30 failures, and reports that the change broke 30 features. Analyse this conclusion.",
+   "marks": 5,
+   "a": "The conclusion is unsupported. Several failures are probably stale expected values that hard-code 18%, which is a test-maintenance problem, not a code defect. The team must first separate planned-change failures (expected value wrong) from genuine regressions (code wrong), then update the stale tests and investigate the rest."
+  },
+  {
+   "level": "analyze",
+   "q": "When is retest-all the right choice despite its cost?",
+   "marks": 6,
+   "a": "When the suite is cheap enough to run in the time available, when the change touches a widely used core module so almost everything is impacted, when safety or money is at stake and a missed regression is unacceptable, and when no reliable coverage data exists to support safe selection. Selection methods earn their complexity only when these conditions fail."
+  }
+ ],
+ "beyond": "Not for the exam. Regression test selection is an active research area: safe selection algorithms need coverage maps that are expensive to maintain, so industry often approximates with test impact analysis inside build tools. Large monorepos select tests from the dependency graph of packages rather than from source lines. Machine-learning selectors rank tests by historical failure patterns. Flaky tests, which pass and fail without any code change, are the main practical obstacle to trusting any selection. Search for 'regression test selection', 'test impact analysis' and 'flaky tests'."
+}
