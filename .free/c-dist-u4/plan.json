@@ -1,0 +1,138 @@
+{
+ "lead": "After this unit you can explain why a distributed system has no shared memory and no global clock, and what those two losses cost a programmer. You can stamp events with Lamport and vector clocks, decide whether two events are causally related, record a consistent snapshot of a running system, and state exactly what FIFO, causal and total order promise to a group of processes.",
+ "about": "Unit 4 covers the two things a distributed program cannot take for granted: one shared memory and one shared clock. Chapter 4.1 lists what makes a system distributed and the design challenges that follow. 4.2 compares message passing with shared memory and gives the send/receive primitives, and 4.3 shows how remote procedure call hides messages behind an ordinary function call. 4.4 fixes the timing model the rest of the unit assumes. 4.5 and 4.6 are about time: physical clocks and NTP first, then Lamport's logical clocks. 4.7 sharpens scalar time into vector clocks so concurrency becomes visible. 4.8 uses that causal knowledge to cut a consistent global state. 4.9 applies ordering to group communication.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A distributed system is several independent computers that look like one system to the user, and every design challenge comes from what you lose when the program is spread over a network.",
+   "depth": "Definition and characteristics: multiple independent computers, no shared memory, concurrency, no global clock, independent failures, heterogeneity, resource sharing, transparency, openness, scalability. Types of transparency (access, location, migration, relocation, replication, concurrency, failure) with one example each. Distributed systems versus parallel systems: parallel systems share memory and a clock and are built for speed, distributed systems are loosely coupled and built for resource sharing and fault tolerance. Architectural models: client-server, peer-to-peer, three-tier; and the older minicomputer, workstation and processor-pool models some syllabi still list. Design challenges: naming, scalability, fault tolerance, security, clock synchronisation, global state. Mention the common wrong assumptions about networks (reliable, zero delay, secure, one administrator) in one short list.",
+   "figure": "blocks: a user application sitting on a middleware layer, which sits on a network link to three nodes; each node box notes its own CPU, memory and clock, and the middleware box notes the transparencies it hides.",
+   "example": "One task needs 100 s of CPU work. It is split over 8 machines on a LAN; each machine exchanges 5000 messages and each round trip costs 2 ms. Compute time = 100 / 8 = 12.5 s. Network overhead = 5000 × 2 ms = 10 s. Total = 22.5 s, so speedup = 100 / 22.5 = 4.44 and efficiency = 4.44 / 8 = 55.6 percent. The same split over 8 cores of one shared-memory machine avoids the 10 s of messages entirely.",
+   "trap": "Writing that a distributed system is simply 'many computers working together'. The marks are in the consequences: no shared memory, no global clock, independent failures, and the transparencies that must be built to hide them.",
+   "prereq": "Unit 1 on shared-memory and distributed-memory architectures and on speedup and efficiency.",
+   "leave": "Mutual exclusion, consensus and replication belong to Unit 5; cloud deployment models belong to Unit 6."
+  },
+  {
+   "k": 2,
+   "idea": "Processes with no common memory must exchange data by explicit messages, so the whole design reduces to how send and receive behave.",
+   "depth": "Shared memory: threads in one address space, Pthreads and OpenMP, cache coherence and memory consistency issues in one line (details in Unit 3). Message passing: separate address spaces, a send and a receive primitive, data copied through the kernel or the network. Classify primitives: blocking versus non-blocking, synchronous (rendezvous) versus asynchronous (buffered), direct (named process) versus indirect (mailbox or port), reliable versus unreliable, ordered versus unordered. Explain that send and receive block independently, so four combinations exist and the sender and receiver must agree. Cost model: time = startup latency + bytes / bandwidth. Buffering and the unbounded-buffer assumption.",
+   "figure": "sequence: a Sender, a kernel Buffer and a Receiver; the blocking send returns only when the matching receive takes the message, while a second dashed arrow shows an asynchronous send returning at once.",
+   "example": "A 1 MB message on a link of 1 Gbps = 125 MB/s with startup latency 50 µs. Transfer = 1,000,000 / 125,000,000 = 8 ms; total = 8.05 ms. The same 1 MB sent as 1000 messages of 1 KB: each costs 8 µs of transfer plus 50 µs of startup = 58 µs, total 58 ms, which is 58 / 8.05 ≈ 7.2 times slower. Startup dominates small messages, so batch them.",
+   "trap": "Saying asynchronous send means the message arrives immediately. It only means the sender does not wait; delivery delay is unchanged. Also do not assume a blocking receive can be matched by a non-blocking send without extra buffering.",
+   "prereq": "Chapter 4.1 for why there is no shared memory.",
+   "leave": "MPI and GPU programming go to Unit 3; remote procedure call is the next chapter; delivery order guarantees to 4.9."
+  },
+  {
+   "k": 3,
+   "idea": "Remote procedure call turns a message exchange into something that looks like a local function call, by packing the arguments, sending them, waiting, and unpacking the reply.",
+   "depth": "Only a few universities teach this chapter. Interprocess communication forms: sockets, pipes, message queues, shared-memory segments, with one line each. RPC mechanism as a numbered flow: client calls the stub, stub marshals arguments, transport sends to the server, server stub unmarshals, calls the real procedure, marshals the result back, client stub unmarshals and returns. Binding: how the client finds the server's port through a name or directory service. Call semantics: at-most-once, at-least-once, exactly-once; why exactly-once is hard and what idempotent operations give you. Differences from a local call: latency, partial failure, no shared address space so pointers cannot be passed, parameters by value only. Keep it short and stop there.",
+   "figure": "blocks: a downward flow Client → Client stub (marshal) → Network → Server stub (unmarshal) → Server procedure, with a dashed return edge carrying the marshalled result back to the client stub.",
+   "example": "A program makes 10,000 calls in a loop. A local call costs 0.1 µs, so 10,000 × 0.1 µs = 1 ms. The same calls as RPC over a LAN at 2 ms per round trip cost 10,000 × 2 ms = 20 s. The remote version is 20 s / 1 ms = 20,000 times slower, which is why the interface design matters more than the algorithm inside.",
+   "trap": "Treating RPC as a local call. Pointer arguments cannot cross the network, and a lost reply leaves the client unsure whether the call ran — the exactly-once problem.",
+   "prereq": "Chapter 4.2 for send and receive primitives.",
+   "leave": "MPI point-to-point details to Unit 3; atomicity and transactions to Unit 6."
+  },
+  {
+   "k": 4,
+   "idea": "A distributed computation is a set of processes each running a sequence of events linked only by messages, and the model states what we may assume about timing, delay and failures.",
+   "depth": "Definitions: process, event (internal, send, receive), local history, execution, run, and the fact that an execution is a partial order, not a single sequence. Synchronous model: known bound on message delay and on step time, execution in rounds, algorithms can use timeouts safely. Asynchronous model: no bound on delay, no shared clock, no timeout can be trusted; state the consequence that some problems become impossible without extra assumptions. Semi-synchronous model in one line. 'Asynchronous execution with synchronous communication': a program written as rounds of send/receive pairs, executed on an asynchronous network, still behaves like rounds if messages are delivered in round order — the basis of synchronisers. 'Synchronous program order on asynchronous system': the program's logical order is preserved even though real time is not bounded. State-based models: a process as a state machine with a state and a transition function. Failure models listed, not developed: crash, fail-stop, omission, Byzantine.",
+   "figure": "sequence: three processes P1, P2 and P3 with internal events, and messages m1 and m2 whose arrival times are drawn with uneven gaps to show there is no fixed delay bound.",
+   "example": "A chain P1 → P2 → P3 → P4, each process doing 5 ms of work and then sending one message. In a synchronous system with message delay at most 20 ms the whole chain finishes within 4 × 5 ms + 3 × 20 ms = 80 ms, so a 100 ms timeout is safe. In the asynchronous model no such bound exists: a single message may legally take 20 s, so the same 100 ms timeout is a guess, not a guarantee.",
+   "trap": "Confusing 'asynchronous message passing' with 'non-blocking send'. Here asynchronous means no bound on delay. Also do not claim a synchronous system needs identical physical clocks; it needs bounded delay, not synchronised clocks.",
+   "prereq": "Chapters 4.1 and 4.2.",
+   "leave": "Consensus and failure detectors go to Unit 5; snapshot algorithms need the FIFO channel assumption and come in 4.8."
+  },
+  {
+   "k": 5,
+   "idea": "Each machine has its own crystal clock that drifts, so real timestamps are only usable after they are synchronised to a reference such as UTC within a known bound.",
+   "depth": "Only a few universities teach this chapter. Clock skew (instantaneous difference between two clocks) and drift (rate of change, in parts per million). Offset and round-trip delay. External versus internal synchronisation. Cristian's algorithm: client sends a request, server replies with its time, client sets its clock to server time plus half the measured round trip; why the error is at most half the round trip. Berkeley algorithm: a coordinator polls, averages the offsets, tells each node how much to adjust. NTP: hierarchy of strata, stratum 0 reference clocks, primary and secondary servers, a client queries several servers and discards outliers. The four timestamps T1 to T4 and the offset and delay formulas. State the accuracy qualitatively: milliseconds on a LAN, worse across the Internet. Do not quote specific ppm or accuracy figures for real hardware.",
+   "figure": "sequence: Client and Server with the four timestamps T1 (client sends), T2 (server receives), T3 (server replies), T4 (client receives), plus a dashed line showing the assumed one-way delay on each half.",
+   "example": "An NTP exchange gives T1 = 1000 ms, T2 = 1100 ms, T3 = 1105 ms, T4 = 1120 ms. Offset θ = [(T2 − T1) + (T3 − T4)] / 2 = [(1100 − 1000) + (1105 − 1120)] / 2 = (100 − 15) / 2 = 42.5 ms, so the client clock is 42.5 ms behind and must move forward. Delay δ = (T4 − T1) − (T3 − T2) = 120 − 5 = 115 ms, so the true offset lies within ±δ/2 = ±57.5 ms of the estimate.",
+   "trap": "Forgetting to subtract the server's own processing time (T3 − T2) from the round trip, and presenting the round trip halved as an exact offset instead of a bound.",
+   "prereq": "Chapter 4.4 for the system model and the meaning of a timing assumption.",
+   "leave": "Logical clocks, which need no synchronisation at all, start in 4.6; timestamped mutual exclusion goes to Unit 5."
+  },
+  {
+   "k": 6,
+   "idea": "Because physical clocks cannot order events across machines, Lamport defined a happened-before relation and a scalar counter that respects it.",
+   "depth": "Happened-before relation →: same process events ordered by program order; a send happens before its receive; transitive closure. Concurrent events: neither a → b nor b → a. Lamport's scalar clock rules: increment before each event; on receiving a message with timestamp t, set the clock to max(local, t) + 1. The clock condition: a → b implies C(a) < C(b). Proof sketch by induction over the three rules. The converse is false, and that is the whole limitation. Total ordering of all events by the pair (timestamp, process id), and its use for distributed mutual exclusion (point forward to Unit 5). Mention direct dependency clocks in one line as a way to avoid carrying full vectors.",
+   "figure": "sequence: three processes P1, P2 and P3 with events labelled by their Lamport timestamps, showing the receive step jumping to max(local, message) + 1.",
+   "example": "P1 has internal event a with C = 1, then sends m1 with C = 2. P2 has internal event c with C = 1, receives m1 and sets C = max(1, 2) + 1 = 3, then sends m2 with C = 4. P3 has events f = 1, g = 2, then receives m2 and sets C = max(2, 4) + 1 = 5. Now compare: a has 1 and c has 1, so equal timestamps mean the events are concurrent, not ordered; g has 2 and m1's event has 2, again concurrent.",
+   "trap": "Reading C(a) < C(b) as a → b. It does not follow. Equal or smaller timestamps across different processes tell you nothing about causality.",
+   "prereq": "Chapter 4.4 for events and the asynchronous model; 4.5 shows why physical clocks cannot do this job.",
+   "leave": "Vector clocks in 4.7 fix the converse; timestamp-based mutual exclusion goes to Unit 5."
+  },
+  {
+   "k": 7,
+   "idea": "A vector with one counter per process captures happened-before exactly: a → b if and only if V(a) < V(b), so concurrency becomes detectable.",
+   "depth": "Vector clock rules: V has one entry per process; a process increments its own entry at every event; on receiving a message it takes the component-wise maximum of its vector and the message vector, then increments its own entry. Comparison: V(a) ≤ V(b) if every component is ≤; V(a) < V(b) if ≤ and at least one strict; otherwise the events are concurrent. State and justify the theorem both ways. Cost: n integers per message for n processes, so overhead grows with group size. Mention that the same idea appears as version vectors in replication (point to Unit 6). One line on verifying clock algorithms: check the two rules and the theorem by induction on the length of the causal chain.",
+   "figure": "sequence: three processes P1, P2 and P3 carrying vector timestamps on each event and on each message, so the reader can see the component-wise maximum at a receive.",
+   "example": "P1: e11 = (1,0,0), then sends m1 at e12 = (2,0,0). P2: e21 = (0,1,0), receives m1 giving max((0,1,0),(2,0,0)) = (2,1,0), then increments its own entry to (2,2,0), then sends m2 at e23 = (2,3,0). P3: e31 = (0,0,1), e32 = (0,0,2), receives m2 giving max((0,0,2),(2,3,0)) = (2,3,2) and then (2,3,3). Decision: e12 = (2,0,0) and e31 = (0,0,1) are incomparable, so concurrent; e11 = (1,0,0) < e33 = (2,3,3), so e11 happened before e33.",
+   "trap": "Forgetting to increment your own entry after a receive, which turns a strict < into an equality and makes a cause look concurrent with its effect. Never compare vectors by their sum or by one component.",
+   "prereq": "Chapter 4.6 for happened-before and scalar clocks.",
+   "leave": "Causal message delivery in 4.9; version vectors for replicated data in Unit 6."
+  },
+  {
+   "k": 8,
+   "idea": "A snapshot is consistent when, for every message, it contains both the send and the receive or neither, and Chandy and Lamport get such a snapshot without stopping the system by sending markers on FIFO channels.",
+   "depth": "Definitions: local state, channel state, global state, cut, consistent cut, inconsistent cut, run. The system model: n processes, directed FIFO channels, messages in transit. Chandy-Lamport: the initiator records its own state and sends a marker on every outgoing channel; a process that receives its first marker records its own state, marks that channel empty, and forwards markers on all outgoing channels; any application message that arrives on a channel after the first marker but before the marker from that channel is appended to that channel's state; the snapshot is complete when every process has recorded and every channel has been marked. Say clearly that the resulting snapshot need not correspond to any single instant in real time. Purposes: checkpointing, termination detection, deadlock detection, stable predicate evaluation. Distinguish stable from unstable predicates in one line. For channels that are not FIFO the algorithm needs extra bookkeeping, so only state that FIFO is assumed.",
+   "figure": "blocks: a downward flowchart Initiator records state → sends markers out → receiver sees first marker, records state and marks channel empty → messages after the marker go into channel state → all markers in, snapshot complete, with a dashed back edge from the last step to the first.",
+   "example": "Account A holds ₹100 and account B holds ₹100, total ₹200. A transfers ₹30 to B. Snapshot S1: A records ₹70 after sending, B records ₹100 before receiving, and the channel A → B holds the ₹30 message; total = 70 + 100 + 30 = ₹200, consistent. Snapshot S2: A records ₹100 before the transfer and B records ₹130 after it; total = ₹230, which invents ₹30 and is inconsistent.",
+   "trap": "Believing a snapshot must be instantaneous or must stop the system, and forgetting the channel states. Also forgetting that a message arriving after the marker on that channel belongs to the channel state, not to the receiving process's state.",
+   "prereq": "Chapters 4.2 and 4.4 for FIFO channels and the asynchronous model; 4.7 for the causal knowledge the markers rely on.",
+   "leave": "Checkpointing and rollback recovery to Unit 5; distributed deadlock detection to Unit 5; termination detection is only named here."
+  },
+  {
+   "k": 9,
+   "idea": "When one message goes to a whole group, the members must agree on a delivery order, and FIFO, causal and total order are progressively stronger promises.",
+   "depth": "Group communication terms: group, membership, multicast, atomic multicast (delivered to all members or to none). Ordering paradigms: unordered; FIFO order (messages from one sender are delivered in send order, but different senders can be interleaved differently); causal order (if send(m1) → send(m2) then every member delivers m1 before m2); total order (all members deliver in the same sequence, which need not respect causality). Implementation of causal order: each message carries the sender's sequence number and a vector giving the highest sequence number delivered from every process; a member delivers m only when the FIFO condition and the causal condition both hold, otherwise it buffers. Implementation of total order: a sequencer assigns a number to each message, or members run a agreement round. Say that casual plus total gives the strongest practical service and that atomic multicast is what replicated services need (point to Unit 6). Mention membership change as a hard problem in one line.",
+   "figure": "sequence: processes P1, P2 and P3; P1 sends m1 with V = (1,0,0) to P2 and P3, P2 sends m2 with V = (1,1,0) to P3, and m2 reaches P3 before m1 so it must be buffered.",
+   "example": "P1 sends m1 carrying V = (1,0,0). P2 receives m1, so its vector is (1,0,0) plus its own first send, giving m2 with V = (1,1,0). P3 receives m2 first and checks: Vmsg[2] = 1 equals Vdelivered[2] + 1 = 0 + 1, fine, but Vmsg[1] = 1 is greater than Vdelivered[1] = 0, so m2 is buffered. m1 arrives: Vmsg[1] = 1 = 0 + 1 and the other component is 0 ≤ 0, so m1 is delivered and Vdelivered = (1,0,0). Re-checking m2: 1 = 0 + 1 and 1 ≤ 1, so m2 is delivered and Vdelivered = (1,1,0). With total order instead, a sequencer would stamp m1 = 1 and m2 = 2 and every member would deliver in that order.",
+   "trap": "Assuming FIFO order gives causal order. It does not across different senders: FIFO says nothing about m1 from P1 and m2 from P2. Also total order does not imply causal order, and causal order does not fix a single global sequence.",
+   "prereq": "Chapter 4.7 for vector timestamps; 4.8 for consistent views of the group.",
+   "leave": "Distributed mutual exclusion and consensus to Unit 5; replication and consistency models to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "independent nodes can only talk by messages"
+  ],
+  [
+   2,
+   3,
+   "send and receive become RPC stubs"
+  ],
+  [
+   3,
+   4,
+   "RPC latency and partial failure need a timing model"
+  ],
+  [
+   4,
+   5,
+   "the model needs real timestamps, so clocks must be synchronised"
+  ],
+  [
+   5,
+   6,
+   "drift shows physical clocks cannot order events, so use logical clocks"
+  ],
+  [
+   6,
+   7,
+   "scalar clocks hide concurrency, vectors expose it"
+  ],
+  [
+   7,
+   8,
+   "causal knowledge lets you cut a consistent global state"
+  ],
+  [
+   8,
+   9,
+   "snapshots plus ordering give group members one delivery order"
+  ]
+ ]
+}

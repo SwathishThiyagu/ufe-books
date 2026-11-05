@@ -1,0 +1,148 @@
+{
+ "lead": "A group is a set of processes that act as one recipient. Group communication sends one message to all members. The network can deliver copies in different orders at different members. If a member acts on a message too early, replicas can diverge. Message ordering gives delivery promises: FIFO, causal and total. Replicated services, chat rooms, stock tickers and cluster control planes use these promises.",
+ "prereq": "You need <a href=\"#vector-clocks-and-causality\">vector clocks</a> from Chapter 4.7 and <a href=\"#global-state-and-consistent-snapshots\">consistent snapshots</a> from Chapter 4.8.",
+ "sections": [
+  {
+   "h3": "Groups and the delivery problem",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A group is a named set of processes. The list of current members is the membership. A multicast is one send that creates a copy for every member. Ordinary multicast is best effort: some members may get a copy, others may not. Atomic multicast is stronger: either every current member delivers the message or no member does. A delivery is the moment the message is handed to the application; a receive may only place it in a buffer. This difference is the whole game. A member can receive early and still wait. Ordering rules say when waiting ends. Group communication appears in replicated databases, cluster managers, chat rooms and market-data feeds. Membership change, when a process joins, leaves or is suspected dead, is a hard problem because old and new members must agree on which messages belong to which view. Real systems spend much code there."
+    }
+   ]
+  },
+  {
+   "h3": "Ordering paradigms",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Unordered means no promise. FIFO means: for each sender, messages are delivered in send order. If P1 sends m1 then m3, every member delivers m1 before m3. FIFO says nothing about m1 from P1 and m2 from P2; different members may interleave them differently. Causal order adds cross-sender order that follows <a href=\"#logical-clocks-happened-before-and-scalar-time\">happened-before</a>. If send(m1) → send(m2), every member delivers m1 before m2. Concurrent messages may still be ordered differently at different members. Total order is a separate axis: every member delivers all messages in one same sequence. Total order does not require that sequence to respect happened-before. A sequencer can put a causally later message first. Causal plus total is the strongest practical service in this unit: one sequence that also respects causality. It is what replicated services need. Ordinary multicast is not atomic; atomic multicast is the all-or-none delivery promise."
+    }
+   ]
+  },
+  {
+   "h3": "Implementing causal and total order",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Implement causal order with vector timestamps. Each process keeps V<sub>del</sub>[j] = highest sequence number it has delivered from process j. A message m from sender s carries V<sub>msg</sub>, where V<sub>msg</sub>[j] is the number of messages from j that causally precede m, including m itself for j = s. This is the same vector clock idea as Chapter 4.7. A member delivers m only when two tests pass."
+    },
+    {
+     "type": "formula",
+     "text": "V<sub>msg</sub>[s] = V<sub>del</sub>[s] + 1 and V<sub>msg</sub>[j] ≤ V<sub>del</sub>[j] for every j ≠ s",
+     "where": "V<sub>msg</sub> is the message's vector timestamp; V<sub>del</sub> is the receiver's vector of highest delivered sequence numbers; s is the sender's index. The first test is FIFO; the second is causal. If either test fails, buffer m and try again after the next delivery. On delivery, set V<sub>del</sub>[j] = max(V<sub>del</sub>[j], V<sub>msg</sub>[j]) for all j."
+    },
+    {
+     "type": "p",
+     "text": "Total order has two common implementations. In a sequencer, one process numbers every message 1, 2, 3, ...; members deliver in increasing number. If the sequencer is a bottleneck or failure point, members run an agreement round to choose the next number; that round is consensus, left to Unit 5. Total order alone can reorder causal messages, so real systems combine causal plus total. Atomic multicast needs the all-or-none property; replicated services use it (see Unit 6)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "P3 receives m2 before m1. The causal test fails because P1's component is still 0, so m2 waits in the buffer until m1 arrives.",
+  "spec": {
+   "type": "sequence",
+   "aria": "Sequence diagram: P1 sends m1 with vector (1,0,0) to P2 and P3; P2 sends m2 with vector (1,1,0) to P3; the delayed copy of m1 reaches P3 after m2, so P3 buffers m2.",
+   "actors": [
+    "P1",
+    "P2",
+    "P3"
+   ],
+   "messages": [
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "m1 V=(1,0,0)",
+     "dashed": false
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "m2 V=(1,1,0)",
+     "dashed": false
+    },
+    {
+     "from": "P1",
+     "to": "P3",
+     "label": "m1 V=(1,0,0) delayed",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "P3 starts with Vdel = (0,0,0). It receives m2 from P2 with Vmsg = (1,1,0) before m1 from P1 with Vmsg = (1,0,0). Using causal delivery, decide what P3 buffers and delivers. Give the delivery order and final Vdel. Then a sequencer stamps m1 = 1 and m2 = 2. Give the total-order delivery sequence.",
+   "steps": [
+    "For m2, sender s = P2, so s = 2. FIFO check: Vmsg[2] = 1 and Vdel[2] + 1 = 0 + 1 = 1, so the FIFO test passes.",
+    "Causal check for m2: for P1, Vmsg[1] = 1 and Vdel[1] = 0. 1 ≤ 0 is false. Buffer m2. Vdel stays (0,0,0).",
+    "For m1, s = P1. FIFO: Vmsg[1] = 1 equals Vdel[1] + 1 = 1. Causal for P2: Vmsg[2] = 0 ≤ Vdel[2] = 0. Deliver m1. Vdel becomes (1,0,0).",
+    "Re-check m2: FIFO 1 = 0 + 1; causal for P1: 1 ≤ 1. Deliver m2. Vdel becomes (1,1,0).",
+    "Causal delivery order at P3: m1 then m2. Total-order stamps are 1 for m1 and 2 for m2, so total order is also m1 then m2."
+   ],
+   "answer": "P3 buffers m2, delivers m1, then delivers m2; final Vdel = (1,1,0), and the total-order sequence is m1, m2 with stamps 1, 2.",
+   "check": "Vdel = [0,0,0]\nbuffer = []\n\ndef can_deliver(Vmsg, s):\n    if Vmsg[s-1] != Vdel[s-1] + 1:\n        return False\n    for j in range(3):\n        if j != s-1 and Vmsg[j] > Vdel[j]:\n            return False\n    return True\n\ndef try_deliver(Vmsg, s, name):\n    if can_deliver(Vmsg, s):\n        for j in range(3):\n            Vdel[j] = max(Vdel[j], Vmsg[j])\n        return name\n    buffer.append((name, Vmsg, s))\n    return None\n\ntry_deliver([1,1,0], 2, 'm2')\ntry_deliver([1,0,0], 1, 'm1')\nfor item in list(buffer):\n    name, Vmsg, s = item\n    if try_deliver(Vmsg, s, name) is not None:\n        buffer.remove(item)\nseq_m1 = 1\nseq_m2 = 2\nprint(Vdel[0])\nprint(Vdel[1])\nprint(Vdel[2])\nprint(seq_m1)\nprint(seq_m2)",
+   "values": [
+    1,
+    1,
+    0,
+    1,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "FIFO does not give causal order across senders: FIFO says nothing about m1 from P1 and m2 from P2.",
+  "Total order does not imply causal order; a sequencer can place a causally later message first.",
+  "Causal order does not fix one global sequence; two concurrent messages can be delivered in different orders at different members.",
+  "Receive is not deliver; a received message may wait in a buffer until its ordering tests pass."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define atomic multicast.",
+   "marks": 2,
+   "a": "A multicast in which every current group member delivers the message, or no member delivers it."
+  },
+  {
+   "level": "understand",
+   "q": "Why can FIFO order alone let two replicas diverge?",
+   "marks": 3,
+   "a": "FIFO orders messages from each sender, but not between different senders. One replica may deliver m1 then m2 while another delivers m2 then m1 if the sends are concurrent."
+  },
+  {
+   "level": "apply",
+   "q": "P3 has Vdel = (1,0,0). It receives m2 from P2 with Vmsg = (1,1,0). Can P3 deliver m2 now? Give the final Vdel.",
+   "marks": 4,
+   "a": "FIFO: 1 = 0 + 1. Causal: for P1, 1 ≤ 1. Yes. Deliver m2, Vdel = (1,1,0)."
+  },
+  {
+   "level": "analyze",
+   "q": "A total-order service stamps m2 = 1 and m1 = 2, even though send(m1) → send(m2). Is this allowed? What property is missing?",
+   "marks": 5,
+   "a": "Yes, total order alone only requires one common sequence. It does not require causal order, so the sequence can violate happened-before. The missing property is causal order; causal plus total would forbid it."
+  },
+  {
+   "level": "remember",
+   "q": "What does FIFO order guarantee for one sender?",
+   "marks": 2,
+   "a": "If a sender sends m1 before m2, every member delivers m1 before m2."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the causal algorithm buffer a message instead of dropping it?",
+   "marks": 3,
+   "a": "The message is valid but not yet deliverable; an earlier causal message is missing. Buffering preserves it until the missing message is delivered."
+  },
+  {
+   "level": "analyze",
+   "q": "What does causal plus total order add over causal order alone?",
+   "marks": 4,
+   "a": "Causal order gives happened-before delivery. Total order adds one common sequence for all members. Together every member delivers in the same causal sequence."
+  }
+ ],
+ "beyond": "Not for the exam. Industry group communication appears in cluster membership services, replicated logs and publish-subscribe buses. Raft and Paxos are usually described as consensus on a log, but the log gives a total order of commands to replicas. Kafka gives FIFO order within a partition, not total order across partitions. Search for virtual synchrony, sequencer total order, atomic multicast and view change if you meet a real group service."
+}

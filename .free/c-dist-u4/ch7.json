@@ -1,0 +1,173 @@
+{
+ "lead": "Scalar clocks give one number per event. They order events that are causally related, but they cannot tell whether two events are unrelated. A vector clock keeps one counter for every process. Comparing two vectors then gives three answers: earlier, later, or concurrent. This is the standard tool for detecting causality in distributed systems, from debugging traces to replicated databases. This chapter gives the vector-clock rules, proves the comparison theorem, and states the cost: n integers per message for n processes.",
+ "prereq": "You need <a href=\"#logical-clocks-happened-before-and-scalar-time\">Chapter 4.6</a> for happened-before and scalar clocks.",
+ "sections": [
+  {
+   "h3": "Vector clock rules",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A vector clock assigns a vector <code>V(e)</code> to each event <code>e</code>. For <code>n</code> processes, the vector has <code>n</code> entries, one per process. Entry <code>i</code> counts the events of process <code>P<sub>i</sub></code> that are in the causal history of <code>e</code>. All entries start at 0."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "At every local event, <code>P<sub>i</sub></code> increments its own entry <code>V[i]</code> by 1. This includes sends, receives and internal events.",
+      "On a send, the message carries the sender's current vector. This is the vector after the send event has incremented the sender's entry.",
+      "On a receive of a message with vector <code>W</code>, <code>P<sub>i</sub></code> first sets <code>V[j] = max(V[j], W[j])</code> for every <code>j</code>. Then it increments <code>V[i]</code> by 1 for the receive event.",
+      "Compare two events <code>a</code> and <code>b</code> component by component. <code>V(a) ≤ V(b)</code> means every entry of <code>V(a)</code> is less than or equal to the same entry of <code>V(b)</code>."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "V(a) < V(b)  iff  V(a) ≤ V(b) and V(a) ≠ V(b)",
+     "where": "V(a) and V(b) are vector timestamps of events a and b; V(a) ≤ V(b) means every entry of V(a) is less than or equal to the same entry of V(b). If neither V(a) ≤ V(b) nor V(b) ≤ V(a), the events are concurrent."
+    }
+   ]
+  },
+  {
+   "h3": "Why the comparison is exact",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The central theorem is: for any two events <code>a</code> and <code>b</code>, <code>a → b</code> if and only if <code>V(a) < V(b)</code>. Here <code>a → b</code> means <code>a</code> happened before <code>b</code> in the sense of <a href=\"#logical-clocks-happened-before-and-scalar-time\">Chapter 4.6</a>."
+    },
+    {
+     "type": "p",
+     "text": "First direction. If <code>a → b</code>, prove <code>V(a) < V(b)</code> by induction on the length of the causal chain from <code>a</code> to <code>b</code>. For one step on the same process, the later event has a larger own entry and equal other entries. For one message step, the receiver takes the component-wise maximum, so every entry is at least the sender's entry; the receive increment makes its own entry strict. Induction adds the steps."
+    },
+    {
+     "type": "p",
+     "text": "Second direction. If <code>V(a) < V(b)</code>, let <code>a</code> be the <code>k</code>-th event of process <code>P<sub>j</sub></code>. Then <code>V(a)[j] = k</code>. The inequality gives <code>V(b)[j] ≥ k</code>. By the invariant below, <code>V(b)[j]</code> counts how many events of <code>P<sub>j</sub></code> are in the causal history of <code>b</code>. Since events on one process are ordered, that history contains <code>a</code>. So <code>a → b</code>."
+    },
+    {
+     "type": "p",
+     "text": "The invariant: after every event <code>e</code>, <code>V(e)[i]</code> equals the number of events of <code>P<sub>i</sub></code> in the causal history of <code>e</code>. The two update rules preserve it: a local event adds itself, and a receive adds the sender's known history before adding itself."
+    },
+    {
+     "type": "p",
+     "text": "Cost: each message carries <code>n</code> integers for <code>n</code> processes. The overhead grows with group size, so vector clocks suit groups where exact causality matters more than bandwidth. The same counters appear as version vectors in replicated data; see Unit 6."
+    }
+   ]
+  },
+  {
+   "h3": "Checks and use",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "To check any proposed clock algorithm, verify two things. First, the local rule must make the own entry increase at every event. Second, the receive rule must take the component-wise maximum and then increment. Then prove the theorem by induction on the length of the causal chain, as above."
+    },
+    {
+     "type": "p",
+     "text": "Vector comparison is not arithmetic. Never compare by the sum of entries or by a single entry. The vectors <code>(2,0,0)</code> and <code>(0,0,1)</code> have sums 2 and 1, but neither is ≤ the other, so the events are concurrent."
+    },
+    {
+     "type": "p",
+     "text": "Causal message delivery uses exactly this test; see <a href=\"#message-ordering-and-group-communication\">Chapter 4.9</a>. Replicated stores use the same idea under the name version vectors to decide whether two versions are ordered or concurrent; see Unit 6. Some syllabi call happened-before potential causality. The vector is the same relation, made computable."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "P1 sends m1 at (2,0,0); P2 receives it, increments to (2,2,0), and sends m2 at (2,3,0). P3 receives m2 and increments to the final vector (2,3,3), which is larger than (1,0,0).",
+  "spec": {
+   "type": "sequence",
+   "aria": "Three processes exchange two messages; labels show the vector timestamp carried by each message and the final vector at P3.",
+   "actors": [
+    "P1",
+    "P2",
+    "P3"
+   ],
+   "messages": [
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "m1 (2,0,0)",
+     "dashed": false
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "m2 (2,3,0); recv (2,3,3)",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Three processes <code>P1</code>, <code>P2</code>, <code>P3</code> use vector clocks with entries <code>(P1,P2,P3)</code>. <code>P1</code> performs <code>e11</code>, then sends <code>m1</code> at <code>e12</code>. <code>P2</code> performs <code>e21</code>, receives <code>m1</code> at <code>e22</code>, then sends <code>m2</code> at <code>e23</code>. <code>P3</code> performs <code>e31</code>, then <code>e32</code>, then receives <code>m2</code> at <code>e33</code>. Give every vector timestamp. Decide whether <code>e12</code> and <code>e31</code> are causally related, and whether <code>e11</code> happened before <code>e33</code>. Marks 6.",
+   "steps": [
+    "All vectors start at <code>(0,0,0)</code>. <code>e11</code> is the first event of <code>P1</code>: increment entry 1 to get <code>(1,0,0)</code>.",
+    "<code>e12</code> is the next event of <code>P1</code>: increment entry 1 to get <code>(2,0,0)</code>. Message <code>m1</code> carries <code>(2,0,0)</code>.",
+    "<code>e21</code> is the first event of <code>P2</code>: <code>(0,1,0)</code>.",
+    "<code>e22</code> receives <code>m1</code>. Component-wise max of <code>(0,1,0)</code> and <code>(2,0,0)</code> is <code>(2,1,0)</code>. Increment entry 2: <code>(2,2,0)</code>.",
+    "<code>e23</code> sends <code>m2</code>. Increment entry 2: <code>(2,3,0)</code>. Message <code>m2</code> carries <code>(2,3,0)</code>.",
+    "<code>e31</code> is the first event of <code>P3</code>: <code>(0,0,1)</code>. <code>e32</code> is the next: <code>(0,0,2)</code>.",
+    "<code>e33</code> receives <code>m2</code>. Max of <code>(0,0,2)</code> and <code>(2,3,0)</code> is <code>(2,3,2)</code>. Increment entry 3: <code>(2,3,3)</code>.",
+    "Compare <code>e12 = (2,0,0)</code> with <code>e31 = (0,0,1)</code>. Entry 1 gives 2 > 0, entry 3 gives 0 < 1. Neither vector is ≤ the other, so the events are concurrent.",
+    "Compare <code>e11 = (1,0,0)</code> with <code>e33 = (2,3,3)</code>. Every entry is ≤ and at least one is strict, so <code>e11 → e33</code>."
+   ],
+   "answer": "The final vector is <code>e33 = (2,3,3)</code>; <code>e12</code> and <code>e31</code> are concurrent, and <code>e11</code> happened before <code>e33</code>.",
+   "check": "def inc(v, i):\n    w = v[:]\n    w[i] += 1\n    return w\n\ndef mx(a, b):\n    return [max(a[i], b[i]) for i in range(3)]\n\ne11 = inc([0, 0, 0], 0)\ne12 = inc(e11, 0)\ne21 = inc([0, 0, 0], 1)\ne22 = inc(mx(e21, e12), 1)\ne23 = inc(e22, 1)\ne31 = inc([0, 0, 0], 2)\ne32 = inc(e31, 2)\ne33 = inc(mx(e32, e23), 2)\n\nprint(e33[0])\nprint(e33[1])\nprint(e33[2])",
+   "values": [
+    2,
+    3,
+    3
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Forgetting to increment the receiver's own entry after a receive. Then the receive can end up with the same vector as the send, so the effect is not strictly later than its cause; only the equality holds.",
+  "Comparing vectors by their sum or by one component. <code>(2,0,0)</code> and <code>(0,0,1)</code> have sums 2 and 1, yet they are concurrent; only component-wise comparison is valid.",
+  "Using <code>V(a) ≤ V(b)</code> as happened-before for distinct events. Strict <code>V(a) < V(b)</code> is needed; equality means the same event, or a broken clock.",
+  "Carrying the receive timestamp on the message. A message carries the sender's vector at the send event, not the receiver's later vector."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the vector-clock theorem that links <code>a → b</code> and vector timestamps.",
+   "marks": 2,
+   "a": "For any events a and b, a → b if and only if V(a) < V(b), where < means component-wise ≤ with at least one strict entry."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a scalar Lamport clock not detect concurrency?",
+   "marks": 3,
+   "a": "It gives one number per event. Two concurrent events can get different numbers, and the smaller number looks as if it happened first; no scalar value tells whether the events are unrelated."
+  },
+  {
+   "level": "apply",
+   "q": "Process P1 has vector <code>(1,0,2)</code> and receives a message with vector <code>(0,3,1)</code>. What is its vector after the receive event on P1?",
+   "marks": 4,
+   "a": "Take max: (1,3,2). Increment P1's own entry: (2,3,2)."
+  },
+  {
+   "level": "analyze",
+   "q": "Vectors <code>(2,1,0)</code> and <code>(1,2,0)</code> are given. Are the events ordered or concurrent? Justify.",
+   "marks": 5,
+   "a": "Entry 1 gives 2 > 1, entry 2 gives 1 < 2. Neither vector is ≤ the other, so the events are concurrent."
+  },
+  {
+   "level": "remember",
+   "q": "What does entry i of V(e) count?",
+   "marks": 2,
+   "a": "The number of events of process Pi in the causal history of e, including e when e is an event of Pi."
+  },
+  {
+   "level": "understand",
+   "q": "Why must a receiver increment its own entry after taking the component-wise maximum?",
+   "marks": 3,
+   "a": "The receive event itself must be later than the message and all events known from it. Without the increment, V(receive) would equal the maximum and would not be strictly greater than the send event."
+  },
+  {
+   "level": "apply",
+   "q": "Given <code>(2,0,0)</code> and <code>(2,1,0)</code>, what is the relation?",
+   "marks": 4,
+   "a": "Every entry of the first is ≤ the second and the second entry is strict, so the first event happened before the second."
+  }
+ ],
+ "beyond": "Not for the exam. Vector clocks are used in distributed debugging, causal logging and replicated stores. The same counters are called version vectors when they label data versions; a store can then keep both versions when they are concurrent. Search next for vector clock versus version vector, causal consistency, and dotted version vector."
+}

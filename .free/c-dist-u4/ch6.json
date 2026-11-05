@@ -1,0 +1,180 @@
+{
+ "lead": "Lamport timestamps solve a narrow but vital problem: giving a consistent order to events spread over machines whose physical clocks disagree. Each process keeps one integer. It increments the integer for every event, and on receiving a message it jumps above the sender's timestamp. This scalar clock respects the happened-before relation: if event a can have influenced event b, then a's timestamp is smaller. It cannot detect concurrency, because smaller timestamps do not prove influence. The idea is used in distributed mutual exclusion, logging, debugging and any protocol that needs a cheap global order without synchronised clocks.",
+ "prereq": "You need: <a href=\"#model-of-distributed-computations-synchronous-vs-asynchronous\">Chapter 4.4</a> for events and the asynchronous model, and <a href=\"#physical-clock-synchronization-and-ntp\">Chapter 4.5</a> for why physical clocks cannot order events across machines.",
+ "sections": [
+  {
+   "h3": "Happened-before: the only order we can trust",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Physical clocks on separate machines drift, and NTP leaves a bounded error. So real timestamps cannot decide which of two events came first. Lamport asked a smaller question: could event a have influenced event b? He wrote a → b for \"a happened before b\". The relation has three rules."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "If a and b are events in the same process, and a occurs before b in program order, then a → b.",
+      "If a is the send of message m and b is the receive of the same m, then a → b.",
+      "The relation is transitive: if a → b and b → c, then a → c."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "If neither a → b nor b → a, events a and b are concurrent. Concurrent does not mean simultaneous. It means no chain of program order and messages connects them, so one cannot have caused the other. This partial order is the causality we can defend without synchronised clocks."
+    }
+   ]
+  },
+  {
+   "h3": "Lamport's scalar clock rules",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each process P<sub>i</sub> keeps one integer C<sub>i</sub>, its scalar logical clock. The starting value is arbitrary; usually it is 0. Three rules update it and stamp events."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Before every event in P<sub>i</sub>, set C<sub>i</sub> = C<sub>i</sub> + 1. The event's timestamp is the new value.",
+      "If the event is a send of message m, put the timestamp C<sub>i</sub> inside m.",
+      "On receiving message m with timestamp t, set C<sub>i</sub> = max(C<sub>i</sub>, t) + 1. The receive event gets this new value."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "a → b ⇒ C(a) < C(b)",
+     "where": "a and b are events; C(e) is the Lamport timestamp of event e; → is happened-before. This is the clock condition."
+    },
+    {
+     "type": "p",
+     "text": "The condition holds by induction over the three rules. Inside one process, each event adds at least 1, so order is preserved. For a send and its receive, the sender stamps t, and the receiver sets C = max(local, t) + 1, which is strictly greater than t. Transitivity follows because < is transitive. The converse is false: C(a) < C(b) does not prove a → b. That gap is the whole limitation of scalar time."
+    }
+   ]
+  },
+  {
+   "h3": "Total order and its limit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Lamport timestamps give every event a pair (C(e), i), where C(e) is the timestamp and i is the process id. Sorting these pairs lexicographically gives one total order that every process can compute. If two events have equal timestamps, the process id breaks the tie. This is useful when a system needs all sites to agree on one order, as in Lamport's distributed mutual exclusion algorithm (see Unit 5)."
+    },
+    {
+     "type": "p",
+     "text": "The total order is consistent with causality, but it adds order between concurrent events. Two concurrent events get some order only because the tie-break rule is arbitrary. For causality exactly, use <a href=\"#vector-clocks-and-causality\">Chapter 4.7</a> and vector clocks. If storing one counter per process is too heavy, direct dependency clocks keep counters only for processes a site directly depends on; they reduce state but still do not make the converse true."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "P1 sends m1 at scalar time 2; P2 receives it and jumps to 3 before sending m2 at 4; P3 receives m2 and jumps to 5. The internal events in the worked example are P1 a = 1, P2 c = 1, and P3 f = 1, g = 2.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A sequence diagram with processes P1, P2 and P3: P1 sends m1 labelled 2 to 3 to P2, and P2 sends m2 labelled 4 to 5 to P3.",
+   "actors": [
+    "P1",
+    "P2",
+    "P3"
+   ],
+   "messages": [
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "m1: C=2→3",
+     "dashed": false
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "m2: C=4→5",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Three processes P1, P2 and P3 run in an asynchronous system. All scalar clocks start at 0. P1 has internal event a, then sends message m1 to P2. P2 has internal event c, receives m1, then sends message m2 to P3. P3 has internal events f and g, then receives m2. Assign Lamport timestamps to these eight events. Which pairs are concurrent?",
+   "steps": [
+    "P1 starts with C1 = 0. Internal event a increments C1 to 1, so timestamp(a) = 1.",
+    "P1 sends m1: C1 becomes 2, and m1 carries timestamp t = 2.",
+    "P2 starts with C2 = 0. Internal event c increments C2 to 1, so timestamp(c) = 1.",
+    "P2 receives m1 with t = 2: C2 = max(1, 2) + 1 = 3. timestamp(receive m1) = 3.",
+    "P2 sends m2: C2 becomes 4, and m2 carries timestamp t = 4.",
+    "P3 starts with C3 = 0. Event f increments C3 to 1.",
+    "Event g increments C3 to 2.",
+    "P3 receives m2 with t = 4: C3 = max(2, 4) + 1 = 5.",
+    "Equal timestamps rule out causality: a, c and f all have 1, so each pair among them is concurrent, and g and the send of m1 both have 2, so those two are concurrent. Different timestamps prove nothing. For the rest, read the causal chains: a → send m1 → receive m1 → send m2 → receive m2, c → receive m1, and f → g → receive m2. Two events with no chain between them are concurrent."
+   ],
+   "answer": "The eight timestamps in event order are a = 1, send m1 = 2, c = 1, receive m1 = 3, send m2 = 4, f = 1, g = 2, receive m2 = 5. The concurrent pairs are a‖c, a‖f, a‖g, send m1‖c, send m1‖f, send m1‖g, c‖f, c‖g, receive m1‖f, receive m1‖g, send m2‖f, send m2‖g. Equal timestamps prove concurrency for a, c and f (all 1) and for g with send m1 (both 2); the other pairs come from the causal chains, not from comparing numbers.",
+   "check": "C1 = C2 = C3 = 0\nts = []\nC1 += 1\nts.append(C1)\nC1 += 1\nm1 = C1\nts.append(m1)\nC2 += 1\nts.append(C2)\nC2 = max(C2, m1) + 1\nts.append(C2)\nC2 += 1\nm2 = C2\nts.append(m2)\nC3 += 1\nts.append(C3)\nC3 += 1\nts.append(C3)\nC3 = max(C3, m2) + 1\nts.append(C3)\nfor x in ts:\n    print(x)",
+   "values": [
+    1,
+    2,
+    1,
+    3,
+    4,
+    1,
+    2,
+    5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "C(a) < C(b) does not mean a → b. The clock condition runs one way only; a smaller timestamp can belong to a concurrent event.",
+  "Equal timestamps on different processes do not order events. If a → b then C(a) < C(b), so equal values rule out causality; the events are concurrent.",
+  "On receive, do not do C = C + 1 and ignore the message timestamp. The rule is C = max(C, t) + 1, so the receive is later than the send.",
+  "The timestamp of a send is taken after the increment for that send event, not before. A common slip is to attach the old value.",
+  "Program order applies only inside one process. Event 3 in P1 and event 3 in P2 are not ordered by the number 3 alone."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the three rules that define the happened-before relation a → b.",
+   "marks": 2,
+   "a": "Same-process program order: if a occurs before b in one process, a → b. Message rule: the send of m happens before the receive of m. Transitivity: if a → b and b → c, then a → c."
+  },
+  {
+   "level": "understand",
+   "q": "Why must a receive set its clock to max(local, message timestamp) + 1 rather than local + 1?",
+   "marks": 3,
+   "a": "The local clock may be behind the sender's clock. max(local, t) makes the receive timestamp greater than the send timestamp t. The +1 marks the receive as a new event after the send."
+  },
+  {
+   "level": "apply",
+   "q": "P1 has clock value 7 and then sends message m. P2 has clock value 3 and receives m. What is P2's clock value after the receive?",
+   "marks": 3,
+   "a": "P1 increments to 8 for the send event, so m carries t = 8. The receive rule gives C = max(3, 8) + 1 = 9. If m had carried a timestamp stamped before the increment, t = 7, P2 would reach max(3, 7) + 1 = 8."
+  },
+  {
+   "level": "analyze",
+   "q": "Events x and y on different processes have C(x) = 3 and C(y) = 5. Can we conclude x → y? Explain.",
+   "marks": 4,
+   "a": "No. The clock condition says x → y implies C(x) < C(y), not the converse. Only two cases remain: x → y, or x and y are concurrent. y → x is ruled out, because it would force C(y) < C(x). Timestamps alone cannot choose between the two remaining cases."
+  },
+  {
+   "level": "apply",
+   "q": "Three events have pairs e1 = (C=4, P3), e2 = (C=4, P1), e3 = (C=5, P2). Process ids order as P1 < P2 < P3. Give the total order by (timestamp, process id).",
+   "marks": 4,
+   "a": "Compare timestamps first. The two with 4 are ordered by process id: e2 = (4, P1) before e1 = (4, P3). Then e3 = (5, P2). Order: e2, e1, e3."
+  },
+  {
+   "level": "understand",
+   "q": "Prove the send-receive case of the clock condition: if a is the send of m and b is the receive of m, then C(a) < C(b).",
+   "marks": 4,
+   "a": "Let C(a) = t. The receive rule gives C(b) = max(C(before), t) + 1. This is at least t + 1, so C(b) > t = C(a). Therefore C(a) < C(b)."
+  },
+  {
+   "level": "analyze",
+   "q": "Two events on different processes both have timestamp 6. What can you say about their causal relation? What if one has 6 and the other has 7?",
+   "marks": 5,
+   "a": "Equal timestamps cannot be causal in either direction, because a → b would force a strict inequality. So the two events are concurrent. With 6 and 7, nothing is proved: the event with 6 may have happened before the event with 7, or they may be concurrent."
+  },
+  {
+   "level": "remember",
+   "q": "What pair gives a total order of Lamport events, and how is the pair compared?",
+   "marks": 2,
+   "a": "The pair (timestamp, process id), compared lexicographically: first by timestamp, then by process id to break ties."
+  }
+ ],
+ "beyond": "Not for the exam. Lamport's one-integer clock appears inside real systems wherever a cheap global order is enough: lease tokens, log ordering and membership changes. Vector clocks give exact causality but grow with the number of processes; production systems often shrink them with dotted version vectors or direct dependency clocks. Search for Lamport timestamps, direct dependency clocks and hybrid logical clocks. Hybrid logical clocks combine physical time with a Lamport counter to keep causality while staying close to wall-clock time."
+}

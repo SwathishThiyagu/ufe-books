@@ -1,0 +1,187 @@
+{
+ "lead": "Processes on different machines cannot read each other's variables. They exchange data as explicit messages. A message-passing system gives each process two primitives: send and receive. Buffering, blocking, reliability and order are all properties of those two calls. Shared-memory threads instead use ordinary reads and writes in one address space. The same send and receive primitives sit under sockets, MPI, remote procedure calls and microservices. This chapter compares the two models and classifies the primitives, so you can judge cost and spot bugs before writing code.",
+ "prereq": "You need: <a href=\"#characteristics-and-design-challenges-of-distributed-systems\">Chapter 4.1</a> for why there is no shared memory.",
+ "sections": [
+  {
+   "h3": "Shared memory and message passing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Shared memory means several threads run in one address space. One thread writes a variable and another reads it with a normal load or store. Pthreads and OpenMP use this model. The hardware must keep caches coherent, and the language must define a memory consistency model; see Unit 3 for those details. One machine can scale this way to a few sockets, but not across a network."
+    },
+    {
+     "type": "p",
+     "text": "Message passing means each process has its own address space. A process cannot read the other's variables. It calls send with a destination and a message. The receiver calls receive, which gives a message and usually the sender's identity. The kernel or network card copies the bytes from the sender's buffer into a kernel buffer, then into the receiver's buffer. The channel is the logical link between them."
+    },
+    {
+     "type": "p",
+     "text": "The design reduces to how send and receive behave: when they return, what they copy, what happens if no message is waiting, and what order messages keep. Interprocess communication (IPC) is the general name for this exchange."
+    },
+    {
+     "type": "p",
+     "text": "Shared memory costs a load or store but no copy; message passing costs a kernel copy and a system call per message, and that copy is the price of running across machines."
+    }
+   ]
+  },
+  {
+   "h3": "How send and receive behave",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A blocking send returns only when the sender may safely reuse its buffer. A blocking receive returns only when it has a message. A non-blocking send or receive returns at once; the call reports completion or gives a handle to test later."
+    },
+    {
+     "type": "p",
+     "text": "A synchronous send, also called rendezvous, waits until a matching receive has started or taken the message. An asynchronous send copies the message into a buffer and returns. Buffering is storage between sender and receiver. With an unbounded buffer, a sender never waits for space. Real buffers are finite, so an asynchronous send can still block when the buffer is full."
+    },
+    {
+     "type": "p",
+     "text": "Direct communication names the partner process. Indirect communication uses a mailbox or port: the sender names the mailbox, and the receiver reads from it. A reliable primitive reports loss or retries. An unreliable one may drop messages. A channel may preserve FIFO order or not; group ordering is in <a href=\"#message-ordering-and-group-communication\">Chapter 4.9</a>."
+    },
+    {
+     "type": "p",
+     "text": "Send and receive block independently. Four combinations exist: blocking send with blocking receive; blocking send with non-blocking receive; non-blocking send with blocking receive; and non-blocking send with non-blocking receive. All four are legal; each side picks its own primitive. A non-blocking send needs a buffer to hold the message until the receiver asks for it. Real systems provide that buffer, so non-blocking send with blocking receive is common. Only a system with no buffering at all can lose the message."
+    }
+   ]
+  },
+  {
+   "h3": "Cost model and buffering",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Measure a message by startup latency L and bandwidth B. L is the fixed cost per message: system call, kernel copy, network stack and interrupt. B is the sustained rate in bytes per second. The transfer time for m bytes is m / B. The total is"
+    },
+    {
+     "type": "formula",
+     "text": "T = L + m / B",
+     "where": "T is total time in seconds; L is startup latency in seconds; m is message size in bytes; B is bandwidth in bytes per second."
+    },
+    {
+     "type": "p",
+     "text": "Startup dominates small messages. Sending many small messages pays L many times, so batch items into one large message when the application allows it. Bandwidth sets the floor for large messages."
+    },
+    {
+     "type": "p",
+     "text": "Buffering hides delay. The sender copies into a kernel buffer, so the receiver can run later. The unbounded-buffer assumption lets a model ignore send blocking. Real systems bound the buffer; when it fills, send blocks or fails. A blocking receive with no matching message waits forever unless it uses a timeout."
+    },
+    {
+     "type": "p",
+     "text": "Use the model to choose message size. If L is 50 µs and B is 125 MB/s, one 1 MB message costs about 8.05 ms; one thousand 1 KB messages cost about 58 ms. The worked example does the arithmetic."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The synchronous path finishes the send only after the matching receive takes the message. A plain blocking send would return as soon as the bytes are in the buffer. The dashed self arrow is an asynchronous send returning at once; delivery still takes the same time.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A sender copies a one megabyte message into a kernel buffer, a receiver takes it, a synchronous send returns after that receive, and a dashed self arrow shows an asynchronous send returning at once.",
+   "actors": [
+    "Sender",
+    "Buffer",
+    "Receiver"
+   ],
+   "messages": [
+    {
+     "from": "Sender",
+     "to": "Buffer",
+     "label": "send 1 MB",
+     "dashed": false
+    },
+    {
+     "from": "Buffer",
+     "to": "Receiver",
+     "label": "copy 1 MB",
+     "dashed": false
+    },
+    {
+     "from": "Receiver",
+     "to": "Sender",
+     "label": "recv; synchronous send returns",
+     "dashed": false
+    },
+    {
+     "from": "Sender",
+     "to": "Sender",
+     "label": "async returns",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A link has bandwidth 1 Gbps and startup latency 50 µs. Send a 1 MB message as one message, then as 1000 messages of 1 KB. Use 1 MB = 1,000,000 bytes and 1 KB = 1000 bytes. Find the transfer time, total time, and slowdown ratio.",
+   "steps": [
+    "Convert bandwidth: 1 Gbps = 1×10⁹ bits/s. Divide by 8: B = 125×10⁶ bytes/s = 125 MB/s.",
+    "One 1 MB message: m = 1,000,000 bytes. Transfer time = m / B = 1,000,000 / 125,000,000 = 0.008 s = 8.0 ms.",
+    "Startup latency L = 50 µs = 0.05 ms. Total time = 8.0 + 0.05 = 8.05 ms.",
+    "One small message: m = 1000 bytes. Transfer time = 1000 / 125,000,000 = 8×10⁻⁶ s = 8 µs. Each total = 50 + 8 = 58 µs.",
+    "For 1000 small messages: total = 1000 × 58 µs = 58,000 µs = 58.0 ms.",
+    "Slowdown ratio = 58.0 ms / 8.05 ms ≈ 7.2."
+   ],
+   "answer": "One 1 MB message takes 8.0 ms of transfer plus 0.05 ms startup, total 8.05 ms. The 1000 small messages take 58.0 ms. Slowdown ratio = 58.0 ms / 8.05 ms ≈ 7.2, so the small messages are about 7.2 times slower.",
+   "check": "m = 1_000_000\nB = 125_000_000\nL = 50e-6\nt_transfer_ms = (m / B) * 1000\nt_one_ms = t_transfer_ms + L * 1000\nprint(t_transfer_ms)\nprint(t_one_ms)\nm_small = 1000\nt_small_each_us = (m_small / B) * 1_000_000 + L * 1_000_000\nt_small_total_ms = (1000 * t_small_each_us) / 1000\nprint(t_small_total_ms)\nprint(t_small_total_ms / t_one_ms)",
+   "values": [
+    8.0,
+    8.05,
+    58.0,
+    7.2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Asynchronous send does not mean the message arrives immediately. It means the sender does not wait; delivery delay is unchanged.",
+  "Non-blocking send with blocking receive is legal and common when a buffer exists to hold the message until the receiver asks. Only a system with no buffer at all can lose the message, because the send returns before the receive asks and the bytes have nowhere to wait.",
+  "Bandwidth units: 1 Gbps = 125 MB/s, not 1000 MB/s. Divide bits per second by 8 to get bytes per second.",
+  "Startup latency is charged per message, not per byte. Sending 1000 small messages pays the startup cost 1000 times.",
+  "Cache coherence is a shared-memory issue. It is not a message-passing primitive and does not order messages on a channel."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define direct and indirect communication in message passing.",
+   "marks": 2,
+   "a": "Direct communication names the partner process. Indirect communication uses a mailbox or port, and the sender names the mailbox."
+  },
+  {
+   "level": "remember",
+   "q": "What does a blocking send guarantee when it returns?",
+   "marks": 2,
+   "a": "The sender may safely reuse its buffer. The message has been copied or a matching receive has taken it."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an asynchronous send not reduce the message's delivery delay?",
+   "marks": 3,
+   "a": "It only copies the message into a buffer and lets the sender continue. The kernel copy, network delay and receiver processing still take the same time."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the unbounded-buffer assumption useful, and when does it fail?",
+   "marks": 3,
+   "a": "It lets a model ignore send blocking. It fails when a finite buffer fills, because then an asynchronous send blocks or fails."
+  },
+  {
+   "level": "apply",
+   "q": "A 4 MB message goes over 2 Gbps with startup latency 100 µs. Find the total time. Use 1 MB = 1,000,000 bytes.",
+   "marks": 4,
+   "a": "2 Gbps = 250 MB/s. Transfer = 4 / 250 = 16 ms. Startup = 100 µs = 0.1 ms. Total = 16.1 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A sender uses non-blocking send, and the receiver uses blocking receive. No buffer is provided. Explain the risk.",
+   "marks": 5,
+   "a": "The pairing is legal and common once a buffer exists. With no buffer at all, the send can return before the receive asks, and the message has nowhere to wait, so it may be dropped or overwritten. Add a buffer, or use a synchronous send so the sender waits for the receive."
+  },
+  {
+   "level": "analyze",
+   "q": "Why do many small messages cost much more than one large message of the same total bytes?",
+   "marks": 4,
+   "a": "Each message pays the fixed startup latency L. Splitting the data increases the number of L payments while the total transfer time stays the same. Batching removes most of those repeated startups."
+  }
+ ],
+ "beyond": "Not for the exam. Modern message passing separates the control path from the data path: RDMA writes directly into a remote buffer, and zero-copy paths avoid one kernel copy. gRPC and Kafka expose send and receive through streams and logs, so blocking, buffering and ordering questions return at a higher level. Search for zero-copy messaging, RDMA verbs, io_uring network calls, and backpressure in message queues to see where these primitives go."
+}

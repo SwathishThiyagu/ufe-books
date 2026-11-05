@@ -1,0 +1,202 @@
+{
+ "lead": "A global state is the local state of every process together with every message in transit on the channels. A snapshot is consistent when, for every message, it contains the send and the receive or neither. Chandy and Lamport record such a snapshot without stopping the system by sending markers over FIFO channels. The result may not match any single real instant. Snapshot algorithms support checkpointing, termination detection and deadlock detection.",
+ "prereq": "You need: FIFO channels and the asynchronous model from <a href=\"#message-passing-versus-shared-memory-communication-primitives\">Chapter 4.2</a> and <a href=\"#model-of-distributed-computations-synchronous-vs-asynchronous\">Chapter 4.4</a>, and causal knowledge from <a href=\"#vector-clocks-and-causality\">Chapter 4.7</a>.",
+ "sections": [
+  {
+   "h3": "Local states, channels and cuts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A distributed computation runs on n processes P1, P2, ..., Pn. Each process has a local state: the values of its variables and its program counter at a point in its run. A run is the actual sequence of events at all processes. Processes communicate only by messages over directed channels; an asynchronous model means no bound on message delay."
+    },
+    {
+     "type": "p",
+     "text": "A channel state is the set of messages sent on that channel but not yet received. A global state is every local state plus every channel state. A cut is a frontier that chooses a prefix of events at each process. The cut is consistent if, for every message, a receive inside the cut implies the matching send is also inside the cut. Equivalently, the snapshot must contain both send and receive or neither."
+    },
+    {
+     "type": "p",
+     "text": "If a receive is inside the cut and its send is outside, the snapshot shows a message arriving from nowhere. That is an inconsistent cut. If the send is inside and the receive is outside, the message is in transit. The cut is still consistent. But when you add up the totals, the channel state must include that message, or the total is short."
+    },
+    {
+     "type": "formula",
+     "text": "S = Σ L(Pi) + Σ C(c)",
+     "where": "S is the snapshot total for an additive quantity such as money; L(Pi) is the local state of process i; C(c) is the state of channel c, meaning messages sent but not received in the cut."
+    }
+   ]
+  },
+  {
+   "h3": "Chandy–Lamport marker algorithm",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Assumptions: n processes, directed FIFO channels, no failures, asynchronous timing. FIFO means a marker cannot overtake an earlier application message on the same channel. Only the initiator starts; every process records exactly once."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The initiator records its own local state, then sends a marker on every outgoing channel.",
+      "A process that receives its first marker records its own local state and marks that incoming channel empty. It forwards a marker on every outgoing channel.",
+      "For every incoming channel, an application message that arrives after the first marker but before the marker on that same channel is appended to that channel's state, not to the process's state.",
+      "When a marker arrives on any other incoming channel, the process stops recording that channel; its state is whatever arrived on it after the process recorded its own state and before this marker, and it is empty if nothing arrived.",
+      "A message that arrives before the first marker is already reflected in the receiver's local state.",
+      "The snapshot is complete when every process has recorded its state and every channel has been marked. The initiator's incoming channels are marked when their markers arrive."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The snapshot is consistent because each channel's marker closes the channel state at a known point. It need not correspond to one instant in real time: processes record at different real times, and the channel states stitch the pieces into one consistent cut."
+    },
+    {
+     "type": "p",
+     "text": "The snapshot supports checkpointing, termination detection, deadlock detection and evaluation of stable predicates. A stable predicate stays true once true, such as deadlock or termination; an unstable predicate, such as 'A has ₹70', may become false again. For non-FIFO channels the same marker rule fails; extra bookkeeping is needed."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "B initiates: it records ₹100 before the ₹30 arrives. A records ₹70 at its first marker. The ₹30 is kept in channel A→B and the total is ₹200.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Consistent snapshot with markers",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "B initiates",
+     "note": "records ₹100 before ₹30",
+     "style": "accent"
+    },
+    {
+     "id": "b",
+     "label": "B sends markers",
+     "note": "each outgoing channel",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "A records ₹70",
+     "note": "at first marker after sending ₹30",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Channel A→B state",
+     "note": "holds ₹30",
+     "style": "accent"
+    },
+    {
+     "id": "e",
+     "label": "Snapshot complete",
+     "note": "total ₹200",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "then",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "marker",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "₹30 before A's marker",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "label": "all marked",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "a",
+     "label": "next snapshot",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Account A holds ₹100 and account B holds ₹100, so the starting total is ₹200. A transfers ₹30 to B by one message. Snapshot S1: A records ₹70 after sending, B records ₹100 before receiving, and the channel A→B holds the ₹30 message. Snapshot S2: A records ₹100 before sending, B records ₹130 after receiving, and the channel is empty. Compute both totals and say which snapshot is consistent.",
+   "steps": [
+    "Starting total = ₹100 + ₹100 = ₹200.",
+    "S1: A's local state = ₹70; B's local state = ₹100; channel A→B state = ₹30.",
+    "S1 total = 70 + 100 + 30 = ₹200. The send is inside the cut and the receive is outside, so the ₹30 message is correctly held in the channel. S1 is consistent.",
+    "S2: A's local state = ₹100; B's local state = ₹130; channel state = ₹0.",
+    "S2 total = 100 + 130 + 0 = ₹230. The receive is inside the cut but the send is outside, so S2 is inconsistent.",
+    "Money invented by S2 = ₹230 − ₹200 = ₹30."
+   ],
+   "answer": "S1 totals ₹200 and is consistent; S2 totals ₹230, invents ₹30, and is inconsistent.",
+   "check": "initial = 100\ntransfer = 30\ns1_a = initial - transfer\ns1_b = initial\ns1_channel = transfer\ns1_total = s1_a + s1_b + s1_channel\ns2_a = initial\ns2_b = initial + transfer\ns2_channel = 0\ns2_total = s2_a + s2_b + s2_channel\nprint(s1_total)\nprint(s2_total)\nprint(s2_total - s1_total)",
+   "values": [
+    200,
+    230,
+    30
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Believing a snapshot must be instantaneous or must stop the system. Chandy–Lamport records a consistent cut while processes keep running.",
+  "Forgetting channel states. A message sent inside the cut but not yet received must appear in the channel state, or the total is short.",
+  "Putting a message that arrives after the process's first marker but before the marker on its own channel into the receiving process's local state. That message belongs to that channel's state until that channel's marker arrives.",
+  "Assuming the same marker rule works for non-FIFO channels. FIFO prevents a marker from overtaking an earlier message; non-FIFO needs extra bookkeeping.",
+  "Confusing a consistent snapshot with the real system state at one real time. The local states may be recorded at different real times."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define channel state in a cut.",
+   "marks": 2,
+   "a": "The messages sent on a channel inside the cut but not yet received inside the cut; they are in transit."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Chandy–Lamport not stop the system?",
+   "marks": 3,
+   "a": "Processes keep running. Markers are control messages sent through the same channels as application messages, and FIFO order means no marker overtakes an earlier message. Each process records once, and each channel's marker closes that channel's state, so the pieces form a consistent cut."
+  },
+  {
+   "level": "apply",
+   "q": "A holds ₹100 and B holds ₹100. A sends ₹30 to B. Snapshot S1 has A = ₹70 after send, B = ₹100 before receive, channel = ₹30. Snapshot S2 has A = ₹100 before send, B = ₹130 after receive, channel = ₹0. Compute both totals and state consistency.",
+   "marks": 4,
+   "a": "S1 = 70 + 100 + 30 = ₹200, consistent. S2 = 100 + 130 + 0 = ₹230; receive is inside but send is outside, so S2 is inconsistent and invents ₹30."
+  },
+  {
+   "level": "analyze",
+   "q": "A snapshot records B after receiving ₹30 but records A before sending it, with an empty channel. What total results and what is wrong?",
+   "marks": 4,
+   "a": "Total = 100 + 130 = ₹230. The cut includes the receive but not the send, so it is inconsistent and creates ₹30 that the starting total did not contain."
+  },
+  {
+   "level": "remember",
+   "q": "Give one stable and one unstable predicate.",
+   "marks": 2,
+   "a": "Stable: deadlock exists. Unstable: account A has ₹70."
+  },
+  {
+   "level": "understand",
+   "q": "Why is FIFO needed in Chandy–Lamport?",
+   "marks": 3,
+   "a": "FIFO ensures a marker cannot pass an earlier message. Then every message is either before the first marker, in the receiver's state, or after it but before that channel's marker, in the channel state."
+  },
+  {
+   "level": "analyze",
+   "q": "Does a consistent snapshot equal the real system state at one real time? Explain.",
+   "marks": 4,
+   "a": "Not necessarily. Local states are recorded at different real times; channel states hold in-transit messages. The result is a consistent cut, not a single instant."
+  }
+ ],
+ "beyond": "Not for the exam. The Chandy–Lamport marker idea appears in stream processors as barrier-based checkpointing, where a barrier flows through the dataflow graph like a marker. Distributed databases use consistent snapshots for backup and for reading a stable view while writes continue. Cloud systems use similar ideas to snapshot a running virtual machine or a replicated store. Search next for 'Chandy Lamport snapshot', 'consistent cut', and 'checkpoint barrier' in stream processing."
+}

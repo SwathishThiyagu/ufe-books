@@ -1,0 +1,206 @@
+{
+ "lead": "Interprocess communication (IPC) is how processes exchange data when they do not share memory. The processes may be on the same machine (pipes, shared memory) or on different machines (sockets). Remote procedure call (RPC) builds on IPC across machines: it hides the send and receive behind a function call, so a client calls a procedure that runs on a server. RPC is used in web services, microservices, distributed databases and file systems. Only a few universities teach this chapter in detail.",
+ "prereq": "You need <a href=\"#message-passing-versus-shared-memory-communication-primitives\">Chapter 4.2</a> for send and receive primitives.",
+ "sections": [
+  {
+   "h3": "IPC forms and the RPC path",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process cannot read another machine's memory. It must use an interprocess communication (IPC) mechanism that moves bytes or messages. Four standard forms are:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Socket: an endpoint named by an IP address and a port; two processes exchange a byte stream or datagrams.",
+      "Pipe: a one-way byte stream between processes, usually related processes on one machine.",
+      "Message queue: a kernel-held queue of discrete messages; sender and receiver need not run at the same time.",
+      "Shared-memory segment: one memory region mapped into two processes on the same machine; fastest, but needs separate synchronisation."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "RPC builds request and reply on top of IPC. The client writes an ordinary call; a local stub turns it into messages, and a server stub turns messages back into a call."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The client calls the client stub. The call looks like a local procedure, with the same name and arguments.",
+      "The client stub marshals the arguments. Marshalling packs values into an agreed byte format; a pointer value is not valid on another machine, so arguments cross by value.",
+      "The transport sends the request message to the server host and port.",
+      "The server stub unmarshals the arguments and calls the real server procedure.",
+      "The server procedure computes and returns its result to the server stub.",
+      "The server stub marshals the result into a reply message.",
+      "The client stub receives the reply, unmarshals the result, and returns it to the client."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Binding is how the client finds the server: a name or directory service maps a service name to a host and port. The request carries a procedure identifier so the server stub knows which procedure to call."
+    }
+   ]
+  },
+  {
+   "h3": "Call semantics and differences from a local call",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A lost reply leaves the client unsure whether the server ran the procedure. Three call semantics describe the promise:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "At-most-once: the client sends one request and never retries; the procedure may not run if the request is lost.",
+      "At-least-once: the client retries until a reply arrives; the procedure can run more than once.",
+      "Exactly-once: the client sees one execution; the server must detect duplicate requests, usually with request IDs and stored replies."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Exactly-once is hard because the server and client can fail independently. If the server crashes after computing but before replying, the client cannot tell that from a lost reply. An idempotent operation can be repeated safely — for example, reading a record — but a non-idempotent operation such as debiting ₹500 must not be repeated blindly."
+    },
+    {
+     "type": "p",
+     "text": "RPC differs from a local call in four ways: latency is milliseconds not nanoseconds; partial failure is normal; there is no shared address space; and parameters pass by value only, so pointers and object references cannot cross."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The request goes down through the client stub and network to the server stub and the server procedure; the server stub marshals the result and the dashed edge carries the reply back to the client stub.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "RPC path",
+   "aria": "A downward block diagram from client to client stub to network to server stub to server procedure, with a dashed return edge from the server stub back to the client stub carrying the marshalled reply.",
+   "nodes": [
+    {
+     "id": "client",
+     "label": "Client",
+     "style": "normal"
+    },
+    {
+     "id": "cstub",
+     "label": "Client stub",
+     "note": "marshal args",
+     "style": "accent"
+    },
+    {
+     "id": "net",
+     "label": "Network",
+     "note": "request message",
+     "style": "normal"
+    },
+    {
+     "id": "sstub",
+     "label": "Server stub",
+     "note": "unmarshal args / marshal result",
+     "style": "accent"
+    },
+    {
+     "id": "proc",
+     "label": "Server procedure",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "client",
+     "to": "cstub",
+     "label": "call",
+     "style": "solid"
+    },
+    {
+     "from": "cstub",
+     "to": "net",
+     "label": "send",
+     "style": "solid"
+    },
+    {
+     "from": "net",
+     "to": "sstub",
+     "label": "deliver",
+     "style": "solid"
+    },
+    {
+     "from": "sstub",
+     "to": "proc",
+     "label": "call",
+     "style": "solid"
+    },
+    {
+     "from": "sstub",
+     "to": "cstub",
+     "label": "result (marshalled) reply",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A program makes 10,000 calls. A local call costs 0.1 µs. The same calls as RPC over a LAN cost 2 ms per round trip. Find the local loop time, the remote loop time, and the slowdown ratio.",
+   "steps": [
+    "Local time = 10,000 × 0.1 µs = 1,000 µs.",
+    "Convert to ms: 1,000 µs ÷ 1,000 = 1 ms.",
+    "Remote time = 10,000 × 2 ms = 20,000 ms.",
+    "Convert to s: 20,000 ms ÷ 1,000 = 20 s.",
+    "Slowdown = 20 s ÷ 1 ms = 20,000 ms ÷ 1 ms = 20,000."
+   ],
+   "answer": "The remote loop takes 20 s, which is 20,000 times the 1 ms local loop.",
+   "check": "calls = 10000\nlocal_us = 0.1\nrpc_ms = 2\nlocal_ms = calls * local_us / 1000\nremote_s = calls * rpc_ms / 1000\nratio = (calls * rpc_ms) / local_ms\nprint(local_ms)\nprint(remote_s)\nprint(ratio)",
+   "values": [
+    1.0,
+    20.0,
+    20000.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "RPC is not a local call: pointer arguments cannot cross the network; pass data by value.",
+  "Exactly-once is not free: it needs duplicate detection at the server; a simple timeout and retry gives at-least-once.",
+  "A lost reply is not the same as a failed procedure; the server may have run it.",
+  "At-most-once may not run at all; at-least-once may run twice."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name four IPC forms.",
+   "marks": 2,
+   "a": "Socket, pipe, message queue, shared-memory segment."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a pointer not be an RPC argument?",
+   "marks": 3,
+   "a": "It is an address in the client's memory; the server has no such address. Arguments pass by value."
+  },
+  {
+   "level": "apply",
+   "q": "A local call costs 0.2 µs; 5,000 calls. What is the total local time?",
+   "marks": 3,
+   "a": "5,000 × 0.2 µs = 1,000 µs = 1 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A client times out and retries. The server had already debited ₹500. Which semantics did it get, and what is the risk?",
+   "marks": 4,
+   "a": "At-least-once; duplicate debit, because debit is not idempotent."
+  },
+  {
+   "level": "understand",
+   "q": "What does binding do?",
+   "marks": 2,
+   "a": "Maps a service name to a host and port so the client can send the request."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is exactly-once hard when replies are lost?",
+   "marks": 4,
+   "a": "The client cannot distinguish a lost reply from server failure; the server needs request IDs and stored replies."
+  }
+ ],
+ "beyond": "Not for the exam. Modern systems use gRPC and REST over HTTP/2, with Protocol Buffers or JSON for marshalling. Industry RPC frameworks add deadlines, tracing, retries and load balancing. Search terms: interface definition language, idempotency key, circuit breaker, retry budget."
+}
