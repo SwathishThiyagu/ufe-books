@@ -1,0 +1,210 @@
+{
+ "lead": "Cloud storage does not keep a user file as one piece on one disk. It puts the file in a namespace, cuts it into chunks, records where each chunk lives in metadata, and places copies on many machines. That layout decides durability when a disk dies, latency when a reader asks for bytes, and the monthly bill. Photo services, backups, logs, VM disks and databases all use it, but they choose different storage shapes and different copy schemes. This chapter shows the shapes and the layout.",
+ "prereq": "You need: storage devices, usage monitors and SLAs from Unit 2, and storage virtualization from Unit 3; the chunk-server design appears in <a href=\"#distributed-file-systems-gfs-and-hdfs\">4.2</a>.",
+ "sections": [
+  {
+   "h3": "Three storage shapes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Cloud offers three storage shapes. <b>Block storage</b> gives a raw volume: a sequence of fixed-size blocks with no file system inside it. The VM attaches the volume and formats it. Use it for boot disks, databases and workloads needing low latency and random writes. <b>File storage</b> gives a shared directory tree. Many VMs mount the same directory and use paths and file locks. Use it for home directories, shared application files and build caches. <b>Object storage</b> gives a flat namespace called a bucket. Each item has a key and a value, reached over HTTP. Use it for photos, videos, backups, logs and static sites. Some syllabi call object storage blob storage, and call chunks blocks or extents. The three shapes differ in access method and in who manages the file system."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Shape",
+      "Access",
+      "Typical use"
+     ],
+     "rows": [
+      [
+       "Block",
+       "raw blocks, attached to VM",
+       "database, boot disk"
+      ],
+      [
+       "File",
+       "shared path tree",
+       "home dirs, shared apps"
+      ],
+      [
+       "Object",
+       "HTTP key in bucket",
+       "photos, backups, logs"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "How one object is laid out",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Organization starts with a namespace. The bucket is a flat namespace: the key <code>img1.jpg</code> is unique inside it. A prefix such as <code>2025/</code> looks like a folder but is only part of the key. The store then splits the object into fixed-size chunks, for example 64 MB each. A metadata service records the object name, size, chunk list and the servers that hold each chunk. The metadata is small compared with data but must be highly available. Each chunk is copied to r servers. The replication factor r is the number of full copies kept; r=3 means three full copies. On a read, the client asks metadata, then fetches chunks from a replica. A caching tier in front of the store keeps hot objects close to users. Data locality means running the compute near the chunk: a photo resizer should run in the same region as the bucket. The data type also matters. Block and file storage suit structured records with a schema; object storage suits semi-structured files such as JSON and logs; key-value stores suit simple lookups by key. Erasure coding replaces full copies with k data fragments and m parity fragments. Any k of the k+m fragments rebuild the chunk. RS(6,3) uses 6 data and 3 parity fragments, so 9 fragments in total."
+    },
+    {
+     "type": "formula",
+     "text": "raw disk = S × r",
+     "where": "S is the logical data size in GB; r is the replication factor, the number of full copies kept."
+    },
+    {
+     "type": "formula",
+     "text": "storage factor = (k + m) ÷ k",
+     "where": "k is the number of data fragments; m is the number of parity fragments; k + m is the total fragments per chunk."
+    }
+   ]
+  },
+  {
+   "h3": "Durability, latency and the bill",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Replication is simple and fast. A read can come from any copy, and a rebuild is a copy from a live replica. Its cost is disk. Erasure coding is cheaper in disk but needs more CPU and network to encode, decode and rebuild. Small random reads can be slower because a read may need several fragments. A repair also needs k surviving fragments and network traffic, so the saving is paid for in work. The bill follows raw disk, requests and egress, not logical bytes. Reporting 600 GB of user data as 600 GB of disk is wrong when r=3; the provider buys 1800 GB. Metadata, snapshots and indexes add more. Durability is not three times one copy. Three copies on the same rack still fail together, so providers place replicas on different racks or zones and repair lost copies automatically. Latency comes from distance and round trips: metadata lookup, chunk fetch, cache miss. A local cache cuts the last two. For a photo service, the hot set is small; caching it changes both latency and egress cost."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "A bucket maps a key to an object; the object is split into 64 MB chunks and each chunk is copied to three nodes. Notice the bucket is flat: the key is not a real folder.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "Bucket photos",
+    "note": "flat namespace",
+    "children": [
+     {
+      "label": "img1.jpg",
+      "edge": "key",
+      "children": [
+       {
+        "label": "chunk c0",
+        "edge": "split 64 MB",
+        "children": [
+         {
+          "label": "Node A",
+          "edge": "replica",
+          "_d": 3,
+          "children": [],
+          "_x": 202.33919999999995,
+          "_y": 264
+         },
+         {
+          "label": "Node B",
+          "edge": "replica",
+          "_d": 3,
+          "children": [],
+          "_x": 360.0,
+          "_y": 264
+         },
+         {
+          "label": "Node C",
+          "edge": "replica",
+          "_d": 3,
+          "children": [],
+          "_x": 517.6608000000001,
+          "_y": 264
+         }
+        ],
+        "_d": 2,
+        "_x": 360.0,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 360.0,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "A bucket named photos contains an object img1.jpg, which is split into a 64 MB chunk c0, and that chunk has replicas on Node A, Node B and Node C."
+  }
+ },
+ "examples": [
+  {
+   "question": "A photo service stores 600 GB of images. With a replication factor of 3, how much raw disk is needed, and what does it cost per month at ₹1.5 per GB-month? With erasure coding RS(6,3) instead, how much?",
+   "steps": [
+    "Logical data S = 600 GB.",
+    "Replication factor r = 3, so raw disk = S × r = 600 GB × 3 = 1800 GB.",
+    "Price p = ₹1.5 per GB-month, so replication cost = 1800 GB × ₹1.5 = ₹2700 per month.",
+    "RS(6,3) has k = 6 data fragments and m = 3 parity fragments, total n = 9. Storage factor = n ÷ k = 9 ÷ 6 = 1.5.",
+    "Raw disk = S × 1.5 = 600 GB × 1.5 = 900 GB.",
+    "Erasure-coding cost = 900 GB × ₹1.5 = ₹1350 per month.",
+    "Saving = ₹2700 − ₹1350 = ₹1350 per month."
+   ],
+   "answer": "Replication needs 1800 GB and costs ₹2700 per month; RS(6,3) needs 900 GB and costs ₹1350 per month, saving ₹1350 per month.",
+   "check": "S = 600\nr = 3\nprice = 1.5\nraw_rep = S * r\ncost_rep = raw_rep * price\nk = 6\nm = 3\nfactor = (k + m) / k\nraw_ec = S * factor\ncost_ec = raw_ec * price\nsaving = cost_rep - cost_ec\nprint(int(raw_rep))\nprint(int(cost_rep))\nprint(int(raw_ec))\nprint(int(cost_ec))\nprint(int(saving))",
+   "values": [
+    1800,
+    2700,
+    900,
+    1350,
+    1350
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Logical size is not the disk bill. With replication factor r, raw disk is S × r; metadata, snapshots and indexes add more.",
+  "Replication factor 3 means three copies, not three times the durability of one copy. Durability depends on independent failure domains and timely repair.",
+  "Block storage (a raw volume for a VM) is not the same as a chunk or block inside an object store. The first is a product; the second is an internal piece.",
+  "Erasure coding is not free storage. It saves disk but spends CPU, network and repair time, and can hurt small random reads.",
+  "A bucket is flat. Prefixes look like folders but are part of the key, so renaming a prefix is not a cheap directory rename."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define object storage in one sentence.",
+   "marks": 2,
+   "a": "Object storage is a flat bucket of key-value items reached over HTTP, with metadata and chunks managed by the store."
+  },
+  {
+   "level": "remember",
+   "q": "What does the metadata service record?",
+   "marks": 2,
+   "a": "It records the object name, size, chunk list and the servers holding each chunk."
+  },
+  {
+   "level": "understand",
+   "q": "Why split an object into fixed-size chunks instead of storing it whole?",
+   "marks": 3,
+   "a": "Chunks let the store place pieces on many disks, replicate or encode each piece, rebuild only a lost piece, and stream reads in parallel."
+  },
+  {
+   "level": "understand",
+   "q": "Why is replication factor 3 not three times the durability of one copy?",
+   "marks": 4,
+   "a": "Copies in the same failure domain fail together; durability comes from independent placement and automatic repair, not from multiplying one copy's failure rate."
+  },
+  {
+   "level": "apply",
+   "q": "A 2 TB data set uses replication factor 2. How much raw disk is needed? At ₹2 per GB-month, what is the monthly cost?",
+   "marks": 4,
+   "a": "2 TB = 2000 GB; raw = 2000 GB × 2 = 4000 GB; cost = 4000 GB × ₹2 = ₹8000 per month."
+  },
+  {
+   "level": "apply",
+   "q": "RS(10,4) is used on 500 GB. Find the storage factor and the raw disk.",
+   "marks": 4,
+   "a": "n = 10 + 4 = 14; factor = 14 ÷ 10 = 1.4; raw = 500 GB × 1.4 = 700 GB."
+  },
+  {
+   "level": "analyze",
+   "q": "A photo service serves hot images to users in Chennai from a bucket in another region. How do data locality and a caching tier change latency and cost?",
+   "marks": 5,
+   "a": "Locality removes long-haul round trips by running compute near the bucket; a cache in Chennai serves repeated reads without egress from the bucket. Both cut latency, and the cache cuts repeated egress cost, but the cache adds its own storage and invalidation work."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can erasure coding be cheaper than replication but slower for small random reads?",
+   "marks": 5,
+   "a": "It stores (k+m)/k fragments instead of r full copies, so less disk; a small read may need several fragments from different nodes, and a repair needs k fragments, so CPU and network rise."
+  }
+ ],
+ "beyond": "Not for the exam. Real object stores expose tiers such as hot, cool and archive, with different retrieval costs; search for S3 storage classes, Azure Blob access tiers and Google Cloud Storage classes. Erasure coding at scale is implemented in systems such as Ceph and MinIO; search for Ceph CRUSH and MinIO erasure coding. The next research step is serverless storage that moves chunks to the compute automatically; search for data locality in serverless and cloud storage consistency models."
+}

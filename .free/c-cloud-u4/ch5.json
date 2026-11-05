@@ -1,0 +1,207 @@
+{
+ "lead": "A cloud scheduler is built in two layers. The mechanism is the machinery: a queue, an admission test, a timer and a dispatcher that starts work. The policy is the rule that picks the next item from the queue. Keeping them apart lets a provider change from first-come-first-served to a fairness rule without rebuilding the platform. The same split appears when tasks run on a VM, when VMs are placed on hosts, and when user requests enter a data centre. This chapter covers the mechanisms, the common policies, the timing measures used to compare them, and how CloudSim models the parts.",
+ "prereq": "You need: <a href=\"#resource-provisioning-and-allocation\">Chapter 4.4</a> for placement and resource units.",
+ "sections": [
+  {
+   "h3": "Mechanism, policy and the timing measures",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A scheduler has two separable parts. The <b>mechanism</b> holds and moves work: a ready queue, an admission check, a timer and a dispatcher. The <b>policy</b> chooses the next item from the queue. A provider can swap the policy without rebuilding the queue. The same split appears for tasks on a VM, VMs on hosts, and requests entering a data centre."
+    },
+    {
+     "type": "p",
+     "text": "Three times describe a job. Arrival time is when it becomes ready. Start time is when it first gets the resource. Finish time is when it completes."
+    },
+    {
+     "type": "formula",
+     "text": "wait = start − arrival",
+     "where": "start is the time the job first gets the resource and arrival is when it enters the system; this holds when the job runs without preemption."
+    },
+    {
+     "type": "formula",
+     "text": "completion = finish − arrival",
+     "where": "finish is the time the job ends; completion time is also called turnaround time."
+    },
+    {
+     "type": "formula",
+     "text": "makespan = last finish − first arrival",
+     "where": "last finish is the end of the final job in the set and first arrival is the earliest arrival in that set."
+    },
+    {
+     "type": "p",
+     "text": "On one machine, a policy can lower average waiting time but cannot reduce makespan when all jobs must run and the machine never idles. Short jobs moved earlier only change who waits."
+    }
+   ]
+  },
+  {
+   "h3": "Policies and when to use them",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A policy is chosen for the workload, not for fashion."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "First-come-first-served runs in arrival order. A long job at the front makes later jobs wait: the convoy effect.",
+      "Shortest-job-first runs the smallest run time first. It minimises average wait on one machine when all jobs are ready, but needs estimates and can starve long jobs. Shortest remaining time is its preemptive form.",
+      "Priority runs the highest priority first; aging raises a waiting job so it eventually runs.",
+      "Round robin gives each job a fixed time slice, called a quantum, so no job waits long: it suits interactive work. Weighted round robin gives each tenant slices in proportion to its weight, so a tenant with double the weight gets double the time.",
+      "Backfilling lets small jobs fill gaps while a large job keeps its reservation; batch clusters use it to raise utilisation without missing the reservation.",
+      "Fair share gives each tenant or queue an equal share of the schedulable resource pool (for example memory slots), and unused share is handed to others. Dominant resource fairness (DRF) generalises this to many resource types: it computes each tenant's dominant share and picks the tenant with the smallest one; it fits clusters where tenants need different resources.",
+      "Earliest deadline first runs the nearest deadline. If no order meets all deadlines, admission control must reject or delay work.",
+      "Cost-aware scheduling picks the cheapest VM or slot that still meets the deadline; spot capacity is cheaper but can be taken back."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Levels, preemption and CloudSim",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Scheduling happens at three levels: user requests to a data centre, VMs to hosts (<a href=\"#resource-provisioning-and-allocation\">4.4</a>), and application tasks to a VM."
+    },
+    {
+     "type": "p",
+     "text": "Preemption stops a running job and returns it to the queue. It needs checkpointing for a process or live migration for a VM. Both cost time and bandwidth; live migration moves memory over the network (Unit 3). A model that ignores this cost reports a schedule that is too good."
+    },
+    {
+     "type": "p",
+     "text": "A <b>centralized</b> scheduler keeps one queue and one cluster view; it is simple but a bottleneck and a single failure point. A <b>decentralized</b> scheduler lets hosts schedule locally and share load by offers or work stealing; it scales but needs conflict handling."
+    },
+    {
+     "type": "p",
+     "text": "In CloudSim, a <b>cloudlet</b> has a length in million instructions (MI). A <b>VM</b> has a speed in million instructions per second (MIPS), so run time = length ÷ MIPS. A <b>broker</b> submits cloudlets, applies a policy and receives results from a data centre."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Both lanes run the same three cloudlets on one 1000 MIPS VM; SJF moves the short jobs forward, so P1 starts at 1.8 s, but the last finish stays 4.8 s.",
+  "spec": {
+   "type": "gantt",
+   "unit": "s",
+   "lanes": [
+    {
+     "label": "FCFS",
+     "bars": [
+      {
+       "label": "P1",
+       "start": 0,
+       "end": 3,
+       "style": "accent"
+      },
+      {
+       "label": "P2",
+       "start": 3,
+       "end": 3.6,
+       "style": "normal"
+      },
+      {
+       "label": "P3",
+       "start": 3.6,
+       "end": 4.8,
+       "style": "normal"
+      }
+     ]
+    },
+    {
+     "label": "SJF",
+     "bars": [
+      {
+       "label": "P2",
+       "start": 0,
+       "end": 0.6,
+       "style": "next"
+      },
+      {
+       "label": "P3",
+       "start": 0.6,
+       "end": 1.8,
+       "style": "next"
+      },
+      {
+       "label": "P1",
+       "start": 1.8,
+       "end": 4.8,
+       "style": "live"
+      }
+     ]
+    }
+   ],
+   "aria": "Two Gantt lanes compare FCFS and SJF for three jobs on one VM; in FCFS P1 runs 0 to 3 s while in SJF P2 and P3 finish first and P1 starts at 1.8 s."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three cloudlets arrive at time 0 on one VM rated 1000 MIPS. P1 needs 3000 MI, P2 needs 600 MI and P3 needs 1200 MI. Compare FCFS with SJF by average waiting time and state the makespan.",
+   "steps": [
+    "Run time = length ÷ MIPS. P1 = 3000 ÷ 1000 = 3 s; P2 = 600 ÷ 1000 = 0.6 s; P3 = 1200 ÷ 1000 = 1.2 s.",
+    "FCFS order P1, P2, P3. P1 starts 0, finishes 3 s; P2 starts 3 s, finishes 3.6 s; P3 starts 3.6 s, finishes 4.8 s.",
+    "Waiting time = start − arrival and all arrivals are 0, so waits are 0 s, 3 s and 3.6 s. Average = (0 + 3 + 3.6) ÷ 3 = 6.6 ÷ 3 = 2.2 s.",
+    "SJF order is shortest first: P2, P3, P1. Starts are 0, 0.6 and 1.8 s; finishes are 0.6, 1.8 and 4.8 s.",
+    "SJF waits are 0 s, 0.6 s and 1.8 s; average = (0 + 0.6 + 1.8) ÷ 3 = 2.4 ÷ 3 = 0.8 s.",
+    "Makespan = last finish − first arrival = 4.8 − 0 = 4.8 s in both. SJF lowers average wait by 1.4 s but does not change the span."
+   ],
+   "answer": "FCFS average wait is 2.2 s; SJF average wait is 0.8 s; makespan is 4.8 s for both.",
+   "check": "m=1000\nL={'P1':3000,'P2':600,'P3':1200}\nr={k:v/m for k,v in L.items()}\ndef s(o):\n    t=0;w={}\n    for p in o:\n        w[p]=t;t+=r[p]\n    return w,t\nw1,k1=s(['P1','P2','P3'])\nw2,k2=s(['P2','P3','P1'])\na1=sum(w1.values())/3\na2=sum(w2.values())/3\nfor x in [r['P1'],r['P2'],r['P3'],a1,a2,k1]:print(f'{x:g}')",
+   "values": [
+    3,
+    0.6,
+    1.2,
+    2.2,
+    0.8,
+    4.8
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Waiting time is not completion time: wait = start − arrival, completion = finish − arrival. In the FCFS lane of the example P1 completes at 3 s but waits 0 s; under SJF it waits 1.8 s.",
+  "Makespan is last finish − first arrival. On one machine a policy can lower average wait but cannot shrink makespan when all jobs must run.",
+  "SJF uses total run time; shortest remaining time uses remaining time and can preempt. They differ when arrivals are staggered.",
+  "Preemption is not free; include checkpoint or live-migration time and bandwidth in the schedule."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define mechanism and policy in a scheduler.",
+   "marks": 2,
+   "a": "Mechanism is the queue, admission check, timer and dispatcher that move work. Policy is the rule that selects the next item."
+  },
+  {
+   "level": "understand",
+   "q": "Why keep the scheduling policy separate from the mechanism?",
+   "marks": 3,
+   "a": "The provider can change the selection rule, such as FCFS to fair share, without rebuilding the queue, timer and dispatcher."
+  },
+  {
+   "level": "apply",
+   "q": "P1 needs 2000 MI and P2 needs 500 MI on one VM at 1000 MIPS. Both arrive at 0. Find the average wait under FCFS.",
+   "marks": 3,
+   "a": "Run times are 2 s and 0.5 s. FCFS runs P1 first: waits are 0 s and 2 s, so average = (0 + 2) ÷ 2 = 1 s."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can SJF starve long jobs, and what reduces that risk?",
+   "marks": 4,
+   "a": "A stream of short jobs keeps overtaking a long job. Aging raises the long job's priority over time; backfilling can also reserve a future slot for it."
+  },
+  {
+   "level": "apply",
+   "q": "Jobs arrive at 2 s and 4 s. The last job finishes at 15 s. Find makespan.",
+   "marks": 2,
+   "a": "Makespan = last finish − first arrival = 15 − 2 = 13 s."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare DRF with FCFS for two tenants, one CPU-heavy and one memory-heavy.",
+   "marks": 4,
+   "a": "DRF compares dominant shares and schedules the tenant with the smallest share, so both resources are used fairly. FCFS ignores shares, so the CPU-heavy tenant can crowd out the memory-heavy one."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems expose these ideas as Kubernetes scheduler predicates and priorities, YARN Capacity and Fair Schedulers, and Mesos dominant resource fairness. Research moves toward learning-based and deadline-aware schedulers that predict run times from past jobs. Search next for Kubernetes scheduling framework, YARN capacity scheduler, DRF in Mesos, and deadline-aware cloud scheduling."
+}

@@ -1,0 +1,272 @@
+{
+ "lead": "Resource provisioning decides how much capacity a provider makes available; resource allocation decides which host and which slot actually serves each request. Both are judged by two numbers: utilisation, the share of installed capacity doing useful work, and the SLA, the promise made to the tenant. Give too much capacity and money burns; give too little and the promise breaks. Every provider runs this loop, from a UPI app on a Friday evening to a Chennai startup's batch job at 2 a.m., and simulators use hosts, VMs and MIPS ratings to study it.",
+ "prereq": "You need: virtual machines and live migration from <a href=\"#hypervisors-and-virtual-machine-monitors\">Unit 3, hypervisors</a>; SLAs and automated scaling from <a href=\"#elastic-and-on-demand-computing\">Unit 2, elastic and on-demand computing</a>.",
+ "sections": [
+  {
+   "h3": "The two decisions, kept apart",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Provisioning answers <i>how much</i>. Allocation answers <i>where</i>. Provisioning runs on a slow clock: a monthly capacity plan, an autoscaling rule firing in minutes. Allocation runs fast: a scheduler places a VM or container in seconds, and live migration may move it later."
+    },
+    {
+     "type": "p",
+     "text": "Admission control sits before both. It checks the request against the tenant's quota and the SLA — say 2 vCPU and 8 GB for a new web tier — and accepts, queues or rejects. A provider that accepts work it cannot place has already broken its SLA."
+    },
+    {
+     "type": "p",
+     "text": "Four resources must fit at once: vCPU (a virtual processor core), RAM in GB, disk IOPS (input/output operations per second) and network bandwidth in Mbit/s. A host with free CPU but a saturated disk fits nothing more. Allocation is therefore a vector test, not one number."
+    },
+    {
+     "type": "formula",
+     "text": "host accepts request  ⇔  for every resource r:  used_r + need_r ≤ capacity_r",
+     "where": "used_r is the capacity already promised on that host for resource r; need_r is what the new VM asks for; capacity_r is the host's total for that resource. If any r fails, the host is rejected."
+    }
+   ]
+  },
+  {
+   "h3": "How much: static, dynamic and headroom",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Static provisioning reserves a fixed slice — a rack, a committed 100 Mbit/s line. Easy to bill, wasteful when idle. Dynamic (elastic) provisioning adds and removes capacity with demand: a ticket site before a final, a retail app on a sale day. It needs a monitor, a scaling rule (add a VM when mean CPU over 5 minutes passes 70 percent) and a cooldown so it does not oscillate."
+    },
+    {
+     "type": "p",
+     "text": "Over-provisioning buys safety and wastes money. Under-provisioning saves money and breaks the SLA through throttling, long queues or out-of-memory kills. Both are read off utilisation:"
+    },
+    {
+     "type": "formula",
+     "text": "U = (busy capacity ÷ installed capacity) × 100%   and   A = (promised capacity ÷ installed capacity) × 100%",
+     "where": "U is utilisation in percent; busy capacity is what is actually doing work. A is the allocation ratio in percent; promised capacity is what tenants were given. installed capacity is what the provider bought and powered. The worked example and quizzes below report A, the allocation ratio, because busy load is not given."
+    },
+    {
+     "type": "p",
+     "text": "Keep headroom. The hypervisor needs CPU and RAM of its own, so planning often holds back 10 to 20 percent of vCPU. A second reserve stops a host thrashing: if RAM is sold to 100 percent, the hypervisor swaps and every VM on that host slows down. Never plan to 100 percent."
+    },
+    {
+     "type": "p",
+     "text": "In simulators a host is rated in <b>MIPS</b>, millions of instructions per second. That is an instruction rate, not a clock speed in MHz. Each VM or cloudlet asks for a share of the host's MIPS, and the simulator checks that the shares sum to no more than the rating."
+    }
+   ]
+  },
+  {
+   "h3": "Which host: allocation as bin packing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Placement is bin packing. Hosts are bins, VMs are items, and item sizes have several dimensions. Bin packing is NP-hard, so real schedulers use fast heuristics."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sort pending VMs largest first (first-fit decreasing).",
+      "Walk the host list in order.",
+      "Place the VM on the first host where every resource fits.",
+      "If no host fits, open a new host or queue the request."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Best-fit picks the host with the least free space left after placing, which packs tightly and reduces the number of hosts used, but it leaves small leftover gaps that a later large VM cannot use. First-fit is faster and leaves larger free regions on the later hosts. Worst-fit spreads load, useful when VMs are bursty and share a network link."
+    },
+    {
+     "type": "p",
+     "text": "Rules override the packing. Affinity keeps two VMs together, such as a web tier and its cache, to cut latency. Anti-affinity keeps them apart, such as two replicas of a database, so one host failure cannot take both."
+    },
+    {
+     "type": "p",
+     "text": "Live migration rebalances without downtime: copy a running VM's memory pages to another host, then switch over. Use it on hot hosts, to drain a host before maintenance, and after a scale-out. It spends network bandwidth, so it is not free."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A tenant request passes quota and SLA checks, provisioning fixes how much capacity, placement picks the host, and the utilisation monitor feeds back into the provisioning policy.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Provision and allocate one tenant request",
+   "nodes": [
+    {
+     "id": "req",
+     "label": "Tenant request",
+     "note": "2 vCPU, 8 GB",
+     "style": "normal"
+    },
+    {
+     "id": "adm",
+     "label": "Admission control",
+     "note": "SLA and quota check",
+     "style": "normal"
+    },
+    {
+     "id": "prov",
+     "label": "Provisioning policy",
+     "note": "how much capacity",
+     "style": "accent"
+    },
+    {
+     "id": "place",
+     "label": "Placement",
+     "note": "which host",
+     "style": "accent"
+    },
+    {
+     "id": "host",
+     "label": "Host resources",
+     "note": "vCPU, RAM, IOPS",
+     "style": "normal"
+    },
+    {
+     "id": "mon",
+     "label": "Monitor utilisation",
+     "note": "scale or migrate",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "req",
+     "to": "adm",
+     "style": "solid"
+    },
+    {
+     "from": "adm",
+     "to": "prov",
+     "style": "solid"
+    },
+    {
+     "from": "prov",
+     "to": "place",
+     "style": "solid"
+    },
+    {
+     "from": "place",
+     "to": "host",
+     "style": "solid"
+    },
+    {
+     "from": "host",
+     "to": "mon",
+     "style": "solid"
+    },
+    {
+     "from": "mon",
+     "to": "prov",
+     "label": "feedback",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A request passes admission control, provisioning and placement onto a host, and a monitor feeds utilisation back into the provisioning policy."
+  }
+ },
+ "examples": [
+  {
+   "question": "A host has 16 vCPU and 64 GB RAM. The provider keeps 20 percent of the vCPU for the hypervisor and does not oversubscribe RAM. Each VM requests 2 vCPU and 8 GB RAM. (a) How many VMs fit on one host? (b) How many hosts are needed for 10 VMs? (c) What is the CPU utilisation (allocation ratio) of that cluster? (d) How many vCPU sit idle, and why?",
+   "steps": [
+    "Usable vCPU = 16 × (1 − 0.20) = 12.8 vCPU.",
+    "CPU limit = floor(12.8 ÷ 2) = 6 VMs.",
+    "RAM limit = floor(64 ÷ 8) = 8 VMs.",
+    "The smaller limit wins: min(6, 8) = 6 VMs per host.",
+    "Hosts for 10 VMs = ceil(10 ÷ 6) = 2 hosts.",
+    "Allocated vCPU = 10 × 2 = 20 vCPU.",
+    "Installed vCPU = 2 × 16 = 32 vCPU.",
+    "Utilisation = (20 ÷ 32) × 100 = 62.5 percent.",
+    "Idle vCPU = 32 − 20 = 12 vCPU: 6.4 vCPU held as hypervisor reserve (2 × 3.2), 0.8 vCPU stranded on the first host because 12.8 − 12 = 0.8 is too small for one more 2-vCPU VM, and 4.8 vCPU simply unused on the second host because only 4 of its 6 slots are filled."
+   ],
+   "answer": "6 VMs per host, 2 hosts for 10 VMs, 62.5 percent CPU utilisation (allocation ratio), with 12 vCPU idle (6.4 reserved, 0.8 stranded, 4.8 unused).",
+   "check": "total_vcpu = 16\ntotal_ram = 64\nreserve_frac = 0.20\nvm_vcpu = 2\nvm_ram = 8\nn_vms = 10\n\nusable_vcpu = total_vcpu * (1 - reserve_frac)\nby_cpu = int(usable_vcpu // vm_vcpu)\nby_ram = int(total_ram // vm_ram)\nper_host = min(by_cpu, by_ram)\nhosts = -(-n_vms // per_host)\nallocated = n_vms * vm_vcpu\ncapacity = hosts * total_vcpu\nutilisation = allocated / capacity * 100\nidle = capacity - allocated\n\nprint(usable_vcpu)\nprint(by_cpu)\nprint(by_ram)\nprint(per_host)\nprint(hosts)\nprint(allocated)\nprint(capacity)\nprint(utilisation)\nprint(idle)\n",
+   "values": [
+    12.8,
+    6,
+    8,
+    6,
+    2,
+    20,
+    32,
+    62.5,
+    12
+   ],
+   "dry_run": {
+    "head": [
+     "host",
+     "vCPU used",
+     "RAM used"
+    ],
+    "rows": [
+     [
+      "H1",
+      "12",
+      "48 GB"
+     ],
+     [
+      "H2",
+      "8",
+      "32 GB"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Dividing host capacity by VM size and stopping there. Every resource must fit, so the minimum over all resources decides the count.",
+  "Swapping the two words: provisioning is how much capacity, allocation is which host. An answer that places VMs when asked about provisioning loses marks.",
+  "Treating MIPS as a clock speed. MIPS is millions of instructions per second, an instruction rate used by simulators, not MHz.",
+  "Planning RAM to 100 percent. Without a reserve for the hypervisor and for burst, the host swaps and every VM on it slows down.",
+  "Forgetting rules: anti-affinity can cut the number of VMs that fit even when free vCPU and free RAM both exist."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define resource provisioning and resource allocation in one line each, and say which runs on the slower clock.",
+   "marks": 2,
+   "a": "Provisioning decides how much capacity to make available; it runs on the slower clock (capacity plans, autoscaling rules). Allocation decides which host serves each request; it runs in seconds."
+  },
+  {
+   "level": "understand",
+   "q": "A host shows 40 percent free CPU but its disk is at 100 percent IOPS. Explain why a new VM that writes heavily is still rejected.",
+   "marks": 3,
+   "a": "Allocation is a vector test: used_r + need_r ≤ capacity_r for every resource. Disk IOPS fails, so the host is rejected even though CPU is free. The saturated disk is the bottleneck."
+  },
+  {
+   "level": "apply",
+   "q": "A host has 32 vCPU and 128 GB RAM, with 25 percent of vCPU reserved for the hypervisor. Each VM needs 4 vCPU and 16 GB. How many VMs fit?",
+   "marks": 3,
+   "a": "Usable vCPU = 32 × 0.75 = 24; CPU limit = 24 ÷ 4 = 6 VMs. RAM limit = 128 ÷ 16 = 8 VMs. Minimum = 6 VMs per host."
+  },
+  {
+   "level": "apply",
+   "q": "Using the host above, how many hosts are needed for 20 VMs, and what is the CPU allocation ratio?",
+   "marks": 4,
+   "a": "Hosts = ceil(20 ÷ 6) = 4. Allocated vCPU = 20 × 4 = 80; installed = 4 × 32 = 128; allocation ratio = 80 ÷ 128 × 100 = 62.5 percent."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare first-fit and best-fit placement for a stream of mixed-size VMs arriving over a day.",
+   "marks": 4,
+   "a": "First-fit scans hosts in order and takes the first that fits: fast, but it fills early hosts and leaves many half-empty ones. Best-fit takes the host with the least space left after placing: tighter packing and fewer hosts, but it scatters small gaps that a later large VM cannot use, and it costs a full scan of the host list."
+  },
+  {
+   "level": "analyze",
+   "q": "Two database replicas are placed with an anti-affinity rule. Explain the effect on usable capacity and on fault tolerance.",
+   "marks": 4,
+   "a": "Anti-affinity forces the replicas onto different hosts, so a host that has room for both can take only one. Usable capacity per host falls and more hosts are needed. Fault tolerance rises: one host failure takes at most one replica, so the database stays available."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a host not filled to 100 percent of its RAM, even when tenants are willing to pay?",
+   "marks": 3,
+   "a": "The hypervisor needs memory of its own, and a reserve absorbs bursts. At 100 percent the host swaps and every VM on it slows, so throughput and SLA compliance fall below what the extra sale is worth."
+  },
+  {
+   "level": "remember",
+   "q": "What does MIPS stand for in a cloud simulator, and what does a host's MIPS rating mean?",
+   "marks": 2,
+   "a": "MIPS is millions of instructions per second. A host's rating is the total instruction rate it can supply; each VM or cloudlet requests a share of that rating, and the shares must fit within it."
+  }
+ ],
+ "beyond": "Not for the exam. Kubernetes' scheduler is a live version of this loop: filter hosts that fit, score the survivors by weighted rules, then bind. Research moves toward learned placement, where a model predicts demand from past traces instead of a fixed CPU threshold. CloudSim lets you test a policy against thousands of VMs before renting one. Search for vector bin packing for VM placement, autoscaling cooldown, and host MIPS in CloudSim."
+}

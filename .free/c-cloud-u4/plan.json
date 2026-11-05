@@ -1,0 +1,640 @@
+{
+ "lead": "This unit is about where cloud data lives, how the machines that hold it are shared out, and how the whole thing is paid for. By the end you can trace a file from a client write to three replicas on disk, place virtual machines on hosts without breaking an SLA, schedule tasks, survive a node failure, cut the power bill, and read a monthly cloud invoice line by line.",
+ "about": "The unit runs from storage to money. Chapter 4.1 fixes the vocabulary of data organization: objects, chunks, metadata, replicas and erasure coding. Chapter 4.2 opens the two systems every syllabus names, GFS and HDFS, and shows the write path to replicas. Chapter 4.3 moves from files to tables with BigTable and the NoSQL families. Chapters 4.4 and 4.5 turn to compute: how capacity is provisioned and allocated, then how the resulting tasks are ordered by scheduling policies. Chapter 4.6 (advanced) adds fault tolerance, replication and business continuity, and 4.7 (advanced) adds energy and green computing. Chapter 4.8 prices all of it with market models and billing, and 4.9 closes with federated clouds, where one provider borrows another's capacity.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Cloud data is never stored as one whole file on one disk; it is broken into chunks, described by metadata, and placed on many machines, and that layout decides durability, latency and cost.",
+   "depth": "Three storage shapes and when each is used: block storage (raw volumes attached to a VM), file storage (shared directories with a hierarchy) and object storage (flat bucket plus key, with HTTP access). Then the organization itself: a namespace or bucket, the object split into fixed-size chunks, a separate metadata service that maps chunk to server, a replication factor that sets how many copies exist, and erasure coding as the cheaper alternative to full copies. Define data locality (run the compute near the chunk), the caching tier in front of the store, and the split between structured, semi-structured and key-value data. Some syllabi call object storage 'blob storage' and chunks 'blocks' or 'extents'; use both names once.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Bucket photos",
+     "note": "flat namespace",
+     "children": [
+      {
+       "label": "img1.jpg",
+       "edge": "key",
+       "children": [
+        {
+         "label": "chunk c0",
+         "edge": "split 64 MB",
+         "children": [
+          {
+           "label": "Node A",
+           "edge": "replica"
+          },
+          {
+           "label": "Node B",
+           "edge": "replica"
+          }
+         ]
+        },
+        {
+         "label": "chunk c1",
+         "edge": "split 64 MB",
+         "children": [
+          {
+           "label": "Node A",
+           "edge": "replica"
+          },
+          {
+           "label": "Node C",
+           "edge": "replica"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "label": "img2.jpg",
+       "edge": "key",
+       "children": [
+        {
+         "label": "chunk c2",
+         "edge": "split 64 MB",
+         "children": [
+          {
+           "label": "Node B",
+           "edge": "replica"
+          },
+          {
+           "label": "Node C",
+           "edge": "replica"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A bucket holds two objects, each object is split into 64 MB chunks, and each chunk is held on two different nodes."
+   },
+   "example": "A photo service stores 600 GB of images. With a replication factor of 3, how much raw disk is needed, and what does it cost per month at ₹1.5 per GB-month? With erasure coding RS(6,3) instead, how much? Answer: replication stores 600 × 3 = 1800 GB, costing 1800 × 1.5 = ₹2700 per month. RS(6,3) turns every 6 data fragments into 9 fragments total, a factor of 1.5, so 600 × 1.5 = 900 GB, costing 900 × 1.5 = ₹1350 per month. The saving is ₹1350 per month, paid for by more network and CPU work when a fragment is rebuilt.",
+   "trap": "Reporting the logical size as the disk bill. 600 GB of user data is 1800 GB of raw disk at replication factor 3, and metadata plus snapshots add more. Also, replication factor 3 does not mean three times the durability of one copy.",
+   "prereq": "Unit 2 for storage devices, usage monitors and SLAs; Unit 3 for storage virtualization.",
+   "leave": "The internal protocol of GFS and HDFS to 4.2, the table model to 4.3, encryption and access control to Unit 6."
+  },
+  {
+   "k": 2,
+   "idea": "GFS and HDFS use one metadata master and many chunk servers, with every chunk replicated three times, because that design makes cheap commodity disks survive failure and gives very high sequential read throughput.",
+   "depth": "GFS first: a single master holding the namespace and chunk map, chunk servers holding 64 MB chunks, three replicas by default, a lease granted to one replica so writes have a single order, and a write pipeline that pushes data along the replica chain. Then HDFS: NameNode and DataNodes, default block size 128 MB (configurable, often 64 MB on older clusters), replication 3, rack-aware placement (one replica off-rack), the fsck-style block report, and high availability with a standby NameNode reading a shared journal; the Secondary NameNode only merges the edit log into the fsimage, it is not a standby. Cover both the read path (client asks where, then reads directly from a DataNode) and the append-once, write-once model, and explain why small files hurt (one metadata entry per file and per block).",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "NameNode",
+     "DataNode 1",
+     "DataNode 2",
+     "DataNode 3"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "NameNode",
+      "label": "create /f, 1024 MB"
+     },
+     {
+      "from": "NameNode",
+      "to": "Client",
+      "label": "8 blocks, 3 replicas each"
+     },
+     {
+      "from": "Client",
+      "to": "DataNode 1",
+      "label": "write block b0"
+     },
+     {
+      "from": "DataNode 1",
+      "to": "DataNode 2",
+      "label": "pipe b0"
+     },
+     {
+      "from": "DataNode 2",
+      "to": "DataNode 3",
+      "label": "pipe b0"
+     },
+     {
+      "from": "DataNode 3",
+      "to": "Client",
+      "label": "ack b0"
+     }
+    ],
+    "aria": "A client asks the NameNode for block locations, then writes each block along a pipeline that copies it from the first DataNode to the second to the third."
+   },
+   "example": "A 1024 MB file is written to HDFS with block size 128 MB and replication factor 3. How many blocks, how many block replicas, and how many entries does the NameNode hold? Answer: blocks = 1024 ÷ 128 = 8. Block replicas = 8 × 3 = 24, so 24 copies spread over the DataNodes. The NameNode holds one entry per block, not per replica, so 8 block entries (plus one file entry), a few hundred bytes in total. In GFS with 64 MB chunks the same file gives 1024 ÷ 64 = 16 chunks and 16 × 3 = 48 replicas.",
+   "trap": "Two traps: calling the Secondary NameNode a backup (it is a checkpointing helper, and a real standby is the HA pair), and using the wrong block size, since GFS uses 64 MB and HDFS defaults to 128 MB, which changes every count in the answer.",
+   "prereq": "4.1 for chunks, metadata and replication.",
+   "leave": "The MapReduce program that runs on top of these files to Unit 5; general failure handling to 4.6; table storage to 4.3."
+  },
+  {
+   "k": 3,
+   "idea": "BigTable is a sparse, distributed, sorted map indexed by row key, column and timestamp, and the whole NoSQL family trades joins and rigid schemas for scale on thousands of machines.",
+   "depth": "The BigTable data model in one line, then each part: a row key that sorts rows lexicographically, column families that are created up front and stored together, column qualifiers inside a family that can appear freely, and a timestamp giving multiple versions per cell. Rows are split into tablets by row-key range, one tablet server owns each tablet, and a three-level METADATA tree plus a lock service (Chubby) finds them. Storage path: a commit log for durability, a memtable in memory, SSTables on disk, and compaction merging them. Then the wider NoSQL map: key-value (DynamoDB), wide-column (Cassandra), document (MongoDB), graph, and the consistency choice between strong and eventual. Mention semi-structured storage and why row-key design decides performance. Some syllabi call this unit 'key-value and semi-structured data storage'.",
+   "figure": {
+    "type": "array",
+    "title": "BigTable map: rows × column families, cells hold a version timestamp",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "com.cnn.www",
+      "cells": [
+       "t5",
+       "t3",
+       "t6"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "com.example",
+      "cells": [
+       "t2",
+       "—",
+       "—"
+      ],
+      "marks": {}
+     },
+     {
+      "label": "org.wiki",
+      "cells": [
+       "t7",
+       "—",
+       "b1"
+      ],
+      "marks": {}
+     }
+    ],
+    "pointers": [
+     {
+      "row": 0,
+      "cell": 0,
+      "label": "read at t5.5"
+     }
+    ],
+    "aria": "A three-row table where the highlighted cell shows the value returned for the row com.cnn.www when it is read at time t5.5."
+   },
+   "example": "A crawler stores pages under reversed domain names. Row key com.cnn.www has column family contents with three versions at timestamps t3, t5 and t6, and two anchor columns anchor:cnnsi.com at t3 and anchor:my.look.ca at t6. (a) Which contents value does a read at time t5.5 return? (b) Why reverse the domain? Answer: (a) BigTable returns the newest version at or before the read time, so t5. (b) Reversing puts all pages of cnn.com next to each other in sorted row order, so one tablet scan reads the whole site; rows are sorted by key, so a scan is a contiguous read.",
+   "trap": "Treating a BigTable table as a relational table and expecting joins, foreign keys or a cheap full scan. The second trap is row-key choice: keys that increase monotonically (like timestamps) send every write to the last tablet and create a hotspot.",
+   "prereq": "4.1 for key-value and semi-structured data; 4.2 for the chunk-and-replica storage layer underneath.",
+   "leave": "MapReduce itself to Unit 5; encryption of stored data and access control to Unit 6."
+  },
+  {
+   "k": 4,
+   "idea": "Provisioning decides how much capacity to make available and allocation decides which host or VM actually serves each request, and both are judged by the gap between utilisation and the SLA.",
+   "depth": "Separate the two words clearly. Provisioning: static versus dynamic, capacity planning, over-provisioning (waste) and under-provisioning (SLA violation), elastic and on-demand scaling, admission control, the resource types that must all fit (vCPU, RAM, disk IOPS, network bandwidth). Allocation: VM placement onto hosts, bin-packing view of the same problem, first-fit and best-fit placement, affinity and anti-affinity rules, live migration to rebalance, and the utilisation-versus-cost trade-off. Cover the resource model used by simulators, where a host has a MIPS rating and each VM or cloudlet asks for a share of it, and define MIPS as millions of instructions per second, not MHz. Mention headroom kept for the hypervisor and the reserve that stops a host from thrashing.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Provision and allocate one tenant request",
+    "nodes": [
+     {
+      "id": "req",
+      "label": "Tenant request",
+      "note": "2 vCPU, 8 GB",
+      "style": "normal"
+     },
+     {
+      "id": "adm",
+      "label": "Admission control",
+      "note": "SLA and quota check",
+      "style": "normal"
+     },
+     {
+      "id": "prov",
+      "label": "Provisioning policy",
+      "note": "how much capacity",
+      "style": "accent"
+     },
+     {
+      "id": "place",
+      "label": "Placement",
+      "note": "which host",
+      "style": "accent"
+     },
+     {
+      "id": "host",
+      "label": "Host resources",
+      "note": "vCPU, RAM, IOPS",
+      "style": "normal"
+     },
+     {
+      "id": "mon",
+      "label": "Monitor utilisation",
+      "note": "scale or migrate",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "req",
+      "to": "adm",
+      "style": "solid"
+     },
+     {
+      "from": "adm",
+      "to": "prov",
+      "style": "solid"
+     },
+     {
+      "from": "prov",
+      "to": "place",
+      "style": "solid"
+     },
+     {
+      "from": "place",
+      "to": "host",
+      "style": "solid"
+     },
+     {
+      "from": "host",
+      "to": "mon",
+      "style": "solid"
+     },
+     {
+      "from": "mon",
+      "to": "prov",
+      "label": "feedback",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A request passes admission control, provisioning and placement onto a host, and a monitor feeds utilisation back into the provisioning policy."
+   },
+   "example": "A host has 16 vCPU and 64 GB RAM and keeps 20 percent of CPU free for the hypervisor. Each VM asks for 2 vCPU and 8 GB. How many VMs fit on one host, and what is the utilisation with 10 VMs? Answer: usable vCPU = 16 × 0.8 = 12.8, so CPU allows floor(12.8 ÷ 2) = 6 VMs; RAM allows 64 ÷ 8 = 8 VMs; the smaller number wins, so 6 VMs. Ten VMs need ceil(10 ÷ 6) = 2 hosts. With 10 VMs the cluster holds 10 × 2 = 20 vCPU out of 2 × 16 = 32, so utilisation is 20 ÷ 32 = 62.5 percent, and the idle 12 vCPU are the cost of headroom.",
+   "trap": "Dividing the host capacity by the VM size and stopping there, forgetting that every resource must fit and that the hypervisor, the reserve and the anti-affinity rules all reduce the count. Also, MIPS is an instruction rate used by simulators, not a clock speed.",
+   "prereq": "Unit 3 for virtual machines and migration; Unit 2 for SLAs and automated scaling.",
+   "leave": "The ordering rules that pick which VM runs next to 4.5; power-aware placement to 4.7; the price of the leftover capacity to 4.8."
+  },
+  {
+   "k": 5,
+   "idea": "A scheduler is split into a mechanism (the queue, the timer and the dispatcher that actually switch work) and a policy (the rule that chooses the next item), so the provider can swap fairness for throughput without rebuilding the system.",
+   "depth": "The three levels at which cloud scheduling happens: application tasks, VMs onto hosts, and requests onto a data centre. Mechanisms: queue, admission, dispatcher, preemption, timer. Policies and when each is right: FCFS, SJF and shortest remaining time, priority, round robin and weighted round robin, backfilling for batch jobs, fair share and dominant resource fairness for multi-tenant clusters, deadline and constraint-based, and cost-aware or budget-driven scheduling. Define wait time, completion time, turnaround time and makespan, and state the formula for each: wait = start − arrival, completion = finish − arrival, makespan = last finish − first arrival. Preemption needs checkpointing or live migration, which costs time and bandwidth (Unit 3). Add centralized versus decentralized schedulers and how CloudSim models a cloudlet, a VM and a broker.",
+   "figure": {
+    "type": "gantt",
+    "unit": "s",
+    "lanes": [
+     {
+      "label": "FCFS",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 3,
+        "style": "accent"
+       },
+       {
+        "label": "P2",
+        "start": 3,
+        "end": 3.6,
+        "style": "normal"
+       },
+       {
+        "label": "P3",
+        "start": 3.6,
+        "end": 4.8,
+        "style": "normal"
+       }
+      ]
+     },
+     {
+      "label": "SJF",
+      "bars": [
+       {
+        "label": "P2",
+        "start": 0,
+        "end": 0.6,
+        "style": "next"
+       },
+       {
+        "label": "P3",
+        "start": 0.6,
+        "end": 1.8,
+        "style": "next"
+       },
+       {
+        "label": "P1",
+        "start": 1.8,
+        "end": 4.8,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "Under FCFS the long job P1 runs first and holds the CPU for 3 s, while under SJF the two short jobs finish early and the long job starts at 1.8 s."
+   },
+   "example": "Three cloudlets arrive at time 0 on one VM rated 1000 MIPS: P1 needs 3000 MI, P2 needs 600 MI and P3 needs 1200 MI. Compare FCFS with SJF using average waiting time. Answer: run time = length ÷ MIPS, so P1 = 3 s, P2 = 0.6 s, P3 = 1.2 s. FCFS order P1, P2, P3 gives completions 3, 3.6 and 4.8 s, so wait times are 0, 3 and 3.6 s and the average is 6.6 ÷ 3 = 2.2 s. SJF order P2, P3, P1 gives completions 0.6, 1.8 and 4.8 s, so wait times are 0, 0.6 and 1.8 s and the average is 2.4 ÷ 3 = 0.8 s. Makespan is 4.8 s in both cases: SJF only moves the waiting.",
+   "trap": "Using completion time where the question asks for waiting time. Also, a policy cannot reduce makespan on one machine, only the average wait, and preemption without counting migration or checkpoint cost gives an answer that is too good.",
+   "prereq": "4.4 for placement and resource units.",
+   "leave": "Spark and MapReduce task scheduling internals to Unit 5; energy-aware scheduling to 4.7; the scheduler inside a provider's market to 4.8."
+  },
+  {
+   "k": 6,
+   "idea": "A cloud stays up by assuming every part fails, detecting the failure, and shifting work to a replica within a stated recovery time and data-loss window.",
+   "depth": "Only a few universities teach this chapter. Fault types: crash, omission, timing and Byzantine. Redundancy of four kinds: hardware, software, time and information. Replication models: primary-backup with a lease, quorum (read and write majorities), chain replication and multi-master, with the consistency cost of each. Checkpointing and cloning, and using live migration as failover. Then business continuity: RTO is the time to restore service, RPO is the acceptable amount of data loss, backup types (full, incremental, differential), hot, warm and cold disaster-recovery sites, runbooks and drills. Compute availability as a percentage of allowed downtime per month, and treat CAP as a one-line trade-off between consistency and availability during a partition.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Primary-backup failover",
+    "nodes": [
+     {
+      "id": "c",
+      "label": "Client write",
+      "style": "normal"
+     },
+     {
+      "id": "p",
+      "label": "Primary",
+      "note": "holds the lease",
+      "style": "accent"
+     },
+     {
+      "id": "r",
+      "label": "Replicate write",
+      "note": "to backup",
+      "style": "normal"
+     },
+     {
+      "id": "h",
+      "label": "Heartbeat lost?",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Promote backup",
+      "note": "new primary",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c",
+      "to": "p",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "r",
+      "style": "solid"
+     },
+     {
+      "from": "r",
+      "to": "h",
+      "style": "solid"
+     },
+     {
+      "from": "h",
+      "to": "f",
+      "label": "no reply",
+      "style": "solid"
+     },
+     {
+      "from": "h",
+      "to": "p",
+      "label": "alive",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A client writes to the primary, the write is replicated to the backup, and if the heartbeat stops the monitor promotes the backup to primary."
+   },
+   "example": "A service promises 99.9 percent availability with RPO 15 minutes and RTO 1 hour. A 30-day month has 30 × 24 × 60 = 43,200 minutes. How much downtime is allowed, and how often must snapshots run? Answer: allowed downtime = 0.1 percent of 43,200 = 43.2 minutes per month. For 99.99 percent it would be 0.01 percent × 43,200 = 4.32 minutes. Hourly snapshots lose up to 60 minutes of data, which breaks the 15-minute RPO, so ship the transaction log or snapshot every 15 minutes or less. The 1-hour RTO says the recovery runbook must restore service within 60 minutes, which is a different requirement from the 15 minutes of data loss.",
+   "trap": "Swapping RTO and RPO. The second trap is calling three replicas a backup: a replica receives a bad write or a deletion instantly, so it does not protect against human error or corruption, which needs a point-in-time copy.",
+   "prereq": "4.2 for replica placement and recovery; 4.3 for quorum reads and writes; Unit 2 for high availability and resource replication.",
+   "leave": "Encryption, key management and audit logs to Unit 6; checkpointing and cloning mechanics to Unit 3; the cost of over-replication to 4.8."
+  },
+  {
+   "k": 7,
+   "idea": "In a data centre the binding cost is power, not CPU time, and servers waste most of it when idle, so consolidation and power-proportional design cut both the bill and the carbon.",
+   "depth": "Only a few universities teach this chapter. Start with the model P = P_idle + (P_max − P_idle) × u, where u is utilisation between 0 and 1, and show that a server at 30 percent load still draws more than half its peak. Define power in watts and energy in kilowatt-hours, and PUE as total facility power divided by IT power, typically above 1 because of cooling and losses. Techniques: consolidation with live migration, switching idle hosts off, DVFS and low-power states, power-aware placement, renewable-energy-aware scheduling, free cooling and climate siting. Metrics: energy per transaction, energy per VM-hour, carbon per kWh. Mention the same ideas in reverse: a badly chosen placement or a heavy replication factor raises the power bill.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "utilisation u",
+     "min": 0,
+     "max": 1
+    },
+    "y": {
+     "label": "power (W)",
+     "min": 0,
+     "max": 450
+    },
+    "series": [
+     {
+      "name": "P = 200 + 200u",
+      "expr": "200 + 200*x",
+      "style": "accent"
+     },
+     {
+      "name": "idle floor",
+      "expr": "200",
+      "style": "muted"
+     }
+    ],
+    "aria": "Power rises in a straight line from 200 W at zero utilisation to 400 W at full load, and never falls below the 200 W idle floor."
+   },
+   "example": "A data centre has 100 servers, each with P_idle = 200 W and P_max = 400 W, running at 30 percent average utilisation. Cooling gives PUE = 1.5 and power costs ₹8 per kWh. What is the monthly energy and cost, and what happens after consolidating onto 40 servers at 75 percent? Answer: per server P = 200 + 200 × 0.3 = 260 W, so IT power = 100 × 260 = 26,000 W = 26 kW. Monthly IT energy = 26 × 730 = 18,980 kWh, facility energy = 18,980 × 1.5 = 28,470 kWh, cost = 28,470 × 8 = ₹2,27,760. After consolidation P = 200 + 200 × 0.75 = 350 W, IT power = 40 × 350 = 14 kW, energy = 14 × 730 = 10,220 kWh, facility = 15,330 kWh, cost = ₹1,22,640. Same work, 46 percent less energy.",
+   "trap": "Multiplying by PUE before computing IT power, or applying PUE to the already-cooled figure. The second trap is mixing power (kW, an instant) with energy (kWh, over time); the bill is in kWh, so a missing 730 hours is a factor-of-730 error.",
+   "prereq": "4.4 for host utilisation and consolidation; 4.5 for placement and migration decisions.",
+   "leave": "Hardware and cooling engineering detail; renewable-energy policy; how power appears on the customer invoice to 4.8."
+  },
+  {
+   "k": 8,
+   "idea": "A cloud is a market: providers publish prices, users and brokers bid, a scheduler matches demand to supply under an SLA, and the bill is the sum of metered usage at the granularity the provider chose.",
+   "depth": "The market-oriented cloud computing (MOCC) reference model and its parts: the consumer, the broker that negotiates, the provider, the VM, the SLA and the pricing policy, plus the auctioneer or market directory. Pricing schemes: on-demand or posted price, reserved or subscription, spot or auction, bidding, and the six market-model categories some syllabi list (posted price, on-demand, spot, auction, bidding and bargaining, and a differentiated or priority scheme). Then the cost model: total = compute hours + storage GB-month + network egress + licences + support, with billing granularity (per second, per minute, per hour, and minimum charges) and idle-time cost. Cover TCO comparison with an owned data centre, chargeback and showback inside an organisation, and how an SLA breach becomes a credit.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "One priced allocation in a market-oriented cloud",
+    "nodes": [
+     {
+      "id": "u",
+      "label": "User",
+      "note": "budget and deadline",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Broker",
+      "note": "negotiates SLA",
+      "style": "accent"
+     },
+     {
+      "id": "m",
+      "label": "Market",
+      "note": "spot and reserved",
+      "style": "accent"
+     },
+     {
+      "id": "p",
+      "label": "Provider",
+      "note": "capacity",
+      "style": "normal"
+     },
+     {
+      "id": "v",
+      "label": "VM",
+      "note": "metered usage",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "u",
+      "to": "b",
+      "label": "job",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "m",
+      "label": "bid",
+      "style": "solid"
+     },
+     {
+      "from": "m",
+      "to": "p",
+      "label": "price",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "v",
+      "label": "allocate",
+      "style": "solid"
+     },
+     {
+      "from": "v",
+      "to": "u",
+      "label": "usage bill",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A user sends a job to a broker, the broker bids in the market, the provider allocates a VM, and metered usage comes back as a bill."
+   },
+   "example": "A team runs 2 VMs continuously for a 730-hour month, stores 200 GB and sends 50 GB out of the cloud. On-demand VMs cost ₹6 per VM-hour, reserved VMs cost ₹4 per VM-hour, spot costs ₹2.1 per VM-hour, storage is ₹2 per GB-month and egress is ₹5 per GB. Compare the on-demand and reserved monthly bills. Answer: on-demand compute = 2 × 6 × 730 = ₹8,760; reserved = 2 × 4 × 730 = ₹5,840; spot = 2 × 2.1 × 730 = ₹3,066. Storage = 200 × 2 = ₹400, egress = 50 × 5 = ₹250. On-demand total = 8,760 + 400 + 250 = ₹9,410. Reserved total = 5,840 + 400 + 250 = ₹6,490, a saving of ₹2,920 or 31 percent. Spot is cheapest but can be taken back, so it suits work that can restart.",
+   "trap": "Quoting a per-hour price as the monthly cost without multiplying by the hours and VM count, and forgetting egress and storage, which are often the lines that surprise people. The minimum billing granularity also matters: a 20-second job billed in whole hours costs 180 times its real use.",
+   "prereq": "Unit 1 for cloud economics; Unit 2 for SLAs and usage monitors; 4.4 for capacity and 4.5 for allocation.",
+   "leave": "Spot-instance interruption handling to 4.6; specific provider price pages (they change); bidding games as a topic to 4.9."
+  },
+  {
+   "k": 9,
+   "idea": "Federation lets independent providers lend and borrow capacity through agreed interfaces, so one job can run across two clouds without the user managing two accounts.",
+   "depth": "Define the terms in one place: multi-cloud (a user picks several providers independently), hybrid cloud (private plus public), federation (providers share resources under a contract and a standard interface) and intercloud (the wider internet of clouds). The federation lifecycle: discovery of providers, matchmaking against requirements, authorisation and trust, allocation of the VM, operation with monitoring, and termination and accounting. The cloud federation stack as functional layers, from the physical resources up through the provider interface, the broker and the user application, with the cross-provider transport and identity in between. Architectures: a centralised broker versus peer-to-peer federation. Third-party services such as a content-delivery broker that rents capacity from several providers and presents one name to the user. State the open issues plainly: trust, data location and law, interoperability and cross-provider data transfer cost. Many syllabi pair this with a short look at edge and fog computing as the small-scale end of the same idea.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "A federation broker placing one job",
+    "nodes": [
+     {
+      "id": "job",
+      "label": "User job",
+      "note": "300 VMs for 4 h",
+      "style": "normal"
+     },
+     {
+      "id": "bro",
+      "label": "Federation broker",
+      "note": "matchmake and price",
+      "style": "accent"
+     },
+     {
+      "id": "a",
+      "label": "Cloud A",
+      "note": "own, 100 VMs",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Cloud B",
+      "note": "₹5 per VM-hour",
+      "style": "live"
+     },
+     {
+      "id": "c",
+      "label": "Cloud C",
+      "note": "₹4.5, +200 ms",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "job",
+      "to": "bro",
+      "style": "solid"
+     },
+     {
+      "from": "bro",
+      "to": "a",
+      "label": "100 VMs",
+      "style": "solid"
+     },
+     {
+      "from": "bro",
+      "to": "b",
+      "label": "200 VMs",
+      "style": "solid"
+     },
+     {
+      "from": "bro",
+      "to": "c",
+      "label": "offer",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A job needing 300 VMs goes to a federation broker, which fills 100 from its own cloud and rents the remaining 200 from a partner cloud."
+   },
+   "example": "A video site has 100 VMs of its own and expects 300 VMs of demand for 4 hours during a cricket final. Partner B offers VMs at ₹5 per VM-hour with good latency; partner C offers ₹4.5 per VM-hour but adds 200 ms of network delay. Compare the rental cost. Answer: it must rent 300 − 100 = 200 VMs. From B: 200 × 5 × 4 = ₹4,000. From C: 200 × 4.5 × 4 = ₹3,600, which is ₹400 cheaper, but the extra 200 ms affects every request, so a page-load target of 1 s or less may rule C out. If C wins on price and the latency budget allows it, the federation broker places the batch portion on C and keeps the live streams on B.",
+   "trap": "Calling any use of two providers a federation: multi-cloud is independent use with no sharing agreement, while federation is contract plus interface plus trust. Also, cross-provider traffic is billed by the sending provider, so the cheap partner can become expensive once data moves.",
+   "prereq": "4.8 for pricing and brokers; Unit 2 for SLAs and web-service interfaces.",
+   "leave": "Edge and mobile cloud basics to Unit 1; federated identity, single sign-on and trust between providers to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "chunks and replicas become the GFS and HDFS block protocol"
+  ],
+  [
+   2,
+   3,
+   "the same chunk layer supports a sorted table instead of files"
+  ],
+  [
+   2,
+   6,
+   "replicas are the raw material of failover and recovery"
+  ],
+  [
+   4,
+   5,
+   "placement needs an ordering rule for the waiting VMs"
+  ],
+  [
+   4,
+   6,
+   "headroom and spare hosts decide how fast a failover runs"
+  ],
+  [
+   5,
+   7,
+   "consolidating hosts is a scheduling decision with a power bill"
+  ],
+  [
+   4,
+   8,
+   "provisioned capacity is what the meter charges for"
+  ],
+  [
+   7,
+   8,
+   "energy is a cost line inside the provider's price"
+  ],
+  [
+   8,
+   9,
+   "a broker compares one provider's price with another's"
+  ]
+ ]
+}

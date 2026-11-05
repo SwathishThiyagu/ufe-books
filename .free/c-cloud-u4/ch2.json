@@ -1,0 +1,201 @@
+{
+ "lead": "GFS and HDFS keep one metadata master and many chunk servers. The master stores file names, directories and a map from each file to its chunks; the chunk servers store the bytes. Every chunk is copied three times by default. This design exists because cheap commodity disks fail often, and replication turns a disk failure into a routine event. The single master keeps placement simple. Large blocks give high sequential read throughput for batch jobs, log stores and cloud data lakes.",
+ "prereq": "You need <a href=\"#cloud-storage-organization-of-data\">4.1</a> for chunks, metadata and replication.",
+ "sections": [
+  {
+   "h3": "GFS: master, chunks and the write lease",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "GFS splits each file into fixed-size chunks, 64 MB by default. A single master holds the namespace (directories and file names) and the chunk map (which chunk servers hold each chunk). The chunk servers hold the bytes. Each chunk has three replicas by default, so one disk failure does not lose data. The master is small and does not stream file data."
+    },
+    {
+     "type": "p",
+     "text": "On a write, the client asks the master to create a file. The master records the file and returns. When the client is ready to write a chunk, the master grants a lease on that chunk to one replica, called the primary, for a fixed time. The master also returns the replica locations for that chunk. The lease gives the primary the right to order writes. The client pushes data along a pipeline: primary, then second replica, then third. Each server stores the bytes and sends an acknowledgement back. The primary sends the final ack to the client. All replicas apply writes in the same order, so the chunk stays consistent. For a read, the client asks the master for chunk locations, then reads directly from a chunk server."
+    }
+   ]
+  },
+  {
+   "h3": "HDFS: NameNode, DataNodes, racks and HA",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "HDFS copies the same idea with new names. The NameNode holds the namespace and the block map. DataNodes store blocks. The default block size is 128 MB; many older clusters use 64 MB. Replication is 3. Rack-aware placement keeps at least one replica on a different rack, so a rack switch or power failure does not remove all copies."
+    },
+    {
+     "type": "p",
+     "text": "Read path: a client asks the NameNode where a block lives. The NameNode returns DataNode addresses. The client reads the block directly from a DataNode, usually the nearest one. File data does not pass through the NameNode, so one metadata server can support many readers."
+    },
+    {
+     "type": "p",
+     "text": "DataNodes send block reports to the NameNode. <code>hdfs fsck</code> checks missing and under-replicated blocks. For high availability, an active NameNode and a standby NameNode share an edit journal. The standby reads the journal and can take over. The Secondary NameNode is not a standby: it only merges the edit log into the fsimage checkpoint."
+    },
+    {
+     "type": "p",
+     "text": "Files are write-once. You can append at the end, but you do not update bytes at random offsets. This fits batch jobs that write large files once and read them many times."
+    }
+   ]
+  },
+  {
+   "h3": "Small files and the metadata count",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Small files are expensive. The NameNode keeps one metadata entry per file and one entry per block, not per replica. A 1 MB file still uses one block entry, even if the block size is 128 MB. One million 1 MB files therefore create about two million entries, while the data is only 1 TB. NameNode memory becomes the limit before disk does."
+    },
+    {
+     "type": "p",
+     "text": "Replication uses DataNode disk, not NameNode entries. If a file has B blocks and replication R, the cluster stores B × R block copies, but the NameNode records B block entries plus one file entry. Use the block size given in the question. GFS at 64 MB and HDFS at 128 MB give different counts for the same file. Failure recovery after a disk loss is covered in <a href=\"#fault-tolerance-replication-and-business-continuity\">4.6</a>."
+    },
+    {
+     "type": "formula",
+     "text": "blocks = ⌈S ÷ B⌉; replicas = blocks × R; metadata entries = blocks + 1",
+     "where": "S is file size in MB; B is block size in MB; R is replication factor; ⌈⌉ rounds up. The +1 is the file entry, not one per replica."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Creating /f does not give all locations. Block size is 128 MB; for 1024 MB there are 8 blocks. The client asks for b0 locations, writes b0 along DataNode 1 to 2 to 3; the ack returns 3 to 2 to 1, then DataNode 1 acks the client. The location exchange repeats for each block. File data never passes through the NameNode.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Client",
+    "NameNode",
+    "DataNode 1",
+    "DataNode 2",
+    "DataNode 3"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "NameNode",
+     "label": "create /f"
+    },
+    {
+     "from": "NameNode",
+     "to": "Client",
+     "label": "created"
+    },
+    {
+     "from": "Client",
+     "to": "NameNode",
+     "label": "need b0"
+    },
+    {
+     "from": "NameNode",
+     "to": "Client",
+     "label": "locations b0"
+    },
+    {
+     "from": "Client",
+     "to": "DataNode 1",
+     "label": "write b0"
+    },
+    {
+     "from": "DataNode 1",
+     "to": "DataNode 2",
+     "label": "pipe b0"
+    },
+    {
+     "from": "DataNode 2",
+     "to": "DataNode 3",
+     "label": "pipe b0"
+    },
+    {
+     "from": "DataNode 3",
+     "to": "DataNode 2",
+     "label": "ack b0"
+    },
+    {
+     "from": "DataNode 2",
+     "to": "DataNode 1",
+     "label": "ack b0"
+    },
+    {
+     "from": "DataNode 1",
+     "to": "Client",
+     "label": "ack b0"
+    }
+   ],
+   "aria": "A client asks the NameNode to create a file, then asks for locations of block b0. It writes b0 along DataNode 1 to 2 to 3. The acknowledgement returns from DataNode 3 to 2 to 1, and DataNode 1 sends the final acknowledgement to the client."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 1024 MB file is written to HDFS with block size 128 MB and replication factor 3. Find the number of blocks, block replicas, and NameNode metadata entries (block entries plus the file entry). Then repeat for GFS with 64 MB chunks.",
+   "steps": [
+    "HDFS blocks = 1024 ÷ 128 = 8 blocks.",
+    "HDFS block replicas = 8 × 3 = 24 copies on DataNodes.",
+    "NameNode entries = 8 block entries + 1 file entry = 9 entries. It does not store 24 entries.",
+    "GFS chunks = 1024 ÷ 64 = 16 chunks.",
+    "GFS replicas = 16 × 3 = 48 chunk copies.",
+    "GFS metadata entries = 16 chunk entries + 1 file entry = 17 entries."
+   ],
+   "answer": "HDFS: 8 blocks, 24 block replicas and 9 NameNode entries. GFS: 16 chunks, 48 chunk replicas and 17 metadata entries (16 chunk entries + 1 file entry).",
+   "check": "file_mb = 1024\nhdfs_block = 128\nrepl = 3\nhdfs_blocks = file_mb // hdfs_block\nhdfs_replicas = hdfs_blocks * repl\nhdfs_entries = hdfs_blocks + 1\ngfs_chunk = 64\ngfs_chunks = file_mb // gfs_chunk\ngfs_replicas = gfs_chunks * repl\ngfs_entries = gfs_chunks + 1\nprint(hdfs_blocks)\nprint(hdfs_replicas)\nprint(hdfs_entries)\nprint(gfs_chunks)\nprint(gfs_replicas)\nprint(gfs_entries)",
+   "values": [
+    8,
+    24,
+    9,
+    16,
+    48,
+    17
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The Secondary NameNode is not a backup or standby; it only checkpoints the edit log into the fsimage.",
+  "Do not mix the block sizes: GFS uses 64 MB chunks, HDFS defaults to 128 MB, and older HDFS clusters often use 64 MB.",
+  "NameNode entries are per block, not per replica, so 8 blocks with replication 3 give 8 block entries, not 24.",
+  "File data goes from the client to a DataNode, not through the NameNode; the NameNode only gives locations.",
+  "Write-once and append-only do not mean random updates; random writes are a poor fit for GFS and HDFS."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What two things does the HDFS NameNode store?",
+   "marks": 2,
+   "a": "The namespace (directories and file names) and the block map (which DataNodes hold each block). It does not store file data."
+  },
+  {
+   "level": "understand",
+   "q": "Why does GFS grant a lease to one replica before a write?",
+   "marks": 3,
+   "a": "The lease makes one replica the primary, so all replicas apply writes in one order and stay consistent."
+  },
+  {
+   "level": "apply",
+   "q": "A 512 MB file is stored in HDFS with block size 128 MB and replication factor 3. Find blocks, block replicas, and NameNode entries (block entries plus file entry).",
+   "marks": 4,
+   "a": "Blocks = 512 ÷ 128 = 4. Replicas = 4 × 3 = 12. NameNode entries = 4 block entries + 1 file entry = 5."
+  },
+  {
+   "level": "analyze",
+   "q": "Why do many small files hurt HDFS more than a few large files of the same total size?",
+   "marks": 4,
+   "a": "Each file and each block has a NameNode entry. Many small files create many entries, so NameNode memory fills before DataNode disk."
+  },
+  {
+   "level": "remember",
+   "q": "What is the default block size in HDFS, and what is the default GFS chunk size?",
+   "marks": 2,
+   "a": "HDFS default block size is 128 MB; GFS default chunk size is 64 MB."
+  },
+  {
+   "level": "understand",
+   "q": "What does the Secondary NameNode do, and what does it not do?",
+   "marks": 3,
+   "a": "It merges the edit log into the fsimage checkpoint. It is not a standby and cannot take over as the active NameNode."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does rack-aware replication place at least one HDFS replica on a different rack?",
+   "marks": 5,
+   "a": "A rack switch, rack power loss or network fault can remove all replicas on one rack. One off-rack copy keeps data available and still lets most reads use a local rack."
+  }
+ ],
+ "beyond": "Not for the exam. HDFS can replace three-way replication with erasure coding, such as Reed-Solomon, to cut storage overhead. NameNode federation splits the namespace across several NameNodes so one master is not the only metadata limit. Google's newer Colossus changes GFS's single-master design for larger scale. Search next for HDFS erasure coding, NameNode federation and Colossus."
+}

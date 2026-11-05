@@ -1,0 +1,253 @@
+{
+ "lead": "BigTable is a sparse, distributed, sorted map: most cells are empty, rows sit in key order, and data is spread over thousands of machines. A cell is addressed by row key, column key and timestamp. It exists because a web index is too large for one relational database and needs range scans. The NoSQL cloud databases in this unit generalise the trade: they drop joins and fixed schemas to scale out. They run search indexes, click logs, user profiles and time-series data. Some syllabi call this unit 'key-value and semi-structured data storage'.",
+ "prereq": "You need: <a href=\"#cloud-storage-organization-of-data\">4.1</a> for chunks and metadata, and <a href=\"#distributed-file-systems-gfs-and-hdfs\">4.2</a> for the replicated file system under BigTable.",
+ "sections": [
+  {
+   "h3": "Rows, families, qualifiers and versions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BigTable stores an untyped byte string in every cell. A cell is addressed by a row key (a string), a column key, and a timestamp (a 64-bit integer). The column key is written family:qualifier. The row key is the only index. Rows are sorted lexicographically, so keys with the same prefix sit together and a range scan reads them in one pass."
+    },
+    {
+     "type": "p",
+     "text": "Column families are created before data is written. A family is the unit of storage, compression and access control; its columns are stored together. Inside a family, qualifiers can appear freely, so contents:html and anchor:cnnsi.com need no schema change. A missing cell takes no space; that is what sparse means."
+    },
+    {
+     "type": "p",
+     "text": "Each cell may hold several versions. Every write gets a timestamp; a read at time T returns the newest version with timestamp at or before T. Old versions are removed by garbage collection rules set per family."
+    },
+    {
+     "type": "formula",
+     "text": "value = map[row][family:qualifier][timestamp]",
+     "where": "row is the row key string; family:qualifier is the column key; timestamp is the 64-bit version number; value is an uninterpreted byte string."
+    }
+   ]
+  },
+  {
+   "h3": "Tablets, METADATA and the write path",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BigTable splits a table by row-key range into tablets. A tablet is the unit of distribution. One tablet server owns each tablet; as data grows a tablet splits, and as servers fail tablets move."
+    },
+    {
+     "type": "p",
+     "text": "A three-level METADATA tree finds tablets. The root tablet never splits. It lists metadata tablets; each metadata tablet lists user tablets and their ranges. A lock service called Chubby holds the root tablet location and detects failure. Clients cache the path, so most reads go straight to the owning server."
+    },
+    {
+     "type": "p",
+     "text": "A write is durable before it is visible. Steps:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Client sends the write to the tablet server for that row range.",
+      "Server appends the write to a commit log on disk.",
+      "Server inserts the write into the memtable, a sorted in-memory map.",
+      "A full memtable is frozen and written to disk as an immutable SSTable.",
+      "Compaction merges SSTables and removes old versions only when the family's garbage-collection rules allow, for example beyond a version count or an age limit."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An SSTable is an immutable sorted file of key-value pairs. A read merges the memtable and SSTables and returns the newest visible version; bloom filters skip files that cannot hold the key. Replication and recovery targets are in <a href=\"#fault-tolerance-replication-and-business-continuity\">4.6</a>."
+    }
+   ]
+  },
+  {
+   "h3": "The NoSQL family and consistency choices",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BigTable is one point in the NoSQL family. NoSQL means 'not only SQL': keep a simple data model and scale by partitioning and replication instead of joins. Common types:"
+    },
+    {
+     "type": "table",
+     "head": [
+      "Type",
+      "Example",
+      "Data model"
+     ],
+     "rows": [
+      [
+       "Key-value",
+       "DynamoDB",
+       "A key maps to one opaque value; the value may be a document."
+      ],
+      [
+       "Wide-column",
+       "Cassandra",
+       "Rows with named columns grouped into families; sparse and sorted by row key."
+      ],
+      [
+       "Document",
+       "MongoDB",
+       "A JSON-like document per key; fields can differ between documents."
+      ],
+      [
+       "Graph",
+       "Neo4j",
+       "Nodes and edges; traversal follows relationships."
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "These stores hold semi-structured data: each record carries its own field names, so the schema is flexible. The cost is no planned join across records; the application must model each query into the key."
+    },
+    {
+     "type": "p",
+     "text": "Consistency is a design choice. Strong consistency returns the latest committed write. Eventual consistency lets replicas converge later, so a read may return an older value. During a network partition a system may choose availability over consistency; that is the CAP trade. A shopping cart may prefer availability; a bank ledger may prefer strong consistency."
+    }
+   ]
+  },
+  {
+   "h3": "Row-key design decides performance",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Rows are sorted by key, so the row key is the physical layout. A good key turns the common query into a short range scan; a bad key makes every write hit one tablet."
+    },
+    {
+     "type": "p",
+     "text": "A crawler stores www.cnn.com as com.cnn.www. If keys kept hostnames unreversed, pages from different cnn.com subdomains such as www, sports and money would sort apart. Reversing the domain components puts all cnn.com hosts under the prefix com.cnn. A range scan then reads those rows contiguously; a large site spans several adjacent tablets."
+    },
+    {
+     "type": "p",
+     "text": "Monotonic keys create a hotspot. If the key is an always-increasing timestamp, every new write goes to the last tablet while other servers idle. Add a hash prefix or reverse the timestamp to spread writes. Choose the key before the database; no index fixes a bad key."
+    },
+    {
+     "type": "p",
+     "text": "This is why cloud databases suit large logs, click streams, sensor readings and user profiles. Each query is answered from a key range, not a join. You gain scale and predictable range scans; you give up ad-hoc joins and a rigid schema."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Rows are sorted by key. The highlighted cell is the contents version for row com.cnn.www at read time t5.5; BigTable returns t5, the newest version at or before that time.",
+  "spec": {
+   "type": "array",
+   "title": "BigTable map: rows × column families, cells hold a version timestamp",
+   "show_index": false,
+   "rows": [
+    {
+     "label": "com.cnn.www",
+     "cells": [
+      "t5",
+      "t3",
+      "t6"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "com.example",
+     "cells": [
+      "t2",
+      "—",
+      "—"
+     ],
+     "marks": {}
+    },
+    {
+     "label": "org.wiki",
+     "cells": [
+      "t7",
+      "—",
+      "t1"
+     ],
+     "marks": {}
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 0,
+     "label": "read at t5.5"
+    }
+   ],
+   "aria": "A three-row table where the highlighted cell shows the value returned for the row com.cnn.www when it is read at time t5.5."
+  }
+ },
+ "examples": [
+  {
+   "question": "A crawler stores pages under reversed domain names. Row key com.cnn.www has column family contents with three versions at timestamps t3, t5 and t6, and two anchor columns: anchor:cnnsi.com at t3 and anchor:my.look.ca at t6. (a) Which contents value does a read at time t5.5 return? (b) Why reverse the domain? Give the version count and anchor-column count.",
+   "steps": [
+    "Contents versions sorted: t3, t5, t6.",
+    "Candidate versions with timestamp ≤ t5.5: t3 and t5; t6 is excluded because 6 > 5.5.",
+    "Newest candidate: t5. BigTable returns that contents value.",
+    "Contents version count = 3; anchor-column count = 2 (anchor:cnnsi.com, anchor:my.look.ca).",
+    "Reversing www.cnn.com to com.cnn.www makes all cnn.com rows share the prefix com.cnn, so they sit together in sorted order and a range scan reads them contiguously."
+   ],
+   "answer": "The read returns the contents version stamped t5; the row has 3 contents versions and 2 anchor columns.",
+   "check": "versions = [3.0, 5.0, 6.0]\nread_time = 5.5\nvisible = max(v for v in versions if v <= read_time)\nprint(visible)\nprint(len(versions))\nanchors = ['anchor:cnnsi.com', 'anchor:my.look.ca']\nprint(len(anchors))",
+   "values": [
+    5.0,
+    3,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Treating BigTable as relational: it has no joins, no foreign keys and no cheap full scan; row-key design is the query plan.",
+  "Using increasing timestamps as row keys; every write lands on the last tablet and creates a hotspot.",
+  "Confusing a column family with a qualifier; families are schema and storage units, qualifiers are free names inside a family.",
+  "Reading a timestamp as a clock display; it is a version number, and a read returns the newest version at or before its time.",
+  "Mixing strong and eventual consistency; eventual reads may return an older value after a write."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three parts of a BigTable cell key.",
+   "marks": 2,
+   "a": "Row key, column key in the form family:qualifier, and timestamp."
+  },
+  {
+   "level": "understand",
+   "q": "Why are column families created before data, while qualifiers are not?",
+   "marks": 3,
+   "a": "A family defines the storage, compression and access-control unit, so it must exist in the schema. Qualifiers are names inside a family and can appear on first write."
+  },
+  {
+   "level": "apply",
+   "q": "Row keys are increasing timestamps. Which tablet gets new writes, and what is one fix?",
+   "marks": 3,
+   "a": "Writes go to the tablet holding the largest row key, the last tablet. Add a hash prefix or reverse the timestamp to spread writes."
+  },
+  {
+   "level": "analyze",
+   "q": "Contents versions are t3, t5 and t6. A read arrives at t5.5. Which version returns, and why not t6?",
+   "marks": 4,
+   "a": "Return t5. BigTable returns the newest version with timestamp ≤ the read time; t6 is newer than t5.5, so it is not visible."
+  },
+  {
+   "level": "apply",
+   "q": "A scan reads keys com.cnn.www, com.cnn.sport and com.cnn.news. How many row-key ranges does it touch if tablets split at com.cnn?",
+   "marks": 3,
+   "a": "One range: all keys start with com.cnn and sit together after sorting, so one tablet range can serve the scan."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between strong and eventual consistency.",
+   "marks": 3,
+   "a": "Strong consistency returns the latest committed write on every read; eventual consistency may return an older value until replicas converge."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a document store fit semi-structured data better than a fixed relational table?",
+   "marks": 4,
+   "a": "Each document carries its own field names, so records with different fields coexist without null columns or schema migration. The trade is that joins across documents are not planned by the database."
+  },
+  {
+   "level": "remember",
+   "q": "Name the four NoSQL types in this chapter.",
+   "marks": 2,
+   "a": "Key-value, wide-column, document, graph."
+  }
+ ],
+ "beyond": "Not for the exam. BigTable's design lives on in managed wide-column services and in systems that combine strong consistency with global scale. The storage engine idea to search next is the LSM-tree: a memtable plus sorted immutable files plus compaction. The consistency debate to search next is CAP and its practical cousin PACELC. Modern cloud databases add serverless scaling and per-request pricing, which change how you choose a row key because cost follows the request pattern. Search next for LSM-tree, CAP theorem, DynamoDB partition keys, and Cassandra compaction."
+}
