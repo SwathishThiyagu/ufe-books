@@ -1,0 +1,45 @@
+# c-cloud-u6: free-model run
+
+- Book: `books/cse/c-cloud/c-cloud-u6.html`
+- Status: ok
+- Model calls so far: 35 (122,486 tokens in, 238,625 out), 6.5 minutes
+
+## Checker
+
+```
+c-cloud-u6.html: 9 chapters, 14629 words, 10 figures, 165 KB
+OK
+```
+
+## For the reviewer
+
+- chapter 2: the figure cannot be drawn: note "signature" runs off the right edge; shorten it
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 3 figure, Worked example 1, Quiz Q4: The attack path needs a stolen key to read a bucket that is described as public. A truly public bucket needs no credentials, so the stolen-key step is redundant and students learn the wrong causal chain: that a public bucket is only exploitable with a key, or that a key is needed at all.
+- ch 1 [high] Quiz Q7 answer: The answer says STRIDE does not find a cloud-specific path 'such as a public bucket policy'. This contradicts Section 3, where STRIDE asks 'can an attacker read?' per component. A public bucket is exactly information disclosure, so STRIDE does flag it. The example is wrong and would lose marks if repeated.
+- ch 1 [low] Section 2, cross-references: 'see IAM and authentication' and 'See VM security and secure isolation' are written as plain text, so they are not links to those chapters.
+- ch 2 [high] Lead paragraph: The lead calls availability "the fifth member of the classic CIA triad". The CIA triad has exactly three members — confidentiality, integrity and availability — so availability cannot be a fifth member of it, and the sentence contradicts itself (four services plus a fifth, inside a set of three). Section 1 later states the triad correctly, so the lead leaves the student with two conflicting pictures.
+- ch 2 [high] Worked example 1, part (b) and the answer to part (c): Part (b) says a man-in-the-middle changes the amount from ₹10,000 to exactly ₹1,000, while part (c) says the same request was encrypted with a key held only by the app and the bank and concludes that confidentiality held. An attacker who cannot read the ciphertext cannot pick a new amount of their choosing; and if the attacker did read the amount, confidentiality failed. The answer to (c) therefore contradicts the scenario in (b) and teaches the wrong mental model (encryption stopping reading but allowing chosen edits).
+- ch 2 [low] Figure caption and the tree: The caption says encryption appears only under confidentiality, but the table in Section 1 lists the AEAD tag as an integrity mechanism (AEAD is an encryption mode) and Section 2 says AES-GCM gives confidentiality and integrity together. The tree also shows integrity as "hash, MAC" only, and it drops availability even though the text calls availability a security service.
+- ch 3 [high] Section 3 and Exam traps: Revocation is described as making every object permanently unreadable and as crypto-shredding. Revocation only disables a key and can be reversed; crypto-shredding is destruction of the key. This also contradicts Q6, where the old KEK can be re-enabled.
+- ch 3 [high] Quiz Q3: The answer says an HSM handles 'few operations per second'. HSMs have limited throughput compared with general-purpose CPUs, but they can perform many cryptographic operations per second; this is a false quantity.
+- ch 3 [low] Section 1, TLS paragraph: It says application data flows under 'AES-GCM or ChaCha20'. TLS uses ChaCha20-Poly1305, an authenticated cipher; ChaCha20 alone is not an AEAD and does not provide integrity.
+- ch 4 [high] Section 2, formula definition of R: R is defined as the stored volume "at the end of the active period", but the formula itself adds the compressed archive term (Vd × Dr) ÷ C, so R covers the active plus archive storage at the end of the archive period. As written, a student who reads the definition will compute only Vd × Da (900 GB in the example) instead of 1,175 GB, contradicting the worked example.
+- ch 4 [low] Lead paragraph: "Data protection is the set of controls" narrows data protection to technical controls. In law and in standard usage, data protection is the legal and regulatory duty to safeguard personal data and the rights of the person it belongs to (consent, purpose limitation, erasure), which is wider than security controls.
+- ch 4 [low] Worked example 1, step 5, and the figure purge bar: The example says the service writes 10 GB of logs per day, then reports 0 GB after the purge window. If writes continue, day 365 to day 395 adds 30 more days of logs (300 GB) and the last 90 days of logs are still inside their active retention at day 365, so they cannot be purged. The zero figure only holds if the tracked data set stops at day 365.
+- ch 5 [low] Worked example 1, step 2: The justification '10.1.2.3 starts with 10, so it is in 10.0.0.0/8' is imprecise. Comparing address strings, 100.1.2.3 or 101.1.2.3 also 'start with 10' but are outside 10.0.0.0/8. A student can carry this shortcut into the quiz and allow the wrong address.
+- ch 5 [low] Section 1, definitions of identity and principal: The two definitions circle each other: an identity is 'a principal that can make a request', and later a principal is described only through its uses. A student cannot tell whether a principal is the identity itself or the identity acting in a session.
+- ch 6 [low] Figure (sequence spec and caption): The figure shows the only authentication step as a '6-digit OTP', but the chapter itself says an OTP alone is a single factor, and the worked example uses password plus TOTP. A student may read the figure as MFA happening at the IdP.
+- ch 6 [low] Exam traps, point 3: It lumps two different failures together: a wrong audience check lets a token meant for app A be accepted by app B, while a wrong redirect URI leaks the authorization code or token to an attacker's endpoint. Calling both 'replayed to another app' blurs the distinction.
+- ch 6 [low] Section 1, TOTP paragraph: The chapter never says the server must reject a code that was already used in the same time step. Anyone who reads or intercepts the 6 digits can otherwise reuse them for the rest of the 30-second window.
+- ch 6 [low] Quiz Q6: The answer uses T = floor(100 ÷ 30) = 3, which assumes T₀ = 0. The formula in the chapter includes T₀, so the assumption should be stated in the question.
+- ch 8 [low] Quiz Q6: The second named failure, 'with no short-lived identity, logs cannot attribute calls', is imprecise. Copied long-term keys do appear in audit logs; the real gap is that every burst VM shares one identity, so a call cannot be tied to a specific workload or instance, and the key cannot be scoped or revoked per instance.
+- ch 8 [low] Exam traps, fourth trap: 'Without hysteresis the workload flaps across the boundary and cost doubles' states an exact multiplier that nothing supports. Flapping raises cost by an amount that depends on how often the workload crosses the threshold, not by a fixed factor of two.
+- ch 8 [low] Lead: 'an API gateway that checks identity, encrypts traffic, validates input and limits rate' overstates the gateway's role in encryption. The gateway terminates TLS for the hop into it and re-establishes TLS toward the backend; it does not add encryption on its own, and some deployments run it behind a separate TLS terminator.
+- ch 9 [high] Section 2 (Alerting and SIEM), sentence after the MTTD/MTTR definitions: "Cutting MTTD does not cut MTTR" contradicts the chapter's own formula, where MTTR is measured from incident start. Since t_alert,i is inside the interval t_start,i to t_recover,i, a faster alert usually means response work starts earlier and service returns earlier, so MTTR normally falls when MTTD falls. A student will learn the opposite of what the formula shows.
+- ch 9 [low] Worked example 1, step 2 and the answer line: The example calls 30 min the "containment time", but the figure it tells students to use says containment takes 20 minutes (10 to 30 on the timeline). Two different quantities share one label, so the student cannot tell whether containment is 20 or 30 minutes.
+- ch 9 [low] Section 3, last sentence on SLA reports: "A provider meeting 99.9% uptime can still have a 3-hour outage in your region" is only true if the provider measures a wider boundary than the region or a longer period. 99.9% of a 720-hour month allows about 43 minutes, so a 3-hour regional outage would breach a monthly regional SLA. Without that caveat the sentence reads as a contradiction.
+- ch 9 [low] Section 3 (Incident response phases), opening sentence: The text says incident response "follows six phases" as if that were the only model. The widely used NIST incident-response guide groups the same work into four phases, so a student meeting that version in another book or in an exam key will think one of them is wrong.
+- ch 9 [low] Lead and whole chapter (auditing): The lead defines auditing as proving a control worked by comparing evidence with policy, and the chapter title includes auditing, but the body never explains how an audit is done — sampling evidence, testing a control, recording the result. Only the audit trail is described.

@@ -1,0 +1,206 @@
+{
+ "lead": "Identity and access management (IAM) is the cloud control plane that answers one question for every request: may this principal perform this action on this resource under these conditions? It exists because a network boundary cannot protect a shared, API-driven cloud; every call must be checked. IAM is used when an analyst opens a finance dashboard, a service account reads a queue, or a partner account assumes a role across accounts. It ties identities, policies and conditions into an auditable decision: allow or deny.",
+ "prereq": "You need: <a href=\"#security-services-confidentiality-integrity-authentication-n-r\">6.2 authentication</a> for who a principal is, and Unit 1 roles and boundaries for what a cloud account owns.",
+ "sections": [
+  {
+   "h3": "Identities, principals and policies",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An IAM system has four parts: identities, resources, actions and policies. An identity is a principal that can make a request. A user is a long-lived identity for a person. A group is a collection of users that shares permissions. A role is a set of permissions that a principal assumes for a limited time; it is not a person. A service account is an identity for a workload, such as a billing job that reads a queue. A resource is the object being accessed, for example a finance table. An action is the operation, for example read. A policy is a rule that binds effect, principal, action, resource and condition. The effect is Allow or Deny; a condition can require a source IP range, a time window or an MFA result. RBAC assigns permissions to roles and roles to users or groups. It is simple and matches job functions, but it can be coarse. ABAC writes policies over attributes of the principal, resource and request context. It is finer and more complex. Least privilege grants only the actions, resources and time needed for the task. Separation of duties ensures no single identity can both request and approve a sensitive action, such as a payment."
+    }
+   ]
+  },
+  {
+   "h3": "Evaluating a request",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every request carries a principal, an action, a resource and context such as source IP and session details. The IAM engine collects every policy that matches the request. It applies three rules. First, the default is deny: if no policy allows the request, the answer is Deny. Second, an explicit Deny beats every Allow. Third, the request is allowed only if at least one Allow matches and no Deny matches."
+    },
+    {
+     "type": "formula",
+     "text": "Decision = Allow if (∃ Allow) ∧ (¬∃ Deny); otherwise Deny",
+     "where": "∃ Allow means at least one matching Allow statement; ¬∃ Deny means no matching Deny statement; ∧ means both conditions must hold."
+    },
+    {
+     "type": "p",
+     "text": "Conditions narrow an Allow: the principal may read only when MFA is present (see <a href=\"#authentication-multi-factor-single-sign-on-identity-federation\">6.6</a>) and the source IP is inside 10.0.0.0/8. The figure shows this gate sequence. The engine checks the MFA result, then the IP range, then the role permission; one failed gate gives Deny. A policy that says Allow read on finance data is not enough if its condition fails. This is why IAM reviews test both the policy text and the request context."
+    }
+   ]
+  },
+  {
+   "h3": "Temporary trust and privilege escalation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Long-lived access keys are a risk. IAM therefore issues temporary credentials: a trusted principal asks the identity service for a short-lived token, and the token carries the permissions of a role. Cross-account trust uses this mechanism. Account A creates a role and a trust policy that names a principal in account B. A user or service in B calls the role-assumption API, receives temporary credentials, and acts in A with only the role's permissions. Two policies matter: the trust policy decides who may assume the role, and the permissions policy decides what the role may do. Privilege escalation is the path from limited access to greater access. Typical paths are changing a policy that protects the identity, creating a new role with more power, passing a powerful role to a compute service, or assuming a role that trusts the identity. Controls include permissions boundaries, deny statements on policy changes, separation of duties for role creation, and regular review of trust policies. End-to-end access control checks every hop: user to API, service to service, and service to data."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A request must pass every condition: MFA, source IP range, and role permission; a failure at any gate produces Deny.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "Request",
+    "style": "accent",
+    "children": [
+     {
+      "label": "MFA ok?",
+      "note": "factor checked",
+      "style": "normal",
+      "edge": "start",
+      "children": [
+       {
+        "label": "IP in range?",
+        "note": "10.0.0.0/8",
+        "style": "normal",
+        "edge": "yes",
+        "children": [
+         {
+          "label": "Role allows?",
+          "note": "Analyst read",
+          "style": "normal",
+          "edge": "yes",
+          "children": [
+           {
+            "label": "Allow",
+            "style": "next",
+            "edge": "yes",
+            "_d": 4,
+            "children": [],
+            "_x": 144.43319999999997,
+            "_y": 338
+           },
+           {
+            "label": "Deny",
+            "style": "muted",
+            "edge": "no",
+            "_d": 4,
+            "children": [],
+            "_x": 288.1444,
+            "_y": 338
+           }
+          ],
+          "_d": 3,
+          "_x": 216.28879999999998,
+          "_y": 264
+         },
+         {
+          "label": "Deny",
+          "style": "muted",
+          "edge": "no",
+          "_d": 3,
+          "children": [],
+          "_x": 431.8556,
+          "_y": 264
+         }
+        ],
+        "_d": 2,
+        "_x": 324.07219999999995,
+        "_y": 190
+       },
+       {
+        "label": "Deny",
+        "style": "muted",
+        "edge": "no",
+        "_d": 2,
+        "children": [],
+        "_x": 575.5668000000001,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 449.8195,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 449.8195,
+    "_y": 42
+   },
+   "aria": "A decision tree for a request: MFA must pass, the source IP must be in range, and the role must allow the action; any failure leads to deny."
+  }
+ },
+ "examples": [
+  {
+   "question": "Role Analyst has an allow policy for read on finance data when MFA is present and the source IP is in 10.0.0.0/8. Classify requests A, B and C, then count allowed and denied. A: MFA yes, IP 10.1.2.3, role allows read. B: MFA yes, IP 192.168.1.5, role allows read. C: MFA no, IP 10.1.2.3, role allows read.",
+   "steps": [
+    "Policy conditions: MFA yes, IP in 10.0.0.0/8, role allows read. All three must hold; otherwise the decision is Deny.",
+    "Request A: MFA yes; 10.1.2.3 starts with 10, so it is in 10.0.0.0/8; role allows read. Decision: Allow.",
+    "Request B: MFA yes; 192.168.1.5 starts with 192, so it is outside 10.0.0.0/8; the IP condition fails. Decision: Deny.",
+    "Request C: MFA no; the MFA condition fails even though 10.1.2.3 is in range. Decision: Deny.",
+    "Counts: allowed = 1; denied = 2."
+   ],
+   "answer": "Request A is allowed; B and C are denied; allowed = 1, denied = 2.",
+   "check": "from ipaddress import ip_address, ip_network\nnet = ip_network('10.0.0.0/8')\nreqs = [('A', True, '10.1.2.3', True), ('B', True, '192.168.1.5', True), ('C', False, '10.1.2.3', True)]\nallowed = 0\ndenied = 0\nfor name, mfa, ip, role in reqs:\n    ok = mfa and (ip_address(ip) in net) and role\n    if ok:\n        allowed += 1\n    else:\n        denied += 1\nprint(allowed)\nprint(denied)",
+   "values": [
+    1,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Authentication says who you are; IAM authorization says what you can do. A successful login does not imply access to every resource.",
+  "An explicit Deny beats every Allow. A matching Deny statement makes the request denied even if an Allow also matches.",
+  "A role is a set of permissions assumed for a time, not a user. Do not treat a role name as a person's account.",
+  "Default deny means a missing policy is not permission. If no Allow matches, the request is denied.",
+  "10.0.0.0/8 covers 10.0.0.0 to 10.255.255.255 only. 192.168.x.x is private but not in that range, so it fails the condition."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a principal in IAM?",
+   "marks": 2,
+   "a": "Any identity that can make a request, such as a user, a role session or a service account."
+  },
+  {
+   "level": "understand",
+   "q": "Why is default deny safer than default allow?",
+   "marks": 3,
+   "a": "It fails closed: a missing or mistaken policy blocks access instead of exposing a resource."
+  },
+  {
+   "level": "apply",
+   "q": "Role Analyst allows read if MFA is present and IP is in 10.0.0.0/8. A request has MFA yes, IP 10.9.8.7, and role allows read. What is the decision?",
+   "marks": 2,
+   "a": "Allow: MFA is present, 10.9.8.7 is in 10.0.0.0/8, and the role allows read."
+  },
+  {
+   "level": "apply",
+   "q": "Same policy: MFA yes, IP 172.16.0.5, role allows read. What is the decision?",
+   "marks": 2,
+   "a": "Deny: 172.16.0.5 is outside 10.0.0.0/8, so the IP condition fails."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain cross-account role trust and the two policies involved.",
+   "marks": 5,
+   "a": "Account A creates a role whose trust policy names a principal in account B; that principal assumes the role and gets temporary credentials. The trust policy controls who may assume the role; the permissions policy controls what the role can do."
+  },
+  {
+   "level": "analyze",
+   "q": "Name two IAM privilege-escalation paths and one control for each.",
+   "marks": 6,
+   "a": "Editing a policy that protects the identity; control: deny policy changes and use permissions boundaries. Passing a powerful role to a compute service; control: restrict role passing to approved roles and review service roles."
+  },
+  {
+   "level": "remember",
+   "q": "What does RBAC assign permissions to?",
+   "marks": 2,
+   "a": "RBAC assigns permissions to roles; users or groups are then assigned to roles."
+  },
+  {
+   "level": "understand",
+   "q": "Give one advantage and one cost of ABAC compared with RBAC.",
+   "marks": 4,
+   "a": "ABAC can express fine conditions on principal, resource and request attributes; it costs more policy complexity and testing."
+  }
+ ],
+ "beyond": "Not for the exam. Industry IAM has moved toward policy-as-code, workload identity and continuous review of effective permissions. Cloud infrastructure entitlement management tools scan for unused or dangerous permissions. Zero-trust designs treat every request as untrusted and check identity and device context. Search for policy-as-code, workload identity, CIEM and least-privilege reviews."
+}

@@ -1,0 +1,239 @@
+{
+ "lead": "Encryption turns readable data into ciphertext that only a key holder can reverse. In the cloud the cipher is the easy part; the hard part is where the keys live and who may use them. A provider that stores your ciphertext and your key in the same place has protected nothing. This chapter covers the ciphers used in practice, the key hierarchy of root keys, key encryption keys and data encryption keys, the lifecycle operations of rotation, revocation, escrow and bring-your-own-key, and the certificates that carry public keys.",
+ "prereq": "You need: <a href=\"#security-services-confidentiality-integrity-authentication-non-r\">6.2</a> for confidentiality and integrity, and Unit 2 for TLS and web services.",
+ "sections": [
+  {
+   "h3": "Two ciphers, two jobs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A symmetric cipher uses one key for both encryption and decryption. AES is the standard choice: it works on 128-bit blocks and takes a key of 128, 192 or 256 bits. In AES-256-GCM the same key encrypts the data and produces a 16-byte authentication tag, so any edit to the ciphertext makes decryption fail. That gives confidentiality and integrity in one mechanism, the goal set out in <a href=\"#security-services-confidentiality-integrity-authentication-non-r\">6.2</a>. A server CPU with AES instructions moves several gigabytes per second."
+    },
+    {
+     "type": "p",
+     "text": "An asymmetric cipher uses a key pair. RSA-2048 and elliptic-curve keys such as P-256 are common. Data encrypted with the public key opens only with the private key; a signature made with the private key is checked by anyone holding the public key. Asymmetric operations cost far more per byte, so they carry only small items: key transport, key agreement and signatures."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "AES-256-GCM",
+      "RSA-2048",
+      "ECC P-256"
+     ],
+     "rows": [
+      [
+       "Key size",
+       "256 bits",
+       "2048 bits",
+       "256 bits"
+      ],
+      [
+       "Key type",
+       "symmetric, one key",
+       "asymmetric pair",
+       "asymmetric pair"
+      ],
+      [
+       "Speed on bulk data",
+       "very fast",
+       "slow",
+       "slow"
+      ],
+      [
+       "Typical cloud use",
+       "data at rest, TLS records",
+       "key transport, signatures",
+       "signatures, TLS key agreement"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "TLS joins the two. The handshake uses asymmetric keys, or the ECDHE key-agreement exchange, to fix a shared secret. Both sides derive session keys from it, then application data flows under AES-GCM or ChaCha20-Poly1305. That protects data in transit. Data at rest never travels, so it is protected by AES directly, under a key from the hierarchy below."
+    }
+   ]
+  },
+  {
+   "h3": "Envelope encryption and the key hierarchy",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A hardware security module (HSM) is a tamper-resistant device that generates and holds keys and does crypto inside its own boundary; a key marked non-exportable can never leave it. An HSM is slow and costly per operation, so multi-megabyte objects cannot pass through it. Envelope encryption layers the keys instead."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The key management service (KMS) generates a data encryption key (DEK), for example 256 bits for AES-256-GCM.",
+      "The storage node encrypts the object with that DEK and writes ciphertext plus the 16-byte tag; the plaintext DEK lives only in memory.",
+      "The KMS wraps (encrypts) the DEK with a key encryption key (KEK) using AES key wrap or AES-GCM; the wrapped DEK goes into the object's metadata.",
+      "A reader sends the wrapped DEK back to the KMS, receives the plaintext DEK over TLS, decrypts the object and wipes the DEK.",
+      "The KEK is itself wrapped by a root key held inside the HSM and never exported."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The KMS now sees 60-byte blobs instead of gigabytes, so one tenant KEK wraps a thousand DEKs cheaply. Rotation follows the same lines: a new KEK means rewrapping the DEKs, a new DEK means re-encrypting the object."
+    }
+   ]
+  },
+  {
+   "h3": "Key lifecycle: rotation, revocation, escrow and custody",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Rotation replaces a key with a fresh one on a schedule or after an incident. Rotating a DEK re-encrypts the object, a full pass over the data. Rotating a KEK only unwraps and rewraps each DEK, kilobytes of work. Rotation caps how much data one key protects and shortens the life of a leaked key."
+    },
+    {
+     "type": "p",
+     "text": "Revocation disables a key, so the KMS refuses to unwrap with it. Revoke a KEK without first rewrapping its DEKs and every object beneath it becomes unreadable until the old KEK is re-enabled. Revocation alone is reversible, so it is not crypto-shredding. Crypto-shredding is the destruction of the key: if the key is destroyed and no copy exists anywhere, the objects stay unreadable forever. Destroying one key wipes out petabytes. Retention rules in <a href=\"#data-security-data-protection-and-data-retention\">6.4</a> use crypto-shredding deliberately."
+    },
+    {
+     "type": "p",
+     "text": "Escrow keeps a copy of a key with a third party or offline, so data survives a lost HSM or a departed administrator. Custody is where the key material physically sits. In BYOK (bring your own key) you generate the key and import it into the provider's KMS, stored inside the provider's HSM. In HYOK (hold your own key) the key stays in your own HSM and the provider calls out for every unwrap, so it never enters the provider at all. Who may call the key is an access-control question, see <a href=\"#identity-and-access-management-iam\">6.5</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Certificates and chains of trust",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A public key alone proves nothing about who owns it. A certificate is a signed statement binding a public key to an identity: subject name, public key, issuer, serial number, validity dates, and the issuer's signature over all of it. The common format is X.509."
+    },
+    {
+     "type": "p",
+     "text": "Certificates form a chain. The server presents its leaf certificate; the leaf is signed by an intermediate CA; the intermediate is signed by a root CA; the root certificate is pre-installed in the client's trust store. The client walks the chain, checks each signature, checks that the name matches the host it dialled, checks the dates, and checks revocation through a CRL or an OCSP responder. A cloud load balancer terminates TLS for you, so the chain configured on that balancer is part of your security surface."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "One tenant key-encryption key wraps the thousand data keys, and each data key encrypts one object; the root key that wraps the tenant key never leaves the HSM. Rotating the tenant key rewraps the data keys and leaves the stored ciphertext untouched.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Key hierarchy",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Root key",
+     "note": "in HSM",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Tenant KEK",
+     "note": "wraps 1,000 DEKs",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "1,000 DEKs",
+     "note": "one per object",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "1,000 objects",
+     "note": "ciphertext stored",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "wraps",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "wraps",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "encrypts",
+     "style": "solid"
+    }
+   ],
+   "aria": "A key hierarchy from a root key in an HSM, to a tenant key-encryption key that wraps 1,000 data encryption keys, to 1,000 encrypted objects."
+  }
+ },
+ "examples": [
+  {
+   "question": "A tenant bucket holds 1,000 objects of 4 MB each. Every object has its own 256-bit AES-GCM data encryption key (DEK). All 1,000 DEKs are wrapped by one tenant KEK, and a stored wrapped DEK occupies 60 bytes. The tenant rotates the KEK. Find (a) how many objects must be re-encrypted, (b) how many bytes of wrapped DEKs are rewritten, (c) how many bytes of object data a full DEK rotation would rewrite, and (d) the factor by which KEK rotation reduces the work.",
+   "steps": [
+    "KEK rotation rewraps DEKs only and never touches stored ciphertext. Objects re-encrypted = 0.",
+    "Wrapped DEK bytes rewritten = 1,000 × 60 bytes = 60,000 bytes = 60 kB.",
+    "Object data under a full DEK rotation = 1,000 × 4,000,000 bytes = 4,000,000,000 bytes = 4 GB (taking 1 MB = 10⁶ bytes).",
+    "Work ratio = 4,000,000,000 ÷ 60,000 = 66,666.67, so about 66,667 times less work."
+   ],
+   "answer": "Zero objects are re-encrypted, 60,000 bytes (60 kB) of wrapped DEKs are rewritten, against 4,000,000,000 bytes (4 GB) for a full data re-encryption — roughly 66,667 times less work.",
+   "check": "objects = 1000\nwrapped_dek_bytes = 60\nobject_bytes = 4_000_000\nre_encrypted = 0\nrewrapped = objects * wrapped_dek_bytes\nfull = objects * object_bytes\nprint(re_encrypted)\nprint(rewrapped)\nprint(full)\nprint(round(full / rewrapped))",
+   "values": [
+    0,
+    60000,
+    4000000000,
+    66667
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A key stored beside the ciphertext — same bucket, same database row, same config file — protects nothing. The attacker who takes the data takes the key with it.",
+  "Rotating a KEK rewraps DEKs and does not re-encrypt data; rotating a DEK does re-encrypt the object. Exam questions swap these two on purpose.",
+  "Encryption alone gives confidentiality, not integrity. AES-CBC without a MAC can be edited and still decrypt; use AES-GCM or encrypt-then-MAC.",
+  "Revoking a KEK before rewrapping its DEKs makes every object under it unreadable until the old KEK is re-enabled, and rotating that key does not help because the new KEK never wrapped those DEKs. Only destroying the key with no copy left is crypto-shredding, and that loss is permanent.",
+  "Tokenization replaces a value with a surrogate that has no mathematical relation to it; it is not encryption and is handled in <a href=\"#data-security-data-protection-and-data-retention\">6.4</a>."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define DEK and KEK, and say which one encrypts the object.",
+   "marks": 2,
+   "a": "A DEK (data encryption key) encrypts the object itself. A KEK (key encryption key) encrypts, or wraps, the DEK."
+  },
+  {
+   "level": "remember",
+   "q": "State the AES block size and the three permitted AES key sizes.",
+   "marks": 2,
+   "a": "Block size 128 bits; key sizes 128, 192 and 256 bits."
+  },
+  {
+   "level": "understand",
+   "q": "Why not encrypt every object directly with the root key inside the HSM?",
+   "marks": 3,
+   "a": "An HSM has much lower throughput than a general-purpose server and non-exportable keys cannot leave it, so gigabytes of object data cannot pass through it. Envelope encryption sends only small key blobs to the KMS and does the bulk AES work on the storage nodes."
+  },
+  {
+   "level": "understand",
+   "q": "Distinguish BYOK from HYOK.",
+   "marks": 3,
+   "a": "BYOK: you generate the key material and import it into the provider's KMS, where it is stored and used inside the provider's HSM. HYOK: the key stays in your own HSM and the provider calls out to it for every unwrap, so the material never enters the provider."
+  },
+  {
+   "level": "apply",
+   "q": "An account holds 2,500 objects, each with its own DEK, all wrapped by one KEK. A stored wrapped DEK takes 80 bytes. The KEK is rotated. Find (i) the number of objects re-encrypted and (ii) the bytes of wrapped DEK rewritten.",
+   "marks": 4,
+   "a": "(i) 0 objects, because only the DEKs are rewrapped. (ii) 2,500 × 80 = 200,000 bytes = 200 kB."
+  },
+  {
+   "level": "analyze",
+   "q": "An engineer revokes a KEK to test it, then rotates that KEK and expects the data to read again. Why does it stay unreadable?",
+   "marks": 5,
+   "a": "Revocation blocks unwrap calls. The rotated KEK is new and has never wrapped the existing DEKs, so it cannot open them. The old KEK must be re-enabled, or the DEKs restored from a backup copy of the key, before the data can be read."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does one TLS connection use both an asymmetric and a symmetric cipher?",
+   "marks": 4,
+   "a": "Asymmetric operations cost far more per byte, so they are used only in the handshake: certificate signatures and key transport or ECDHE agreement. Those produce a shared secret, and the record stream then runs under fast AES-GCM or ChaCha20-Poly1305."
+  }
+ ],
+ "beyond": "Not for the exam. In industry the hierarchy is standardised: KMIP is the protocol many KMS products speak, and an external key store lets a provider call into a customer HSM at unwrap time. Confidential computing pushes encryption further, keeping a running virtual machine's memory encrypted with keys the hypervisor cannot read. Post-quantum key encapsulation, standardised by NIST in 2024, is being added to TLS handshakes because a recorded session can be broken later by a quantum computer. Crypto-agility, designing so a cipher or key size can be swapped without redesign, is the practical skill to search next, along with 'KMIP', 'external key store' and 'confidential computing'."
+}

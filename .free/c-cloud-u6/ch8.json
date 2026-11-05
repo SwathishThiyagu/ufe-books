@@ -1,0 +1,175 @@
+{
+ "lead": "A design pattern is a reusable arrangement of components that stops a known problem from coming back. Cloud bursting is one: a private cloud carries the steady load and, at a peak, the overflow goes to a public cloud. Secure interfaces are the other: every call that crosses a trust boundary passes an API gateway that checks identity, encrypts traffic, validates input and limits rate. Together they keep identity, data and traffic controlled while a workload crosses trust domains. Ticketing sites use this on match day; banks on salary day.",
+ "prereq": "You need: <a href=\"#encryption-and-key-management-in-the-cloud\">6.3 encryption</a>, <a href=\"#identity-and-access-management-iam\">6.5 IAM</a>, <a href=\"#authentication-multi-factor-single-sign-on-identity-federation\">6.6 federation</a>, and elasticity from Unit 2.",
+ "sections": [
+  {
+   "h3": "Cloud bursting: trigger, broker, tunnel",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Bursting keeps the steady load in a private cloud and sends only the overflow to a public cloud for as long as the peak lasts. The trigger is a threshold on a measurable signal: requests per second, queue depth, or CPU. A private cloud built for 100 req/s starts bursting when the five-minute average passes 100 and stops at 80, so it does not switch on and off at the boundary. Only a few universities teach this pattern."
+    },
+    {
+     "type": "formula",
+     "text": "burst requests = (peak rate − base rate) × burst duration",
+     "where": "peak rate is requests per second at the top of the peak; base rate is what the private cloud serves; burst duration is in seconds."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set the trigger with hysteresis: start at 100 req/s, stop at 80 req/s.",
+      "Route the decision through the burst broker. It is the only component allowed to create public-cloud resources, it holds the credentials, and it checks policy: tenant, region, spend cap.",
+      "Keep one identity. The private identity provider issues short-lived tokens that the public cloud accepts, so no long-term keys are copied across.",
+      "Carry traffic in a secure tunnel: IPsec or TLS between the two clouds, and the public side accepts connections only from that tunnel.",
+      "Encrypt data before it leaves, with a key the customer holds. Better still, send code to the data, not data to the code.",
+      "Write egress rules as an allow-list: the public side may call only named endpoints; everything else is denied.",
+      "Drain on exit: stop new work, finish running work, wipe instance storage, revoke tokens, log the burst."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Secure interfaces: gateway, mTLS, scopes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An interface is secure when the caller is authenticated, authorised for exactly that action, and cannot overload or corrupt the backend."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "API gateway: one entry point. It terminates TLS, authenticates the caller, applies quota, validates and routes. Backends stay private.",
+      "Mutual TLS: client and server both show certificates. Plain TLS proves the server only; mTLS proves both ends, which is what service-to-service calls need.",
+      "OAuth scopes: the token carries scopes such as read:orders. The scope limits what the token can do, so ask for the narrowest one.",
+      "Input validation: check type, length, range and encoding on the server, before the request reaches the backend.",
+      "Rate limits: per key, per IP, per tenant; answer 429 when exceeded. This caps credential stuffing and surprise bills."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An API key shipped inside a mobile app is not a secure interface. Anyone can extract it, and TLS protects the bytes in transit but decides nothing about who may do what."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Peak load of 150 req/s reaches the broker, which leaves 100 req/s in the private cloud and sends 50 req/s to the public cloud. Notice that the broker, not the public cloud, makes the split.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Burst split",
+   "aria": "A peak load of 150 requests per second reaches a burst broker, which sends 100 requests per second to a private cloud and 50 to a public cloud.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Peak load",
+     "note": "150 req/s",
+     "style": "accent"
+    },
+    {
+     "id": "b",
+     "label": "Burst broker",
+     "note": "identity and policy",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Private cloud",
+     "note": "100 req/s",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Public cloud",
+     "note": "+50 req/s",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "peak 150",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "100",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "d",
+     "label": "50",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A private cloud is sized for 100 requests/s. A cricket final pushes peak load to 150 requests/s for 2 hours. The broker bursts the overflow to a public cloud at ₹0.001 per request. How many requests go to the public cloud, and what does the burst cost?",
+   "steps": [
+    "Overflow rate = 150 − 100 = 50 requests/s.",
+    "Duration = 2 h × 3,600 s/h = 7,200 s.",
+    "Burst requests = 50 requests/s × 7,200 s = 360,000 requests.",
+    "Cost = 360,000 × ₹0.001 = ₹360."
+   ],
+   "answer": "360,000 requests go to the public cloud, costing ₹360.",
+   "check": "base = 100\npeak = 150\nhours = 2\nprice = 0.001\noverflow = peak - base\nseconds = hours * 3600\nrequests = overflow * seconds\ncost = requests * price\nprint(int(requests))\nprint(int(cost))",
+   "values": [
+    360000,
+    360
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Bursting without federated identity and encrypted data copies tenant data into a second trust domain, where the first cloud's controls do not reach.",
+  "An API key inside a mobile app is not a secure interface; it is a password printed on the box.",
+  "TLS protects data in transit. It does not authorise: a valid certificate says nothing about permission.",
+  "A broker holding permanent admin keys in the public cloud turns one compromise into two. Use short-lived tokens.",
+  "Without hysteresis the workload flaps across the boundary and cost doubles."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define cloud bursting in one line.",
+   "marks": 2,
+   "a": "Running the base load in a private cloud and sending only the overflow to a public cloud for the duration of the peak."
+  },
+  {
+   "level": "remember",
+   "q": "What does mutual TLS prove that ordinary TLS does not?",
+   "marks": 2,
+   "a": "That the client also holds a valid certificate; ordinary TLS authenticates the server only."
+  },
+  {
+   "level": "understand",
+   "q": "Why should the broker, not the application, create public-cloud resources?",
+   "marks": 3,
+   "a": "It centralises credentials and policy (tenant, region, spend), so the application never holds cloud keys and every burst is capped and logged."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a scope check not the same as authentication?",
+   "marks": 3,
+   "a": "Authentication says who the caller is; the scope says what the token may do. A valid token with a narrow scope is authenticated but limited."
+  },
+  {
+   "level": "apply",
+   "q": "Base 100 req/s, peak 250 req/s for 30 minutes, ₹0.002 per request. Find burst requests and cost.",
+   "marks": 4,
+   "a": "Overflow = 250 − 100 = 150 req/s; duration = 30 × 60 = 1,800 s; requests = 150 × 1,800 = 270,000; cost = 270,000 × ₹0.002 = ₹540."
+  },
+  {
+   "level": "analyze",
+   "q": "A team bursts to a public cloud but keeps its identity provider private and copies long-term API keys to the burst VMs. Name two failures and one fix.",
+   "marks": 5,
+   "a": "Long-term keys sit in a second trust domain and outlive the burst, so revocation is slow and a leak is permanent; with no short-lived identity, logs cannot attribute calls. Fix: federation with short-lived tokens from the private identity provider."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, bursting has largely become multi-cloud failover and burst-to-serverless, where the trigger is queue depth and the broker is an admission controller. Workload identity standards now issue certificates to services automatically, replacing copied keys. Search for workload identity, egress gateway and confidential bursting to see how allow-lists and short-lived tokens are built today."
+}

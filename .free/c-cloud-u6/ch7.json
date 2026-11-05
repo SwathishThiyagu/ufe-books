@@ -1,0 +1,231 @@
+{
+ "lead": "Virtual machine security keeps one tenant's VM from reading, changing, or reaching another tenant's VM on shared hardware. The hypervisor draws the first boundary, but images, management APIs, snapshots, and live migration cross it. Isolation is therefore designed: hardened images, least privilege, patched guests and hypervisors, segmented virtual networks, and protected migration. Cloud providers use it in IaaS and private cloud, where many customers share physical hosts. The goal is not only a strong hypervisor but tested separation of every path between tenants.",
+ "prereq": "You need Unit 3 on hypervisors and virtual machines and <a href=\"#cloud-security-threats-risks-and-attack-vectors\">6.1</a> on cloud threats.",
+ "sections": [
+  {
+   "h3": "Where VM isolation is built",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A type-1 hypervisor runs directly on the physical host and gives each virtual machine (VM) virtual CPU, memory, disk, and network interface. The guest operating system inside the VM believes it owns a real machine. The hypervisor traps privileged instructions and keeps each VM's memory ranges apart. A virtual NIC (vNIC) connects a VM to a virtual switch. The switch forwards frames to other VMs on the same host or to the physical network. The management plane is the control API that creates VMs, attaches disks, takes snapshots, and starts live migration. It is powerful, so it needs strong authentication and role-based least privilege."
+    },
+    {
+     "type": "p",
+     "text": "Secure isolation is built in layers:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Physical host: firmware, baseboard management controller (BMC), and boot chain must be patched and restricted.",
+      "Hypervisor: patch the virtual machine monitor (VMM) and virtual switch; remove unused virtual hardware.",
+      "Management plane: separate admin roles, use multi-factor authentication, log every API call.",
+      "Guest and image: harden the guest OS, patch it, disable unused services, and keep secrets out of the image."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "One weak layer can expose all VMs on the host, so control each layer separately."
+    }
+   ]
+  },
+  {
+   "h3": "How isolation fails",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An attacker who controls one VM tries to cross the boundary. A VM escape is an exploit that breaks out of the guest and runs code in the hypervisor or host. It is rare but severe: one escape can reach every VM on the host. Co-residency is sharing one physical host with another tenant. Co-residency alone is normal in cloud; cache-timing and other side channels can still leak small amounts of data if the hypervisor and CPU mitigations are weak."
+    },
+    {
+     "type": "p",
+     "text": "Other paths cross the boundary by design. A snapshot copies disk state and sometimes memory; it can contain passwords, session tokens, keys, and personal data. A clone copies the VM identity, including host keys, local accounts, and agent tokens. Live migration sends memory pages over a network; without encryption and mutual authentication, an attacker can read or alter them. Templates and images can carry default accounts or old packages."
+    },
+    {
+     "type": "p",
+     "text": "Network isolation is separate from VM isolation. Two VMs on one host can still reach each other through the virtual switch unless policy denies it. Inter-tenant segmentation places tenant A on 10.1.0.0/24 and tenant B on 10.2.0.0/24, then applies a default-deny rule between the segments. Microsegmentation adds rules per VM or per workload, for example allow only TCP 443 from A-web to A-db. The hypervisor isolates memory; the network policy isolates reachability. You need both."
+    }
+   ]
+  },
+  {
+   "h3": "Designing and testing secure isolation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Secure isolation strategies combine hardening, least privilege, segmentation, and evidence. Use this order:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Harden the golden image: remove default accounts, disable unused services, install current patches, and add a monitoring agent.",
+      "Patch in two tracks: guest OS patches by the customer, hypervisor and firmware patches by the provider. Track both in a register.",
+      "Apply least privilege to the management plane: create VM, snapshot, and migrate are separate permissions.",
+      "Segment traffic: default deny between tenants; allow only named flows; log denied packets.",
+      "Protect copies: encrypt snapshots, restrict who can restore them, rotate secrets after cloning, and expire old images.",
+      "Protect migration: use encrypted channels, mutual authentication, and a dedicated migration network.",
+      "Test: run escape and policy tests, review audit logs, and verify that a VM cannot reach another tenant's segment."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Virtualization strategy matters. Prefer current hypervisor versions with CPU mitigations enabled. Do not mix tenants of different trust levels on one host when policy forbids it. Containers add another isolation boundary: they share the host kernel, so a kernel bug can cross containers more easily than a hypervisor boundary. Use containers for speed, VMs for stronger separation, and combine them when needed."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Tenant A and tenant B sit on one host, but their virtual NICs attach to separate segments 10.1.0.0/24 and 10.2.0.0/24; the dashed deny edge is the control that stops A reaching B.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Tenant isolation",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Physical host",
+     "note": "shared hardware",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Hypervisor",
+     "note": "trusted layer",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "VM A",
+     "note": "tenant A",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "VM B",
+     "note": "tenant B",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "Segment A",
+     "note": "10.1.0.0/24",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "Segment B",
+     "note": "10.2.0.0/24",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "runs",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "vNIC",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "d",
+     "label": "vNIC",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "e",
+     "label": "attached",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "f",
+     "label": "attached",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "label": "deny",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A host runs a hypervisor with VM A on tenant segment 10.1.0.0/24 and VM B on tenant segment 10.2.0.0/24; traffic between the segments is denied."
+  }
+ },
+ "examples": [
+  {
+   "question": "Tenant A has VM A-web at 10.1.0.12 and A-db at 10.1.0.20. Tenant B has VM B at 10.2.0.5. The policy has rule R1: allow TCP 443 from 10.1.0.12 to 10.1.0.20; rule R2: deny all traffic from 10.1.0.0/24 to 10.2.0.0/24; default deny. An attacker on A-web sends three packets: (1) to 10.1.0.20:443, (2) to 10.2.0.5:22, (3) to 10.2.0.5:443. How many packets are allowed and how many are denied?",
+   "steps": [
+    "Source is 10.1.0.12.",
+    "Packet 1: destination 10.1.0.20, port 443. It matches R1, so it is allowed. Allowed count = 1.",
+    "Packet 2: destination 10.2.0.5, port 22. It matches R2 because 10.1.0.12 is inside 10.1.0.0/24 and 10.2.0.5 is inside 10.2.0.0/24. It is denied. Denied count = 1.",
+    "Packet 3: destination 10.2.0.5, port 443. It also matches R2; R2 denies all ports. It is denied. Denied count = 2.",
+    "No packet is left for the default deny rule."
+   ],
+   "answer": "1 packet is allowed and 2 packets are denied.",
+   "check": "allowed = 0\ndenied = 0\npackets = [(\"10.1.0.20\", 443), (\"10.2.0.5\", 22), (\"10.2.0.5\", 443)]\nfor dst, port in packets:\n    if dst == \"10.1.0.20\" and port == 443:\n        allowed += 1\n    else:\n        denied += 1\nprint(allowed)\nprint(denied)",
+   "values": [
+    1,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A VM boundary is not a firewall: two VMs on one host still need network policy.",
+  "A snapshot includes disk state and sometimes memory; it can hold credentials, keys, and personal data, so treat it as sensitive data.",
+  "Live migration copies memory over the network; without encryption and authentication an attacker can read or alter it.",
+  "Cloning a VM copies its identity: same host keys, local accounts, and agent tokens; rotate secrets after cloning.",
+  "Co-residency does not by itself break isolation; cache and timing side channels need separate mitigations."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define VM escape.",
+   "marks": 2,
+   "a": "A VM escape is an exploit that breaks out of a guest VM and runs code in the hypervisor or host, crossing the isolation boundary."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a VM snapshot a security risk?",
+   "marks": 3,
+   "a": "A snapshot copies disk state and sometimes memory. It can contain passwords, tokens, keys, and personal data. If it is stored or restored without encryption and access control, an attacker can read those secrets."
+  },
+  {
+   "level": "apply",
+   "q": "A VM at 10.1.0.12 sends a packet to 10.2.0.5:443. Rules: allow TCP 443 from 10.1.0.12 to 10.1.0.20; deny all from 10.1.0.0/24 to 10.2.0.0/24; default deny. What happens?",
+   "marks": 4,
+   "a": "The source 10.1.0.12 is in 10.1.0.0/24 and the destination 10.2.0.5 is in 10.2.0.0/24, so the deny rule matches. The packet is denied."
+  },
+  {
+   "level": "analyze",
+   "q": "Two VMs on the same host cannot ping each other. Does that prove secure isolation? Give reasons.",
+   "marks": 5,
+   "a": "No. It proves only that one network path is blocked. Check the management plane permissions, shared storage, snapshots, clones, live migration, hypervisor patches, and side channels. Isolation must be tested across every path, not only ICMP."
+  },
+  {
+   "level": "understand",
+   "q": "Why patch the guest OS and the hypervisor separately?",
+   "marks": 3,
+   "a": "The customer controls the guest OS; the provider controls the hypervisor. A guest patch fixes software inside the VM. A hypervisor patch fixes the isolation layer. Missing either leaves an attack path."
+  },
+  {
+   "level": "apply",
+   "q": "Tenant A uses 10.1.0.0/24 and tenant B uses 10.2.0.0/24. State the default inter-tenant rule and one allowed flow for A-web to A-db.",
+   "marks": 4,
+   "a": "Default rule: deny all traffic from 10.1.0.0/24 to 10.2.0.0/24 and from 10.2.0.0/24 to 10.1.0.0/24. Allowed flow example: allow TCP 443 from A-web to A-db only."
+  },
+  {
+   "level": "analyze",
+   "q": "Why should live migration traffic be encrypted and authenticated?",
+   "marks": 5,
+   "a": "Live migration copies memory pages, which can include keys, session data, and personal data. Without encryption an attacker on the path can read it. Without authentication an attacker can inject or alter pages, corrupting the destination VM."
+  }
+ ],
+ "beyond": "Not for the exam. Confidential computing, such as encrypted memory with AMD SEV or Intel TDX, moves isolation into hardware so the host cannot read guest memory. Cloud providers now expose microsegmentation through policy engines and eBPF-based filters on each node. Research measures cache side channels and migration confidentiality. Search terms: confidential VMs, VM escape, microsegmentation, live migration encryption."
+}
