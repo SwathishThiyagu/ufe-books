@@ -2,7 +2,7 @@
 
 - Book: `books/cse/c-os/c-os-u1.html`
 - Status: error
-- Model calls so far: 24 (86,923 tokens in, 243,323 out), 53.4 minutes
+- Model calls so far: 27 (98,632 tokens in, 258,147 out), 61.8 minutes
 
 ## For the reviewer
 

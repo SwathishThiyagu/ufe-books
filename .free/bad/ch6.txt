@@ -1,0 +1,246 @@
+{
+  "lead": "A system call is the programmatic way a computer program requests a service from the kernel of the operating system. While applications perform logic, they cannot directly touch hardware like the disk, network, or memory of other programs. They live in a restricted environment called user mode. To perform privileged tasks, the program must jump into the kernel using a system call. This acts as a secure bridge. It is used every time you save a file in Word, send a message on WhatsApp, or even check the time on your system clock.",
+  "prereq": "You need to understand dual-mode operation from <a href=\"#os-operations-dual-mode-and-timers\">1.4</a> and the general services provided by the OS in <a href=\"#operating-system-services\">1.5</a>.",
+  "sections": [
+    {
+      "h3": "APIs and the System Call Interface",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Most programmers do not write system calls directly. Instead, they use an Application Programming Interface (API). An API is a set of functions available to a programmer that handles the details of talking to the OS. For example, the <b>POSIX API</b> is used on Linux and macOS, while the <b>Win32 API</b> is used on Windows."
+        },
+        {
+          "type": "p",
+          "text": "Behind every API function, like <code>printf()</code> in C, there is often a system call like <code>write()</code>. The standard C library (libc) acts as a wrapper. It takes the programmer's request, puts the right data into the CPU registers, and triggers the hardware to switch to kernel mode. This makes the code portable; a program using <code>printf()</code> can run on many systems even if their internal system calls are different."
+        },
+        {
+          "type": "p",
+          "text": "The OS maintains a <b>system call table</b>. This is an array of memory addresses. Each index in the array corresponds to a specific system call number. When a program triggers a 'trap' or 'interrupt', the kernel looks up the number in this table to find the correct code to run."
+        }
+      ]
+    },
+    {
+      "h3": "Passing Parameters to the OS",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "The kernel needs more than just the name of the call. If you want to read a file, the kernel needs to know which file, where to put the data, and how many bytes to read. There are three main ways to pass these parameters:"
+        },
+        {
+          "type": "bullets",
+          "items": [
+            "<b>Registers:</b> Parameters are loaded directly into CPU registers. This is the fastest method but is limited by the number of registers (usually 5 to 8).",
+            "<b>Memory Block/Table:</b> If there are many parameters, the program stores them in a block of memory and passes the <i>address</i> of that block in a register. This is used when the data is too large for registers.",
+            "<b>Stack:</b> Parameters are pushed onto the program's stack by the application and popped off by the operating system."
+          ]
+        }
+      ]
+    },
+    {
+      "h3": "Types of System Calls",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "Operating systems provide hundreds of calls, which we group into six categories based on what they manage:"
+        },
+        {
+          "type": "table",
+          "head": [
+            "Category",
+            "Purpose",
+            "Examples (Linux/Unix)"
+          ],
+          "rows": [
+            [
+              "Process Control",
+              "Start, stop, or manage programs.",
+              "fork(), exec(), exit(), wait()"
+            ],
+            [
+              "File Management",
+              "Create, delete, read, or write files.",
+              "open(), read(), write(), close()"
+            ],
+            [
+              "Device Management",
+              "Request or release hardware like a printer.",
+              "ioctl(), read(), write()"
+Check or set system time and date.",
+              "getpid(), time(), alarm()"
+            ],
+            [
+              "Communications",
+              "Send data between programs.",
+              "pipe(), shmget(), send()"
+            ],
+            [
+              "Protection",
+              "Control access to resources.",
+              "chmod(), umask(), chown()"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Consider a simple task like copying a file. This requires <code>open()</code> for the source, <code>open()</code> for the destination (or <code>creat()</code>), a loop of <code>read()</code> and <code>write()</code> calls, and finally <code>close()</code> for both. If an error occurs, such as the disk being full, the system call returns an error code to the program."
+        }
+      ]
+    }
+  ],
+  "figure": {
+    "after_section": 1,
+    "caption": "The sequence of events when a user application calls a standard library function. Notice how the mode bit changes from 1 (user) to 0 (kernel) during the trap.",
+    "spec": {
+      "type": "sequence",
+      "actors": [
+        "User App",
+        "C Library (libc)",
+        "OS Kernel Trap Handler",
+        "Syscall Table"
+      ],
+      "messages": [
+        {
+          "from": "User App",
+          "to": "C Library (libc)",
+          "label": "printf(\"Hello\")",
+          "dashed": false
+        },
+        {
+          "from": "C Library (libc)",
+          "to": "OS Kernel Trap Handler",
+          "label": "Load #1, Trap (Mode=0)",
+          "dashed": false
+        },
+        {
+          "from": "OS Kernel Trap Handler",
+          "to": "Syscall Table",
+          "label": "Look up entry #1",
+          "dashed": false
+        },
+        {
+          "from": "Syscall Table",
+          "to": "OS Kernel Trap Handler",
+          "label": "Run sys_write()",
+          "dashed": true
+        },
+        {
+          "from": "OS Kernel Trap Handler",
+          "to": "C Library (libc)",
+          "label": "Return, Mode=1",
+          "dashed": false
+        },
+        {
+          "from": "C Library (libc)",
+          "to": "User App",
+          "label": "Return success",
+          "dashed": false
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "question": "A C program on a 64-bit Linux system executes the call read(3, buffer, 128). The system call number for 'read' is 0. Trace the register states if the buffer address is 0x7fffffffe400 and the registers used for parameters are %rax (syscall number), %rdi (arg1), %rsi (arg2), and %rdx (arg3).",
+      "steps": [
+        "Identify the system call number for 'read'. In Linux x86-64, this is 0. Place this in %rax.",
+        "Identify the first argument, which is the file descriptor (fd). Here, fd = 3. Place this in %rdi.",
+        "Identify the second argument, which is the memory address of the buffer. Here, buffer = 0x7fffffffe400. Place this in %rsi.",
+        "Identify the third argument, which is the number of bytes to read. Here, count = 128. Place this in %rdx.",
+        "Execute the 'syscall' assembly instruction to trigger the kernel trap."
+      ],
+      "answer": "The register state before the trap is: %rax = 0, %rdi = 3, %rsi = 0x7fffffffe400, and %rdx = 128.",
+      "check": "rax = 0\nrdi = 3\nrsi = 0x7fffffffe400\nrdx = 128\nprint(rax)\nprint(rdi)\nprint(int('0x7fffffffe400', 16))\nprint(rdx)",
+      "values": [
+        0,
+        3,
+        140737488348160,
+        128
+      ],
+      "code": {
+        "lang": "c",
+        "code": "#include <unistd.h>\n#include <stdio.h>\n\nint main() {\n    char buf[128];\n    // Using the write system call directly via the wrapper\n    // 1 is the file descriptor for stdout\n    ssize_t bytes = write(1, \"System Call Demo\\n\", 17);\n    if (bytes > 0) return 0;\n    return 1;\n}",
+        "stdin": ""
+      },
+      "dry_run": {
+        "head": [
+          "Register",
+          "Value",
+          "Description"
+        ],
+        "rows": [
+          [
+            "%rax",
+            "0",
+            "Read Syscall ID"
+          ],
+          [
+            "%rdi",
+            "3",
+            "File Descriptor"
+          ],
+          [
+            "%rsi",
+            "0x7fffffffe400",
+            "Buffer Address"
+          ],
+          [
+            "%rdx",
+            "128",
+            "Byte Count"
+          ]
+        ]
+      },
+      "output": "System Call Demo"
+    }
+  ],
+  "traps": [
+    "Thinking that <code>printf()</code> is a system call. It is a library function that calls the <code>write()</code> system call internally.",
+    "Assuming system calls are fast. They are much slower than regular function calls because they require a context switch and a privilege mode change.",
+    "Forgetting that system calls return -1 on error in C, but the specific error reason is stored in a global variable called <code>errno</code>."
+  ],
+  "quiz": [
+    {
+      "level": "remember",
+      "q": "What is the hardware instruction that triggers a system call called?",
+      "marks": 2,
+      "a": "A trap (or software interrupt)."
+    },
+    {
+      "level": "understand",
+      "q": "Why does the operating system use a system call table instead of letting programs jump to any kernel address?",
+      "marks": 3,
+      "a": "Security. A table ensures programs can only enter the kernel at predefined, safe entry points managed by the OS."
+    },
+    {
+      "level": "apply",
+      "q": "If a program needs to pass 20 different configuration settings to the kernel, which parameter-passing method is most appropriate?",
+      "marks": 3,
+      "a": "The memory block (or table) method, because 20 parameters will not fit in the limited number of CPU registers."
+    },
+    {
+      "level": "analyze",
+      "q": "Explain the change in the CPU mode bit when a program calls <code>open()</code>.",
+      "marks": 4,
+      "a": "The CPU starts with the mode bit at 1 (user mode). When the trap instruction is executed, the hardware switches the mode bit to 0 (kernel mode). After the OS finishes opening the file, it switches the bit back to 1 before returning control to the program."
+    },
+    {
+      "level": "remember",
+      "q": "Which category of system call does <code>chmod()</code> belong to?",
+      "marks": 2,
+      "a": "Protection (or Security)."
+    },
+    {
+      "level": "understand",
+      "q": "What is the difference between an API and a system call?",
+      "marks": 4,
+      "a": "An API is a set of functions (like POSIX or Win32) that a programmer uses. A system call is the actual low-level request to the kernel. One API call might trigger one, many, or zero system calls."
+    },
+    {
+      "level": "apply",
+      "q": "A system call table has entries indexed from 0 to 255. If a developer adds a new service, what is the maximum index they can use?",
+      "marks": 2,
+      "a": "255."
+    }
+  ],
+  "beyond": "Not for the exam. In modern high-performance systems, the overhead of switching between user and kernel mode for every small task is a bottleneck. Technologies like <b>eBPF</b> now allow programmers to run small, safe pieces of code directly inside the Linux kernel without making traditional system calls. Similarly, <b>io_uring</b> is a newer Linux interface that allows programs to submit many system calls at once in a single batch. This is critical for high-speed databases and web servers that handle millions of requests per second. Researching 'kernel bypass' will show you how some systems skip the OS entirely for extreme speed."
+}
