@@ -1,0 +1,250 @@
+{
+ "lead": "Deadlock detection finds a set of processes that are stuck waiting for each other after the system has already entered a deadlock. It exists because prevention and avoidance are not always possible or economical. Detection is used in systems where resources are shared dynamically, such as printer pools in offices, database connections in a web service, or CPU cores allocated to container workloads.",
+ "prereq": "You need: the deadlock system model and necessary conditions (<a href=\"#deadlock-system-model-and-necessary-conditions\">) and the avoidance techniques (<a href=\"#deadlock-avoidance-and-banker-s-algorithm\">).",
+ "sections": [
+  {
+   "h3": "Detection for single‑instance resources",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When each resource has only one copy, the system can be represented by a Resource Allocation Graph (RAG). Nodes are processes and resources. An edge from a process to a resource means the process is requesting that resource. An edge from a resource to a process means the resource is allocated to the process."
+    },
+    {
+     "type": "p",
+     "text": "A cycle in this directed graph indicates a deadlock. The cycle shows that each process in the cycle holds a resource needed by the next process."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Build the RAG from the current allocation and request tables.",
+      "Search the graph for cycles using depth‑first search.",
+      "If a cycle is found, list all processes that belong to any cycle."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "The algorithm runs in O(P+R+E) time where P is the number of processes, R the number of resources, and E the number of edges.",
+      "It works only for single‑instance resources. For multiple instances the graph may have no cycle even though a deadlock exists."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Detection for multiple‑instance resources",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When resources have several identical instances, the RAG cannot capture deadlocks fully. Instead we use matrices similar to the Banker's algorithm."
+    },
+    {
+     "type": "p",
+     "text": "Let Available be a vector of free instances for each resource type. Let Allocation be a matrix where Allocation[i][j] is the number of instances of resource j held by process i. Let Request be a matrix where Request[i][j] is the number of instances of j still needed by i."
+    },
+    {
+     "type": "p",
+     "text": "Let Finish be a boolean vector of length P, initially false for all processes, indicating whether a process can finish."
+    },
+    {
+     "type": "formula",
+     "text": "Work = Available",
+     "where": "Work is a temporary vector of currently free instances."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Initialize Work = Available and Finish[i] = false for all processes.",
+      "Find a process i such that Finish[i] = false and Request[i] ≤ Work (component‑wise).",
+      "If such i exists, set Work = Work + Allocation[i] and Finish[i] = true. Repeat step 2.",
+      "When no such i exists, all processes with Finish[i] = false are deadlocked."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "The test is similar to the safety check in the Banker's algorithm, but it is run only when a deadlock is suspected.",
+      "Complexity is O(P×R) per detection run."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Recovery actions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "After detection, the OS must break the deadlock. Three common actions are used."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Process termination – abort one or more deadlocked processes. The chosen process must release all its resources. The OS may pick the lowest‑priority process or the one that costs least to restart.",
+      "Resource preemption – forcibly take resources from a deadlocked process and give them to another. The preempted process may need to be rolled back to a safe state.",
+      "Rollback – restore one or more processes to a previously saved checkpoint. After rollback the processes request resources again, hopefully avoiding the deadlock."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The chosen method must ensure that the system returns to a consistent state. Killing a process is simple but may lose work. Preemption requires careful handling of I/O buffers. Rollback needs checkpointing support, which many databases already provide."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "RAG showing a cycle between two processes and a single‑instance resource. The cycle is what the detection algorithm must locate.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "aria": "Directed graph showing a cycle that the detection algorithm must find.",
+   "nodes": [
+    {
+     "id": "P1",
+     "label": "P1",
+     "x": 0,
+     "y": 1,
+     "style": "accent"
+    },
+    {
+     "id": "P2",
+     "label": "P2",
+     "x": 2,
+     "y": 1,
+     "style": "accent"
+    },
+    {
+     "id": "R",
+     "label": "R",
+     "x": 1,
+     "y": 0,
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "P1",
+     "to": "R",
+     "label": "req",
+     "style": "solid"
+    },
+    {
+     "from": "R",
+     "to": "P2",
+     "label": "alloc",
+     "style": "solid"
+    },
+    {
+     "from": "P2",
+     "to": "R",
+     "label": "req",
+     "style": "solid"
+    },
+    {
+     "from": "R",
+     "to": "P1",
+     "label": "alloc",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Four processes P1‑P4 compete for three identical printers. The current allocation matrix (rows = processes, columns = printers) is:\n\nAllocation =\n|   | Prin1 | Prin2 | Prin3 |\n|---|-------|-------|-------|\n|P1 |   1   |   0   |   0   |\n|P2 |   0   |   1   |   0   |\n|P3 |   0   |   0   |   1   |\n|P4 |   0   |   0   |   0   |\n\nThe request matrix is:\n\nRequest =\n|   | Prin1 | Prin2 | Prin3 |\n|---|-------|-------|-------|\n|P1 |   0   |   1   |   0   |\n|P2 |   0   |   0   |   1   |\n|P3 |   1   |   0   |   0   |\n|P4 |   1   |   1   |   1   |\n\nAvailable vector = (0,0,0). Detect the deadlocked processes using the multiple‑instance algorithm and suggest a recovery action.",
+   "steps": [
+    "Initialize Work = Available = (0,0,0). Set Finish[i] = false for i = 1..4.",
+    "Check each process i for Request[i] ≤ Work.",
+    "P1: Request = (0,1,0) > Work. Not eligible.",
+    "P2: Request = (0,0,1) > Work. Not eligible.",
+    "P3: Request = (1,0,0) > Work. Not eligible.",
+    "P4: Request = (1,1,1) > Work. Not eligible.",
+    "No process can proceed. The loop ends.",
+    "All processes with Finish[i] = false are deadlocked. Hence P1, P2, P3, and P4 are in deadlock.",
+    "Recovery: abort a process that actually holds a printer, e.g., P1. After termination, its allocation (1,0,0) is released, making Available = (1,0,0). The remaining processes can now obtain the needed printer and finish."
+   ],
+   "answer": "All four processes are deadlocked; aborting P1 (or P2 or P3) breaks the deadlock.",
+   "check": "available = [0,0,0]\nallocation = [[1,0,0],[0,1,0],[0,0,1],[0,0,0]]\nrequest = [[0,1,0],[0,0,1],[1,0,0],[1,1,1]]\nwork = available.copy()\nfinish = [False]*4\nchanged = True\nwhile changed:\n    changed = False\n    for i in range(4):\n        if not finish[i] and all(request[i][j] <= work[j] for j in range(3)):\n            work = [work[j] + allocation[i][j] for j in range(3)]\n            finish[i] = True\n            changed = True\nprint([i+1 for i,f in enumerate(finish) if not f])",
+   "values": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int deadlocked[] = {1,2,3,4};\n    int n = sizeof(deadlocked)/sizeof(deadlocked[0]);\n    printf(\"List of deadlocked process indices\\n\");\n    for(int i=0;i<n;i++)\n        printf(\"%d \", deadlocked[i]);\n    printf(\"\\n\");\n    return 0;\n}"
+   },
+   "stdin": "",
+   "dry_run": {
+    "head": [
+     "i",
+     "deadlocked[i]"
+    ],
+    "rows": [
+     [
+      "0",
+      "1"
+     ],
+     [
+      "1",
+      "2"
+     ],
+     [
+      "2",
+      "3"
+     ],
+     [
+      "3",
+      "4"
+     ]
+    ]
+   },
+   "output": "List of deadlocked process indices\n1 2 3 4 \n"
+  }
+ ],
+ "traps": [
+  "Assuming that any single process termination will always free enough resources; the chosen process must actually hold resources needed by others.",
+  "Confusing the request matrix with the allocation matrix; the detection algorithm uses Request ≤ Work, not Allocation.",
+  "Treating a zero‑available vector as a sign that no deadlock exists; a deadlock can exist even when all resources are allocated.",
+  "Forgetting to update the Work vector after a process finishes; this prevents the algorithm from finding subsequent safe processes."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a cycle in a Resource Allocation Graph indicate?",
+   "marks": 2,
+   "a": "It indicates that the processes in the cycle are deadlocked."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why the single‑instance detection method cannot find deadlocks when resources have multiple instances.",
+   "marks": 3,
+   "a": "With multiple instances, a cycle may exist without a deadlock because a process can still obtain a free instance of the resource; the graph loses information about the count of instances."
+  },
+  {
+   "level": "apply",
+   "q": "Given Available = (2,1), Allocation = [[1,0],[0,1]], Request = [[1,1],[1,0]], run one iteration of the multiple‑instance detection algorithm and state which processes can finish.",
+   "marks": 4,
+   "a": "Work = (2,1). Process 2 has Request (1,0) ≤ Work, so it can finish. After finishing, Work becomes (2+0,1+1) = (2,2). Process 1 now has Request (1,1) ≤ Work and can also finish."
+  },
+  {
+   "level": "analyze",
+   "q": "A system uses only process termination for recovery. Discuss two drawbacks of this approach in a transaction‑processing environment.",
+   "marks": 6,
+   "a": "First, terminating a process aborts all its in‑flight transactions, causing loss of work and possible inconsistency in the database. Second, it may violate service‑level agreements because customers lose their sessions, and the system may need to roll back many dependent processes, increasing recovery time."
+  },
+  {
+   "level": "apply",
+   "q": "In a system with two resource types A(3 instances) and B(2 instances), Allocation = [[2,0],[1,1],[0,1]], Request = [[0,2],[1,0],[2,0]]. Available = (0,0). Run the detection algorithm and list the deadlocked processes.",
+   "marks": 4,
+   "a": "Work = (0,0). No process has Request ≤ Work, so none can finish. All three processes are deadlocked."
+  },
+  {
+   "level": "evaluate",
+   "q": "Compare process termination and resource preemption as recovery actions in terms of system throughput and user impact.",
+   "marks": 5,
+   "a": "Process termination quickly frees all resources, improving throughput but may discard user work, causing dissatisfaction. Preemption keeps processes alive, preserving work, but requires extra overhead to roll back state, which can lower throughput and increase complexity."
+  }
+ ],
+ "beyond": "Not for the exam. In cloud platforms, deadlock detection is combined with automated scaling so that additional resource instances are provisioned when a deadlock is detected. Research explores probabilistic detection that reduces overhead for large micro‑service graphs. Emerging curricula integrate detection with container orchestration tools like Kubernetes, teaching students to write custom controllers that monitor resource graphs. Searching \"runtime deadlock detection in Go\" or \"distributed deadlock detection algorithms\" will reveal recent open‑source projects."
+}

@@ -1,0 +1,342 @@
+{
+ "lead": "Peterson’s solution gives a software way for two threads to enter a critical section without conflict. It uses two shared variables – a flag array and a turn variable – to enforce mutual exclusion, guarantee progress and bound waiting. When hardware provides atomic instructions like test‑and‑set or compare‑and‑swap, the same properties can be obtained with a single instruction, which is why modern OS kernels prefer the hardware primitives.",
+ "prereq": "You need: <a href=\"#critical-section-problem-and-race-conditions\">Critical‑section problem and race conditions</a>.",
+ "sections": [
+  {
+   "h3": "Peterson’s two‑process algorithm",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two processes are identified by indices i and j where i ≠ j and i, j ∈ {0,1}. Each process has a Boolean flag[i] that indicates its intention to enter the critical section. The shared integer turn tells whose turn it is to wait. The algorithm consists of four statements before the critical section, a busy‑wait loop, the critical section, and a single statement after the critical section."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "flag[i] = true            // declare interest",
+      "turn = j                  // give priority to the other process",
+      "while (flag[j] && turn == j)   // spin while the other wants in and it is its turn",
+      "   ;                       // empty body",
+      "// critical section",
+      "flag[i] = false           // release the lock"
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Both flag[0] and flag[1] may be true simultaneously; the turn variable determines which process is allowed to enter the critical section.",
+      "If both flags are true, turn decides which process proceeds.",
+      "When a process leaves, it resets its flag, allowing the other to proceed."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "CS_allowed(i) ⇔ ¬(flag[j] ∧ turn == j)",
+     "where": "CS_allowed(i) is true when process i may enter; flag[j] is true if j wants the CS; turn == j means the turn variable currently holds j."
+    }
+   ]
+  },
+  {
+   "h3": "Why the algorithm satisfies the three properties",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Mutual exclusion holds because the while condition blocks i whenever j is in the critical section (flag[j] = true) and turn == j. At most one process can have the condition false at any time, so both cannot be inside together."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Progress: If no process is in the critical section and some processes wish to enter, the turn variable eventually gives the right to one of them because each process sets turn to the other before waiting.",
+      "Bounded waiting: Once a process sets turn to the other, the other can enter at most once before the first process is allowed to proceed. No process can be delayed indefinitely."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The algorithm works only for two processes because the single turn variable cannot represent more than one competitor. For more than two processes, hardware primitives or more complex software (like bakery algorithm) are required."
+    }
+   ]
+  },
+  {
+   "h3": "Hardware atomic instructions as replacements",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Modern CPUs provide atomic read‑modify‑write instructions. Two common primitives are test‑and‑set (TAS) and compare‑and‑swap (CAS). Both guarantee that a single memory location is accessed atomically, eliminating the need for the flag‑turn dance."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <stdbool.h>\n#include <stdatomic.h>\n\natomic_bool lock = ATOMIC_VAR_INIT(false);\n\nvoid enter(void) {\n    bool expected;\n    do {\n        expected = false;\n    } while (!atomic_compare_exchange_weak(&lock, &expected, true));\n    // now inside critical section\n}\n\nvoid leave(void) {\n    atomic_store(&lock, false);\n}\n\nint main(void) {\n    printf(\"lock initial = %d\\n\", atomic_load(&lock));\n    enter();\n    printf(\"lock after enter = %d\\n\", atomic_load(&lock));\n    leave();\n    printf(\"lock after leave = %d\\n\", atomic_load(&lock));\n    return 0;\n}",
+     "stdin": "",
+     "output": "lock initial = 0\nlock after enter = 1\nlock after leave = 0"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Test‑and‑set atomically reads the current value of a memory location and sets it to true (1), returning the previous value.",
+      "Compare‑and‑swap checks that a memory location contains an expected value and, only if it does, writes a new value. It returns true on success."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "When the OS kernel uses TAS or CAS to implement mutexes, the same three properties (mutual exclusion, progress, bounded waiting) are obtained with far less code and without busy‑waiting on shared variables."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Flow of Peterson’s two‑process algorithm; notice the flag setting, turn assignment and the waiting condition.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Peterson’s steps",
+   "nodes": [
+    {
+     "id": "start",
+     "label": "Start",
+     "style": "normal"
+    },
+    {
+     "id": "setFlag",
+     "label": "flag[i]=true",
+     "style": "accent"
+    },
+    {
+     "id": "setTurn",
+     "label": "turn=j",
+     "style": "accent"
+    },
+    {
+     "id": "wait",
+     "label": "while(flag[j] && turn==j)",
+     "style": "normal"
+    },
+    {
+     "id": "cs",
+     "label": "Critical Section",
+     "style": "live"
+    },
+    {
+     "id": "exit",
+     "label": "flag[i]=false",
+     "style": "accent"
+    },
+    {
+     "id": "end",
+     "label": "End",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "start",
+     "to": "setFlag",
+     "style": "solid"
+    },
+    {
+     "from": "setFlag",
+     "to": "setTurn",
+     "style": "solid"
+    },
+    {
+     "from": "setTurn",
+     "to": "wait",
+     "style": "solid"
+    },
+    {
+     "from": "wait",
+     "to": "cs",
+     "label": "condition false",
+     "style": "solid"
+    },
+    {
+     "from": "cs",
+     "to": "exit",
+     "style": "solid"
+    },
+    {
+     "from": "exit",
+     "to": "end",
+     "style": "solid"
+    }
+   ],
+   "aria": "Flowchart of Peterson’s two‑process mutual exclusion algorithm."
+  }
+ },
+ "examples": [
+  {
+   "question": "Two threads T0 and T1 share a variable balance initialized to ₹10,000. Each thread executes Peterson’s entry protocol, adds ₹500 to balance in the critical section, and then executes the exit protocol. Show the values of flag[0], flag[1] and turn after each statement of both threads, assuming T0 starts first and T1 arrives while T0 is still in the while loop.",
+   "steps": [
+    "Initial: flag=[false,false], turn=0 (arbitrary), balance=₹10,000.",
+    "T0: flag[0]=true → flag=[true,false].",
+    "T0: turn=1 → turn=1.",
+    "T1 arrives: flag[1]=true → flag=[true,true].",
+    "T1: turn=0 → turn=0.",
+    "T0 evaluates while(flag[1] && turn==1): flag[1]=true but turn=0, so condition false → T0 enters CS.",
+    "Inside CS: balance=₹10,500.",
+    "T0 exit: flag[0]=false → flag=[false,true].",
+    "T1 evaluates while(flag[0] && turn==0): flag[0]=false, condition false → T1 enters CS.",
+    "Inside CS: balance=₹11,000.",
+    "T1 exit: flag[1]=false → flag=[false,false]."
+   ],
+   "answer": "After both threads have executed, the shared balance is ₹11,000.",
+   "check": "balance = 10000\nbalance += 500  # T0\nbalance += 500  # T1\nprint(balance)",
+   "values": [
+    11000
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\n#include <stdbool.h>\n#include <pthread.h>\n\nbool flag[2] = {false, false};\nint turn;\nint balance = 10000;\n\nvoid *thread0(void *arg) {\n    flag[0] = true;\n    turn = 1;\n    while (flag[1] && turn == 1) {}\n    balance += 500;\n    flag[0] = false;\n    return NULL;\n}\n\nvoid *thread1(void *arg) {\n    flag[1] = true;\n    turn = 0;\n    while (flag[0] && turn == 0) {}\n    balance += 500;\n    flag[1] = false;\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t0, t1;\n    pthread_create(&t0, NULL, thread0, NULL);\n    pthread_create(&t1, NULL, thread1, NULL);\n    pthread_join(t0, NULL);\n    pthread_join(t1, NULL);\n    printf(\"Final balance = %d\\n\", balance);\n    return 0;\n}",
+    "stdin": "",
+    "output": "Final balance = 11000"
+   },
+   "dry_run": {
+    "head": [
+     "step",
+     "flag[0]",
+     "flag[1]",
+     "turn",
+     "balance"
+    ],
+    "rows": [
+     [
+      "init",
+      "false",
+      "false",
+      "0",
+      "10000"
+     ],
+     [
+      "T0 setFlag",
+      "true",
+      "false",
+      "0",
+      "10000"
+     ],
+     [
+      "T0 setTurn",
+      "true",
+      "false",
+      "1",
+      "10000"
+     ],
+     [
+      "T1 setFlag",
+      "true",
+      "true",
+      "1",
+      "10000"
+     ],
+     [
+      "T1 setTurn",
+      "true",
+      "true",
+      "0",
+      "10000"
+     ],
+     [
+      "T0 CS entry",
+      "true",
+      "true",
+      "0",
+      "10000"
+     ],
+     [
+      "T0 add",
+      "true",
+      "true",
+      "0",
+      "10500"
+     ],
+     [
+      "T0 exit",
+      "false",
+      "true",
+      "0",
+      "10500"
+     ],
+     [
+      "T1 CS entry",
+      "false",
+      "true",
+      "0",
+      "10500"
+     ],
+     [
+      "T1 add",
+      "false",
+      "true",
+      "0",
+      "11000"
+     ],
+     [
+      "T1 exit",
+      "false",
+      "false",
+      "0",
+      "11000"
+     ]
+    ]
+   },
+   "output": "Final balance = 11000"
+  }
+ ],
+ "traps": [
+  "Mixing up i and j in the wait condition; the correct test is flag[j] && turn==j.",
+  "Assuming the algorithm works for more than two processes; it does not.",
+  "Thinking that setting turn=j gives the other process priority forever; it only matters while both flags are true.",
+  "Forgetting to reset flag[i] after leaving the critical section, which would dead‑lock the other process.",
+  "Confusing test‑and‑set (returns old value) with compare‑and‑swap (returns success flag)."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What two shared variables does Peterson’s algorithm use?",
+   "marks": 2,
+   "a": "A Boolean array flag[2] and an integer turn."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why the while condition in Peterson’s algorithm guarantees mutual exclusion.",
+   "marks": 4,
+   "a": "If both processes want to enter, each sets its flag true and then sets turn to the other. The process whose turn value matches the other’s index will see flag[other] true and turn==other, so it stays in the loop. Only the process whose turn does not equal its own index can exit the loop, ensuring only one can be inside the critical section at a time."
+  },
+  {
+   "level": "apply",
+   "q": "Given flag[0]=true, flag[1]=false, turn=1, can process 0 enter the critical section? Show the evaluation of the while condition.",
+   "marks": 3,
+   "a": "while(flag[1] && turn==1) → flag[1] is false, so the whole expression is false. Process 0 may proceed into the critical section."
+  },
+  {
+   "level": "apply",
+   "q": "If a processor provides only a test‑and‑set instruction, sketch a C function that implements a binary lock using it.",
+   "marks": 4,
+   "a": "bool lock = false;\nbool acquire(void) {\n    return !__sync_lock_test_and_set(&lock, true);\n}\nvoid release(void) {\n    __sync_lock_release(&lock);\n}"
+  },
+  {
+   "level": "analyze",
+   "q": "Compare Peterson’s algorithm with a hardware compare‑and‑swap lock in terms of busy‑waiting and scalability.",
+   "marks": 5,
+   "a": "Peterson’s algorithm causes both processes to spin on a shared variable while waiting, which wastes CPU cycles and does not scale beyond two processes. A compare‑and‑swap lock is implemented with a single atomic operation and is lock‑free; the CAS primitive itself never blocks. The OS may block a thread only when CAS is used inside a higher‑level construct such as a futex."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Peterson’s algorithm require the turn variable to be written after setting flag[i]?",
+   "marks": 2,
+   "a": "Writing turn after flag[i] ensures that if both processes set their flags simultaneously, the later write to turn determines which process will wait, preventing both from entering."
+  },
+  {
+   "level": "remember",
+   "q": "Name one hardware primitive that can replace Peterson’s software solution.",
+   "marks": 1,
+   "a": "Test‑and‑set or compare‑and‑swap."
+  },
+  {
+   "level": "analyze",
+   "q": "A system uses only test‑and‑set for locks. Identify a scenario where this could lead to starvation, and suggest a remedy.",
+   "marks": 4,
+   "a": "A thread may starve because it repeatedly loses the race to acquire the test‑and‑set lock; each time the lock is already set, the thread spins while another thread succeeds. A fair lock such as a ticket lock or a queue‑based lock can prevent this by granting the lock in order."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, hardware primitives are exposed through language libraries (e.g., C++ std::atomic) and are the basis of lock‑free data structures used in high‑frequency trading and real‑time systems. Research explores hybrid approaches that combine Peterson‑style software with hardware hints to reduce cache traffic. Emerging architectures such as RISC‑V define custom atomic instructions that extend the classic set. The next logical step is to study memory‑ordering models and how they affect the correctness of concurrent algorithms."
+}

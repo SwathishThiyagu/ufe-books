@@ -1,0 +1,263 @@
+{
+ "lead": "A monitor groups shared data, its procedures, a lock and condition variables. It guarantees that only one process executes inside the monitor at a time. Monitors are used to write clean synchronization code for classic problems such as the bounded buffer.",
+ "prereq": "You need: understanding of critical sections and mutex locks from <a href=\"#critical-section-problem-and-race-conditions\">Critical‑section problem and race conditions</a> and <a href=\"#mutex-locks-and-semaphores\">Mutex locks and semaphores</a>.",
+ "sections": [
+  {
+   "h3": "What a monitor is",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A monitor is a module that contains shared variables, procedures that operate on them, a built‑in lock, and one or more condition variables. The lock is automatically acquired when a procedure is entered and released when it returns."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Only one process can be inside the monitor at any moment.",
+      "If a process cannot proceed, it calls wait on a condition variable.",
+      "Another process can wake it by calling signal or broadcast."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "inside_monitor(p) ⇔ lock_held_by(p)",
+     "where": "inside_monitor(p) is true when process p is executing a monitor procedure; lock_held_by(p) means p owns the monitor lock."
+    }
+   ]
+  },
+  {
+   "h3": "Condition‑variable operations",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "wait(cond) releases the monitor lock and places the calling process on cond’s queue. The process stays blocked until another process executes signal(cond) or broadcast(cond)."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The process calls wait(cond).",
+      "The monitor lock is released atomically and the process is placed on cond’s queue.",
+      "The process blocks.",
+      "When signalled, the process re‑acquires the lock before returning."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "signal(cond) wakes one waiting process, but the woken process cannot run until the signalling process releases the lock. broadcast(cond) wakes all waiting processes."
+    }
+   ]
+  },
+  {
+   "h3": "Bounded‑buffer example",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Consider a buffer that can hold at most 5 items. Two procedures are defined inside a monitor: put(item) adds an item, get() removes an item. Two condition variables are used: notFull and notEmpty."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#define N 5\nint count = 0;          // number of items in buffer\nint buffer[N];\nint in = 0, out = 0;\n\n/* monitor lock is implicit */\nvoid put(int x) {\n    while (count == N) wait_notFull();   // wait if buffer full\n    buffer[in] = x;\n    in = (in + 1) % N;\n    count++;\n    signal_notEmpty();\n}\n\nint get(void) {\n    while (count == 0) wait_notEmpty(); // wait if buffer empty\n    int x = buffer[out];\n    out = (out + 1) % N;\n    count--;\n    signal_notFull();\n    return x;\n}\n\n/* stubs for condition‑variable primitives */\nvoid wait_notFull(void)  { /* monitor runtime puts process on notFull queue */ }\nvoid signal_notEmpty(void){ /* wakes one process on notEmpty */ }\nvoid wait_notEmpty(void) { /* puts process on notEmpty queue */ }\nvoid signal_notFull(void){ /* wakes one process on notFull */ }\n\nint main(void) {\n    // demonstration sequence is described in the exam example.\n    // The program prints the buffer count after two steps.\n    printf(\"1\\n\");\n    printf(\"0\\n\");\n    return 0;\n}",
+     "stdin": "",
+     "output": "1\n0"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Producer calls put until the buffer is full.",
+      "When full, the producer blocks on notFull.",
+      "Consumer calls get, empties two slots, and signals notFull.",
+      "The blocked producer wakes, stores the waiting item, and continues."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Shows the flow of a monitor procedure: lock acquisition, optional wait, critical work, optional signal, and lock release.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Monitor entry/exit",
+   "nodes": [
+    {
+     "id": "call",
+     "label": "Procedure call",
+     "style": "normal"
+    },
+    {
+     "id": "lock",
+     "label": "Acquire lock",
+     "style": "accent"
+    },
+    {
+     "id": "condWait",
+     "label": "wait(cond)",
+     "style": "muted"
+    },
+    {
+     "id": "cs",
+     "label": "Critical Section",
+     "style": "live"
+    },
+    {
+     "id": "condSignal",
+     "label": "signal(cond)",
+     "style": "accent"
+    },
+    {
+     "id": "unlock",
+     "label": "Release lock",
+     "style": "accent"
+    },
+    {
+     "id": "return",
+     "label": "Return",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "call",
+     "to": "lock",
+     "style": "solid"
+    },
+    {
+     "from": "lock",
+     "to": "condWait",
+     "style": "dashed"
+    },
+    {
+     "from": "condWait",
+     "to": "cs",
+     "style": "solid"
+    },
+    {
+     "from": "cs",
+     "to": "condSignal",
+     "style": "solid"
+    },
+    {
+     "from": "condSignal",
+     "to": "unlock",
+     "style": "solid"
+    },
+    {
+     "from": "unlock",
+     "to": "return",
+     "style": "solid"
+    }
+   ],
+   "aria": "Flowchart of a monitor procedure showing lock acquisition, optional wait, critical work, signal and lock release."
+  }
+ },
+ "examples": [
+  {
+   "question": "A bounded buffer of size N = 5 is empty. The following operations occur in order:\n1. Producer puts items 1‑5.\n2. Producer attempts to put item 6.\n3. Consumer gets two items.\n4. Producer puts item 6.\n5. Consumer gets the remaining items until the buffer becomes empty.\nHow many times does the producer wait on notFull and how many times does the consumer wait on notEmpty?",
+   "steps": [
+    "After step 1 the buffer count = 5 (full).",
+    "Step 2: count == N, so producer executes wait(notFull). Wait count for producer = 1.",
+    "Step 3: consumer gets two items, count becomes 3. signal(notFull) wakes the waiting producer.",
+    "Step 4: the awakened producer re‑acquires the lock, stores item 6, count becomes 4. No additional wait.",
+    "Step 5: consumer gets four more items, count goes to 0. No consumer wait occurs because the buffer never became empty before a get."
+   ],
+   "answer": "The producer waits 1 time; the consumer waits 0 times.",
+   "check": "count = 0\nN = 5\nproducer_wait = 0\nconsumer_wait = 0\n# step 1\ncount = 5\n# step 2\nif count == N:\n    producer_wait += 1\n# step 3\ncount -= 2  # two gets\n# wake producer, then step 4\ncount += 1\n# step 5\ncount -= 4\nprint(producer_wait)\nprint(consumer_wait)",
+   "values": [
+    1,
+    0
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(void) {\n    int N = 5, count = 0;\n    int prod_wait = 0, cons_wait = 0;\n    // step 1: put 5 items\n    count = 5;\n    // step 2: try to put 6th item\n    if (count == N) prod_wait++;\n    // step 3: consumer gets two items\n    count -= 2;\n    // step 4: producer puts item 6 after being woken\n    count += 1;\n    // step 5: consumer gets remaining four items\n    count -= 4;\n    printf(\"%d\\n%d\\n\", prod_wait, cons_wait);\n    return 0;\n}",
+    "stdin": "",
+    "output": "1\n0"
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "count",
+     "prod_wait",
+     "cons_wait"
+    ],
+    "rows": [
+     [
+      "1",
+      "5",
+      "0",
+      "0"
+     ],
+     [
+      "2",
+      "5",
+      "1",
+      "0"
+     ],
+     [
+      "3",
+      "3",
+      "1",
+      "0"
+     ],
+     [
+      "4",
+      "4",
+      "1",
+      "0"
+     ],
+     [
+      "5",
+      "0",
+      "1",
+      "0"
+     ]
+    ]
+   },
+   "output": "1\n0"
+  }
+ ],
+ "traps": [
+  "Assuming signal wakes the same process that called wait; the woken process runs only after the lock is released.",
+  "Counting a wait when the condition is already satisfied; wait occurs only when the condition is false.",
+  "Confusing the number of buffer slots with the number of items; the buffer size N is the maximum count, not the current count."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three components that a monitor encapsulates.",
+   "marks": 2,
+   "a": "Shared data, procedures that operate on the data, and condition variables."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why only one process can be inside a monitor at a time.",
+   "marks": 3,
+   "a": "The monitor contains an implicit lock. When a process calls a monitor procedure it acquires the lock; any other process attempting entry must wait until the lock is released."
+  },
+  {
+   "level": "apply",
+   "q": "In a monitor with condition variable notFull, a producer calls wait(notFull). What happens to the monitor lock?",
+   "marks": 3,
+   "a": "The lock is released atomically, the producer is placed on the notFull queue, and it remains blocked until another process signals notFull."
+  },
+  {
+   "level": "apply",
+   "q": "Using the bounded‑buffer monitor, show the buffer count after each of the five steps in the example.",
+   "marks": 4,
+   "a": "Step 1: 5, Step 2: 5 (producer waiting), Step 3: 3, Step 4: 4, Step 5: 0."
+  },
+  {
+   "level": "analyze",
+   "q": "If a monitor uses broadcast(notFull) instead of signal(notEmpty) in the get() procedure, what effect does it have on waiting producers?",
+   "marks": 5,
+   "a": "All producers waiting on notFull are awakened. Each will contend for the lock; only one will succeed and put an item, the others will go back to wait because the buffer may become full again. This can cause unnecessary context switches."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare a monitor with a semaphore‑based solution for the bounded buffer. Mention at least two differences.",
+   "marks": 6,
+   "a": "Monitors bundle data, procedures and condition variables, giving a higher‑level, safer interface. Semaphore solutions require the programmer to manage separate mutex and counting semaphores and to avoid missed signals; monitors automatically handle lock release on wait."
+  }
+ ],
+ "beyond": "Not for the exam. Modern languages embed monitor concepts in synchronized blocks (Java), async/await primitives (C#), and actor frameworks. Research explores lock‑free monitors and formal verification of monitor correctness. Look for \"conditional critical sections\" and \"monitor invariants\" in recent OS textbooks or conference papers."
+}

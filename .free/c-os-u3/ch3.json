@@ -1,0 +1,269 @@
+{
+ "lead": "Mutex locks and semaphores are tools that let several processes share resources without corrupting data. They prevent race conditions by allowing only one process to enter a critical section at a time, or by limiting the number of simultaneous users of a pool. These mechanisms appear in file‑system access, printer queues, and database connections.",
+ "prereq": "You need: <a href=\"#critical-section-problem-and-race-conditions\">Critical‑section problem</a> and <a href=\"#peterson-s-solution-and-hardware-synchronization-support\">Peterson’s solution</a>.",
+ "sections": [
+  {
+   "h3": "Mutex lock basics",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A mutex lock is a binary flag that can be either free or held. The flag is called the lock state. A process that wants the lock executes the acquire operation. If the lock is free, the state changes to held and the process enters the critical section. If the lock is already held, the process must wait."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Check the lock state.",
+      "If free, set it to held and continue.",
+      "If held, block until the lock becomes free."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "When the process finishes the critical section it executes release. Release sets the lock state back to free and wakes one waiting process, if any. A mutex must be released by the same process (or thread) that previously acquired it; releasing it from another process leads to undefined behavior."
+    },
+    {
+     "type": "formula",
+     "text": "Lock_state = {0 (free), 1 (held)}",
+     "where": "Lock_state is the current value of the mutex; 0 means no process owns the lock, 1 means one process owns it."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Only one process can hold a mutex at a time.",
+      "Acquire and release must be atomic."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Binary semaphore as a lock",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A binary semaphore is a semaphore whose value is only 0 or 1. The two operations are called P (wait) and V (signal). P decrements the value if it is 1; otherwise the calling process blocks. V operation works as follows: if there is a blocked process, wake one of them; otherwise set S ← 1. After waking a process the semaphore value remains 0 because the woken process will immediately acquire it."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "P operation: if S = 1, set S ← 0 and proceed; else block.",
+      "V operation: if there is a blocked process, wake one of them; otherwise set S ← 1. After waking, the semaphore value stays 0."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Because the change of S is atomic, a binary semaphore can replace a mutex lock. The main difference is naming: lock uses acquire/release, semaphore uses P/V."
+    },
+    {
+     "type": "p",
+     "text": "Unlike a mutex, a binary semaphore does not track which process holds it; any process may execute V, so correct program logic must ensure that V is called only after a matching P."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Atomicity is guaranteed by hardware instructions such as test‑and‑set.",
+      "Blocking is usually implemented by putting the process on a waiting queue."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Counting semaphore for resource pools",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A counting semaphore holds a non‑negative integer. The value represents the number of identical resources that are currently free. Each P operation claims one resource; each V operation returns one resource."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Initialize semaphore S to the total number of resources.",
+      "When a process needs a resource, execute P(S).",
+      "If S > 0, the process proceeds and S is reduced by 1.",
+      "If S = 0, the process blocks until another process executes V(S).",
+      "After using the resource, the process executes V(S) to increase the count."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Counting semaphores are used for printer pools, database connections, and thread‑pool limits. They give a simple, scalable way to avoid over‑allocation."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "The semaphore value never becomes negative.",
+      "All P and V operations are atomic."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Semaphore value over time as processes acquire (P) and release (V) the resource.",
+  "spec": {
+   "type": "array",
+   "title": "Semaphore value over time",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "t0",
+     "cells": [
+      "3"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "P1",
+     "cells": [
+      "2"
+     ],
+     "marks": {
+      "0": "live"
+     }
+    },
+    {
+     "label": "P2",
+     "cells": [
+      "1"
+     ],
+     "marks": {
+      "0": "live"
+     }
+    },
+    {
+     "label": "P3",
+     "cells": [
+      "0"
+     ],
+     "marks": {
+      "0": "live"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 0,
+     "label": "initial"
+    }
+   ],
+   "aria": "Array showing how a counting semaphore decreases with each acquire and increases with each release."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three processes P1, P2 and P3 request a pool of two identical printers. The semaphore S is initialized to 2. Show the value of S after each operation and state which process proceeds.",
+   "steps": [
+    "Initial: S = 2 (both printers free).",
+    "P1 executes P(S): S becomes 1, P1 proceeds to use a printer.",
+    "P2 executes P(S): S becomes 0, P2 proceeds to use the second printer.",
+    "P3 executes P(S): S is 0, so P3 blocks and waits.",
+    "P1 finishes and executes V(S): S becomes 1, one waiting process (P3) is awakened.",
+    "P3 now proceeds, S becomes 0 again after its P(S) completes."
+   ],
+   "answer": "The semaphore values are 2 → 1 → 0 → 0 → 1 → 0. P1 and P2 run first; P3 runs after P1 releases the printer.",
+   "check": "S = 2\nsteps = ['P1','P2','P3','V1','P3']\nvalues = []\nfor op in steps:\n    if op.startswith('P'):\n        if S > 0:\n            S -= 1\n        # else block, value unchanged\n    else:  # V operation\n        S += 1\n    values.append(S)\nfor v in values:\n    print(v)",
+   "values": [
+    1,
+    0,
+    0,
+    1,
+    0
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main() {\n    int S = 2; // initial semaphore value\n    // P1 acquires\n    if (S > 0) S--;\n    printf(\"After P1: %d\\n\", S);\n    // P2 acquires\n    if (S > 0) S--;\n    printf(\"After P2: %d\\n\", S);\n    // P3 tries to acquire (blocked)\n    printf(\"After P3 blocked: %d\\n\", S);\n    // P1 releases\n    S++;\n    printf(\"After V by P1: %d\\n\", S);\n    // P3 now acquires\n    if (S > 0) S--;\n    printf(\"After P3 proceeds: %d\\n\", S);\n    return 0;\n}",
+    "stdin": "",
+    "output": "After P1: 1\nAfter P2: 0\nAfter P3 blocked: 0\nAfter V by P1: 1\nAfter P3 proceeds: 0"
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "S"
+    ],
+    "rows": [
+     [
+      "Initial",
+      "2"
+     ],
+     [
+      "P1",
+      "1"
+     ],
+     [
+      "P2",
+      "0"
+     ],
+     [
+      "P3 blocked",
+      "0"
+     ],
+     [
+      "V by P1",
+      "1"
+     ],
+     [
+      "P3 proceeds",
+      "0"
+     ]
+    ]
+   },
+   "output": "After P1: 1\nAfter P2: 0\nAfter P3 blocked: 0\nAfter V by P1: 1\nAfter P3 proceeds: 0"
+  }
+ ],
+ "traps": [
+  "Forgetting to execute V after using the printer leaves the semaphore at 0 and blocks later processes.",
+  "Assuming V can be called before any P; this would increase the semaphore above the resource count and hide bugs.",
+  "Treating a binary semaphore as a mutex but using V on a locked semaphore without a waiting process will set the value to 1, never to 2; the value never exceeds 1 for a binary semaphore.",
+  "Confusing the names acquire/release with P/V; exam questions may mix the terminology.",
+  "Counting semaphore initialized with the wrong number of resources leads to premature blocking."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What are the two atomic operations of a semaphore called?",
+   "marks": 2,
+   "a": "P (wait) and V (signal)."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a binary semaphore can be used as a mutex lock.",
+   "marks": 4,
+   "a": "Both allow only one holder at a time. The semaphore value 1 means free; P makes it 0 (locked) and V restores it to 1 (unlocked). Atomicity guarantees mutual exclusion."
+  },
+  {
+   "level": "apply",
+   "q": "A counting semaphore is initialized to 4. Three processes perform P, then one performs V, then two more perform P. What is the final semaphore value?",
+   "marks": 5,
+   "a": "Start 4 → after three P: 1 → after V: 2 → after two P: 0. Final value is 0."
+  },
+  {
+   "level": "apply",
+   "q": "Write a short C fragment that safely acquires a mutex lock named lock and then releases it after printing \"critical\".",
+   "marks": 6,
+   "a": "#include <stdio.h>\n#include <stdatomic.h>\n\nstatic atomic_int lock = ATOMIC_VAR_INIT(0);\n\n// acquire\nwhile (__sync_lock_test_and_set(&lock, 1)) {\n    ; // spin‑wait\n}\n\nprintf(\"critical\\n\");\n\n// release\n__sync_lock_release(&lock);\n"
+  },
+  {
+   "level": "analyze",
+   "q": "If a counting semaphore representing a pool of database connections is mistakenly initialized to 0, what will happen when the first client requests a connection?",
+   "marks": 4,
+   "a": "The client will block indefinitely because the semaphore value is not positive; no connection can ever be granted, leading to a deadlock‑like situation."
+  },
+  {
+   "level": "remember",
+   "q": "What property must the P and V operations satisfy to be safe for synchronization?",
+   "marks": 2,
+   "a": "Both must be atomic."
+  },
+  {
+   "level": "understand",
+   "q": "Distinguish between a mutex lock and a counting semaphore in terms of resource representation.",
+   "marks": 3,
+   "a": "A mutex lock represents a single exclusive resource (binary state). A counting semaphore represents a pool of identical resources and holds the count of free items."
+  }
+ ],
+ "beyond": "Not for the exam. In modern cloud services, distributed mutexes are built on consensus protocols such as Raft. Researchers study lock‑free data structures that avoid mutex overhead. New curricula add transactional memory as an alternative to traditional locks. To explore further, search for \"distributed semaphore\" and \"lock‑free synchronization\"."
+}

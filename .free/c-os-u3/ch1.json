@@ -1,0 +1,248 @@
+{
+ "lead": "When two or more processes access the same variable without coordination, the order of their read‑modify‑write steps can change the final result. This phenomenon is called a race condition. The critical‑section problem asks how to let only one process at a time execute such a sensitive part of code, while still allowing progress and avoiding indefinite waiting. It appears whenever shared data is used – for example, updating a bank balance, counting tickets on an IRCTC portal, or incrementing a global counter in a multiplayer game.",
+ "prereq": "You need: process concepts and context switching from <a href=\"#unit-2-processes-threads-and-cpu-scheduling\">Unit 2</a>.",
+ "sections": [
+  {
+   "h3": "Interleaving of instructions and race conditions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process is a program in execution. A shared variable lives in memory that several processes can read or write. The CPU executes instructions of each process in small time slices. Because the slices are interleaved, the actual order of operations from different processes may differ each run."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Read: load the current value of the variable into a register.",
+      "Modify: compute a new value, e.g., add 1.",
+      "Write: store the new value back to memory."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "If two processes perform these three steps on the same variable without any control, the following interleaving can happen:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "P1 reads x = 0.",
+      "P2 reads x = 0.",
+      "P1 computes x = 0 + 1 and writes 1.",
+      "P2 computes x = 0 + 1 and writes 1."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Both processes intended to increase the counter by one, but the final value is 1 instead of 2. The lost update is the classic race condition."
+    }
+   ]
+  },
+  {
+   "h3": "Critical‑section problem definition",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The part of a program that accesses shared data is called the critical section. The critical‑section problem asks for a protocol that satisfies three conditions."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Mutual exclusion – at most one process may be inside the critical section at any time.",
+      "Progress – if no process is in the critical section and some processes wish to enter, one of them must be allowed to enter.",
+      "Bounded waiting – there exists a limit on how many times other processes can enter before a waiting process gets its turn."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi call this the \"Critical‑Section Problem\" and treat it as a prerequisite for all other synchronization mechanisms such as Peterson’s algorithm, mutexes, semaphores, and monitors."
+    },
+    {
+     "type": "p",
+     "text": "The problem is purely logical; it does not depend on a particular hardware instruction set. Later chapters will show how hardware support (test‑and‑set, compare‑and‑swap) can simplify the solution."
+    }
+   ]
+  },
+  {
+   "h3": "Why naive solutions fail",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A common mistake is to use a simple flag variable, e.g., \"busy = 1\" before entering the critical section and \"busy = 0\" after leaving. The flag itself is a shared variable, so the same race condition can corrupt it."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <pthread.h>\n\nint x = 0;               // shared counter\nint busy = 0;            // naive lock flag\n\nvoid *increment(void *arg) {\n    if (busy == 0) {      // check flag (no atomicity!)\n        busy = 1;         // set flag\n        int temp = x;\n        temp = temp + 1;\n        x = temp;\n        busy = 0;         // release flag\n    }\n    return NULL;\n}\n\nint main() {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, increment, NULL);\n    pthread_create(&t2, NULL, increment, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"final x = %d\\n\", x);\n    return 0;\n}\n",
+     "stdin": "",
+     "output": "final x = 2"
+    },
+    {
+     "type": "p",
+     "text": "The program may print \"final x = 1\" when the first thread sets busy = 1, increments x, and resets busy = 0 before the second thread reads the flag. The second thread then sees busy = 1, skips the critical section, and leaves x unchanged, resulting in a final value of 1. If both threads read busy = 0 before either sets it, both will increment, giving final x = 2. Hence the output can be 1 or 2 depending on the interleaving."
+    },
+    {
+     "type": "p",
+     "text": "To meet all three conditions we need an atomic operation or a protocol that guarantees ordering. The next chapter introduces Peterson’s solution, which works for two processes using only shared memory and turn variables."
+    },
+    {
+     "type": "p",
+     "text": "For more than two processes, hardware primitives such as test‑and‑set or compare‑and‑swap are used, leading to mutex locks and semaphores."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Shows two processes entering the same critical section and updating variable x, illustrating the race condition.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Race condition",
+   "nodes": [
+    {
+     "id": "p1",
+     "label": "P1",
+     "note": "reads x",
+     "style": "normal"
+    },
+    {
+     "id": "p2",
+     "label": "P2",
+     "note": "reads x",
+     "style": "normal"
+    },
+    {
+     "id": "cs",
+     "label": "Critical Section",
+     "note": "x = x+1",
+     "style": "accent"
+    },
+    {
+     "id": "out",
+     "label": "Output",
+     "note": "final x",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "p1",
+     "to": "cs",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "p2",
+     "to": "cs",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "cs",
+     "to": "out",
+     "label": "",
+     "style": "solid"
+    }
+   ],
+   "aria": "Shows two processes entering the same critical section and causing a race on variable x."
+  }
+ },
+ "examples": [
+  {
+   "question": "Two processes P1 and P2 share an integer counter x initialized to 0. Each process executes the three statements: read x; x = x + 1; write x. List all possible final values of x after both processes have finished, assuming any interleaving of the six individual statements is allowed.",
+   "steps": [
+    "Step 1: Identify the six atomic actions – P1‑read, P1‑write, P2‑read, P2‑write, and the two compute steps (addition).",
+    "Step 2: The final value depends on the relative ordering of the read and write actions of the two processes.",
+    "Case A – P1 reads first, then P2 reads after P1 has written: final x = 2.",
+    "Case B – P1 and P2 both read before any write occurs: both compute 1, then the first write stores 1, the second write also stores 1, final x = 1.",
+    "No other ordering can produce a different result because each write overwrites the previous value.",
+    "Therefore the set of possible final values is {1, 2}."
+   ],
+   "answer": "The final value of x can be either 1 or 2, depending on the interleaving.",
+   "check": "x = 0\n# simulate both interleavings\nfinal_values = set()\n# Interleaving A: P1 reads, P1 writes, P2 reads, P2 writes\nx = 0\n# P1 reads 0, adds 1, writes 1\nx = 1\n# P2 reads 1, adds 1, writes 2\nx = 2\nfinal_values.add(x)\n# Interleaving B: both read before any write\nx = 0\np1_read = x\np2_read = x\np1_write = p1_read + 1\np2_write = p2_read + 1\n# first write\nx = p1_write\n# second write\nx = p2_write\nfinal_values.add(x)\nfor v in sorted(final_values):\n    print(v)\n",
+   "values": [
+    1,
+    2
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\n#include <pthread.h>\n\nint x = 0;               // shared counter\n\nvoid *inc(void *arg) {\n    int temp = x;          // read\n    temp = temp + 1;       // modify\n    x = temp;              // write (no lock)\n    return NULL;\n}\n\nint main() {\n    pthread_t t1, t2;\n    pthread_create(&t1, NULL, inc, NULL);\n    pthread_create(&t2, NULL, inc, NULL);\n    pthread_join(t1, NULL);\n    pthread_join(t2, NULL);\n    printf(\"final x = %d\\n\", x);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Action",
+     "x value"
+    ],
+    "rows": [
+     [
+      "1",
+      "P1 read",
+      "0"
+     ],
+     [
+      "2",
+      "P1 write 1",
+      "1"
+     ],
+     [
+      "3",
+      "P2 read",
+      "1"
+     ],
+     [
+      "4",
+      "P2 write 2",
+      "2"
+     ]
+    ]
+   },
+   "output": "final x = 2"
+  }
+ ],
+ "traps": [
+  "Assuming that setting a simple flag variable automatically provides mutual exclusion; the flag itself is subject to the same race condition.",
+  "Confusing progress with bounded waiting – a solution may allow a waiting process to eventually enter, but without a bound on how many times others can overtake it.",
+  "Counting the number of reads and writes incorrectly; the critical section consists of the whole read‑modify‑write sequence, not just the write.",
+  "Believing that a single CPU core eliminates race conditions; even on one core the OS scheduler can pre‑empt a process between the read and the write."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What are the three requirements of a correct solution to the critical‑section problem?",
+   "marks": 2,
+   "a": "Mutual exclusion, progress, and bounded waiting."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why two processes that both read a shared variable x = 0, add 1, and write back may leave x equal to 1.",
+   "marks": 3,
+   "a": "Both processes read the same initial value (0) before either writes. Each computes 0+1 = 1. The first write stores 1; the second write overwrites the same value, so the net increase is only 1."
+  },
+  {
+   "level": "apply",
+   "q": "Given three processes that each increment a shared counter initialized to 5, what are the possible final values if no synchronization is used?",
+   "marks": 4,
+   "a": "If all reads happen before any write, each adds 1 to 5 producing 6, and the three writes store 6, final value = 6. If the reads and writes are interleaved so that each write sees the previous increment, final value = 8. Therefore possible final values are 6, 7, or 8."
+  },
+  {
+   "level": "analyze",
+   "q": "A student proposes using a boolean variable lock = false; before entering the critical section each process does: while(lock); lock = true; // critical section ; lock = false;. Identify the flaw and state which requirement of the critical‑section problem it violates.",
+   "marks": 5,
+   "a": "The test while(lock) and the assignment lock = true are not atomic; two processes can both see lock as false and both set it to true, entering the critical section together. This violates mutual exclusion."
+  },
+  {
+   "level": "evaluate",
+   "q": "Compare a spinlock based on a busy flag with a mutex lock. Which requirement(s) of the critical‑section problem does the spinlock fail to satisfy in a pre‑emptive multitasking OS?",
+   "marks": 5,
+   "a": "A spinlock using a simple flag may fail mutual exclusion because checking and setting the flag are not atomic; the OS can pre‑empt a thread between them, allowing another thread to enter. It also may violate progress if a thread is stuck in the while loop while the lock holder is pre‑empted."
+  },
+  {
+   "level": "create",
+   "q": "Design a simple two‑process algorithm using only shared variables turn and flag[] that satisfies mutual exclusion, progress, and bounded waiting. Briefly describe the steps each process follows.",
+   "marks": 6,
+   "a": "Each process i sets flag[i] = true and turn = j (the other process). Then it waits while flag[j] && turn == j. When the condition is false it enters the critical section. On exit it sets flag[i] = false. This is Peterson’s algorithm and meets all three requirements."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, critical‑section solutions are built into language libraries (e.g., Java synchronized blocks, C++ std::mutex) and hardware primitives (Intel LOCK prefix, ARM LDREX/STREX). Research continues on lock‑free and wait‑free algorithms that avoid the bounded‑waiting problem altogether. Emerging curricula add transactional memory and formal verification of synchronization protocols. To explore further, search for \"hardware transactional memory\" and \"linearizability proofs\"."
+}
