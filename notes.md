@@ -377,3 +377,7 @@
 - Manipal's 6.1 (RAID) credit seems to come from "Data Storage and Querying" and "Storage" (recovery), not RAID; its "Measure of Query Cost" fits 6.7, but Manipal is not credited there.
 - From memory (no lookups): RAID 1988, Bayer–McCreight 1972, Fagin 1979, Litwin 1980, Selinger 1979, CAP/Gilbert–Lynch 2002, MongoDB 4.0 transactions (2018), GQL (2024).
 
+
+## c-ml-u6 (Codex, 5 Nov 2026)
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- Neighbouring syllabus lists mix clustering and instance-based learning, which belong to other ML units.
