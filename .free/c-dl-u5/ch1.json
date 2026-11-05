@@ -1,0 +1,222 @@
+{
+ "lead": "Attention is a soft dictionary lookup. A query vector asks what we want; key vectors are labels to compare against; value vectors are the content to mix. Compare the query with every key, turn the scores into weights that sum to one, and return the weighted mix of the values. This lets a model look back at many inputs instead of squeezing them into one fixed vector. Translation, image captioning, speech recognition, document classification and chatbots use it.",
+ "prereq": "You need Unit 4's encoder-decoder seq2seq and Unit 1's softmax and dot products; <a href=\"#self-attention-and-the-transformer-architecture\">5.2</a> builds self-attention from this.",
+ "sections": [
+  {
+   "h3": "The soft lookup: query, key, value",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A query q is a vector that says what we want. Each key k_i is a vector that describes one item we can look at. Each value v_i is the vector we return for that item. The index i runs over N items. Keys and query must have the same length d_k so we can compare them; values can have another length d_v."
+    },
+    {
+     "type": "formula",
+     "text": "s_i = q·k_i = Σ_{j=1}^{d_k} q_j k_ij",
+     "where": "q is the query vector; k_i is the i-th key vector; d_k is their length; q_j and k_ij are the j-th components; s_i is the match score."
+    },
+    {
+     "type": "p",
+     "text": "The score measures match. For stability, scaled dot-product attention divides by √d_k: s_i = q·k_i / √d_k. Bahdanau additive attention uses a small network: s_i = w^T tanh(W_q q + W_k k_i), where W_q, W_k and w are learned. Luong dot attention uses s_i = q·k_i; Luong multiplicative attention uses s_i = q^T W k_i with a learned matrix W."
+    },
+    {
+     "type": "formula",
+     "text": "α_i = exp(s_i) / Σ_{j=1}^{N} exp(s_j)",
+     "where": "α_i is the weight for key i; N is the number of keys; exp is e raised to the power; the denominator normalizes the weights to sum to 1."
+    },
+    {
+     "type": "formula",
+     "text": "c = Σ_{i=1}^{N} α_i v_i",
+     "where": "c is the context vector; α_i is the weight; v_i is the i-th value vector."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Score every key with the query.",
+      "Apply softmax over the N scores to get weights that sum to 1.",
+      "Return c = Σ α_i v_i, a weighted mix of values."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Attention in translation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An encoder-decoder translator reads a source sentence with an encoder RNN and writes a target sentence with a decoder RNN (see Unit 4). Without attention the encoder's last state must carry the whole source; long sentences lose detail. Attention removes this bottleneck."
+    },
+    {
+     "type": "p",
+     "text": "At decoder step t, the decoder hidden state s_t is the query q. The encoder hidden states h_1, ..., h_T are keys and values. Score s_t with each h_i, softmax to α_{t,i}, and form context c_t = Σ_i α_{t,i} h_i. The decoder combines c_t with its previous output to predict the next word. At each step the weights change, so the decoder can look at the source word it needs now. When producing a noun it can put weight on the source noun and less on function words. The weights are recomputed per decoder step and are not learned parameters."
+    },
+    {
+     "type": "p",
+     "text": "This is cross-attention: query from the decoder, keys and values from the encoder. Self-attention, where query, key and value come from the same sequence, is the next step; see <a href=\"#self-attention-and-the-transformer-architecture\">5.2</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Attention over images and hierarchy",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A CNN turns an image into a grid of feature vectors. A 7×7 grid from the last convolutional layer gives 49 vectors, one per region (see Unit 3). Flatten the grid to h_1, ..., h_N with N = 49; each h_i is a key and a value. A caption decoder produces words one at a time. At word t its state q_t is the query. Scores q_t·h_i, softmax over regions gives α_{t,i}, and c_t = Σ α_{t,i} h_i. The decoder can focus on the region with the cat when it writes 'cat'."
+    },
+    {
+     "type": "p",
+     "text": "Soft attention uses all regions through the weighted average; it is differentiable, so normal backpropagation trains it. Hard attention samples one region index z from the distribution α_t and uses c_t = h_z. Sampling is not differentiable, so training uses reinforcement: treat the sampled region as an action and use the caption score as reward, often with a baseline to reduce variance."
+    },
+    {
+     "type": "p",
+     "text": "Hierarchical attention stacks two levels. For a document, word attention inside each sentence mixes word states into a sentence vector using a learned word-level query. Sentence attention then mixes sentence vectors into a document vector using a learned sentence-level query. This lets a classifier point to important sentences and, inside them, important words. Some syllabi call this whole topic Attention Models."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The query meets three keys, softmax makes three weights that sum to one, and the weights mix the three values into the context vector. Notice that the first and third keys tie on score and share the largest weight.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Attention as a soft lookup",
+   "aria": "A query and three keys produce three scores, softmax turns them into three weights, and the weighted sum of three values gives the context vector.",
+   "nodes": [
+    {
+     "id": "q",
+     "label": "Query q",
+     "note": "q = [1, 0]",
+     "style": "accent"
+    },
+    {
+     "id": "k",
+     "label": "Keys k1 k2 k3",
+     "note": "1,0; 0,1; 1,1"
+    },
+    {
+     "id": "s",
+     "label": "Scores q·k",
+     "note": "1, 0, 1"
+    },
+    {
+     "id": "a",
+     "label": "Softmax",
+     "note": "0.422, 0.155, 0.422",
+     "style": "live"
+    },
+    {
+     "id": "v",
+     "label": "Values v1 v2 v3",
+     "note": "[10,0] [0,10] [5,5]"
+    },
+    {
+     "id": "c",
+     "label": "Context c",
+     "note": "[6.335, 3.665]",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "q",
+     "to": "s"
+    },
+    {
+     "from": "k",
+     "to": "s"
+    },
+    {
+     "from": "s",
+     "to": "a"
+    },
+    {
+     "from": "a",
+     "to": "c"
+    },
+    {
+     "from": "v",
+     "to": "c"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A decoder state q = [1, 0] attends over three encoder states using unscaled dot-product scores. The keys are k1 = [1, 0], k2 = [0, 1], k3 = [1, 1]; the values are v1 = [10, 0], v2 = [0, 10], v3 = [5, 5]. Find the three scores, the softmax weights to 3 decimals, and the context vector to 3 decimals. Use e ≈ 2.718.",
+   "steps": [
+    "Scores: q·k1 = 1×1 + 0×0 = 1; q·k2 = 1×0 + 0×1 = 0; q·k3 = 1×1 + 0×1 = 1. Because the scores are unscaled, we do not divide by √2.",
+    "Exponentials: e^1 = 2.718, e^0 = 1, e^1 = 2.718. Sum = 2.718 + 1 + 2.718 = 6.436.",
+    "Weights: α1 = 2.718 / 6.436 = 0.422; α2 = 1 / 6.436 = 0.155; α3 = 2.718 / 6.436 = 0.422. They sum to 0.999, which is 1 within rounding.",
+    "Context: c1 = 0.4223188×10 + 0.1553634×0 + 0.4223188×5 = 6.3348 → 6.335. c2 = 0.4223188×0 + 0.1553634×10 + 0.4223188×5 = 3.6652 → 3.665."
+   ],
+   "answer": "The weights are 0.422, 0.155 and 0.422, and the context is c = [6.335, 3.665]; the first and third encoder states tie and together supply most of the context.",
+   "check": "import math\nq = [1.0, 0.0]\nkeys = [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]\nvals = [[10.0, 0.0], [0.0, 10.0], [5.0, 5.0]]\nscores = [sum(q[j] * k[j] for j in range(2)) for k in keys]\nexps = [math.exp(s) for s in scores]\nden = sum(exps)\nw = [e / den for e in exps]\nc = [sum(w[i] * vals[i][j] for i in range(3)) for j in range(2)]\nprint(f'{w[0]:.3f}')\nprint(f'{w[1]:.3f}')\nprint(f'{w[2]:.3f}')\nprint(f'{c[0]:.3f}')\nprint(f'{c[1]:.3f}')",
+   "values": [
+    0.422,
+    0.155,
+    0.422,
+    6.335,
+    3.665
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Attention weights are computed from q and k at run time; they are not learned parameters. They always sum to 1 across the keys, and a weight changes when the query changes.",
+  "Use a weighted sum, not a plain average, of the values. The weights come from softmax scores, and the value vectors can have a different length from the keys.",
+  "For scaled dot-product attention divide scores by √d_k, where d_k is the key and query length, before softmax. Forgetting the scale makes large scores and nearly one-hot weights.",
+  "Soft attention is differentiable and trained by backpropagation; hard attention samples one region, so it is trained by reinforcement or a relaxed estimator.",
+  "In encoder-decoder attention the decoder state is the query, while encoder states are keys and values; in self-attention all three come from the same sequence."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define query, key and value in one line each.",
+   "marks": 2,
+   "a": "Query: the vector that states what the current step wants. Key: a vector that labels one item to compare against. Value: the vector that is mixed into the output for that item."
+  },
+  {
+   "level": "understand",
+   "q": "Why does attention help an encoder-decoder translator handle long sentences?",
+   "marks": 3,
+   "a": "Without attention the decoder depends on one fixed encoder vector, which loses detail. With attention the decoder queries all encoder states at every output step, so it can look back at the source words it needs."
+  },
+  {
+   "level": "apply",
+   "q": "A query q = [1, 1] attends over two keys k1 = [1, 0] and k2 = [0, 1] using unscaled dot-product scores. Find the scores and softmax weights to 3 decimals.",
+   "marks": 4,
+   "a": "Scores: q·k1 = 1, q·k2 = 1. Exponentials: 2.718 and 2.718; sum 5.436. Weights: α1 = 2.718 / 5.436 = 0.500 and α2 = 0.500."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can soft attention be trained by backpropagation but hard attention usually needs reinforcement learning?",
+   "marks": 5,
+   "a": "Soft attention computes a weighted average, which is differentiable in the weights, so gradients reach the model. Hard attention samples one region; the sampling step has no useful gradient, so the model is treated as taking an action and trained with a reward, often using REINFORCE with a baseline."
+  },
+  {
+   "level": "understand",
+   "q": "What are the two levels in hierarchical attention for a document?",
+   "marks": 3,
+   "a": "Word attention inside each sentence mixes word states into a sentence vector. Sentence attention then mixes sentence vectors into a document vector."
+  },
+  {
+   "level": "apply",
+   "q": "An image encoder gives a 5×5 feature grid. A caption has 6 words. How many region keys are there, and how many separate attention weight sets are computed?",
+   "marks": 4,
+   "a": "25 region keys, one per grid cell. Six weight sets, one per decoder word."
+  },
+  {
+   "level": "analyze",
+   "q": "A weight α_i = 0.8 for one value. Does that mean the model reads 80% of that value vector and ignores the rest of the vector's dimensions? Explain.",
+   "marks": 5,
+   "a": "No. α_i is the mixing coefficient for the whole value vector v_i. The context is a weighted sum of full vectors; all dimensions of v_i are scaled by 0.8, and the other values still contribute their weighted parts."
+  },
+  {
+   "level": "remember",
+   "q": "Write the scaled dot-product score and say what d_k is.",
+   "marks": 3,
+   "a": "s_i = q·k_i / √d_k. d_k is the number of components in the query and key vectors."
+  }
+ ],
+ "beyond": "Not for the exam. Attention maps are used to inspect vision models and medical image classifiers, and vision transformers replace the CNN grid with patch tokens and self-attention. Hard attention is rare now because sampling is noisy, but stochastic attention and Gumbel-softmax relaxations appear in research. Search for Bahdanau attention, Luong attention, show-attend-tell image captioning, hierarchical attention networks, and attention rollout."
+}

@@ -1,0 +1,257 @@
+{
+ "lead": "A pretrained language model is a Transformer that has already learned language from a large pile of unlabelled text, so you can reuse its weights on your own small labelled dataset. Labelling ten thousand sentences by hand can cost lakhs; raw text is free. BERT reads a sentence in both directions and fills in blanks. GPT reads left to right and predicts the next token. Both sit inside modern search, tagging, translation and chatbots.",
+ "prereq": "You need: <a href=\"#self-attention-and-the-transformer-architecture\">5.2</a> for the Transformer block, Unit 4 for language modelling and word embeddings, and Unit 1 for cross-entropy.",
+ "sections": [
+  {
+   "h3": "Pretraining is self-supervised",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A supervised model needs a label for every input. Text already carries its own label: hide part of a sentence and ask the model to recover it. This is self-supervised learning, and it is the whole reason pretraining exists — billions of web pages can be used without paying a single annotator."
+    },
+    {
+     "type": "p",
+     "text": "The result is a set of weights that encodes general language: grammar, word senses, common facts. You then reuse it in one of two ways."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Fine-tuning: add a small task head and update every weight on your labelled data. A few thousand examples are often enough.",
+      "Feature extraction: freeze the pretrained weights and train only the head. Cheaper, usually a little weaker, and the right choice when your dataset is tiny."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The fine-tuning recipe is three steps."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Load the pretrained checkpoint and attach a task head.",
+      "Train with a small learning rate, roughly 2e-5 to 5e-5, for three or four epochs.",
+      "Evaluate on the task benchmark, for example the GLUE suite of sentence-level tasks (acceptability, sentiment, inference, paraphrase, similarity)."
+     ]
+    },
+    {
+     "type": "table",
+     "head": [
+      "Family",
+      "Example",
+      "How it reads"
+     ],
+     "rows": [
+      [
+       "Encoder-only",
+       "BERT",
+       "both directions"
+      ],
+      [
+       "Decoder-only",
+       "GPT",
+       "left to right"
+      ],
+      [
+       "Encoder-decoder",
+       "T5, BART",
+       "both, then generates"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "BERT: masked language modelling",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BERT means Bidirectional Encoder Representations from Transformers. It is an encoder-only stack, built as in <a href=\"#self-attention-and-the-transformer-architecture\">5.2</a> but with no causal mask, so every position sees both its left and right context at the same time."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Pick 15% of the tokens at random.",
+      "Replace 80% of those with [MASK], 10% with a random vocabulary token, and leave 10% unchanged.",
+      "Predict the original token at every chosen position with a softmax over the vocabulary.",
+      "Compute cross-entropy only at the chosen positions; the untouched 85% adds nothing to the loss."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "L_MLM = −(1/|M|) × Σ log p(xᵢ | x̃)",
+     "where": "M is the set of chosen positions, xᵢ is the true token there, x̃ is the corrupted sentence, and p is the model's softmax probability for that token."
+    },
+    {
+     "type": "p",
+     "text": "The 80/10/10 split matters. If every chosen token became [MASK], the model would never see the symbol [MASK] during fine-tuning, and the random 10% forces it to distrust the input token rather than copy it. Two special tokens complete the input: [CLS] sits first and its final state is the whole-sentence vector used for classification, while [SEP] marks where one segment ends and the next begins. The original paper also trained next sentence prediction, asking whether segment B follows A; later work showed it adds little, and RoBERTa dropped it."
+    },
+    {
+     "type": "p",
+     "text": "BERT-base has 12 layers, hidden size 768, 12 heads and about 110 million parameters. BERT-large has 24 layers, 1024 hidden, 16 heads and about 340 million."
+    }
+   ]
+  },
+  {
+   "h3": "GPT, the other families, and metrics",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "GPT is decoder-only. A causal mask lets position i attend only to positions up to i, so the model computes p(token t+1 | tokens 1…t) and nothing more. Every token in the corpus is therefore a training example, far denser than BERT's 15%. The family grew fast: GPT-1 had about 117 million parameters, GPT-2 about 1.5 billion, GPT-3 about 175 billion. Scaling that run is <a href=\"#large-language-models-training-scaling-and-fine-tuning\">5.4</a>."
+    },
+    {
+     "type": "formula",
+     "text": "PPL = exp(L)",
+     "where": "L is the mean cross-entropy loss in nats per token, so perplexity is the number of equally likely tokens the model is effectively choosing among. Lower is better; 1 would be perfect certainty. If your loss is in bits, use PPL = 2^L instead; both forms give the same number."
+    },
+    {
+     "type": "p",
+     "text": "Encoder-decoder models such as T5 and BART use both halves: an encoder reads the input bidirectionally and a decoder writes the output left to right. They suit translation and summarisation, where input and output are different sequences. NVIDIA NeMo is a toolkit for building and fine-tuning these models — it is not a model family."
+    },
+    {
+     "type": "p",
+     "text": "Where you attach the task head depends on the family. For a classifier on an encoder, attach a head to the [CLS] state; on a decoder-only model, attach it to the state at the final position. For tagging or question answering, attach heads to the token states. Fine-tuning updates all weights; prompting changes none of them and belongs to <a href=\"#prompt-engineering-and-chatbots\">5.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Unlabelled text feeds two objectives: masking for BERT's encoder and next-token prediction for GPT's decoder. Notice that both stacks end at the same reuse step, fine-tuning or prompting.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Two pretraining objectives",
+   "aria": "Unlabelled text feeds two branches, masked language modelling into an encoder stack for BERT and next-token prediction into a decoder stack for GPT, and both branches end at fine-tune or prompt.",
+   "nodes": [
+    {
+     "id": "t",
+     "label": "Unlabelled text",
+     "style": "accent"
+    },
+    {
+     "id": "b",
+     "label": "Mask 15% of tokens",
+     "note": "masked LM, BERT"
+    },
+    {
+     "id": "g",
+     "label": "Predict next token",
+     "note": "autoregressive, GPT"
+    },
+    {
+     "id": "e",
+     "label": "Bidirectional encoder",
+     "style": "live"
+    },
+    {
+     "id": "d",
+     "label": "Causal decoder",
+     "style": "live"
+    },
+    {
+     "id": "f",
+     "label": "Fine-tune or prompt",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "t",
+     "to": "b"
+    },
+    {
+     "from": "t",
+     "to": "g"
+    },
+    {
+     "from": "b",
+     "to": "e"
+    },
+    {
+     "from": "g",
+     "to": "d"
+    },
+    {
+     "from": "e",
+     "to": "f"
+    },
+    {
+     "from": "d",
+     "to": "f"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "(a) A BERT masked-LM head reads 'the cat sat on the [MASK]'. It gives P(mat) = 0.5, P(floor) = 0.2, P(dog) = 0.1, and 0.2 spread over all remaining words. Find the cross-entropy loss at this position in nats and in bits. (b) A small GPT scores the three true tokens of a sequence with probabilities 0.5, 0.25 and 0.125. Find its perplexity on that sequence.",
+   "steps": [
+    "(a) The true token is mat, predicted with probability 0.5.",
+    "Loss = −ln p = −ln 0.5 = 0.6931 nats.",
+    "Convert to bits: 0.6931 ÷ ln 2 = 0.6931 ÷ 0.6931 = 1.0 bit.",
+    "(b) Multiply the three probabilities: 0.5 × 0.25 × 0.125 = 0.015625 = 1/64.",
+    "Take the geometric mean: (1/64)^(1/3) = 1/4 = 0.25.",
+    "Perplexity = 1 ÷ 0.25 = 4.0, so the model is as unsure as choosing among 4 equally likely tokens."
+   ],
+   "answer": "The masked-LM loss is 0.6931 nats, which is 1.0 bit; the GPT's perplexity is 4.0.",
+   "check": "import math\np = 0.5\nloss = -math.log(p)\nprint(round(loss, 3))\nprint(round(loss / math.log(2), 3))\nprobs = [0.5, 0.25, 0.125]\nprod = 1.0\nfor q in probs:\n    prod *= q\nprint(round(prod ** (-1 / 3), 3))",
+   "values": [
+    0.693,
+    1.0,
+    4.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "BERT cannot generate text: its masked objective needs the whole sentence at once, so there is no left-to-right order to sample from.",
+  "15% is the fraction of tokens chosen, and only 80% of those become [MASK], so the real mask rate is 12% of all tokens.",
+  "Few-shot examples in a prompt change no weights. Prompting is inference; only gradient steps update parameters.",
+  "Perplexity must match the log base of the loss: PPL = exp(L) when L is in nats, and PPL = 2^L when L is in bits. The two give the same number. Mixing them — exp of a bit-loss, or 2^L of a nat-loss — gives a wrong value.",
+  "NVIDIA NeMo is a toolkit for building and fine-tuning models, not a model family like BERT or GPT."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the pretraining objective of BERT and of GPT in one line each.",
+   "marks": 2,
+   "a": "BERT: predict randomly masked tokens from both-side context (masked language modelling). GPT: predict the next token from the left context only (autoregressive language modelling)."
+  },
+  {
+   "level": "remember",
+   "q": "Give the layer count, hidden size, head count and parameter count of BERT-base and BERT-large.",
+   "marks": 3,
+   "a": "BERT-base: 12 layers, hidden 768, 12 heads, about 110M parameters. BERT-large: 24 layers, hidden 1024, 16 heads, about 340M parameters."
+  },
+  {
+   "level": "understand",
+   "q": "Why does BERT replace only 80% of chosen tokens with [MASK] instead of all of them?",
+   "marks": 3,
+   "a": "Because [MASK] never appears at fine-tuning time, a model trained only on [MASK] would face a distribution it has never seen. Mixing in random and unchanged tokens forces it to build a real representation of every input token."
+  },
+  {
+   "level": "understand",
+   "q": "Contrast fine-tuning with feature extraction for a pretrained encoder.",
+   "marks": 3,
+   "a": "Fine-tuning updates all pretrained weights plus a new head, so it needs more compute and more labelled data but gives the best accuracy. Feature extraction freezes the encoder and trains only the head; it is cheaper and safer on tiny datasets."
+  },
+  {
+   "level": "apply",
+   "q": "A masked-LM head gives P(a) = 0.4 for the correct token and spreads 0.6 over the rest. Compute the loss in nats and in bits.",
+   "marks": 4,
+   "a": "Loss = −ln 0.4 = 0.9163 nats. In bits: 0.9163 ÷ 0.6931 = 1.322 bits."
+  },
+  {
+   "level": "apply",
+   "q": "A GPT assigns the true tokens of a 2-token sequence probabilities 0.8 and 0.5. Compute the perplexity.",
+   "marks": 4,
+   "a": "Product = 0.8 × 0.5 = 0.4. Geometric mean = 0.4^(1/2) = 0.6325. Perplexity = 1 ÷ 0.6325 = 1.581."
+  },
+  {
+   "level": "analyze",
+   "q": "A team wants a model to write product descriptions from a short spec. Explain why they should not pick a BERT encoder for the writing step itself.",
+   "marks": 5,
+   "a": "BERT is trained to fill blanks with the full sentence visible, so its representations of later positions already contain the words it would have to produce. Generation needs p(next token | prefix) computed without seeing the future. A causal decoder, that is a GPT-style model or the decoder half of T5/BART, is the correct choice; BERT can still help by encoding the spec and tagging the output."
+  }
+ ],
+ "beyond": "Not for the exam. In industry most teams never pretrain from scratch: they start from an open checkpoint and fine-tune or prompt it. Domain pretraining on a hospital's own notes or a bank's own circulars still pays off when the vocabulary is unusual. Encoder models remain the cheap option for search and tagging, since a 110-million-parameter encoder runs on a CPU. Sentence-embedding models built from BERT power the vector search behind many product catalogues. Search next for RoBERTa, DeBERTa, sentence-transformers and IndicBERT."
+}

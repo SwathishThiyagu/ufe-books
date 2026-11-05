@@ -1,0 +1,492 @@
+{
+ "lead": "Attention is a weighted lookup: a query decides which keys matter, and the values are mixed in those proportions. Stacked into a Transformer, attention is the engine inside BERT, GPT and today's chat models. After this unit you can compute attention by hand, trace a Transformer block, explain pretraining and fine-tuning, and say what RLHF, prompting and compression each change in a deployed model.",
+ "about": "This unit follows one idea from a single attention weight to a chatbot on a phone. Chapter 5.1 builds attention as a soft lookup over keys and values, first for translation and then over image regions. Chapter 5.2 turns the lookup on the sequence itself: self-attention, multi-head attention, positional encoding and the full Transformer block. Chapter 5.3 shows how BERT and GPT pretrain that block on raw text with masked or next-token prediction. Chapter 5.4 scales pretraining into large language models and adds cheap fine-tuning. Chapter 5.5 covers RLHF, the step that turns a text predictor into a helpful assistant. Chapter 5.6 puts the model behind a prompt and a chat interface. Chapter 5.7 shrinks the result with distillation, quantization and pruning so serving stays affordable.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Attention is a soft dictionary lookup: a query is compared with keys, the scores become weights that sum to 1, and the output is the weighted mix of the values.",
+   "depth": "Define query q, key k, value v. Score by dot product s = q·k; mention additive (Bahdanau) attention, where a small network scores the pair, and Luong dot and multiplicative variants in one line each. Weights α = softmax(s), context c = Σ αᵢ vᵢ. Show encoder-decoder attention for machine translation: the decoder state is the query, encoder hidden states are keys and values, so the decoder looks back at the source instead of squeezing it into one vector. Then attention over images: a CNN grid gives one feature vector per region; the decoder word state queries the regions. Soft attention averages all regions; hard attention samples one region and is trained by reinforcement. Close with hierarchical attention, word attention inside a sentence and sentence attention inside a document. Some syllabi call this whole topic 'Attention Models'.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Attention as a soft lookup",
+    "aria": "A query and three keys produce three scores, softmax turns them into three weights, and the weighted sum of three values gives the context vector.",
+    "nodes": [
+     {
+      "id": "q",
+      "label": "Query q",
+      "note": "what we want",
+      "style": "accent"
+     },
+     {
+      "id": "k",
+      "label": "Keys k1 k2 k3",
+      "note": "what we compare against"
+     },
+     {
+      "id": "s",
+      "label": "Scores q·k",
+      "note": "1, 0, 1"
+     },
+     {
+      "id": "a",
+      "label": "Softmax",
+      "note": "0.422, 0.155, 0.422",
+      "style": "live"
+     },
+     {
+      "id": "v",
+      "label": "Values v1 v2 v3",
+      "note": "[10,0] [0,10] [5,5]"
+     },
+     {
+      "id": "c",
+      "label": "Context c",
+      "note": "[6.34, 3.67]",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "q",
+      "to": "s"
+     },
+     {
+      "from": "k",
+      "to": "s"
+     },
+     {
+      "from": "s",
+      "to": "a"
+     },
+     {
+      "from": "v",
+      "to": "a"
+     },
+     {
+      "from": "a",
+      "to": "c"
+     }
+    ]
+   },
+   "example": "A decoder state q = [1, 0] attends over three encoder states. Keys k1 = [1,0], k2 = [0,1], k3 = [1,1]; values v1 = [10,0], v2 = [0,10], v3 = [5,5]. Use unscaled dot-product scores. Scores: q·k1 = 1, q·k2 = 0, q·k3 = 1. Exponentials: 2.718, 1, 2.718; sum 6.436. Weights: 0.422, 0.155, 0.422. Context: c = 0.422×[10,0] + 0.155×[0,10] + 0.422×[5,5] = [6.34, 3.67].",
+   "trap": "Attention weights are computed, not learned parameters, and they always sum to 1 over the keys. Students also forget scaling by √d_k and wrongly average the values instead of taking a weighted sum.",
+   "prereq": "Unit 4 (encoder-decoder seq2seq), Unit 1 (softmax and dot products)",
+   "leave": "Stacking attention into the full Transformer goes to 5.2; word embeddings and seq2seq training go to Unit 4; GANs go to Unit 6."
+  },
+  {
+   "k": 2,
+   "idea": "Self-attention lets every position gather information from all other positions in the same sequence, and the Transformer block wraps it with multiple heads, positional encoding, residual connections, layer norm and a feed-forward network.",
+   "depth": "Build Q = XW_Q, K = XW_K, V = XW_V from one sequence X. Scaled dot-product attention: Attention(Q,K,V) = softmax(QKᵀ/√d_k)V; explain why √d_k stops large dot products from saturating the softmax. Multi-head attention: h heads, each with d_k = d_model/h, outputs concatenated and mixed by W_O. Positional encoding: PE(pos, 2i) = sin(pos/10000^(2i/d)) and the cosine form for odd i; it is added to the embedding because attention alone has no order. Encoder block: multi-head self-attention, add and norm, feed-forward (d_ff = 4×d_model) with ReLU, add and norm. Decoder block: masked self-attention (set future scores to −∞ before softmax), cross-attention to the encoder, then the feed-forward. Give the cost: O(n²d) time and memory in sequence length n. Some syllabi list 'Spatial Transformers' here; that is a different vision module that learns to warp an image grid, not this block.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One Transformer block",
+    "aria": "Token embeddings with added positional encoding pass through multi-head self-attention, an add-and-norm step, a feed-forward layer and a second add-and-norm to give the block output.",
+    "nodes": [
+     {
+      "id": "x",
+      "label": "Token embeddings",
+      "note": "+ positional encoding",
+      "style": "accent"
+     },
+     {
+      "id": "m",
+      "label": "Multi-head self-attention",
+      "note": "8 heads, dk = 96",
+      "style": "accent"
+     },
+     {
+      "id": "n1",
+      "label": "Add & norm"
+     },
+     {
+      "id": "f",
+      "label": "Feed-forward",
+      "note": "768 to 3072 to 768"
+     },
+     {
+      "id": "n2",
+      "label": "Add & norm"
+     },
+     {
+      "id": "o",
+      "label": "Block output",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "x",
+      "to": "m"
+     },
+     {
+      "from": "m",
+      "to": "n1"
+     },
+     {
+      "from": "n1",
+      "to": "f"
+     },
+     {
+      "from": "f",
+      "to": "n2"
+     },
+     {
+      "from": "n2",
+      "to": "o"
+     }
+    ]
+   },
+   "example": "Two tokens x1 = [1,0], x2 = [0,1], with W_Q = W_K = W_V = identity and d_k = 2. QKᵀ = [[1,0],[0,1]]; divide by √2 = 1.414 to get [[0.707,0],[0,0.707]]. Row softmax: [0.670, 0.330] and [0.330, 0.670]. Output rows: o1 = 0.670×[1,0] + 0.330×[0,1] = [0.670, 0.330]; o2 = [0.330, 0.670]. Without the √d_k scaling the first row would be [0.731, 0.269].",
+   "trap": "Positional encodings are added to the embeddings, not concatenated, and the mask is applied to the scores before the softmax, not after. Multi-head attention splits d_model across heads, so the total width stays d_model.",
+   "prereq": "5.1, Unit 4 (seq2seq), Unit 1 (softmax), Unit 2 (normalization)",
+   "leave": "BERT and GPT objectives go to 5.3; large-scale training and scaling laws go to 5.4."
+  },
+  {
+   "k": 3,
+   "idea": "Pretraining trains a Transformer on unlabelled text with a self-supervised objective, and fine-tuning reuses those weights for a labelled task; BERT reads text in both directions with masked prediction, GPT reads it left to right with next-token prediction.",
+   "depth": "Masked language modelling: pick 15% of tokens, replace 80% with [MASK], 10% with a random token, keep 10% unchanged, and predict the originals with cross-entropy. Next sentence prediction and its later dropping; [CLS] and [SEP]. BERT-base: 12 layers, hidden size 768, 12 heads, about 110M parameters; BERT-large: 24 layers, 1024 hidden, 16 heads, about 340M. GPT: decoder-only, causal mask, next-token objective, the GPT-1 to GPT-3 growth in size and data. Name the three families: encoder-only (BERT), decoder-only (GPT), encoder-decoder (T5, BART) with one line each. Fine-tuning: attach a task head to [CLS] for classification, or use the token states for tagging and question answering; compare with feature extraction (frozen weights). Metrics: cross-entropy loss, perplexity = exp(mean loss), GLUE scores. NVIDIA NeMo is a toolkit for building and fine-tuning such models, not a model family.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Two pretraining objectives",
+    "aria": "Unlabelled text feeds two branches, masked language modelling into an encoder stack for BERT and next-token prediction into a decoder stack for GPT, and both branches end at fine-tune or prompt.",
+    "nodes": [
+     {
+      "id": "t",
+      "label": "Unlabelled text",
+      "style": "accent"
+     },
+     {
+      "id": "b",
+      "label": "Mask 15% of tokens",
+      "note": "masked LM, BERT"
+     },
+     {
+      "id": "g",
+      "label": "Predict next token",
+      "note": "autoregressive, GPT"
+     },
+     {
+      "id": "e",
+      "label": "Bidirectional encoder",
+      "style": "live"
+     },
+     {
+      "id": "d",
+      "label": "Causal decoder",
+      "style": "live"
+     },
+     {
+      "id": "f",
+      "label": "Fine-tune or prompt",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "t",
+      "to": "b"
+     },
+     {
+      "from": "t",
+      "to": "g"
+     },
+     {
+      "from": "b",
+      "to": "e"
+     },
+     {
+      "from": "g",
+      "to": "d"
+     },
+     {
+      "from": "e",
+      "to": "f"
+     },
+     {
+      "from": "d",
+      "to": "f"
+     }
+    ]
+   },
+   "example": "(a) BERT masked-LM on 'the cat sat on the [MASK]' gives P(mat) = 0.5, P(floor) = 0.2, P(dog) = 0.1, other words 0.2. Loss = −ln 0.5 = 0.693 nats, that is 1 bit. (b) A GPT assigns the three true tokens of a sequence probabilities 0.5, 0.25 and 0.125. Perplexity = (0.5 × 0.25 × 0.125)^(−1/3) = (1/64)^(−1/3) = 4.",
+   "trap": "BERT is not a text generator; its masked objective needs the whole sentence, so it cannot be sampled left to right. Few-shot examples in a prompt do not update any BERT or GPT weight.",
+   "prereq": "5.2, Unit 4 (language modelling), Unit 1 (cross-entropy)",
+   "leave": "Scaling to billions of parameters goes to 5.4; preference training to 5.5; prompt tricks to 5.6."
+  },
+  {
+   "k": 4,
+   "idea": "A large language model is a decoder-only Transformer trained with next-token prediction on a very large text corpus, and its loss falls predictably with more parameters, data and compute, so planning a training run is a calculation, not a guess.",
+   "depth": "Pretraining pipeline: collect and clean text, deduplicate, train a byte-pair encoding tokenizer, then minimize mean next-token cross-entropy with AdamW, warmup plus cosine decay, mixed precision and gradient clipping (Unit 2). Compute estimate: about 6ND FLOPs for N parameters and D tokens. Scaling laws: loss falls as a power law in parameters, data and compute (Kaplan and co-workers reported exponents near −0.076 for parameters and −0.095 for data), and the compute-optimal split is roughly 20 tokens per parameter (Chinchilla). Say plainly that some abilities appear only past a certain scale. Fine-tuning: full fine-tuning, instruction tuning on question-answer pairs, and parameter-efficient methods — adapters, prefix tuning and LoRA, where ΔW = BA with rank r much smaller than the layer width. Domain adaptation on in-domain text. Evaluation: held-out loss, perplexity, task benchmarks, and human review.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "compute C (relative units)",
+     "min": 1,
+     "max": 64
+    },
+    "y": {
+     "label": "test loss L",
+     "min": 2,
+     "max": 3.5
+    },
+    "series": [
+     {
+      "name": "L = 2.0 + 1.2C^-0.25",
+      "expr": "2.0 + 1.2*x**-0.25",
+      "style": "accent"
+     }
+    ],
+    "aria": "A curve falling steeply at first and then flattening, showing test loss dropping from 3.2 to about 2.4 as compute rises from 1 to 64 relative units."
+   },
+   "example": "A 1B-parameter model is trained on 20B tokens, the Chinchilla ratio of 20 tokens per parameter. (a) Training compute ≈ 6ND = 6 × 10⁹ × 2×10¹⁰ = 1.2×10²⁰ FLOPs. (b) A GPU delivers 3×10¹⁴ FLOP/s at 40% utilisation, so 1.2×10¹⁴ FLOP/s; time = 1.2×10²⁰ ÷ 1.2×10¹⁴ = 10⁶ s ≈ 11.6 days. (c) A fitted curve L = 2.0 + 1.2C^−0.25 gives L = 2.6 at C = 16.",
+   "trap": "Scaling laws predict loss, not accuracy on your task, and they are not a licence to add parameters without data. Also remember 6ND is an estimate for dense training, not the cost of inference.",
+   "prereq": "5.3, Unit 2 (Adam, learning-rate schedules), Unit 4 (language modelling)",
+   "leave": "The preference stage after pretraining goes to 5.5; serving and compression go to 5.7."
+  },
+  {
+   "k": 5,
+   "idea": "RLHF learns a reward model from human comparisons of answers, then tunes the language model with reinforcement learning to raise that reward while a KL penalty keeps it close to the original model. Only a few universities teach this.",
+   "depth": "Three stages. (1) Supervised fine-tuning on good demonstrations. (2) Reward model: collect pairs (chosen y_w, rejected y_l) for the same prompt, train r(x, y) with the Bradley–Terry loss −log σ(r(x,y_w) − r(x,y_l)). (3) PPO: maximise E[r(x,y)] − β·KL(π‖π_ref), where β is the penalty weight and π_ref is the frozen SFT model; the clipped PPO objective and the value head are named, not derived. Explain the KL term as a leash against reward hacking and drift. Name the failure modes: reward model bias, length bias, over-optimisation. Mention direct preference optimisation (DPO) in one line as a cheaper alternative that fits preferences without a separate RL loop.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Three stages of RLHF",
+    "aria": "Prompts produce an SFT model that samples response pairs, humans rank them to train a reward model, and PPO with a KL leash to the reference model gives the aligned model.",
+    "nodes": [
+     {
+      "id": "p",
+      "label": "Prompt set"
+     },
+     {
+      "id": "s",
+      "label": "SFT model",
+      "note": "stage 1"
+     },
+     {
+      "id": "d",
+      "label": "Sample response pairs",
+      "note": "same prompt"
+     },
+     {
+      "id": "h",
+      "label": "Humans rank",
+      "note": "chosen vs rejected"
+     },
+     {
+      "id": "r",
+      "label": "Reward model",
+      "note": "stage 2, Bradley-Terry",
+      "style": "accent"
+     },
+     {
+      "id": "o",
+      "label": "PPO + KL leash",
+      "note": "stage 3",
+      "style": "live"
+     },
+     {
+      "id": "a",
+      "label": "Aligned model",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p",
+      "to": "s"
+     },
+     {
+      "from": "s",
+      "to": "d"
+     },
+     {
+      "from": "d",
+      "to": "h"
+     },
+     {
+      "from": "h",
+      "to": "r"
+     },
+     {
+      "from": "r",
+      "to": "o"
+     },
+     {
+      "from": "s",
+      "to": "o",
+      "label": "reference",
+      "style": "dashed"
+     },
+     {
+      "from": "o",
+      "to": "a"
+     }
+    ]
+   },
+   "example": "A reward model scores response A at 2.0 and response B at 1.0, and humans preferred A. P(A over B) = σ(2.0 − 1.0) = 1/(1 + e^−1) = 0.731; loss = −ln 0.731 = 0.313. In the PPO step a sampled response scores reward 2.0 with KL divergence 0.5 from the reference model and β = 0.1, so the objective value is 2.0 − 0.1 × 0.5 = 1.95.",
+   "trap": "The reward model is a learned proxy, not human judgement, so the KL term is not optional. RLHF is not the same as fine-tuning on human-written answers; that is only stage 1.",
+   "prereq": "5.4, Unit 2 (policy-gradient ideas and optimizers)",
+   "leave": "GAN training and latent-variable generative models go to Unit 6; chatbot plumbing goes to 5.6."
+  },
+  {
+   "k": 6,
+   "idea": "A prompt is the program for a frozen model: wording, examples and output format steer it, and a chatbot is that model wrapped in a system prompt, conversation memory and an API call.",
+   "depth": "Prompt design: clear instruction, role or system message, delimiters, output format (for example JSON), decomposition into steps. Zero-shot, one-shot and few-shot prompting; in-context learning means the examples act at inference time and no weights change. Chain-of-thought prompting ('show the steps') helps multi-step arithmetic and logic. Sampling controls: softmax with temperature T divides logits by T, and top-p keeps the smallest set of tokens whose probability adds to p. Context window: the system prompt, examples, history and the reply all share one token budget, so long chats need truncation or summarisation. Chatbot stack: UI, backend, prompt assembly, model API with a key, response rendering; retrieval-augmented generation in one line. Tooling named in some syllabi: the OpenAI API for hosted models, LangChain for chaining prompts, memory and tools, Ollama for running open models locally, and no-code builders such as Botsonic and Chatbase.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "User",
+     "Chat app",
+     "LLM API"
+    ],
+    "messages": [
+     {
+      "from": "User",
+      "to": "Chat app",
+      "label": "question",
+      "dashed": false
+     },
+     {
+      "from": "Chat app",
+      "to": "LLM API",
+      "label": "system + history + question",
+      "dashed": false
+     },
+     {
+      "from": "LLM API",
+      "to": "Chat app",
+      "label": "generated tokens",
+      "dashed": true
+     },
+     {
+      "from": "Chat app",
+      "to": "User",
+      "label": "answer",
+      "dashed": false
+     },
+     {
+      "from": "Chat app",
+      "to": "LLM API",
+      "label": "next turn, history grows",
+      "dashed": true
+     }
+    ]
+   },
+   "example": "A model outputs logits 2, 1, 0 for three tokens. At T = 1: exponentials 7.389, 2.718, 1, sum 11.107, so probabilities 0.665, 0.245, 0.090. At T = 0.5 the logits are divided by 0.5 to give 4, 2, 0: exponentials 54.598, 7.389, 1, sum 62.987, so probabilities 0.867, 0.117, 0.016. Lower temperature sharpens the distribution.",
+   "trap": "Few-shot examples do not train the model; they only fill the context. Also count the reply inside the context window, and do not expect a prompt to supply facts the model never learned.",
+   "prereq": "5.3 and 5.4 (what the model was trained on), Unit 1 (softmax)",
+   "leave": "Training and aligning the model go to 5.4 and 5.5; deploying it cheaply goes to 5.7; RAG's vector search details belong to an information-retrieval course."
+  },
+  {
+   "k": 7,
+   "idea": "Compression keeps most of a trained network's accuracy in far fewer bits or weights, using a small student model (distillation), lower precision (quantization) or removed connections (pruning).",
+   "depth": "Distillation: a teacher's softmax at temperature T gives soft targets; student loss = α·CE(y, p_s) + (1−α)·T²·KL(p_t^T ‖ p_s^T). Temperature softens the teacher distribution so rare-class information shows. Quantization: q = round(x/s) + z, where s is the scale, z the zero point and q an 8-bit integer; dequantize with x̂ = s(q − z). FP32 to INT8 cuts memory 4× and usually speeds inference; FP16 and BF16 are the easy middle step. Post-training quantization versus quantization-aware training, per-tensor versus per-channel scales. Pruning: magnitude pruning removes small weights (unstructured, sparse but hard to speed up) or whole channels and heads (structured, fast on ordinary hardware); prune iteratively and fine-tune after each round; mention the lottery-ticket idea in one line. Deployment formats such as TFLite and ONNX Runtime are the practical end point.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Three routes to a smaller model",
+    "aria": "One trained model branches into distillation, quantization and pruning, and all three routes end at a deployed small model.",
+    "nodes": [
+     {
+      "id": "t",
+      "label": "Trained model",
+      "note": "high accuracy",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Distillation",
+      "note": "student mimics teacher"
+     },
+     {
+      "id": "q",
+      "label": "Quantization",
+      "note": "FP32 to INT8",
+      "style": "live"
+     },
+     {
+      "id": "p",
+      "label": "Pruning",
+      "note": "drop small weights"
+     },
+     {
+      "id": "s",
+      "label": "Deployed small model",
+      "note": "4x less memory",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "t",
+      "to": "d"
+     },
+     {
+      "from": "t",
+      "to": "q"
+     },
+     {
+      "from": "t",
+      "to": "p"
+     },
+     {
+      "from": "d",
+      "to": "s"
+     },
+     {
+      "from": "q",
+      "to": "s"
+     },
+     {
+      "from": "p",
+      "to": "s"
+     }
+    ]
+   },
+   "example": "Quantize four weights [−0.9, 0.1, 0.7, 0.0] to INT8 with zero point z = 0 and the range [−127, 127]. The maximum absolute value is 0.9, so s = 0.9/127 = 0.00709. Codes: −0.9/0.00709 = −127 → −127; 0.1/0.00709 = 14.1 → 14; 0.7/0.00709 = 98.8 → 99; 0 → 0. Dequantized values: −0.900, 0.0992, 0.7016, 0.000; largest error 0.0016. Storage falls from 4 × 32 = 128 bits to 4 × 8 = 32 bits, a 4× saving.",
+   "trap": "Quantization error depends on the scale, so one outlier weight can wreck a per-tensor scale; check per-channel instead. Pruning without fine-tuning loses accuracy, and sparsity does not speed up hardware unless the structure is regular.",
+   "prereq": "5.3 and 5.4 (model structure and size), Unit 2 (regularization and fine-tuning)",
+   "leave": "Sparse format details and hardware kernels belong to a systems course; GAN compression to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the same weights become self-attention when q, k and v come from one sequence"
+  ],
+  [
+   2,
+   3,
+   "the Transformer block is the body that BERT and GPT pretrain"
+  ],
+  [
+   3,
+   4,
+   "pretrained BERT and GPT checkpoints are scaled into large language models"
+  ],
+  [
+   4,
+   5,
+   "the pretrained model is the starting policy that RLHF aligns"
+  ],
+  [
+   5,
+   6,
+   "the aligned model is what a chatbot serves behind a prompt"
+  ],
+  [
+   6,
+   7,
+   "chat models are compressed to cut serving cost per user"
+  ],
+  [
+   4,
+   6,
+   "instruction tuning is why a short prompt works with few examples"
+  ]
+ ]
+}

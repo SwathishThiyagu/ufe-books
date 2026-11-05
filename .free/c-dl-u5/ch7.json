@@ -1,0 +1,270 @@
+{
+ "lead": "Big models predict well but cost memory, battery and latency. Compression keeps most of the accuracy in a much smaller package. Three standard routes are distillation (a small student model learns from a large teacher), quantization (weights and activations use fewer bits, usually INT8 instead of FP32) and pruning (small or structured weights are removed). You meet this when a phone runs a speech recogniser offline, when a startup serves a language model on one GPU, or when a booking site must answer many users cheaply.",
+ "prereq": "You need: <a href=\"#pretrained-language-models-bert-and-gpt\">5.3</a> and <a href=\"#large-language-models-training-scaling-and-fine-tuning\">5.4</a> for model structure and size, and Unit 2 for regularization and fine-tuning.",
+ "sections": [
+  {
+   "h3": "Distillation: soft targets at a temperature",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Distillation trains a small student to imitate a large teacher. The teacher's softmax gives a probability for every class, not just the true label. A picture of a cat may get 0.80 cat, 0.15 dog and 0.05 fox, which tells the student that cat and dog are similar. A one-hot label hides that information."
+    },
+    {
+     "type": "formula",
+     "text": "L = α·CE(y, p_s) + (1 − α)·T²·KL(p_t^T ‖ p_s^T)",
+     "where": "L is the student loss; y is the true one-hot label; p_s is the student's normal softmax output; p_t^T = softmax(z_t/T) and p_s^T = softmax(z_s/T) are softened outputs from teacher logits z_t and student logits z_s; T > 0 is the temperature; α in [0,1] weights the two terms; CE is cross-entropy; KL is Kullback–Leibler divergence."
+    },
+    {
+     "type": "p",
+     "text": "Temperature T > 1 softens the distribution: rare classes get visible probability. The T² factor keeps the gradient scale similar when T changes. α balances the hard-label loss and the imitation loss. Use T = 1 and the student alone at inference."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Train or obtain the teacher.",
+      "Run each training input through the teacher at temperature T and keep the soft outputs.",
+      "Train the student on the same inputs with the combined loss L.",
+      "Set T = 1 and deploy only the student."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Distillation is common when a large BERT-style encoder must become a small encoder for a phone, or when a large chat model must become a smaller chat model."
+    }
+   ]
+  },
+  {
+   "h3": "Quantization: FP32 to INT8",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Quantization maps real numbers to low-precision integers. A weight x is stored as an integer code q, and the model computes with q. The scale s and zero point z are chosen so the important range fits."
+    },
+    {
+     "type": "formula",
+     "text": "q = clamp(round(x/s) + z, q_min, q_max),   x̂ = s(q − z)",
+     "where": "x is the real value; q is the stored integer code; s is the scale (real units per integer step); z is the integer zero point; q_min and q_max are the integer limits, for example −127 and 127 for symmetric INT8; x̂ is the dequantized value."
+    },
+    {
+     "type": "p",
+     "text": "Clamp keeps q inside the chosen integer range. For symmetric INT8, z = 0 and q lies in [−127, 127]. For asymmetric, z maps real zero to an integer, so zero padding stays zero."
+    },
+    {
+     "type": "p",
+     "text": "FP16 and BF16 are the easy middle step: half the memory of FP32, little accuracy loss. INT8 cuts memory four times and often speeds inference. Post-training quantization (PTQ) calibrates s and z on a small sample and needs no retraining. Quantization-aware training (QAT) simulates rounding during training and usually gives better accuracy. Use per-channel scales for convolution and linear layers when one channel has an outlier."
+    },
+    {
+     "type": "p",
+     "text": "For a tensor, per-tensor uses one s and z for all values; per-channel uses one pair per output channel. A single outlier weight can stretch a per-tensor scale and crush small values into zero."
+    }
+   ]
+  },
+  {
+   "h3": "Pruning: remove weights, then fine-tune",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Pruning removes weights. Magnitude pruning deletes weights with |w| below a threshold. Unstructured pruning gives a sparse matrix; it saves memory but ordinary hardware rarely speeds up because the nonzeros are irregular. Structured pruning removes whole channels, filters or attention heads; the result is a dense smaller model that runs fast on ordinary GPUs and phones."
+    },
+    {
+     "type": "p",
+     "text": "Prune iteratively: train, remove a small fraction, fine-tune, repeat. Fine-tuning after each round recovers accuracy. The lottery-ticket idea says a sparse subnetwork found early can sometimes retrain to full accuracy; treat it as a research guide, not a deployment promise."
+    },
+    {
+     "type": "p",
+     "text": "Deployment is the end point. Export the compressed model to TFLite for mobile or ONNX Runtime for servers, then check accuracy and latency on the target device. A common pipeline uses all three routes: distill a large teacher, quantize the student, prune structured blocks, and fine-tune once more."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A trained model branches into three compression routes, and each route ends at a deployed small model. Notice that quantization changes the number format, while the other two change model size or connections.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Three routes to a smaller model",
+   "aria": "One trained model branches into distillation, quantization and pruning, and all three routes end at a deployed small model.",
+   "nodes": [
+    {
+     "id": "t",
+     "label": "Trained model",
+     "note": "high accuracy",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Distillation",
+     "note": "student mimics teacher"
+    },
+    {
+     "id": "q",
+     "label": "Quantization",
+     "note": "FP32 to INT8",
+     "style": "live"
+    },
+    {
+     "id": "p",
+     "label": "Pruning",
+     "note": "drop small weights"
+    },
+    {
+     "id": "s",
+     "label": "Deployed small model",
+     "note": "e.g., 4× smaller after INT8",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "t",
+     "to": "d"
+    },
+    {
+     "from": "t",
+     "to": "q"
+    },
+    {
+     "from": "t",
+     "to": "p"
+    },
+    {
+     "from": "d",
+     "to": "s"
+    },
+    {
+     "from": "q",
+     "to": "s"
+    },
+    {
+     "from": "p",
+     "to": "s"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Quantize the four weights [−0.9, 0.1, 0.7, 0.0] to symmetric INT8 with zero point z = 0 and range [−127, 127]. Find s, each integer code q, each dequantized value x̂, the largest error, and the storage saving.",
+   "steps": [
+    "Maximum absolute value is max(|−0.9|, |0.1|, |0.7|, |0.0|) = 0.9. With z = 0, s = 0.9 / 127 = 0.0070866.",
+    "For x = −0.9: x/s = −127.0, round to q = −127. Dequantize: x̂ = −127 × 0.0070866 = −0.900. Error = 0.0000.",
+    "For x = 0.1: x/s = 14.11, round to q = 14. Dequantize: x̂ = 14 × 0.0070866 = 0.0992. Error = 0.0008.",
+    "For x = 0.7: x/s = 98.78, round to q = 99. Dequantize: x̂ = 99 × 0.0070866 = 0.7016. Error = 0.0016.",
+    "For x = 0.0: x/s = 0.0, round to q = 0. Dequantize: x̂ = 0 × 0.0070866 = 0.000. Error = 0.0000.",
+    "Largest error = 0.0016. FP32 storage = 4 × 32 = 128 bits. INT8 storage = 4 × 8 = 32 bits. Saving = 128 / 32 = 4×."
+   ],
+   "answer": "The INT8 codes are [−127, 14, 99, 0], dequantized values are [−0.900, 0.0992, 0.7016, 0.0000], the largest error is 0.0016, and storage falls 4× from 128 bits to 32 bits.",
+   "check": "s = 0.9 / 127\nw = [-0.9, 0.1, 0.7, 0.0]\nq = [round(x / s) for x in w]\ndq = [x * s for x in q]\nfor code in q:\n    print(code)\nfor value in dq:\n    print(round(value, 4))\nprint(round(max(abs(a - b) for a, b in zip(w, dq)), 4))\nprint(round((4 * 32) / (4 * 8), 1))",
+   "values": [
+    -127,
+    14,
+    99,
+    0,
+    -0.9,
+    0.0992,
+    0.7016,
+    0.0,
+    0.0016,
+    4.0
+   ],
+   "code": {
+    "lang": "python",
+    "code": "",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "weight x",
+     "x/s",
+     "code q",
+     "dequantized x̂",
+     "error"
+    ],
+    "rows": [
+     [
+      "-0.9",
+      "-127.0",
+      "-127",
+      "-0.900",
+      "0.0000"
+     ],
+     [
+      "0.1",
+      "14.11",
+      "14",
+      "0.0992",
+      "0.0008"
+     ],
+     [
+      "0.7",
+      "98.78",
+      "99",
+      "0.7016",
+      "0.0016"
+     ],
+     [
+      "0.0",
+      "0.0",
+      "0",
+      "0.0000",
+      "0.0000"
+     ]
+    ]
+   },
+   "output": "-127\n14\n99\n0\n-0.9\n0.0992\n0.7016\n0.0\n0.0016\n4.0"
+  }
+ ],
+ "traps": [
+  "A single outlier weight can wreck a per-tensor scale: small weights round to zero. Check per-channel scales or clip the range.",
+  "Pruning without fine-tuning loses accuracy. Sparsity does not speed up ordinary hardware unless the structure is regular, such as whole channels or heads.",
+  "In distillation, forget the T² factor and the gradient scale changes; forget T = 1 at inference and the student stays softened.",
+  "INT8 saves 4× memory, not always 4× time. Activation conversions, memory bandwidth and kernels decide the real speedup.",
+  "The zero point is not always 0. Symmetric quantization uses z = 0; asymmetric quantization needs z to map real zero correctly."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the temperature T do in distillation?",
+   "marks": 2,
+   "a": "T > 1 softens the teacher and student softmax distributions, making rare-class probabilities visible. At inference the student uses T = 1."
+  },
+  {
+   "level": "understand",
+   "q": "Why are soft targets more informative than one-hot labels?",
+   "marks": 3,
+   "a": "Soft targets give a probability for every class. They show which classes are similar, for example cat 0.80 and dog 0.15. A one-hot label gives only the true class."
+  },
+  {
+   "level": "apply",
+   "q": "A weight 0.4 is quantized with s = 0.01 and z = 0. Give q and the dequantized value.",
+   "marks": 2,
+   "a": "q = round(0.4 / 0.01) + 0 = 40. Dequantized value = 0.01 × (40 − 0) = 0.4."
+  },
+  {
+   "level": "apply",
+   "q": "A model has 1,000,000 FP32 weights. What is the INT8 memory in MB, and what is the saving? Use 32 bits for FP32 and 8 bits for INT8.",
+   "marks": 3,
+   "a": "FP32 memory = 1,000,000 × 32 / 8 = 4,000,000 bytes = 4 MB. INT8 memory = 1,000,000 × 8 / 8 = 1,000,000 bytes = 1 MB. Saving = 4×."
+  },
+  {
+   "level": "analyze",
+   "q": "One weight is 10 while most weights lie in [−1, 1]. Why can per-tensor INT8 hurt accuracy?",
+   "marks": 4,
+   "a": "The large value sets s from the maximum absolute value. With s based on 10, a step is large, so weights near 0.1 or 0.01 round to zero or very few levels. Per-channel scales or clipping reduce this damage."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does 90% unstructured sparsity not guarantee a 10× speedup?",
+   "marks": 4,
+   "a": "The remaining weights are scattered irregularly. Dense hardware and libraries cannot skip them efficiently without sparse kernels, so memory may fall but time may not."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between post-training quantization and quantization-aware training?",
+   "marks": 3,
+   "a": "PTQ quantizes an already trained model using calibration data. QAT simulates rounding during training so the model learns to tolerate quantization, usually giving better accuracy."
+  }
+ ],
+ "beyond": "Not for the exam. Production stacks combine all three routes: distill a large teacher, quantize the student, prune structured blocks, then export to TFLite or ONNX Runtime. Newer work uses 4-bit and 2-bit quantization, activation-aware scaling and sparsity-aware kernels. Search terms: knowledge distillation, INT8 quantization scale and zero point, magnitude pruning, lottery ticket hypothesis, quantization-aware training."
+}

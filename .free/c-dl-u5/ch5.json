@@ -1,0 +1,226 @@
+{
+ "lead": "Reinforcement learning from human feedback (RLHF) turns a text predictor into an assistant that answers the way people prefer. Humans cannot state a score reliably, but they can say which of two answers is better. RLHF collects such comparisons, trains a reward model to imitate them, then tunes the language model with reinforcement learning to earn a high reward, held on a short leash so it cannot drift into nonsense. Chat assistants are built this way. Only a few universities teach it.",
+ "prereq": "You need: <a href=\"#pretrained-language-models-bert-and-gpt\">5.3</a> for pretraining, <a href=\"#large-language-models-training-scaling-and-fine-tuning\">5.4</a> for fine-tuning, and the policy-gradient idea and optimizers from Unit 2.",
+ "sections": [
+  {
+   "h3": "Stage 1: supervised fine-tuning (SFT)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A pretrained model only continues text (see <a href=\"#pretrained-language-models-bert-and-gpt\">5.3</a>); ask it a question and it may reply with another question. Stage 1 collects demonstrations: a human writes a good answer to each prompt, and the model is fine-tuned on those prompt–answer pairs with the next-token loss of <a href=\"#large-language-models-training-scaling-and-fine-tuning\">5.4</a>. The result is the SFT model, written π_ref, and it is frozen after this. RLHF reshapes which answers the model prefers; it adds no new facts and no grammar."
+    }
+   ]
+  },
+  {
+   "h3": "Stage 2: a reward model from pairwise preferences",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Writing a good answer takes minutes; judging two answers takes seconds. So for each prompt x, sample two answers from π_ref and have a human mark the chosen one y_w (won) and the rejected one y_l (lost)."
+    },
+    {
+     "type": "p",
+     "text": "The reward model r(x, y) is a copy of the SFT model whose head outputs one number instead of a word distribution. The Bradley–Terry model turns a score gap into a preference probability:"
+    },
+    {
+     "type": "formula",
+     "text": "P(y_w ≻ y_l | x) = σ(r(x, y_w) − r(x, y_l)),   σ(z) = 1 / (1 + e^(−z))",
+     "where": "y_w is the preferred answer and y_l the rejected one; r(x, y) is the scalar reward for prompt x and answer y; σ is the sigmoid; ≻ reads \"is preferred to\"."
+    },
+    {
+     "type": "p",
+     "text": "Training minimises the negative log of that probability over all comparison pairs:"
+    },
+    {
+     "type": "formula",
+     "text": "L = −log σ(r(x, y_w) − r(x, y_l))",
+     "where": "L is the loss for one pair, in nats because the log is natural; it is small when the chosen answer scores far above the rejected one, and large when the scores are close or reversed."
+    },
+    {
+     "type": "p",
+     "text": "Only the gap enters, so the reward is fixed only up to a constant shift. That is why pairwise labels beat absolute 1–10 ratings: two people rarely agree on a number, but they usually agree on which answer is better."
+    }
+   ]
+  },
+  {
+   "h3": "Stage 3: PPO with a KL leash",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The SFT model now becomes a policy π that generates an answer y for a prompt x, and the reward model scores it. The objective is"
+    },
+    {
+     "type": "formula",
+     "text": "max E_{y~π(·|x)}[ r(x, y) ] − β · KL(π(·|x) ‖ π_ref(·|x))",
+     "where": "E[·] is the average reward over sampled answers; β ≥ 0 is the penalty weight; KL is the Kullback–Leibler divergence, a non-negative number measuring how far the policy's token probabilities have moved from the frozen reference model π_ref."
+    },
+    {
+     "type": "p",
+     "text": "The first term pulls the model towards answers the reward model likes. The second term is a leash. r is a learned proxy, not a human, so a free search finds rubbish that scores high — reward hacking. The KL term is summed over tokens, so drifting on every token costs a lot and the policy stays near fluent text."
+    },
+    {
+     "type": "p",
+     "text": "The optimiser is proximal policy optimisation (PPO), a policy-gradient method from Unit 2. Two parts are named, not derived here: the clipped objective, which caps how far one update can move the probability of an action, and the value head, a critic that predicts the expected reward and supplies the baseline in the advantage."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Reward-model bias: annotators favour confident, formal answers, so the model learns their taste, not correctness.",
+      "Length bias: longer answers win comparisons, so the model pads.",
+      "Over-optimisation: reward keeps climbing while real quality peaks and falls."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Direct preference optimisation (DPO) is a cheaper alternative: it fits the same preference pairs with one supervised-style loss, with no separate reward model and no RL loop."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Demonstrations give the SFT model; its sampled pairs give a reward model; PPO raises the reward while the KL leash to that same SFT model holds the policy in place. The dashed arrow is the whole point of stage 3.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Three stages of RLHF",
+   "aria": "Prompts produce an SFT model that samples response pairs, humans rank them to train a reward model, and PPO with a KL leash to the reference model gives the aligned model.",
+   "nodes": [
+    {
+     "id": "p",
+     "label": "Prompt set"
+    },
+    {
+     "id": "s",
+     "label": "SFT model",
+     "note": "stage 1"
+    },
+    {
+     "id": "d",
+     "label": "Sample response pairs",
+     "note": "same prompt"
+    },
+    {
+     "id": "h",
+     "label": "Humans rank",
+     "note": "chosen vs rejected"
+    },
+    {
+     "id": "r",
+     "label": "Reward model",
+     "note": "stage 2, Bradley-Terry",
+     "style": "accent"
+    },
+    {
+     "id": "o",
+     "label": "PPO + KL leash",
+     "note": "stage 3",
+     "style": "live"
+    },
+    {
+     "id": "a",
+     "label": "Aligned model",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "p",
+     "to": "s"
+    },
+    {
+     "from": "s",
+     "to": "d"
+    },
+    {
+     "from": "d",
+     "to": "h"
+    },
+    {
+     "from": "h",
+     "to": "r"
+    },
+    {
+     "from": "r",
+     "to": "o"
+    },
+    {
+     "from": "s",
+     "to": "o",
+     "label": "reference",
+     "style": "dashed"
+    },
+    {
+     "from": "o",
+     "to": "a"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A reward model scores response A at 2.0 and response B at 1.0 for the same prompt, and humans preferred A. (a) Find the Bradley–Terry probability that A beats B and the loss for this pair. (b) In a PPO step a sampled response earns reward 2.0 and sits at KL divergence 0.5 from the reference model, with β = 0.1. Find the objective value.",
+   "steps": [
+    "Score gap: d = r(x, y_w) − r(x, y_l) = 2.0 − 1.0 = 1.0 reward units.",
+    "Probability: e^(−1.0) = 0.3679, so 1 + e^(−1.0) = 1.3679 and P = 1 / 1.3679 = 0.731.",
+    "Loss: L = −ln(0.731) = 0.313 nats.",
+    "Penalty: β × KL = 0.1 × 0.5 = 0.05.",
+    "Objective: 2.0 − 0.05 = 1.95."
+   ],
+   "answer": "P(A over B) = 0.731, pair loss = 0.313 nats, and the PPO objective value = 1.95.",
+   "check": "import math\ngap = 2.0 - 1.0\np = 1 / (1 + math.exp(-gap))\nloss = -math.log(p)\nobj = 2.0 - 0.1 * 0.5\nprint(round(p, 3))\nprint(round(loss, 3))\nprint(round(obj, 2))",
+   "values": [
+    0.731,
+    0.313,
+    1.95
+   ],
+   "output": "0.731\n0.313\n1.95"
+  }
+ ],
+ "traps": [
+  "The reward model is a learned proxy, not human judgement, so the KL term is never optional; drop β and you get reward hacking, not alignment.",
+  "RLHF is not fine-tuning on human-written answers. That is only stage 1; stages 2 and 3 are preferences and reinforcement learning.",
+  "Bradley–Terry uses the score difference. Adding 5 to both rewards changes nothing; only the gap matters.",
+  "β is the KL weight, not a learning rate. A larger β means a tighter leash: less drift, but also a smaller reward gain.",
+  "The loss uses natural log, so the answer is in nats. A base-10 log gives 0.136 where the correct value is 0.313."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three stages of RLHF and the output of each.",
+   "marks": 2,
+   "a": "Supervised fine-tuning on demonstrations gives π_ref; preference pairs train a reward model r(x, y); PPO with a KL leash to π_ref gives the aligned policy."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the reward model train on pairs rather than on absolute scores?",
+   "marks": 3,
+   "a": "People agree on which answer is better far more than on a number. Bradley–Terry needs only the score gap, so the reward is defined up to a constant shift and labels are steadier."
+  },
+  {
+   "level": "apply",
+   "q": "A reward model gives 3.0 to the chosen answer and 1.5 to the rejected one. Find P(chosen over rejected) and the pair loss.",
+   "marks": 3,
+   "a": "Gap = 1.5; e^(−1.5) = 0.223, so P = 1/1.223 = 0.818. Loss = −ln 0.818 = 0.201 nats."
+  },
+  {
+   "level": "apply",
+   "q": "β = 0.2, the sampled answer earns reward 1.5, and its KL from π_ref is 0.4. Find the objective value.",
+   "marks": 2,
+   "a": "Penalty = 0.2 × 0.4 = 0.08, so the objective is 1.5 − 0.08 = 1.42."
+  },
+  {
+   "level": "analyze",
+   "q": "Raising β tightens the leash. Explain the trade-off.",
+   "marks": 4,
+   "a": "Large β keeps the policy near π_ref, limiting reward hacking and drift but also blocking real gains; small β lets the policy chase the proxy and produces high-scoring, degraded text."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the KL term not cure length bias?",
+   "marks": 4,
+   "a": "KL penalises distance from π_ref, not length. If the reward model likes long answers, longer text can still score higher at low KL, so the bias must be fixed in the reward data."
+  }
+ ],
+ "beyond": "Not for the exam. DPO has become the default cheap alignment step in open-source work, because it removes the reward model and the RL loop. A newer line replaces human labels with AI labels (RLAIF) and with written constitutions instead of pairwise votes. Process reward models score each reasoning step rather than the final answer, which matters for maths and code. Search these terms next: DPO, RLAIF, process reward model, over-optimisation curves."
+}

@@ -1,0 +1,227 @@
+{
+ "lead": "A large language model's weights do not change when you use it. The only lever you hold is the text you send, the prompt. Prompt engineering is the craft of writing that text so the model does the right task, in the right format, with the right examples. A chatbot packages this: a system message, a growing conversation history and one API call, wrapped in an app. Chatbots answer customers in bank apps, sort help-desk tickets and clear study doubts.",
+ "prereq": "You need: <a href=\"#pretrained-language-models-bert-and-gpt\">5.3</a> and <a href=\"#large-language-models-training-scaling-and-fine-tuning\">5.4</a> for what the model learns, and softmax from Unit 1 for the sampling maths.",
+ "sections": [
+  {
+   "h3": "Prompt design: instruction, role, format",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A prompt has four parts: the task instruction, the data it must work on, optional examples, and the output format. Keeping them separate makes the prompt readable and the answer predictable."
+    },
+    {
+     "type": "p",
+     "text": "The <b>system message</b> (system prompt) fixes the role and the rules: <i>You are a billing assistant for a phone company. Answer only from the plan table below.</i> The model stores no memory between API calls, so the system message is resent with every turn."
+    },
+    {
+     "type": "p",
+     "text": "Wrap the data in clear <b>delimiters</b>: triple quotes, a line of ###, or tags such as <code>&lt;review&gt; ... &lt;/review&gt;</code>. Delimiters mark where data stops and instruction starts, and they blunt <b>prompt injection</b>, where a user pastes 'ignore all previous instructions' inside the data."
+    },
+    {
+     "type": "p",
+     "text": "State the output format exactly. <code>Reply with JSON: {\"refund\": true, \"reason\": \"...\"}</code> lets a program parse the reply without guessing."
+    },
+    {
+     "type": "p",
+     "text": "For a long task, write the steps as a numbered procedure inside the prompt, or call the model once per step."
+    }
+   ]
+  },
+  {
+   "h3": "Zero-shot, one-shot and in-context learning",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Zero-shot:</b> the instruction alone, no examples.",
+      "<b>One-shot:</b> one solved example placed before the real input.",
+      "<b>Few-shot:</b> a handful of solved examples, usually three to five, in the same format you want back."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "This is called <b>in-context learning</b>. The examples sit in the context window, so the model conditions on them when predicting the next token. No weight changes, no gradient step, nothing is stored."
+    },
+    {
+     "type": "p",
+     "text": "<b>Chain-of-thought prompting</b> asks the model to show its working: <i>give the steps, then the final line</i>. Each step is generated as ordinary tokens, which then condition the next step; a single forward pass cannot carry a partial sum, but a written one can be read by the next pass. This helps multi-step arithmetic, unit conversion and logic puzzles. It wastes tokens on simple lookups."
+    },
+    {
+     "type": "p",
+     "text": "Examples and working cost tokens and money: a prompt four times longer costs about four times more per call."
+    }
+   ]
+  },
+  {
+   "h3": "Sampling: temperature and top-p",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The model ends with one <b>logit</b> z for each token in its vocabulary. Softmax turns the logits into a probability distribution over the next token. Pure greedy decoding always picks the largest logit."
+    },
+    {
+     "type": "formula",
+     "text": "pᵢ = exp(zᵢ / T) ÷ Σⱼ exp(zⱼ / T)",
+     "where": "pᵢ is the probability of token i; zᵢ is its logit; T is the temperature, a positive number; the sum runs over the whole vocabulary. T = 1 is the plain softmax."
+    },
+    {
+     "type": "p",
+     "text": "Temperature rescales the logits before the softmax. T below 1 divides the logits by a small number, so gaps widen and the distribution sharpens; T above 1 flattens it. As T → 0 the distribution becomes a spike on the top token, greedy decoding."
+    },
+    {
+     "type": "p",
+     "text": "<b>Top-p</b> (nucleus) sampling sorts the tokens by probability, keeps the smallest set whose probabilities add to at least p, discards the rest, and renormalises the kept probabilities to 1. Top-k is the fixed-size cousin: keep exactly k tokens. Use T near 0 for extraction and code, and T near 0.7–1.0 with top-p near 0.9 for free writing."
+    }
+   ]
+  },
+  {
+   "h3": "The chatbot stack and the context window",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A chatbot has five layers: the user interface, a backend that holds the conversation, the prompt assembly step, the model API called with a secret key, and response rendering. Prompt assembly concatenates the system message, examples, stored history and the new question into one string."
+    },
+    {
+     "type": "p",
+     "text": "All of that shares one <b>context window</b>, a hard limit in tokens. The budget is system message + examples + history + the reply: a chat that fits on turn one overflows on turn twenty."
+    },
+    {
+     "type": "p",
+     "text": "Two fixes: truncate (keep the system message, the last few turns, and drop the middle) or summarise (replace old turns with a short recap written by the model). Both lose detail. Add a line to the system message telling the model that older turns may be missing, so it asks again instead of inventing an answer."
+    },
+    {
+     "type": "p",
+     "text": "<b>Retrieval-augmented generation</b> (RAG) is one line of this stack: search a document store for text matching the question, paste the top passages into the prompt as delimiters, and ask the model to answer only from them. It supplies facts the model never learned."
+    },
+    {
+     "type": "p",
+     "text": "Tools some syllabi name: the OpenAI API for hosted models, LangChain for chaining prompts and memory, Ollama for running open models locally, and no-code builders such as Botsonic and Chatbase."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 4,
+  "caption": "Each turn rebuilds one prompt from the system message, the stored history and the new question; the history grows every turn.",
+  "spec": {
+   "type": "sequence",
+   "aria": "Sequence diagram: the user sends a question to the chat app, the app sends the system message, history and question to the LLM API, the API returns generated tokens, the app shows the answer, and the next turn resends a longer history.",
+   "actors": [
+    "User",
+    "Chat app",
+    "LLM API"
+   ],
+   "messages": [
+    {
+     "from": "User",
+     "to": "Chat app",
+     "label": "question",
+     "dashed": false
+    },
+    {
+     "from": "Chat app",
+     "to": "LLM API",
+     "label": "system + history + question",
+     "dashed": false
+    },
+    {
+     "from": "LLM API",
+     "to": "Chat app",
+     "label": "generated tokens",
+     "dashed": true
+    },
+    {
+     "from": "Chat app",
+     "to": "User",
+     "label": "answer",
+     "dashed": false
+    },
+    {
+     "from": "Chat app",
+     "to": "LLM API",
+     "label": "next turn, history grows",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A language model choosing the next token from three candidates has logits z = [2, 1, 0]. (a) Compute the softmax probabilities at T = 1 and at T = 0.5. (b) Apply top-p sampling with p = 0.9 at T = 1: state the nucleus and the renormalised probabilities. Give three decimals.",
+   "steps": [
+    "Use pᵢ = exp(zᵢ / T) ÷ Σⱼ exp(zⱼ / T).",
+    "T = 1: the logits stay 2, 1, 0. exp(2) = 7.389, exp(1) = 2.718, exp(0) = 1.000. Sum = 11.107.",
+    "Divide: 7.389 / 11.107 = 0.665; 2.718 / 11.107 = 0.245; 1.000 / 11.107 = 0.090.",
+    "T = 0.5: dividing by 0.5 doubles the logits to 4, 2, 0. exp(4) = 54.598, exp(2) = 7.389, exp(0) = 1.000. Sum = 62.987.",
+    "Divide: 54.598 / 62.987 = 0.867; 7.389 / 62.987 = 0.117; 1.000 / 62.987 = 0.016. Same ranking, much sharper.",
+    "Top-p at T = 1: sort descending to 0.665, 0.245, 0.090. Running totals: 0.665, then 0.910, which crosses 0.9. Stop there; the nucleus is the first two tokens.",
+    "Renormalise inside the nucleus: 0.665 / 0.910 = 0.731 and 0.245 / 0.910 = 0.269. The third token gets probability 0."
+   ],
+   "answer": "At T = 1 the probabilities are 0.665, 0.245, 0.090; at T = 0.5 they are 0.867, 0.117, 0.016; the top-p = 0.9 nucleus keeps the first two tokens with renormalised probabilities 0.731 and 0.269.",
+   "check": "import math\n\nz = [2.0, 1.0, 0.0]\n\ndef softmax_T(z, T):\n    e = [math.exp(v / T) for v in z]\n    s = sum(e)\n    return [v / s for v in e]\n\np1, p05 = softmax_T(z, 1.0), softmax_T(z, 0.5)\nfor seq in (p1, p05):\n    print(*[f\"{p:.3f}\" for p in seq], sep=\"\\n\")\n\nkeep, cum = [], 0.0\nfor p in p1:\n    keep.append(p); cum += p\n    if cum >= 0.9:\n        break\nprint(*[f\"{p / cum:.3f}\" for p in keep], sep=\"\\n\")\n",
+   "values": [
+    0.665,
+    0.245,
+    0.09,
+    0.867,
+    0.117,
+    0.016,
+    0.731,
+    0.269
+   ],
+   "output": "0.665\n0.245\n0.090\n0.867\n0.117\n0.016\n0.731\n0.269"
+  }
+ ],
+ "traps": [
+  "Few-shot examples do not train the model. Nothing is stored; they only fill the context. Remove them and the behaviour reverts.",
+  "Count the reply inside the context window: budget = system message + examples + history + reply.",
+  "Instructions alone cannot supply a fact. If a fact is in neither the weights nor the prompt text, no wording can produce it; instructions such as 'do not hallucinate' reduce confabulation but never remove it. Pasting the fact into the context (RAG) does work: the fact is then in the prompt.",
+  "Top-p is not top-k. Top-p keeps a variable number of tokens; top-k keeps a fixed number.",
+  "Temperature scales the logits before the softmax, not the probabilities after it. For any T > 0 the ranking of tokens is unchanged."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a prompt and a system message.",
+   "marks": 2,
+   "a": "A prompt is the text sent to a frozen model to steer its next tokens. A system message sits before the user turns, sets the role and rules, and is resent on every API call."
+  },
+  {
+   "level": "understand",
+   "q": "Why do few-shot examples not count as training the model?",
+   "marks": 3,
+   "a": "They are ordinary tokens inside the context window. The model conditions on them at inference time, but no weight is updated and no gradient step is taken, so nothing persists once they leave the context."
+  },
+  {
+   "level": "apply",
+   "q": "Logits are [1, 0]. Find the softmax probabilities at T = 1 and at T = 0.5, to three decimals.",
+   "marks": 4,
+   "a": "T = 1: exp(1) = 2.718, exp(0) = 1.000, sum 3.718, giving 0.731 and 0.269. T = 0.5: logits become 2 and 0, exp values 7.389 and 1.000, sum 8.389, giving 0.881 and 0.119."
+  },
+  {
+   "level": "apply",
+   "q": "Probabilities are 0.50, 0.30, 0.15, 0.05. Apply top-p with p = 0.8 and give the renormalised probabilities.",
+   "marks": 4,
+   "a": "Running totals: 0.50, 0.80, which reaches 0.8, so the nucleus is the first two tokens. Renormalise: 0.50/0.80 = 0.625 and 0.30/0.80 = 0.375."
+  },
+  {
+   "level": "analyze",
+   "q": "A user complains that the chatbot forgot yesterday's conversation. Give two causes and one fix.",
+   "marks": 5,
+   "a": "The model keeps no state between calls, and the backend may not resend old turns or may have truncated them for the context window. Fix: store the history server-side, resend it each turn, and summarise old turns when the budget fills."
+  },
+  {
+   "level": "analyze",
+   "q": "Chain-of-thought helps a three-step word problem but does not help when the user asks for a shop's phone number the model never saw. Explain both.",
+   "marks": 5,
+   "a": "Arithmetic needs intermediate results, and written steps carry those results into the next forward pass. A missing phone number is not in the weights at all, so no amount of reasoning tokens can produce it; the model can only confabulate or say it does not know."
+  },
+  {
+   "level": "understand",
+   "q": "What happens to the softmax distribution as T → 0 and as T becomes large?",
+   "marks": 3,
+   "a": "As T → 0 the largest logit dominates and the distribution approaches a spike, that is greedy decoding. As T grows the distribution flattens towards uniform over the vocabulary."
+  }
+ ],
+ "beyond": "Not for the exam. Teams version prompts and score each change on a labelled input set. Providers cache the unchanged prompt prefix, so a stable system message cuts cost and latency. Function calling returns arguments a program executes. Guardrails screen the input and the reply."
+}

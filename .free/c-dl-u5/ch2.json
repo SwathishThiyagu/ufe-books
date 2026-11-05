@@ -1,0 +1,226 @@
+{
+ "lead": "Self-attention lets every position in a sequence look at every other position and build a new vector from what it finds. A Transformer block wraps this idea with several attention heads, positional encodings, residual connections, layer normalization and a small feed-forward network. Recurrence is gone, so training can run in parallel and long-range links are one matrix multiply away. Translation systems, BERT, GPT and many vision models use this block. The next sections build it from one matrix of token vectors.",
+ "prereq": "You need: <a href=\"#attention-mechanism-and-attention-over-images\">5.1</a> for queries, keys, values and softmax weights; Unit 4 for encoder-decoder sequence models; Unit 1 for softmax; Unit 2 for normalization.",
+ "sections": [
+  {
+   "h3": "From one sequence to queries, keys and values",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take a sequence of n tokens. Each token is already a vector of length d_model, so the sequence is a matrix X with n rows and d_model columns. Self-attention does not use a separate input and output sequence: all three views come from X. Learn three weight matrices W_Q, W_K and W_V, each of size d_model × d_k. Then Q = XW_Q, K = XW_K and V = XW_V. Q holds queries, K holds keys and V holds values. Row i of Q is the query for token i."
+    },
+    {
+     "type": "formula",
+     "text": "Attention(Q, K, V) = softmax(QKᵀ / √d_k) V",
+     "where": "Q is the n×d_k query matrix; K is the n×d_k key matrix; V is the n×d_v value matrix; QKᵀ is the n×n score matrix whose entry (i,j) is the dot product q_i·k_j; d_k is the key width; softmax is applied to each row; the output has n rows and d_v columns."
+    },
+    {
+     "type": "p",
+     "text": "The score s_ij measures how much token i reads from token j. A dot product of d_k entries with variance 1 has variance d_k. Large scores make the softmax nearly one-hot; gradients through it become tiny. Dividing by √d_k brings the variance back to about 1. Each softmax row sums to 1, so each output row is a weighted mix of all value rows. QKᵀ costs n²d_k operations and mixing values costs n²d_v; with d ≈ d_k ≈ d_v the total is O(n²d) time and memory."
+    }
+   ]
+  },
+  {
+   "h3": "Several heads and a sense of position",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "One attention pattern is not enough. Multi-head attention runs h attention operations in parallel. Head i has its own W_Q^i, W_K^i and W_V^i, and width d_k = d_model/h. Concatenate the h outputs along features to get n×d_model, then multiply by W_O, a d_model×d_model matrix, to mix heads. The total width stays d_model: the model splits width across heads, it does not multiply it. With d_model = 768 and h = 8, d_k = 96."
+    },
+    {
+     "type": "formula",
+     "text": "head_i = Attention(XW_Q^i, XW_K^i, XW_V^i),   MultiHead(X) = Concat(head_1, …, head_h) W_O",
+     "where": "X is the n×d_model input; W_Q^i, W_K^i, W_V^i are head-specific weights; h is the number of heads; d_k = d_model/h is each head's width; Concat joins along features; W_O mixes the concatenated heads back to d_model."
+    },
+    {
+     "type": "p",
+     "text": "Attention alone is permutation equivariant: shuffle the tokens and each output shuffles the same way. Word order would vanish. Positional encoding adds a vector p_pos to the embedding at position pos. For dimension index i from 0 to d_model−1:"
+    },
+    {
+     "type": "formula",
+     "text": "PE(pos, 2i) = sin(pos / 10000^(2i/d_model)),   PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))",
+     "where": "pos is the token position starting at 0; i indexes pairs of dimensions; d_model is the embedding width; 2i and 2i+1 are even and odd feature indices; the denominator gives wavelengths from 2π to 10000·2π."
+    },
+    {
+     "type": "p",
+     "text": "The encoding is added to the embedding, not concatenated. Different dimensions oscillate at different rates, so the pattern carries a unique position signature."
+    }
+   ]
+  },
+  {
+   "h3": "Encoder block, decoder block and cost",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An encoder block has two sublayers. First is multi-head self-attention over the input sequence. Second is a feed-forward network applied to each position separately: two linear layers with a ReLU between, expanding d_model to d_ff and back. A common choice is d_ff = 4×d_model, so 768 → 3072 → 768."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Run multi-head self-attention on X.",
+      "Add the input and apply layer norm: x = LayerNorm(x + attention(x)).",
+      "Run the feed-forward network on each row.",
+      "Add the previous x and apply layer norm again: y = LayerNorm(x + feed_forward(x))."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The x + ... terms are residual connections; they give gradients a short path. Layer norm normalizes each token vector across its features. A decoder block has three sublayers."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Masked multi-head self-attention on the tokens produced so far. Before softmax, set every score with key position j > query position i to −∞, so its weight becomes 0.",
+      "Cross-attention: Q comes from the decoder, K and V come from the encoder output, so each output token reads the whole input sentence.",
+      "Feed-forward network, with add-and-norm around each sublayer."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The original design stacks six encoder and six decoder blocks. Self-attention builds an n×n score matrix, so time and memory are O(n²d). Doubling n quadruples that matrix; long context is expensive. Some syllabi list Spatial Transformers in this unit. That is a different vision module: it learns a small warp of an image grid before a CNN, not a sequence attention block."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A token vector plus positional encoding passes through multi-head self-attention, add-and-norm, a feed-forward network and a second add-and-norm. The widths shown are for a 768-dimensional model with 8 heads.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One Transformer block",
+   "aria": "Token embeddings with added positional encoding pass through multi-head self-attention, an add-and-norm step, a feed-forward layer and a second add-and-norm to give the block output.",
+   "nodes": [
+    {
+     "id": "x",
+     "label": "Token embeddings",
+     "note": "+ positional encoding",
+     "style": "accent"
+    },
+    {
+     "id": "m",
+     "label": "Multi-head self-attention",
+     "note": "8 heads, dk = 96",
+     "style": "accent"
+    },
+    {
+     "id": "n1",
+     "label": "Add & norm"
+    },
+    {
+     "id": "f",
+     "label": "Feed-forward",
+     "note": "768 to 3072 to 768"
+    },
+    {
+     "id": "n2",
+     "label": "Add & norm"
+    },
+    {
+     "id": "o",
+     "label": "Block output",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "x",
+     "to": "m"
+    },
+    {
+     "from": "m",
+     "to": "n1"
+    },
+    {
+     "from": "n1",
+     "to": "f"
+    },
+    {
+     "from": "f",
+     "to": "n2"
+    },
+    {
+     "from": "n2",
+     "to": "o"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Two tokens have vectors x₁ = [1, 0] and x₂ = [0, 1]. Use W_Q = W_K = W_V = I, where I is the 2×2 identity, and d_k = 2. Compute the scaled dot-product attention output for both tokens. Also compute the first row when the √d_k scaling is removed.",
+   "steps": [
+    "X = [[1,0],[0,1]]. With identity weights, Q = K = V = X.",
+    "Before scaling, QKᵀ = [[1,0],[0,1]]: self dot-products are 1, cross dot-products are 0.",
+    "d_k = 2, so √d_k = 1.4142. Scaled scores: [[0.7071,0],[0,0.7071]].",
+    "Row 1 softmax: exp(0.7071)=2.0281, exp(0)=1, sum=3.0281; weights [0.6698,0.3302].",
+    "Row 2 softmax: [0.3302,0.6698].",
+    "Output row 1 = 0.6698[1,0] + 0.3302[0,1] = [0.6698,0.3302]; row 2 = [0.3302,0.6698].",
+    "Without scaling, row 1 scores [1,0]: exp(1)=2.7183, exp(0)=1, sum=3.7183; weights [0.7311,0.2689]."
+   ],
+   "answer": "Scaled attention rows are [0.6698, 0.3302] and [0.3302, 0.6698]; without √d_k the first row is [0.7311, 0.2689].",
+   "check": "import math\ns = 1.0 / math.sqrt(2.0)\na = math.exp(s)\nb = math.exp(0.0)\nw1 = a / (a + b)\nw2 = b / (a + b)\nprint(round(w1, 4))\nprint(round(w2, 4))\nprint(round(w2, 4))\nprint(round(w1, 4))\nu = math.exp(1.0)\nv = math.exp(0.0)\nprint(round(u / (u + v), 4))\nprint(round(v / (u + v), 4))",
+   "values": [
+    0.6698,
+    0.3302,
+    0.3302,
+    0.6698,
+    0.7311,
+    0.2689
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Positional encodings are added to token embeddings, not concatenated. Concatenation changes the width and costs extra parameters.",
+  "In a decoder, the mask is applied to the scores before softmax. Setting future scores to −∞ makes their softmax weight exactly 0; zeroing after softmax breaks the sum-to-1 property.",
+  "Multi-head attention splits d_model across heads: d_k = d_model/h. The concatenated output width is still d_model, not h×d_model.",
+  "Scale by √d_k, not by d_k. The scores are not probabilities; softmax comes after scaling.",
+  "Cross-attention takes Q from the decoder but K and V from the encoder. Spatial Transformers are a vision warping module, not this attention block."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What are the inputs Q, K and V in self-attention?",
+   "marks": 2,
+   "a": "All three come from the same sequence matrix X through learned matrices W_Q, W_K and W_V."
+  },
+  {
+   "level": "understand",
+   "q": "Why divide the attention scores by √d_k?",
+   "marks": 3,
+   "a": "A dot product of length d_k has variance growing with d_k. Large scores saturate softmax and shrink gradients. Dividing by √d_k keeps variance about 1."
+  },
+  {
+   "level": "apply",
+   "q": "Scores before scaling are [2, 0] with d_k = 2. Compute the scaled scores and the softmax weights.",
+   "marks": 4,
+   "a": "√d_k = 1.4142, so scaled scores are [1.4142, 0]. exp(1.4142)=4.112, exp(0)=1, sum=5.112. Weights are [0.804, 0.196]."
+  },
+  {
+   "level": "analyze",
+   "q": "What happens if the decoder mask is removed during training?",
+   "marks": 4,
+   "a": "Token i can attend to future tokens, so next-token prediction sees the answer. Training loss falls, but generation is invalid because future tokens do not exist at inference."
+  },
+  {
+   "level": "understand",
+   "q": "A model has d_model = 768 and h = 8 heads. What is each head's width, and what is the concatenated width before W_O?",
+   "marks": 3,
+   "a": "d_k = 768/8 = 96. Concatenated width is 8×96 = 768, then W_O mixes it; it is not 6144."
+  },
+  {
+   "level": "apply",
+   "q": "Self-attention memory is O(n²d). If sequence length n rises from 128 to 512, by what factor does the score matrix grow?",
+   "marks": 3,
+   "a": "(512/128)² = 4² = 16. The matrix grows 16 times."
+  },
+  {
+   "level": "analyze",
+   "q": "What do the residual connection and layer norm do in a Transformer block?",
+   "marks": 4,
+   "a": "The residual adds the sublayer input to its output, giving gradients a short path through deep stacks. Layer norm normalizes each token vector across features, keeping scales stable during training."
+  }
+ ],
+ "beyond": "Not for the exam. Production Transformers use fused attention kernels such as FlashAttention to avoid materialising the n×n matrix, and sparse or linear attention to cut the O(n²) cost. Long-context models, retrieval over documents and vision Transformers all build on this block. Search next for FlashAttention, rotary position embedding (RoPE), and Vision Transformer (ViT)."
+}

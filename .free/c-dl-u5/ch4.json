@@ -1,0 +1,502 @@
+{
+ "lead": "A large language model is a decoder-only Transformer trained to predict the next token on a very large text corpus. Training is planned, not guessed: compute is about 6ND FLOPs for N parameters and D tokens, and loss falls as a power law as parameters, data and compute grow. After pretraining, fine-tuning adapts the model to instructions or a domain. The same ideas run search engines, code assistants and UPI help desks that answer in Indian languages. This chapter shows the pipeline, the scaling arithmetic and the fine-tuning choices.",
+ "prereq": "You need: <a href=\"#pretrained-language-models-bert-and-gpt\">5.3</a> for pretraining and fine-tuning, <a href=\"#self-attention-and-the-transformer-architecture\">5.2</a> for the Transformer block, and Unit 2 for Adam and learning-rate schedules.",
+ "sections": [
+  {
+   "h3": "Pretraining pipeline and the 6ND estimate",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Pretraining starts with text: web pages, books, code and conversation logs. The raw text is cleaned, quality-filtered and deduplicated. Duplicates waste compute and push the model to memorise repeated sentences. A byte-pair encoding tokenizer is trained on a sample. It starts from bytes and repeatedly merges the most frequent adjacent pair into one token. Common words become single tokens; rare words split into pieces."
+    },
+    {
+     "type": "p",
+     "text": "The model is a decoder-only Transformer (see <a href=\"#self-attention-and-the-transformer-architecture\">5.2</a>). It reads tokens and outputs a score for every vocabulary token at every position. The loss is mean next-token cross-entropy:"
+    },
+    {
+     "type": "formula",
+     "text": "L = −(1/T) Σ log p(x<sub>t</sub> | x<sub>1</sub>, …, x<sub>t−1</sub>)",
+     "where": "L is mean cross-entropy per token; T is the number of predicted tokens; x<sub>t</sub> is the actual token at position t; p is the model's probability for that token given the earlier tokens. Lower L is better."
+    },
+    {
+     "type": "p",
+     "text": "Training uses AdamW, warmup then cosine decay, mixed precision and gradient clipping (Unit 2). AdamW is Adam with decoupled weight decay. Warmup raises the learning rate from near zero; cosine decay lowers it smoothly. Mixed precision keeps some tensors in 16-bit to save memory and time. Clipping caps the gradient norm so one bad batch cannot blow up the weights."
+    },
+    {
+     "type": "p",
+     "text": "Plan compute before booking GPUs."
+    },
+    {
+     "type": "formula",
+     "text": "C ≈ 6ND",
+     "where": "C is training compute in FLOPs; N is the number of parameters; D is the number of training tokens. The factor 6 is about 2 FLOPs per parameter per token in the forward pass plus 4 in the backward pass."
+    }
+   ]
+  },
+  {
+   "h3": "Scaling laws and compute-optimal planning",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Loss falls as a power law as scale grows. A power law has the form L = a + bN^−α. Here L is test loss, N is parameters, a is the irreducible loss, b sets the size of the reducible part, and α is the exponent. Kaplan and co-workers reported exponents near −0.076 for parameters and −0.095 for data. The exact numbers depend on the data and architecture; the shape is the point. A curve fitted to early runs predicts later runs within a factor."
+    },
+    {
+     "type": "p",
+     "text": "The figure plots L = 2.0 + 1.2C^−0.25, where C is relative compute. Loss drops fast at first and then flattens. At C = 16, L = 2.6. This flattening is why a bigger model gives diminishing returns per rupee after a point."
+    },
+    {
+     "type": "p",
+     "text": "For a fixed compute budget, split it between N and D. Chinchilla found a compute-optimal ratio near 20 tokens per parameter: D ≈ 20N. A model trained far below this ratio is undertrained; far above it with a fixed small model gives diminishing returns. Some abilities, such as multi-step arithmetic or reading a table, appear only past a certain scale. Do not assume a small model has the same ability at lower loss."
+    }
+   ]
+  },
+  {
+   "h3": "Fine-tuning and evaluation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Full fine-tuning starts from pretrained weights and updates every parameter on a labelled or instruction dataset. It works well but stores a full copy and optimizer state per task. Instruction tuning uses question-answer pairs, for example, explain UPI in two lines, so the model learns to follow formats and requests; it does not add much new factual knowledge."
+    },
+    {
+     "type": "p",
+     "text": "Parameter-efficient fine-tuning trains a small number of new weights and freezes W. Adapters insert small bottleneck layers. Prefix tuning learns virtual key-value vectors prepended to attention. LoRA adds a low-rank update:"
+    },
+    {
+     "type": "formula",
+     "text": "W′ = W + BA",
+     "where": "W′ is the adapted weight; W is the frozen d×k weight; B is a d×r matrix; A is an r×k matrix; r ≪ min(d,k) is the rank. Only B and A are trained. At inference you may merge W + BA, keeping the original shape."
+    },
+    {
+     "type": "p",
+     "text": "Domain adaptation continues pretraining or fine-tuning on in-domain text such as medical notes, legal contracts or code. It shifts vocabulary and style. Evaluation uses held-out loss, perplexity = exp(L), task benchmarks and human review. Perplexity is comparable only with the same tokenizer. Benchmarks catch task accuracy; human review catches tone, safety and fluent nonsense."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Test loss falls steeply at first and then flattens; the curve gives L = 2.6 at C = 16, the value used in the worked example.",
+  "spec": {
+   "type": "plot",
+   "x": {
+    "label": "compute C (relative units)",
+    "min": 1,
+    "max": 64
+   },
+   "y": {
+    "label": "test loss L",
+    "min": 2,
+    "max": 3.5
+   },
+   "series": [
+    {
+     "name": "L = 2.0 + 1.2C^-0.25",
+     "expr": "2.0 + 1.2*x**-0.25",
+     "style": "accent",
+     "_pts": [
+      [
+       1.0,
+       3.2
+      ],
+      [
+       1.7875,
+       3.0378144981111714
+      ],
+      [
+       2.575,
+       2.94729869212601
+      ],
+      [
+       3.3625,
+       2.8861672030349945
+      ],
+      [
+       4.15,
+       2.840754541403313
+      ],
+      [
+       4.9375,
+       2.8050159196769897
+      ],
+      [
+       5.725,
+       2.7757778461139146
+      ],
+      [
+       6.5125,
+       2.751180511204269
+      ],
+      [
+       7.3,
+       2.730046513136167
+      ],
+      [
+       8.0875,
+       2.711586454842597
+      ],
+      [
+       8.875,
+       2.6952470513270033
+      ],
+      [
+       9.6625,
+       2.6806265236559645
+      ],
+      [
+       10.45,
+       2.667424543990268
+      ],
+      [
+       11.2375,
+       2.6554111416075985
+      ],
+      [
+       12.025,
+       2.644406592552016
+      ],
+      [
+       12.8125,
+       2.6342679641628424
+      ],
+      [
+       13.6,
+       2.6248798477096065
+      ],
+      [
+       14.3875,
+       2.6161478138297154
+      ],
+      [
+       15.175,
+       2.6079936887334654
+      ],
+      [
+       15.9625,
+       2.6003520783911034
+      ],
+      [
+       16.75,
+       2.5931677669480693
+      ],
+      [
+       17.5375,
+       2.5863937395370096
+      ],
+      [
+       18.325,
+       2.57998965886181
+      ],
+      [
+       19.1125,
+       2.5739206767544225
+      ],
+      [
+       19.9,
+       2.5681564965366483
+      ],
+      [
+       20.6875,
+       2.5626706256054996
+      ],
+      [
+       21.475,
+       2.5574397740051897
+      ],
+      [
+       22.2625,
+       2.5524433662550123
+      ],
+      [
+       23.05,
+       2.5476631419206823
+      ],
+      [
+       23.8375,
+       2.5430828263653202
+      ],
+      [
+       24.625,
+       2.5386878574752636
+      ],
+      [
+       25.4125,
+       2.534465157386632
+      ],
+      [
+       26.2,
+       2.530402940658555
+      ],
+      [
+       26.9875,
+       2.5264905521695935
+      ],
+      [
+       27.775,
+       2.5227183294114557
+      ],
+      [
+       28.5625,
+       2.5190774849303263
+      ],
+      [
+       29.35,
+       2.5155600055015337
+      ],
+      [
+       30.1375,
+       2.512158565276789
+      ],
+      [
+       30.925,
+       2.5088664506579996
+      ],
+      [
+       31.7125,
+       2.5056774950599956
+      ],
+      [
+       32.5,
+       2.5025860220503793
+      ],
+      [
+       33.2875,
+       2.499586795616431
+      ],
+      [
+       34.075,
+       2.4966749765203433
+      ],
+      [
+       34.8625,
+       2.493846083875675
+      ],
+      [
+       35.65,
+       2.491095961217975
+      ],
+      [
+       36.4375,
+       2.4884207464574204
+      ],
+      [
+       37.225,
+       2.485816845195969
+      ],
+      [
+       38.0125,
+       2.4832809069698825
+      ],
+      [
+       38.8,
+       2.480809804043612
+      ],
+      [
+       39.5875,
+       2.478400612435385
+      ],
+      [
+       40.375,
+       2.4760505949003893
+      ],
+      [
+       41.1625,
+       2.473757185635748
+      ],
+      [
+       41.95,
+       2.4715179765038
+      ],
+      [
+       42.7375,
+       2.469330704597589
+      ],
+      [
+       43.525,
+       2.4671932409957162
+      ],
+      [
+       44.3125,
+       2.4651035805735533
+      ],
+      [
+       45.1,
+       2.463059832754743
+      ],
+      [
+       45.8875,
+       2.461060213101476
+      ],
+      [
+       46.675,
+       2.4591030356545143
+      ],
+      [
+       47.4625,
+       2.457186705944715
+      ],
+      [
+       48.25,
+       2.4553097146071274
+      ],
+      [
+       49.0375,
+       2.453470631536807
+      ],
+      [
+       49.825,
+       2.4516681005325105
+      ],
+      [
+       50.6125,
+       2.4499008343805424
+      ],
+      [
+       51.4,
+       2.4481676103363577
+      ],
+      [
+       52.1875,
+       2.4464672659661884
+      ],
+      [
+       52.975,
+       2.4447986953150553
+      ],
+      [
+       53.7625,
+       2.4431608453711187
+      ],
+      [
+       54.55,
+       2.4415527127994747
+      ],
+      [
+       55.3375,
+       2.4399733409213105
+      ],
+      [
+       56.125,
+       2.438421816916777
+      ],
+      [
+       56.9125,
+       2.436897269232138
+      ],
+      [
+       57.7,
+       2.4353988651736698
+      ],
+      [
+       58.4875,
+       2.433925808672523
+      ],
+      [
+       59.275,
+       2.4324773382062737
+      ],
+      [
+       60.0625,
+       2.43105272486426
+      ],
+      [
+       60.85,
+       2.4296512705450177
+      ],
+      [
+       61.6375,
+       2.4282723062752156
+      ],
+      [
+       62.425,
+       2.426915190640461
+      ],
+      [
+       63.2125,
+       2.425579308319226
+      ],
+      [
+       64.0,
+       2.4242640687119286
+      ]
+     ]
+    }
+   ],
+   "aria": "A curve falling steeply at first and then flattening, showing test loss dropping from 3.2 to about 2.4 as compute rises from 1 to 64 relative units."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 1B-parameter decoder-only Transformer is pretrained on 20B tokens, the Chinchilla ratio of 20 tokens per parameter. (a) Estimate training compute with C ≈ 6ND. (b) A GPU delivers 3×10¹⁴ FLOP/s at 40% utilisation. How many seconds and days does training take? (c) A fitted scaling curve is L = 2.0 + 1.2C^−0.25. Find L at C = 16.",
+   "steps": [
+    "N = 1×10⁹ parameters; D = 20×10⁹ = 2×10¹⁰ tokens.",
+    "C ≈ 6ND = 6 × 10⁹ × 2×10¹⁰ = 1.2×10²⁰ FLOPs.",
+    "Effective rate = 3×10¹⁴ × 0.40 = 1.2×10¹⁴ FLOP/s.",
+    "Time = 1.2×10²⁰ ÷ 1.2×10¹⁴ = 1.0×10⁶ s.",
+    "Days = 10⁶ ÷ 86400 = 11.574… ≈ 11.6 days.",
+    "At C = 16: 16^0.25 = 2; 1.2 ÷ 2 = 0.6; L = 2.0 + 0.6 = 2.6."
+   ],
+   "answer": "Training needs about 1.2×10²⁰ FLOPs, takes 1.0×10⁶ s ≈ 11.6 days on one such GPU, and the fitted loss at C = 16 is 2.6.",
+   "check": "N = 1e9\nD = 20e9\nflops = 6 * N * D\nrate = 3e14 * 0.40\nseconds = flops / rate\ndays = seconds / 86400\nC = 16\nloss = 2.0 + 1.2 * C**-0.25\nprint(f'{flops:.1e}')\nprint(f'{rate:.1e}')\nprint(f'{seconds:.0f}')\nprint(f'{days:.1f}')\nprint(f'{loss:.1f}')",
+   "values": [
+    1.2e+20,
+    120000000000000.0,
+    1000000,
+    11.6,
+    2.6
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Scaling laws predict average next-token loss, not accuracy on your task; a lower loss can leave a benchmark unchanged.",
+  "6ND is a dense training estimate. Inference cost scales with generated tokens and can be larger over a product's life.",
+  "The 20-tokens-per-parameter point is compute-optimal for a fixed budget, not permission to add parameters without matching data; too few tokens undertrain the model.",
+  "Perplexity is exp(loss), not loss as a percentage; lower is better, and it is comparable only with the same tokenizer.",
+  "LoRA trains BA, not W. At inference you may merge W + BA, so the deployed layer has the original shape and speed."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the 6 in C ≈ 6ND count?",
+   "marks": 2,
+   "a": "About 2 FLOPs per parameter per token in the forward pass and 4 in the backward pass."
+  },
+  {
+   "level": "understand",
+   "q": "Why deduplicate pretraining text?",
+   "marks": 2,
+   "a": "Duplicates waste compute and bias the model toward memorising repeated sentences. Deduplication also reduces test contamination when the same text appears in training and evaluation."
+  },
+  {
+   "level": "apply",
+   "q": "A 7B model is trained on 140B tokens. Use C ≈ 6ND to estimate training FLOPs.",
+   "marks": 4,
+   "a": "N = 7×10⁹, D = 140×10⁹ = 1.4×10¹¹. C ≈ 6 × 7×10⁹ × 1.4×10¹¹ = 5.88×10²¹ FLOPs."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is 20 tokens per parameter not a rule to add parameters without data?",
+   "marks": 4,
+   "a": "20 tokens per parameter is the compute-optimal split for a fixed budget. Adding parameters without adding data leaves the model undertrained and can waste inference cost; data quality and task needs also matter."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between full fine-tuning and LoRA?",
+   "marks": 3,
+   "a": "Full fine-tuning updates every weight and stores a full optimizer state per task. LoRA freezes W and trains only the low-rank B and A, so it uses far less memory and can be merged into W for inference."
+  },
+  {
+   "level": "remember",
+   "q": "Define perplexity in terms of mean cross-entropy L.",
+   "marks": 2,
+   "a": "Perplexity = exp(L), where L is mean next-token cross-entropy in nats per token. Lower is better; compare only with the same tokenizer."
+  },
+  {
+   "level": "analyze",
+   "q": "A model gets lower held-out loss but worse on a coding benchmark. Give two reasons.",
+   "marks": 4,
+   "a": "Held-out loss is average next-token likelihood over the pretraining distribution. A coding benchmark needs exact code and formatting, so distribution shift, contamination or decoding choices can keep accuracy low while loss falls."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, pretraining runs are planned with scaling-law fits, data mixtures and hardware-aware parallelism; teams increasingly use mixture-of-experts, long-context data and synthetic data. Research searches for reliable predictions of emergent abilities, better data curation and evaluation that catches contamination. Newer curricula add serving cost, safety and preference tuning. Search next for Chinchilla scaling laws, LoRA, instruction tuning, data deduplication and mixture-of-experts."
+}
