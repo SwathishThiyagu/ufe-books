@@ -215,7 +215,7 @@ class OpenAICompat(Gemini):
     def from_env(cls, log):
         base = os.environ['OPENAI_BASE_URL']; key = os.environ.get('OPENAI_API_KEY', '')
         model = os.environ.get('OPENAI_MODEL', '')
-        for i in range(40):                       # a fresh pod may still be loading the model
+        for i in range(90):                       # a fresh pod may still be downloading and loading the model (up to 45 min)
             st, js = _openai('GET', f'{base.rstrip("/")}/models', key, timeout=30)
             if st == 200 and js.get('data'):
                 names = [m.get('id') for m in js['data']]
@@ -223,7 +223,7 @@ class OpenAICompat(Gemini):
                 log(f'server ready; models {names[:4]}, using {model}'); break
             log(f'waiting for the model server (HTTP {st}) ...'); time.sleep(30)
         else:
-            raise SystemExit('The model server at OPENAI_BASE_URL did not answer for 20 minutes. Is the pod running?')
+            raise SystemExit('The model server at OPENAI_BASE_URL did not answer for 45 minutes. Is the pod running?')
         return cls(base, key, model, os.environ.get('REVIEW_MODEL', ''), log)
 
     def text(self, task, system, prompt, role='write', temperature=0.6, json_mode=True, max_tokens=16000):
