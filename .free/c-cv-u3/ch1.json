@@ -1,0 +1,239 @@
+{
+ "lead": "Every photograph is a spoiled copy of the scene. The lens blurs it, the sensor adds noise, the shutter smears anything that moves. Restoration begins by writing that spoiling as one line of mathematics: g(x,y) = H[f(x,y)] + n(x,y), where f is the true image, H is the degradation, n is the noise and g is what the camera gave you. If you can estimate H and the noise, you can undo them and come close to f. Forensic blur removal, old photo repair, satellite imaging and CT all work from this model.",
+ "prereq": "You need convolution, correlation and the discrete Fourier transform from Unit 2, Image Enhancement and Filtering.",
+ "sections": [
+  {
+   "h3": "The model, and why the order matters",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Photograph a printed page in dim light and zoom in. The letters are soft, and a fine grain sits on top of them. Two different things spoiled the picture: the blur of the lens and the noise of the sensor. The degradation model writes both in one line."
+    },
+    {
+     "type": "formula",
+     "text": "g(x,y) = H[f(x,y)] + n(x,y)",
+     "where": "g(x,y) is the observed image, the one you have; f(x,y) is the true, undegraded image; H is the degradation operator, any process that smears a pixel with its neighbours; n(x,y) is additive noise, a random value added to each pixel; (x,y) are pixel coordinates, x the column and y the row."
+    },
+    {
+     "type": "p",
+     "text": "H acts first, noise comes second. Blur belongs to the optics and to motion, which act on the light before it reaches the sensor. Noise belongs to the sensor electronics and to the transmission channel, and arrives afterwards. Writing g = H[f + n] would blur the noise along with the image, which is physically wrong and makes the noise correlated from pixel to pixel."
+    },
+    {
+     "type": "p",
+     "text": "Restoration is the reverse journey. It estimates what H did, estimates the noise, and then applies an operator R to g to produce an estimate f̂. If H is not known or cannot be estimated, the model gives you nothing."
+    },
+    {
+     "type": "p",
+     "text": "Restoration is objective. It carries a model of what went wrong, tries to recover the actual f, and success is judged against that model. Enhancement is subjective: histogram equalisation or sharpening makes an image look better to a viewer with no claim about the true scene. Reading a blurred number plate for a court case is restoration. Making a wedding photo brighter is enhancement."
+    }
+   ]
+  },
+  {
+   "h3": "Linear, shift-invariant H becomes convolution",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "To invert H, H must be simple. The standard assumption is that H is linear and shift-invariant. Linear means superposition: H[a·f₁ + b·f₂] = a·H[f₁] + b·H[f₂] for constants a and b. Shift-invariant means the blur is the same everywhere: if the input moves by (x₀, y₀), the output moves by exactly (x₀, y₀) and changes in no other way. A lens that is sharp in the centre and soft at the edges breaks this. So does motion blur over a road that recedes into the distance."
+    },
+    {
+     "type": "p",
+     "text": "Under these two assumptions H is completely described by one small image: its response to a single bright point. Feed in a point source and what comes out is the point spread function, PSF, written h(x,y). The degradation is then a convolution."
+    },
+    {
+     "type": "formula",
+     "text": "g(x,y) = (h * f)(x,y) + n(x,y) = Σm Σn h(m,n) f(x−m, y−n) + n(x,y)",
+     "where": "h(m,n) is the point spread function, the blur kernel; m and n are offsets inside the kernel; the double sum runs over the kernel's support; * denotes convolution."
+    },
+    {
+     "type": "p",
+     "text": "Take the DFT of both sides. Convolution becomes multiplication."
+    },
+    {
+     "type": "formula",
+     "text": "G(u,v) = H(u,v) F(u,v) + N(u,v)",
+     "where": "G, F, N are the DFTs of g, f, n; H(u,v) is the DFT of h, called the optical transfer function (OTF); u and v are frequency indices. Undoing the blur in this domain looks like a division by H."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "h is real and non-negative for any physical blur.",
+      "Σ h(m,n) = 1 when the blur only redistributes light rather than creating it; equivalently H(0,0) = 1, so average brightness survives.",
+      "h equal to a single 1 at the origin means no blur at all; the model then has only noise (see <a href=\"#noise-models\">3.2</a>).",
+      "A blur that varies across the frame cannot be written as one convolution."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Estimating the degradation function",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every restoration filter needs h or H as input, so estimating the degradation is the first job. There are four routes, roughly in order of reliability."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Point source. Photograph a bright point against black with the same camera settings — a star, an LED, a pinhole in card. The recorded patch is h directly.",
+      "Line or edge. A sharp straight edge in the scene, such as a building against the sky, becomes an S-shaped ramp after blur. Differentiating that ramp across the edge gives the line spread function, and for a separable blur this gives h.",
+      "Physical model. Derive h from geometry. Uniform motion of L pixels during the exposure gives h(x) = 1/L for x = 0 … L−1 and 0 elsewhere. An out-of-focus lens of aperture radius R gives a disc: h = 1/(πR²) inside a circle of radius R, 0 outside. Atmospheric turbulence has its own standard model.",
+      "Experiment. When the scene offers no point, edge or known physics, image a test chart, or the same static scene with and without the suspected cause, and compare the two."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Sanity-check any candidate kernel before using it: it must be non-negative and sum to 1. Once h is known, the filters in <a href=\"#restoration-filters-mean-order-statistic-and-adaptive\">3.3</a> and <a href=\"#inverse-filtering-and-wiener-filtering\">3.5</a> take over. The statistics of n are covered in <a href=\"#noise-models\">3.2</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The true image passes through the blur H, then noise is added, giving the observed image; the restoration stage estimates the blur and the noise and undoes them to produce f̂. Notice that the noise enters after H, never before.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Degradation and restoration",
+   "nodes": [
+    {
+     "id": "f",
+     "label": "f(x,y)",
+     "note": "true image",
+     "style": "normal"
+    },
+    {
+     "id": "H",
+     "label": "H",
+     "note": "blur kernel h",
+     "style": "normal"
+    },
+    {
+     "id": "n",
+     "label": "+ n(x,y)",
+     "note": "additive noise",
+     "style": "live"
+    },
+    {
+     "id": "g",
+     "label": "g(x,y)",
+     "note": "observed image",
+     "style": "normal"
+    },
+    {
+     "id": "R",
+     "label": "Restoration",
+     "note": "estimate H and n",
+     "style": "accent"
+    },
+    {
+     "id": "fh",
+     "label": "f̂(x,y)",
+     "note": "estimate",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "f",
+     "to": "H",
+     "style": "solid"
+    },
+    {
+     "from": "H",
+     "to": "n",
+     "style": "solid"
+    },
+    {
+     "from": "n",
+     "to": "g",
+     "style": "solid"
+    },
+    {
+     "from": "g",
+     "to": "R",
+     "style": "solid"
+    },
+    {
+     "from": "R",
+     "to": "fh",
+     "style": "solid"
+    }
+   ],
+   "aria": "A chain from the true image through the blur H, the added noise, the observed image and the restoration stage to the estimate."
+  }
+ },
+ "examples": [
+  {
+   "question": "A camera moves exactly 4 pixels horizontally while the shutter is open, so each recorded pixel is the average of 4 successive scene positions. (a) Write the degradation kernel h(x). (b) For a 256-pixel row, at which frequencies u does H(u) = 0? (c) What does that mean for an inverse filter?",
+   "steps": [
+    "The exposure averages 4 positions, so h(x) = 1/4 for x = 0, 1, 2, 3 and h(x) = 0 elsewhere. Check the brightness: 1/4 + 1/4 + 1/4 + 1/4 = 1, so Σh = 1 and light is only redistributed.",
+    "For a row of N = 256 pixels the OTF is H(u) = Σ(x=0 to 3) (1/4)·e^(−j2πux/256), with u = 0, 1, …, 255.",
+    "The four terms are unit vectors at angles 0, −2πu/256, −4πu/256 and −6πu/256. They sum to zero when consecutive angles differ by 2π/4 = π/2, that is when 2πu/256 = 2πk/4, so u = 64k.",
+    "Inside the range 0 to 255 this gives u = 64, 128 and 192. At u = 0 the four terms add to 4, so H(0) = 1 and the average brightness passes through. In general |H(u)| = (1/4)·|sin(4πu/256) / sin(πu/256)|, which is non-zero except at those three frequencies.",
+    "At u = 64, 128, 192 the observed spectrum is G(u) = 0·F(u) + N(u) = N(u). The scene information at those frequencies is destroyed; only noise remains there.",
+    "(c) An inverse filter computes F̂(u) = G(u)/H(u). At those three frequencies it divides by zero, so the output explodes. They must be handled by a regularised filter, as in 3.5."
+   ],
+   "answer": "h = [1/4, 1/4, 1/4, 1/4]; H(u) = 0 at u = 64, 128 and 192 cycles per 256 pixels, so the inverse filter is undefined at those three frequencies.",
+   "check": "import cmath, math\nN = 256\nL = 4\nh = [1.0/L]*L\n\ndef H(u):\n    total = 0\n    for x in range(L):\n        total += h[x]*cmath.exp(-2j*math.pi*u*x/N)\n    return total\n\nprint(h[0])\nfor u in range(N):\n    if abs(H(u)) < 1e-9:\n        print(u)\n",
+   "values": [
+    0.25,
+    64,
+    128,
+    192
+   ],
+   "output": "0.25\n64\n128\n192"
+  }
+ ],
+ "traps": [
+  "Putting noise before the blur, g = H[f + n]. That colours the noise and contradicts the physics; the order is always blur first, noise second.",
+  "Treating restoration as a synonym for enhancement. Restoration is judged against a degradation model; enhancement is judged by the eye.",
+  "Forgetting that Σh must equal 1. A kernel that does not sum to 1 changes the brightness, and the restored image will come out too dark or too bright.",
+  "Confusing h(x,y) with H(u,v). They are the same blur in two domains — PSF in space, OTF in frequency — not two different degradations.",
+  "Assuming the convolution form always holds. It needs H to be linear and shift-invariant; a lens that blurs differently across the frame breaks it."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the degradation–restoration model equation and name each term.",
+   "marks": 2,
+   "a": "g(x,y) = H[f(x,y)] + n(x,y). g is the observed image, f the true image, H the degradation operator, n the additive noise, and (x,y) the pixel coordinates."
+  },
+  {
+   "level": "understand",
+   "q": "Why is noise added after the blur rather than before it?",
+   "marks": 3,
+   "a": "Blur comes from optics and motion acting on the light before it reaches the sensor; noise is generated in the sensor and channel afterwards. Writing g = H[f + n] would smear the noise itself and make it spatially correlated, which real sensor noise is not."
+  },
+  {
+   "level": "remember",
+   "q": "Define the point spread function and the optical transfer function.",
+   "marks": 2,
+   "a": "The PSF h(x,y) is the recorded image of a point source. The OTF H(u,v) is the discrete Fourier transform of h."
+  },
+  {
+   "level": "apply",
+   "q": "Uniform motion blur covers 8 pixels during the exposure, on a 512-pixel row. Write h(x) and list every frequency u at which H(u) = 0.",
+   "marks": 4,
+   "a": "h(x) = 1/8 for x = 0 … 7, else 0. Zeros occur when 2πu/512 = 2πk/8, i.e. u = 64k. In range 0–511 that is u = 64, 128, 192, 256, 320, 384 and 448 (seven frequencies)."
+  },
+  {
+   "level": "apply",
+   "q": "A kernel is h = [1/2, 1/2] and the row length is N = 8. At which u does H(u) = 0?",
+   "marks": 3,
+   "a": "H(u) = (1/2)(1 + e^(−j2πu/8)). This is zero when e^(−j2πu/8) = −1, i.e. 2πu/8 = π, so u = 4."
+  },
+  {
+   "level": "analyze",
+   "q": "One photo is uniformly soft all over; another is sharp but grainy. Which half of the model dominates in each, and which chapter of this unit handles it?",
+   "marks": 5,
+   "a": "Soft photo: H dominates and n is small, so the job is to estimate h and deconvolve (3.5). Grainy photo: H is essentially a delta, so the model collapses to g = f + n and noise-reduction filters apply (3.2 and 3.3)."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a blur that varies across the frame break the convolution model, and what does that cost you?",
+   "marks": 4,
+   "a": "Convolution uses one kernel for every pixel, which is exactly the shift-invariance assumption. If h changes with position, no single h describes the frame; you must split the image into regions and restore each with its own kernel, or use a space-varying formulation that no longer reduces to simple multiplication in the frequency domain."
+  }
+ ],
+ "beyond": "Not for the exam. When no point source or edge is available, blind deconvolution estimates h and f together by alternating between them, using the fact that natural images have sparse gradients. Richardson–Lucy iteration is the standard tool in astronomy and fluorescence microscopy. Modern deblurring trains a CNN or GAN on pairs of sharp and blurred patches and learns the inverse mapping directly, blur kernel and all. Search 'blind deconvolution', 'Richardson-Lucy', and 'PSF calibration microscopy' to go further."
+}

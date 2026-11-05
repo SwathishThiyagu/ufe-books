@@ -1,0 +1,240 @@
+{
+ "lead": "Neighbouring pixels are usually nearly equal; that near-equality is where compression comes from. Predictive coding guesses the next pixel and sends only the small error. Transform coding rotates an 8×8 block into frequency coefficients that are mostly near zero, then drops tiny ones. Both hand small numbers to the entropy coder in <a href=\"#huffman-arithmetic-and-run-length-coding\">3.8</a>. JPEG, PNG and phone cameras use one of the two.",
+ "prereq": "You need <a href=\"#image-compression-fundamentals-and-data-redundancy\">3.7</a> for the encoder model and entropy, <a href=\"#huffman-arithmetic-and-run-length-coding\">3.8</a> for Huffman and run-length coding, and the DCT from Unit 2.",
+ "sections": [
+  {
+   "h3": "Predictive coding: send the error, not the pixel",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A raster scan sends pixels row by row. When the decoder reaches (x,y), it already holds pixels above and left, which are close to f(x,y). A fixed weighted sum of them is a good guess. Send the guess's mistake."
+    },
+    {
+     "type": "formula",
+     "text": "f̂(x,y) = round( Σₙ aₙ · f(x−iₙ, y−jₙ) ) ,   e(x,y) = f(x,y) − f̂(x,y)",
+     "where": "f(x,y) is the true pixel (0–255 for 8-bit grey); f̂ is the prediction from already-reconstructed neighbours; n numbers the neighbours; aₙ is the weight and (iₙ,jₙ) the offset for neighbour n; round() makes encoder and decoder agree exactly; e is the prediction error, the only number sent."
+    },
+    {
+     "type": "p",
+     "text": "Predict from the left pixel. Row 120, 122, 124, 126 gives errors 120 (first pixel), 2, 2, 2. Pixels over 0–255 cost 7–8 bits each; errors near zero cost far less. This removes interpixel redundancy from <a href=\"#image-compression-fundamentals-and-data-redundancy\">3.7</a> before coding."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Encoder: build f̂ from reconstructed neighbours.",
+      "Encoder: e = f − f̂.",
+      "Encoder: quantise ê = round(e/q)·q; q = 1 for lossless.",
+      "Encoder: entropy-code ê.",
+      "Encoder: reconstruct f̃ = f̂ + ê and store it as a neighbour.",
+      "Decoder: read ê, rebuild f̂ from stored neighbours, add, store f̃."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "With q = 1 nothing is rounded, so the coder is lossless and f̃ = f. A quantiser inside the loop makes it lossy DPCM. The predictor must use reconstructed values; using original f makes encoder and decoder drift apart."
+    }
+   ]
+  },
+  {
+   "h3": "Transform coding: rotate the block, then quantise",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Transform coding works on an 8×8 block, 64 pixels at once, and changes the axis. The 2-D DCT from Unit 2 rewrites it as 64 frequency coefficients F(u,v)."
+    },
+    {
+     "type": "formula",
+     "text": "F(u,v) = C(u)·C(v)·Σₓ Σᵧ f(x,y)·cos[(2x+1)uπ/16]·cos[(2y+1)vπ/16]",
+     "where": "N = 8, so u and v run 0 to 7; C(0) = √(1/8) = 0.354, C(k) = √(2/8) = 0.5 for k > 0; F(0,0) is DC and equals 8 × block mean; the other 63 are AC coefficients."
+    },
+    {
+     "type": "p",
+     "text": "Natural blocks are smooth, so DC carries most energy and AC terms fall fast with frequency. A flat block has all AC zero. This is energy compaction: 64 pixels become one big number, a few small ones and many near-zeros."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "DCT output is real; DFT of a real block is complex, so it needs two numbers per coefficient. No complex arithmetic means cheap integer hardware.",
+      "Separable: eight 1-D row transforms then eight 1-D column transforms, about 1024 multiply-adds naively, against about 4096 for direct 64-term sums.",
+      "Energy compaction is close to Karhunen–Loève optimum for natural images, and no wrap-around discontinuity at block edges as with DFT."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "T(u,v) = round( F(u,v) / Q′(u,v) ) ,   decoded F′(u,v) = T(u,v) · Q′(u,v)",
+     "where": "Q′(u,v) is the step for that coefficient from a standard table scaled by a quality factor; smaller quality means larger steps and fewer bits; T(u,v) is the integer sent; this rounding is the only lossy step in baseline JPEG. The luma table starts 16, 11, 10, 16, 24, 40, 51, 61, so DC gets a fine step and high frequencies coarse ones. That is bit allocation written down."
+    },
+    {
+     "type": "p",
+     "text": "After quantisation the block is read zig-zag from DC outward. Zeros then sit together at the end, so run-length coding collapses them into (run, value) pairs ending in end-of-block, and Huffman codes those symbols. Without the scan the zeros are scattered and run-length coding gains little. At very low bit rates neighbouring blocks round to slightly different DC levels and the 8×8 grid shows — blockiness."
+    }
+   ]
+  },
+  {
+   "h3": "The standards",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "JPEG baseline is that pipeline: 8×8 DCT, scaled table, zig-zag. The DC coefficient is DPCM-coded as a difference from the previous block's DC and Huffman-coded; AC coefficients are zig-zag scanned and run-length coded. JPEG progressive sends the same coefficients in several scans, low frequencies first, so a slow link shows a rough picture early. JPEG also defines a lossless DPCM mode, rarely used because PNG and JPEG-LS beat it. JPEG 2000 replaces the 8×8 DCT with a wavelet transform over the whole image: no blockiness, and smooth scaling in quality and resolution."
+    },
+    {
+     "type": "p",
+     "text": "MPEG-1/2/4, H.264/AVC and HEVC/H.265 split each frame into blocks. Inter-coded blocks are predicted from one or two previously decoded reference frames, which for B-frames may lie later in display order; intra-coded blocks are predicted spatially inside the same frame. The residual is transform-coded, then Huffman- or arithmetic-coded. So video is prediction between frames plus transform coding within a frame."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The JPEG encoder chain. The quantiser is the only lossy step; everything after it works on small integers and zeros.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "JPEG-style transform coder",
+   "nodes": [
+    {
+     "id": "b",
+     "label": "8×8 block",
+     "style": "normal"
+    },
+    {
+     "id": "dct",
+     "label": "2-D DCT",
+     "style": "normal"
+    },
+    {
+     "id": "q",
+     "label": "Quantise",
+     "note": "divide by Q",
+     "style": "live"
+    },
+    {
+     "id": "zz",
+     "label": "Zig-zag scan",
+     "style": "accent"
+    },
+    {
+     "id": "hc",
+     "label": "RLE + Huffman",
+     "style": "accent"
+    },
+    {
+     "id": "out",
+     "label": "Bitstream",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "b",
+     "to": "dct",
+     "style": "solid"
+    },
+    {
+     "from": "dct",
+     "to": "q",
+     "style": "solid"
+    },
+    {
+     "from": "q",
+     "to": "zz",
+     "style": "solid"
+    },
+    {
+     "from": "zz",
+     "to": "hc",
+     "style": "solid"
+    },
+    {
+     "from": "hc",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "A chain from an 8×8 pixel block through the DCT, the quantiser, the zig-zag scan and the run-length plus Huffman coder to the bitstream."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 2×2 grey block has all four pixels equal to 4: f = [[4,4],[4,4]]. Use the orthonormal 2-D DCT with N = 2, C(0) = 1/√2 and C(1) = 1. (a) Find F(0,0), F(0,1), F(1,0), F(1,1). (b) Quantise F(0,0) with step 4; give the integer sent and decoded value. (c) A flat block of pixel value 8 has F(0,0) = 16. Quantise it with step 6; give decoded DC, decoded pixel value and error.",
+   "steps": [
+    "C(0)C(0)=0.5 and C(0)C(1)=0.7071.",
+    "F(0,0)=0.5×(4+4+4+4)=8.",
+    "F(0,1): cos(π/4)+cos(3π/4)=0.7071−0.7071=0, so F(0,1)=0.",
+    "Same symmetry gives F(1,0)=0 and F(1,1)=0; F=[[8,0],[0,0]].",
+    "Step 4: 8/4=2, so send 2.",
+    "Decode: 2×4=8, error 0.",
+    "Flat 8s: F(0,0)=0.5×4×8=16.",
+    "Step 6: 16/6=2.667→3; decoded DC=3×6=18.",
+    "Inverse DC: pixel=18/2=9; error 9−8=+1."
+   ],
+   "answer": "Coefficients 8,0,0,0. Step 4 sends 2 and restores 8 exactly. Flat 8 has DC 16; step 6 sends 3, decodes DC 18, pixel 9, error +1 grey level.",
+   "check": "import math\nN=2\ndef C(k):\n    return math.sqrt(1/N) if k==0 else math.sqrt(2/N)\ndef dct(f):\n    F=[[0.0]*N for _ in range(N)]\n    for u in range(N):\n        for v in range(N):\n            s=0.0\n            for x in range(N):\n                for y in range(N):\n                    s+=f[x][y]*math.cos((2*x+1)*u*math.pi/(2*N))*math.cos((2*y+1)*v*math.pi/(2*N))\n            F[u][v]=C(u)*C(v)*s\n    return F\nF=dct([[4,4],[4,4]])\nprint(round(F[0][0],6))\nprint(round(F[0][1],6))\nprint(round(F[1][0],6))\nprint(round(F[1][1],6))\nprint(round(F[0][0]/4))\nprint(round(F[0][0]/4)*4)\nG=dct([[8,8],[8,8]])\nprint(round(G[0][0],6))\nprint(int(round(G[0][0]/6)))\nprint(int(round(G[0][0]/6))*6)\nprint(int(round(G[0][0]/6))*6/2)\nprint(int(round(G[0][0]/6))*6/2-8)",
+   "values": [
+    8.0,
+    0.0,
+    0.0,
+    0.0,
+    2,
+    8,
+    16.0,
+    3,
+    18,
+    9.0,
+    1.0
+   ],
+   "output": "8.0\n0.0\n0.0\n0.0\n2\n8\n16.0\n3\n18\n9.0\n1.0"
+  }
+ ],
+ "traps": [
+  "Skipping zig-zag and run-length: zero AC coefficients are sent one by one instead of one end-of-block symbol.",
+  "Feeding predictor from original pixel instead of reconstructed; encoder and decoder diverge and error grows.",
+  "Dropping C(u)C(v): DC becomes plain sum, not 8× mean for 8×8 (2× mean for N=2).",
+  "Thinking quantiser step applies to pixels. It applies to coefficients; each of the 64 positions has its own step."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the DPCM prediction and error equations, and name every symbol.",
+   "marks": 2,
+   "a": "f̂(x,y)=round(Σₙ aₙ f(x−iₙ,y−jₙ)), e=f−f̂; f is pixel, f̂ prediction from reconstructed neighbours, n neighbour index, aₙ weight, (iₙ,jₙ) offset, e transmitted error."
+  },
+  {
+   "level": "understand",
+   "q": "Why does e have far smaller entropy than f, even though nothing is thrown away?",
+   "marks": 3,
+   "a": "Neighbouring pixels are correlated, so prediction is close and e clusters near zero; a tight distribution has low entropy. The original is rebuilt exactly from e. Entropy falls, information does not."
+  },
+  {
+   "level": "apply",
+   "q": "A row is 100, 102, 101, 103. With the left-neighbour predictor and the first pixel sent as itself, find the four transmitted values.",
+   "marks": 4,
+   "a": "First pixel sent as 100. e=102−100=2, e=101−102=−1, e=103−101=2. Transmitted 100,2,−1,2; decoder gives 100,102,101,103."
+  },
+  {
+   "level": "understand",
+   "q": "Give three reasons JPEG uses the DCT rather than the DFT.",
+   "marks": 3,
+   "a": "DCT of a real block is real, so one number per coefficient and no complex arithmetic; energy compaction near optimal; no wrap-around discontinuity. Both are separable, so that is not a reason."
+  },
+  {
+   "level": "apply",
+   "q": "A DCT coefficient has value 37 and its quantiser step is 9. Find the integer sent, the decoded coefficient and the error.",
+   "marks": 4,
+   "a": "37/9=4.111→4. Decoded 4×9=36. Error 36−37=−1."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain how the zig-zag scan plus run-length coding reduces the bit count, and what happens if you skip the scan.",
+   "marks": 5,
+   "a": "After quantisation most high-frequency coefficients are zero. Zig-zag reads DC outward so zeros form one long run at the end. Run-length coding replaces that run with one (run,value) pair plus end-of-block, and Huffman gives it a short code. Without scan zeros interleave with nonzero values, each zero needs its own symbol, and gain largely disappears."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does baseline JPEG show 8×8 blockiness at a low bit rate while JPEG 2000 does not?",
+   "marks": 5,
+   "a": "In JPEG each block is transformed and quantised alone, so each block's DC level rounds independently; adjacent blocks land on slightly different levels and the grid shows, and coarse steps wipe out high frequencies that would smooth the join. JPEG 2000 uses a wavelet transform over the whole image, so basis functions overlap block boundaries and there is no independent per-block rounding."
+  }
+ ],
+ "beyond": "Not for the exam. Real codecs replace fixed quantiser tables with rate–distortion optimisation, putting bits where the eye notices loss. JPEG's arithmetic-coded variant and JPEG 2000's EBCOT beat Huffman by a few percent. H.264 and HEVC added in-loop deblocking filters and better motion prediction rather than new transforms; AV1 and VVC continue that line."
+}
