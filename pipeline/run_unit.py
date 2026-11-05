@@ -115,6 +115,8 @@ def check_chapter(P, k, final=False):
                 if not isinstance(b, dict) or b.get('type') not in ('p', 'steps', 'bullets', 'formula', 'code', 'table'):
                     p.append(f'section {i} has a block with an unknown "type" (use p, steps, bullets, formula, code, table)'); break
         qz = ch.get('quiz') or []
+        if any(not isinstance(q, dict) for q in qz): p.append('every quiz item must be an object {level, q, marks, a}')
+        if any(not isinstance(x, dict) for x in (ch.get('examples') or [])): p.append('every worked example must be an object')
         if not 5 <= len(qz) <= 9: p.append('give 6 to 8 quiz questions')
         lv = {str(q.get('level', '')).lower() for q in qz if isinstance(q, dict)}
         miss = [x for x in R.LEVELS if x not in lv]
@@ -337,8 +339,10 @@ def main():
         S.put('status', {'state': 'quota', 'at': f'{datetime.datetime.now():%Y-%m-%d %H:%M}'})
         report(S, a.unit, ask, flags, t0, None, out)
         sys.exit(75)
-    except ModelError as e:
-        log(f'model error: {e}')
+    except (ModelError, Exception) as e:
+        if isinstance(e, SystemExit): raise
+        import traceback
+        log(f'error: {type(e).__name__}: {e}\n' + traceback.format_exc()[-1500:])
         S.put('status', {'state': 'error', 'error': str(e)[:300]})
         report(S, a.unit, ask, flags, t0, None, out)
         sys.exit(1)

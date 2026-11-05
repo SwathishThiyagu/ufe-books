@@ -108,14 +108,14 @@ def chapter_html(P, k, ch, ids):
     try: after = max(1, min(int(after), len(ch.get('sections') or [1])))
     except (TypeError, ValueError): after = 1
     fig_ok = True
-    for i, sec in enumerate(ch.get('sections') or [], 1):
+    for i, sec in enumerate([x for x in ch.get('sections') or [] if isinstance(x, dict)], 1):
         out.append(f'<h3>{inline(sec.get("h3"))}</h3>')
         out += [block(b, ids) for b in sec.get('blocks') or [] if isinstance(b, dict)]
         if i == after:
             fh, fig_ok = figure_html(fig.get('spec') or {}, f'f{N}-{k}-1', f'{N}.{k}.1', fig.get('caption', ''), st['t'],
-                                     [s.get('h3', '') for s in ch.get('sections') or []])
+                                     [s.get('h3', '') for s in ch.get('sections') or [] if isinstance(s, dict)])
             out.append(fh)
-    exs = ch.get('examples') or []
+    exs = [e for e in ch.get('examples') or [] if isinstance(e, dict)]
     for j, ex in enumerate(exs):
         h4 = 'Worked example' if j == 0 else 'Worked example 2'
         e = [f'<div class="example"><h4>{h4}</h4>', f'<p><b>Question.</b> {inline(ex.get("question"), ids)}</p>']
@@ -136,7 +136,7 @@ def chapter_html(P, k, ch, ids):
         out.append(''.join(e))
     out.append('<div class="traps"><h4>Exam traps</h4><ul>' + ''.join(f'<li>{inline(t, ids)}</li>' for t in ch.get('traps') or []) + '</ul></div>')
     qs = []
-    for q in ch.get('quiz') or []:
+    for q in [q for q in ch.get('quiz') or [] if isinstance(q, dict)]:
         lv = str(q.get('level', 'understand')).lower()
         lv = lv if lv in LEVELS else ('analyze' if lv.startswith('anal') or lv == 'evaluate' else 'understand')
         try: mk = int(q.get('marks', 2))
@@ -275,9 +275,9 @@ def plain_text(P, k, ch):
     U = P['unit']; t = []
     strip = lambda s: re.sub(r'<[^>]+>', '', str(s or ''))
     t.append(f'{U["n"]}.{k} {U["subtopics"][k - 1]["t"]}\n\nLead: {strip(ch.get("lead"))}')
-    for i, s in enumerate(ch.get('sections') or [], 1):
+    for i, s in enumerate([x for x in ch.get('sections') or [] if isinstance(x, dict)], 1):
         t.append(f'\nSection {i}: {strip(s.get("h3"))}')
-        for b in s.get('blocks') or []:
+        for b in [b for b in s.get('blocks') or [] if isinstance(b, dict)]:
             if b.get('type') in ('steps', 'bullets'): t += ['  - ' + strip(x) for x in b.get('items') or []]
             elif b.get('type') == 'code': t.append(f'  [{b.get("lang")} code]\n{b.get("code")}\n  [shown output]\n{b.get("output", "")}')
             elif b.get('type') == 'table': t.append('  [table] ' + ' | '.join(map(strip, b.get('head') or [])) + '\n' + '\n'.join('   ' + ' | '.join(map(strip, r)) for r in b.get('rows') or []))
@@ -285,7 +285,7 @@ def plain_text(P, k, ch):
             else: t.append('  ' + strip(b.get('text')))
     fig = ch.get('figure') or {}
     t.append(f'\nFigure: {strip(fig.get("caption"))}\n  spec: {fig.get("spec")}')
-    for j, ex in enumerate(ch.get('examples') or [], 1):
+    for j, ex in enumerate([e for e in ch.get('examples') or [] if isinstance(e, dict)], 1):
         t.append(f'\nWorked example {j}: {strip(ex.get("question"))}')
         cd = ex.get('code') or {}
         if isinstance(cd, dict) and cd.get('code'): t.append(f'  [code]\n{cd["code"]}')
@@ -294,7 +294,7 @@ def plain_text(P, k, ch):
         if ex.get('output'): t.append(f'  output: {ex["output"]}')
         t.append(f'  answer: {strip(ex.get("answer"))}')
     t.append('\nExam traps:'); t += ['  - ' + strip(x) for x in ch.get('traps') or []]
-    t.append('\nQuiz:'); t += [f'  Q{i} ({q.get("level")}, {q.get("marks")} marks): {strip(q.get("q"))}\n     answer: {strip(q.get("a"))}' for i, q in enumerate(ch.get('quiz') or [], 1)]
+    t.append('\nQuiz:'); t += [f'  Q{i} ({q.get("level")}, {q.get("marks")} marks): {strip(q.get("q"))}\n     answer: {strip(q.get("a"))}' for i, q in enumerate([q for q in ch.get('quiz') or [] if isinstance(q, dict)], 1)]
     t.append(f'\nBeyond: {strip(ch.get("beyond"))}')
     return '\n'.join(t)
 
