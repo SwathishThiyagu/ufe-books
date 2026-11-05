@@ -226,7 +226,7 @@ class OpenAICompat(Gemini):
             raise SystemExit('The model server at OPENAI_BASE_URL did not answer for 45 minutes. Is the pod running?')
         return cls(base, key, model, os.environ.get('REVIEW_MODEL', ''), log)
 
-    def text(self, task, system, prompt, role='write', temperature=0.6, json_mode=True, max_tokens=16000):
+    def text(self, task, system, prompt, role='write', temperature=0.6, json_mode=True, max_tokens=int(os.environ.get('MAX_TOKENS', '32000'))):
         model = self.reviewer[0] if role == 'review' else self.writer[0]
         body = {'model': model, 'temperature': temperature, 'max_tokens': max_tokens,
                 'messages': [{'role': 'system', 'content': system}, {'role': 'user', 'content': prompt}]}
