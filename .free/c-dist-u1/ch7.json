@@ -1,0 +1,233 @@
+{
+ "lead": "Problem decomposition turns a large computation into smaller tasks. Load balancing places those tasks on processors so each finishes near the same time. Decomposition decides what can run in parallel; balancing decides where it runs. Both matter on a phone chip with four cores, a cloud cluster, or a lab cluster. Bad decomposition creates too many tiny messages; bad balancing leaves cores idle while one core carries the tail. This chapter shows the main decomposition styles, the dependence graph, granularity, and the static and dynamic mapping methods that keep a parallel program busy.",
+ "prereq": "You need: <a href=\"#need-for-parallel-processing-and-levels-of-parallelism\">Chapter 1.1</a> for why parallel work exists and <a href=\"#performance-measures-speedup-and-efficiency\">Chapter 1.6</a> for speedup and efficiency.",
+ "sections": [
+  {
+   "h3": "Four ways to decompose work",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Decomposition is the first design step. You take one problem and cut it into tasks. A task is a unit of work that one processor can run. The cut must expose parallelism and keep dependencies small."
+    },
+    {
+     "type": "p",
+     "text": "Data or domain decomposition splits the data. Each task works on a slice. A 4000 × 4000 image can be cut into 16 tiles of 1000 × 1000 pixels; each tile is a task. The same rule applies to rows of a matrix or records of a UPI transaction file."
+    },
+    {
+     "type": "p",
+     "text": "Functional or task decomposition splits the operations. One task reads input, another filters, another aggregates, another writes results. The tasks may run on different data or pass data in a stream."
+    },
+    {
+     "type": "p",
+     "text": "Recursive decomposition applies divide and conquer. A task splits into smaller tasks until a base case. A merge sort on 8 numbers can split into two halves, then four quarters, giving a tree of tasks."
+    },
+    {
+     "type": "p",
+     "text": "Pipeline decomposition gives each stage to a different worker. Stage 1 reads, stage 2 validates, stage 3 scores. Items move through stages like cars on an assembly line. This works when many items arrive and stages can overlap."
+    }
+   ]
+  },
+  {
+   "h3": "Dependence graph, granularity and cost",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A dependence graph shows tasks as nodes and dependencies as directed edges. If task B needs A's output, an edge A → B exists. B cannot start before A finishes. A chain of edges creates a critical path; its length sets a lower bound on parallel time even with unlimited processors."
+    },
+    {
+     "type": "p",
+     "text": "Granularity is the amount of work in one task. Coarse tasks are few and large; fine tasks are many and small. Fine tasks give more choices for balancing but add communication and scheduling cost. A task of 50 ms with 1 ms message cost is coarse enough; a task of 2 ms with 1 ms message cost is usually too fine."
+    },
+    {
+     "type": "p",
+     "text": "Communication cost is the time a task spends sending or receiving data. It includes message start-up, transfer and waiting. If a task waits for a message, that wait appears as idle time even when the processor has no ready task."
+    },
+    {
+     "type": "formula",
+     "text": "T = max(load₁, load₂, …, load_P),   E = W ÷ (P × T),   idle = P × T − W",
+     "where": "T is makespan in ms; load_i is the total task time on processor i in ms; W is total work in ms; P is the number of processors; E is efficiency as a fraction between 0 and 1; idle is total idle processor time in ms."
+    },
+    {
+     "type": "p",
+     "text": "Load imbalance = (maximum load − average load) ÷ average load. Average load is W ÷ P. A small imbalance means processors finish close together."
+    }
+   ]
+  },
+  {
+   "h3": "Mapping tasks to processors",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Mapping assigns tasks to processors. Static mapping fixes the assignment before the run. It is cheap and works when task times are known and equal. Dynamic mapping decides at run time, so it handles unequal tasks and sudden slowdowns. This mapping is not the operating system's CPU scheduler; it is the parallel program's or runtime's task placement."
+    },
+    {
+     "type": "p",
+     "text": "Block distribution gives each processor one contiguous chunk. With 8 tasks and 3 processors, Proc 1 gets T1–T3, Proc 2 gets T4–T6, Proc 3 gets T7–T8. Block is good when neighbouring tasks share data. With unequal tasks, block can be bad: times 8, 1, 1, 1, 1, 1, 1, 1 ms give block loads 11 and 4 ms on two processors; cyclic or dynamic mapping spreads the 8 ms task better."
+    },
+    {
+     "type": "p",
+     "text": "Cyclic distribution gives task i to processor i mod P. With 8 tasks and 3 processors, Proc 1 gets T1, T4, T7; Proc 2 gets T2, T5, T8; Proc 3 gets T3, T6. Cyclic spreads a heavy task among processors but hurts locality."
+    },
+    {
+     "type": "p",
+     "text": "Block-cyclic distribution uses blocks of size b in round-robin order. b = 1 is cyclic; b ≥ n/P is block. It balances locality and spread."
+    },
+    {
+     "type": "p",
+     "text": "Master-worker is a dynamic method. A master holds a queue and gives the next task to a free worker. Work stealing lets an idle worker take a task from another worker's queue. Guided scheduling gives large chunks first and smaller chunks later, reducing queue overhead near the end."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A three-processor schedule for eight 5 ms tasks under block distribution. Proc 3 finishes at 10 ms and stays idle until 15 ms, so the last 5 ms is lost capacity.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "Proc 1",
+     "bars": [
+      {
+       "label": "T1",
+       "start": 0,
+       "end": 5,
+       "style": "accent"
+      },
+      {
+       "label": "T2",
+       "start": 5,
+       "end": 10,
+       "style": "accent"
+      },
+      {
+       "label": "T3",
+       "start": 10,
+       "end": 15,
+       "style": "accent"
+      }
+     ]
+    },
+    {
+     "label": "Proc 2",
+     "bars": [
+      {
+       "label": "T4",
+       "start": 0,
+       "end": 5,
+       "style": "live"
+      },
+      {
+       "label": "T5",
+       "start": 5,
+       "end": 10,
+       "style": "live"
+      },
+      {
+       "label": "T6",
+       "start": 10,
+       "end": 15,
+       "style": "live"
+      }
+     ]
+    },
+    {
+     "label": "Proc 3",
+     "bars": [
+      {
+       "label": "T7",
+       "start": 0,
+       "end": 5,
+       "style": "next"
+      },
+      {
+       "label": "T8",
+       "start": 5,
+       "end": 10,
+       "style": "next"
+      }
+     ]
+    }
+   ],
+   "aria": "A three-processor schedule: the first two processors run three 5 ms tasks and the third runs two tasks, so the third is idle from 10 ms to 15 ms."
+  }
+ },
+ "examples": [
+  {
+   "question": "Eight tasks T1 to T8 each take 5 ms. They run on three processors under static block distribution in task order. Find the makespan, total work, total capacity, efficiency, idle time and load imbalance. Use maximum load and average load for the imbalance.",
+   "steps": [
+    "Total work W = 8 tasks × 5 ms = 40 ms.",
+    "Block distribution: Proc 1 gets T1–T3, so load₁ = 3 × 5 = 15 ms. Proc 2 gets T4–T6, so load₂ = 3 × 5 = 15 ms. Proc 3 gets T7–T8, so load₃ = 2 × 5 = 10 ms.",
+    "Makespan T = max(15, 15, 10) = 15 ms.",
+    "Capacity = P × T = 3 × 15 = 45 ms.",
+    "Efficiency E = W ÷ (P × T) = 40 ÷ 45 = 0.888… ≈ 0.889.",
+    "Idle time = capacity − W = 45 − 40 = 5 ms. Proc 3 is idle from 10 ms to 15 ms.",
+    "Average load = W ÷ P = 40 ÷ 3 = 13.333 ms. Maximum load = 15 ms. Load imbalance = (15 − 13.333) ÷ 13.333 = 0.125 = 12.5%."
+   ],
+   "answer": "Makespan = 15 ms, total work = 40 ms, capacity = 45 ms, efficiency ≈ 0.889, idle time = 5 ms, load imbalance = 12.5%.",
+   "check": "P = 3\nt = 5\nn = 8\nW = n * t\nloads = [3 * t, 3 * t, 2 * t]\nT = max(loads)\ncapacity = P * T\nE = W / capacity\nidle = capacity - W\navg = W / P\nimbalance = (max(loads) - avg) / avg * 100\nprint(T)\nprint(W)\nprint(capacity)\nprint(round(E, 3))\nprint(idle)\nprint(round(imbalance, 1))",
+   "values": [
+    15,
+    40,
+    45,
+    0.889,
+    5,
+    12.5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Makespan is not the sum of task times. The sum is work; makespan is the last finish time.",
+  "Equal task counts do not guarantee balance when tasks have different sizes or dependencies.",
+  "Block and cyclic are not the same. Block gives contiguous chunks; cyclic gives round-robin single tasks.",
+  "Communication cost belongs in the schedule. A task that waits on a message is idle even if its processor has no work.",
+  "Dynamic balancing is not free. Queue access, task migration and work stealing add overhead; on tiny tasks this can erase the gain."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define granularity and state one cost of making tasks very fine.",
+   "marks": 2,
+   "a": "Granularity is the work per task. Very fine tasks add communication and scheduling overhead."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a schedule with equal total work per processor still have idle time?",
+   "marks": 3,
+   "a": "A processor may wait on a dependency while another processor runs; equal total work does not remove waiting."
+  },
+  {
+   "level": "apply",
+   "q": "Six tasks of 4 ms each run on four processors under block distribution in task order. Find makespan, capacity, efficiency and idle time.",
+   "marks": 4,
+   "a": "Block loads: 8, 8, 4, 4 ms. Makespan = 8 ms. Work = 24 ms. Capacity = 4 × 8 = 32 ms. Efficiency = 24 ÷ 32 = 0.75. Idle = 32 − 24 = 8 ms."
+  },
+  {
+   "level": "apply",
+   "q": "Eight tasks have times 8, 1, 1, 1, 1, 1, 1 and 1 ms. Block distribution puts T1–T4 on Proc 1 and T5–T8 on Proc 2. Find makespan and idle time.",
+   "marks": 3,
+   "a": "Proc 1 load = 8 + 1 + 1 + 1 = 11 ms. Proc 2 load = 1 + 1 + 1 + 1 = 4 ms. Makespan = 11 ms. Work = 15 ms. Capacity = 2 × 11 = 22 ms. Idle = 22 − 15 = 7 ms."
+  },
+  {
+   "level": "understand",
+   "q": "What is block-cyclic distribution, and what do b = 1 and b ≥ n/P give?",
+   "marks": 3,
+   "a": "Tasks are split into blocks of size b and blocks go round-robin. b = 1 is cyclic; b ≥ n/P gives about one block per processor, close to block."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can work stealing beat static block distribution when task times vary?",
+   "marks": 5,
+   "a": "Idle workers take queued tasks from busy workers, so a slow or heavy task does not leave other processors idle. The cost is queue access, task movement and synchronization."
+  },
+  {
+   "level": "analyze",
+   "q": "A dependence graph has one chain of 20 tasks, each 3 ms, plus many independent tasks. Why cannot 100 processors make the makespan below 60 ms?",
+   "marks": 4,
+   "a": "The chain is a critical path. Its tasks must run in order, so at least 20 × 3 = 60 ms is needed regardless of extra processors."
+  }
+ ],
+ "beyond": "Not for the exam. Data-centre job schedulers use block-cyclic placement and work stealing to keep machines busy. Task graphs appear in machine-learning runtimes, where layers are nodes and tensors are edges. Search terms: task graph scheduling, work stealing, guided self-scheduling, load imbalance in MapReduce. The same ideas appear in OpenMP scheduling clauses and in cluster batch queues."
+}

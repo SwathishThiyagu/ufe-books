@@ -1,0 +1,240 @@
+{
+ "lead": "Data parallelism and model parallelism are two ways to spread one machine-learning job over several devices. Data parallelism copies the model to every device and sends each device a different slice of the batch. Model parallelism does the opposite: it keeps the data whole and cuts the model into pieces. Both appear in GPU training, and both echo older ideas: data parallelism is SIMD at a larger scale, and model parallelism is a pipeline. The choice decides speed, memory use and link traffic.",
+ "prereq": "You need: <a href=\"#flynn-s-models-simd-mimd-and-dataflow\">Flynn's SIMD model</a>, <a href=\"#shared-memory-and-distributed-memory-architectures\">shared and distributed memory</a>, and <a href=\"#problem-decomposition-and-load-balancing\">decomposition and load balancing</a>.",
+ "sections": [
+  {
+   "h3": "Data parallelism: same code, different data",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Data parallelism runs the same code on different data. The simplest form is a vector add, c[i] = a[i] + b[i]: one instruction stream, many data lanes. Flynn calls this SIMD, and GPU lanes and CPU vector units implement it in hardware. In training, the data is a mini-batch. With batch B and P devices, each device gets B_dev = B ÷ P examples. Each device holds a full copy of the model. It runs forward and backward on its slice and produces a gradient vector. An all-reduce sums or averages these vectors across devices, so every replica applies the same update. The cost per step is compute plus one gradient exchange. Data parallelism is the default when the model, gradients and optimizer state fit on one device. Its weakness is that the full model must fit everywhere, and the all-reduce grows with the number of parameters. Shared-memory threads use Pthreads or OpenMP; clusters use MPI; GPUs use CUDA or OpenCL. Unit 3 gives the syntax; here the point is the mapping of data to devices."
+    },
+    {
+     "type": "formula",
+     "text": "B_dev = B ÷ P",
+     "where": "B_dev is the number of examples per device; B is the global batch size in examples; P is the number of replicas (devices)."
+    }
+   ]
+  },
+  {
+   "h3": "Model parallelism: split the model",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Model parallelism splits the model, not the batch. In pipeline parallelism, layers are grouped into stages and each stage sits on a different device. Device 0 runs layers 1–6, device 1 runs layers 7–12; the activation of layer 6 is sent over the link to device 1. During backpropagation, gradients travel the other way. The first output is delayed by every stage and every link: T_first = t₁ + t_link + t₂ for two stages. After the pipeline fills, a new micro-batch leaves every max(t₁, t_link, t₂). The start-up and drain periods are pipeline bubbles, when some devices idle. Tensor parallelism is finer: one layer's weight matrix is split by rows or columns, and devices combine partial results inside the layer. Model parallelism lets a model larger than one device's memory run at all. The price is communication at every stage boundary and possible idle time. It suits small micro-batches and fast interconnects."
+    },
+    {
+     "type": "formula",
+     "text": "T_first = t₁ + t_link + t₂,   T_steady = max(t₁, t_link, t₂)",
+     "where": "t₁ and t₂ are stage compute times in ms; t_link is the activation transfer time in ms; T_first is the time to the first output in ms; T_steady is the interval between later micro-batches in ms."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing between them",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Use data parallelism when the model fits on one device and the batch can be large. Use model parallelism when the model does not fit, or when one layer is too large for one device. The table compares the main pressures."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Pressure",
+      "Data parallel",
+      "Model parallel"
+     ],
+     "rows": [
+      [
+       "Model memory",
+       "Full model on every device",
+       "Model split across devices"
+      ],
+      [
+       "Batch",
+       "Needs a large global batch",
+       "Works with small micro-batches"
+      ],
+      [
+       "Link traffic",
+       "Gradients once per step",
+       "Activations at every stage"
+      ],
+      [
+       "Idle time",
+       "Small",
+       "Pipeline bubbles"
+      ],
+      [
+       "Best case",
+       "Model fits, fast link",
+       "Model too large, fast link"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Hybrid parallelism combines both: a group of devices splits the model, and several such groups process different batch slices. For example, 2-way tensor parallelism inside a group and 4-way data parallelism across groups uses 8 devices and gives 4 model replicas. The best split depends on link bandwidth, batch size and the memory per device. Measure before choosing."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Data parallelism copies the model and splits the 64-image batch into 32 images per GPU; model parallelism keeps the batch and puts layers 1–6 and 7–12 on different GPUs.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "Parallel training",
+    "style": "normal",
+    "children": [
+     {
+      "label": "Data parallel",
+      "note": "split batch",
+      "edge": "replicate model",
+      "style": "accent",
+      "children": [
+       {
+        "label": "GPU 0",
+        "note": "32 images",
+        "style": "accent",
+        "_d": 2,
+        "children": [],
+        "_x": 105.0,
+        "_y": 190
+       },
+       {
+        "label": "GPU 1",
+        "note": "32 images",
+        "style": "accent",
+        "_d": 2,
+        "children": [],
+        "_x": 275.0,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 190.0,
+      "_y": 116
+     },
+     {
+      "label": "Model parallel",
+      "note": "split layers",
+      "edge": "split model",
+      "style": "live",
+      "children": [
+       {
+        "label": "Layers 1-6",
+        "style": "live",
+        "_d": 2,
+        "children": [],
+        "_x": 445.0,
+        "_y": 190
+       },
+       {
+        "label": "Layers 7-12",
+        "style": "live",
+        "_d": 2,
+        "children": [],
+        "_x": 615.0,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 530.0,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "A tree splitting parallel training into data parallelism, where each GPU gets part of the batch, and model parallelism, where each GPU gets a block of layers."
+  }
+ },
+ "examples": [
+  {
+   "question": "A batch of 64 images trains a 12-layer network on 2 GPUs. Data parallel: each GPU gets 32 images and the full model. One step takes 80 ms of compute plus 10 ms for the gradient all-reduce. Model parallel: layers 1–6 run on GPU 0 and layers 7–12 on GPU 1; each half computes in 40 ms per micro-batch, and a 100 MB activation crosses the link in 30 ms. Find (a) the data-parallel step time and throughput in images/ms, (b) the model-parallel time to first output and the steady interval between micro-batches.",
+   "steps": [
+    "Data parallel slice: each GPU gets 64 ÷ 2 = 32 images.",
+    "Data parallel step time: 80 ms compute + 10 ms gradient all-reduce = 90 ms.",
+    "Data parallel throughput: 64 images ÷ 90 ms = 0.711 images/ms, or 711 images/s.",
+    "Model parallel first output: stage 0 takes 40 ms, the activation takes 30 ms on the link, stage 1 takes 40 ms, total 40 + 30 + 40 = 110 ms.",
+    "Model parallel steady interval: stages overlap on different micro-batches, so the slower of 40 ms compute and 30 ms link sets the pace: max(40, 30) = 40 ms per micro-batch.",
+    "If one micro-batch is one image, steady throughput = 1 ÷ 40 ms = 0.025 images/ms = 25 images/s. Data parallel is about 28 times faster here because the model fits and the batch is large."
+   ],
+   "answer": "Data parallel: 90 ms per step and 0.711 images/ms (711 images/s). Model parallel: first output at 110 ms, then one micro-batch every 40 ms (0.025 images/ms or 25 images/s for one-image micro-batches).",
+   "check": "batch = 64\ngpus = 2\nper_gpu = batch // gpus\nstep_ms = 80 + 10\nthroughput = batch / step_ms\nfirst_ms = 40 + 30 + 40\ninterval_ms = max(40, 30)\nmicro_tp = 1 / interval_ms\nprint(per_gpu)\nprint(step_ms)\nprint(round(throughput, 3))\nprint(int(round(throughput * 1000)))\nprint(first_ms)\nprint(interval_ms)\nprint(micro_tp)\nprint(int(round(micro_tp * 1000)))",
+   "values": [
+    32,
+    90,
+    0.711,
+    711,
+    110,
+    40,
+    0.025,
+    25
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Data parallelism does not split the model. Every replica holds the full model, gradients and optimizer state, so it fails when the model does not fit on one device.",
+  "Model parallelism is not free memory: it adds activation messages at every stage boundary and can leave devices idle in pipeline bubbles.",
+  "Do not report the first output time of a pipeline as its throughput. The first output includes fill time; steady throughput uses the interval between outputs.",
+  "Match units: ms and s, images/ms and images/s. A throughput of 0.711 images/ms is 711 images/s, not 0.711 images/s.",
+  "Data parallel all-reduce averages gradients, not weights; each replica then applies the same update. Averaging weights after separate updates is not the same algorithm."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define data parallelism in one sentence.",
+   "marks": 2,
+   "a": "Data parallelism keeps the same model and code on every device and gives each device a different slice of the input data."
+  },
+  {
+   "level": "understand",
+   "q": "Why does data parallelism match Flynn's SIMD model?",
+   "marks": 3,
+   "a": "SIMD applies one instruction stream to many data lanes at once. Data parallelism applies one training program to many examples at once, one slice per device, so the same operation runs on different data in parallel."
+  },
+  {
+   "level": "apply",
+   "q": "A batch of 128 images is split over 8 GPUs in data parallelism. How many images per GPU?",
+   "marks": 2,
+   "a": "128 ÷ 8 = 16 images per GPU."
+  },
+  {
+   "level": "analyze",
+   "q": "A model-parallel pipeline has first output at 110 ms and steady interval 40 ms. Explain why these two numbers differ and which one a user notices in a long training run.",
+   "marks": 4,
+   "a": "The first output includes the fill time of all stages and links, so it is larger. After the pipeline fills, stages work on different micro-batches and a new output leaves every slowest stage or link, 40 ms. A long run is dominated by the steady interval, so throughput uses 40 ms, not 110 ms."
+  },
+  {
+   "level": "apply",
+   "q": "A data-parallel step has 70 ms of compute and 20 ms for the all-reduce. What is the throughput for a batch of 64 images?",
+   "marks": 3,
+   "a": "Step time = 70 + 20 = 90 ms. Throughput = 64 ÷ 90 = 0.711 images/ms."
+  },
+  {
+   "level": "analyze",
+   "q": "Give two conditions that favour model parallelism over data parallelism.",
+   "marks": 4,
+   "a": "The model, gradients and optimizer state do not fit on one device; or one layer is too large for one device. A small batch or a fast link between devices also makes model parallelism more attractive."
+  },
+  {
+   "level": "remember",
+   "q": "What is a pipeline bubble?",
+   "marks": 2,
+   "a": "A pipeline bubble is the idle time at the start or end of a pipeline, when some stages have no work because the pipeline is filling or draining."
+  },
+  {
+   "level": "apply",
+   "q": "A hybrid job uses 2-way tensor parallelism and 4-way data parallelism. How many devices and how many model replicas?",
+   "marks": 3,
+   "a": "Devices = 2 × 4 = 8. Model replicas = 4, one per data-parallel group."
+  }
+ ],
+ "beyond": "Not for the exam. Production training now mixes data, pipeline and tensor parallelism in three dimensions, and systems such as ZeRO and FSDP shard optimizer state and gradients to cut memory per device. Search for \"3D parallelism\", \"gradient all-reduce\", \"pipeline bubble\" and \"tensor parallel matrix split\" to go deeper. The same ideas appear in inference serving, where requests are the data and layers are the model."
+}
