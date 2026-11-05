@@ -1,0 +1,651 @@
+{
+ "lead": "This unit is about the speech signal itself: how the mouth and throat make it, how to measure it, and how to turn it into numbers a machine can use. After it you can explain the source-filter model, read a spectrogram, compute MFCCs, decode a word sequence with an HMM plus a language model, describe rule-based and concatenative text-to-speech, and sketch an emotion recogniser. It gives you the speech half of a voice assistant, whose language half you met in Units 2 and 6.",
+ "about": "The unit follows one signal from throat to application. Chapter 7.1 builds the source-filter model and the framing that every later chapter assumes. Chapter 7.2 classifies speech sounds by place and manner of articulation. Chapter 7.3 takes the short-time Fourier transform of each frame and reads a spectrogram. Chapter 7.4 explains how the ear splits sound into critical bands, which gives the mel scale. Chapter 7.5 turns frames into MFCC vectors and shows how speech is compressed. Chapter 7.6 recognises words with hidden Markov models, a lexicon and a language model, and scores them with word error rate. Chapter 7.7 runs the pipeline backwards for synthesis. Chapter 7.8, taught by only a few universities, classifies emotion from prosodic features.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Speech is air from the lungs, switched on and off by the vocal folds and filtered by the vocal tract; sampled at discrete times it becomes a source signal driving a slowly changing filter.",
+   "depth": "Cover the speech chain: lungs, trachea, larynx with vocal folds, pharynx, oral and nasal cavities, lips. Voiced versus unvoiced excitation; fundamental frequency F0 and its harmonics. The source-filter model: x[n] = e[n] convolved with h[n], where e[n] is the excitation and h[n] the vocal tract impulse response. All-pole (LPC) filter of order about 10 at 8 kHz and 18 at 16 kHz. Sampling at 8 kHz or 16 kHz, 16-bit PCM, amplitude range. Quasi-stationarity: the tract changes slowly, so 20-30 ms frames are treated as stationary. Frame length, frame shift (hop) and the frame count formula. Some syllabi call the source the glottal source and the filter the vocal tract transfer function.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Source-filter model of speech",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Lungs",
+      "note": "air stream",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Vocal folds",
+      "note": "voiced source e[n]",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Vocal tract",
+      "note": "filter h[n]",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Lip radiation",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Sample x[n]",
+      "note": "16 kHz, 16 bit",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Frames",
+      "note": "25 ms, hop 10 ms",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "label": "airflow",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "label": "pulses",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     }
+    ],
+    "aria": "Air from the lungs is chopped into pulses by the vocal folds and shaped by the vocal tract, then sampled and cut into overlapping frames."
+   },
+   "example": "A 2-second mono recording at 16 kHz with 16-bit samples. Number of samples = 16000 × 2 = 32000. Storage = 32000 × 16 bits = 512000 bits = 64000 bytes (64 kB). With a 25 ms window (0.025 × 16000 = 400 samples) and a 10 ms hop (160 samples), number of frames = floor((32000 − 400)/160) + 1 = floor(197.5) + 1 = 198 frames.",
+   "trap": "Mixing up sampling rate (samples per second) with frame rate (frames per second). Also, F0 is not the sampling rate and not the frame rate: F0 for a male voice is near 100-150 Hz and for a female voice near 180-250 Hz, while the sampling rate is 8000 or 16000 Hz.",
+   "prereq": "None from earlier units. Basic idea of a signal sampled at regular time instants helps.",
+   "leave": "Names and classes of sounds to 7.2, spectra to 7.3, feature vectors to 7.5."
+  },
+  {
+   "k": 2,
+   "idea": "Every speech sound is one of a small set of classes fixed by where the vocal tract narrows and how it narrows.",
+   "depth": "Three labels for every consonant: voicing (voiced or voiceless), place of articulation (bilabial, labiodental, dental, alveolar, retroflex, palato-alveolar, palatal, velar, glottal) and manner (stop or plosive, nasal, fricative, affricate, lateral, approximant, tap or flap, trill). Vowels described by tongue height (close to open), tongue backness (front to back) and lip rounding; the vowel quadrilateral. Phone versus phoneme versus allophone. IPA symbols read, not memorised wholesale. Syllable as onset, nucleus, coda. Indian language contrasts worth one line each: aspiration in Hindi stops (/k/ versus /kʰ/) and retroflex versus dental in Hindi and Tamil. Some syllabi call manner the constriction type.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Consonants",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Stop",
+       "edge": "manner",
+       "style": "normal",
+       "children": [
+        {
+         "label": "bilabial p b"
+        },
+        {
+         "label": "alveolar t d"
+        },
+        {
+         "label": "velar k g"
+        }
+       ]
+      },
+      {
+       "label": "Nasal",
+       "style": "normal",
+       "children": [
+        {
+         "label": "bilabial m"
+        },
+        {
+         "label": "alveolar n"
+        },
+        {
+         "label": "velar ng"
+        }
+       ]
+      },
+      {
+       "label": "Fricative",
+       "style": "normal",
+       "children": [
+        {
+         "label": "labiodental f v"
+        },
+        {
+         "label": "alveolar s z"
+        },
+        {
+         "label": "palato-alveolar sh zh"
+        }
+       ]
+      },
+      {
+       "label": "Approximant",
+       "style": "normal",
+       "children": [
+        {
+         "label": "lateral l"
+        },
+        {
+         "label": "alveolar r"
+        },
+        {
+         "label": "labio-velar w j"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A hierarchy of English consonants, branching first on manner of articulation and then on place of articulation."
+   },
+   "example": "Classify the first sound of each word: pat, bat, mat, fat, sat. Answer: /p/ voiceless bilabial stop; /b/ voiced bilabial stop; /m/ voiced bilabial nasal; /f/ voiceless labiodental fricative; /s/ voiceless alveolar fricative. The pair pat and bat differ only in voicing; pat and fat differ only in place and manner together.",
+   "trap": "Confusing place with manner, for example calling /m/ a bilabial stop. Also, English spelling is not sound: 'ship' starts with a single fricative /ʃ/, and 'think' starts with the dental fricative /θ/, not /t/ plus /h/.",
+   "prereq": "7.1 for the articulators and the voiced/unvoiced source.",
+   "leave": "Acoustic cues and spectra of these classes to 7.3; phoneme models for recognition to 7.6."
+  },
+  {
+   "k": 3,
+   "idea": "Because speech changes with time, take the Fourier transform of short windowed frames, and stack the magnitudes to get a spectrogram.",
+   "depth": "Why the plain Fourier transform loses time information. Framing and windowing with a Hamming window w[n] = 0.54 − 0.46 cos(2πn/(N−1)). The DFT of one frame and the meaning of bin k, with bin spacing fs/N. Spectrogram: wide-band (short window, about 5 ms, shows pitch pulses and formants) versus narrow-band (long window, about 45 ms, shows harmonics). Short-time energy and zero-crossing rate per frame, used to find speech and silence. Pitch tracking by autocorrelation and the argmax over lag. Word boundary detection: energy dips give candidate boundaries, and a real word boundary needs the lexicon and language model of 7.6. Some syllabi call this the short-time Fourier transform or STFT.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "From one frame to one spectrogram column",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Speech x[n]",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Frame 25 ms",
+      "note": "400 samples",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Hamming window",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "512-point DFT",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Magnitude",
+      "note": "|X[k]|",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Spectrogram column",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     }
+    ],
+    "aria": "One frame of speech is windowed, transformed by a DFT, and its magnitude becomes one column of a spectrogram."
+   },
+   "example": "Speech sampled at 16 kHz, window 25 ms (400 samples), hop 10 ms (160 samples), DFT length 512. Bin spacing = fs/N = 16000/512 = 31.25 Hz. For 1 second of speech, number of frames = floor((16000 − 400)/160) + 1 = floor(97.5) + 1 = 98 frames, so the spectrogram is 98 columns by 256 useful bins (only bins 0 to 256 are non-redundant for a real signal). A voiced frame with F0 = 125 Hz shows peaks at 125, 250, 375 Hz and so on.",
+   "trap": "Thinking window length and hop are the same thing: with a 25 ms window and a 10 ms hop, frames overlap. Also, zero-padding 400 samples to 512 points does not improve true frequency resolution; wide-band spectrograms have good time resolution and poor frequency resolution, not the reverse.",
+   "prereq": "7.1 for sampling and framing; 7.2 for voiced and unvoiced sounds.",
+   "leave": "Mel warping to 7.4; MFCC and compression to 7.5; decoding word boundaries to 7.6."
+  },
+  {
+   "k": 4,
+   "idea": "The ear analyses sound in overlapping frequency bands, so a perceptually spaced frequency scale, not a linear one, is the right axis for speech features.",
+   "depth": "Outer ear, middle ear, inner ear; basilar membrane and hair cells in the cochlea; place theory of pitch. Critical bands: about 24 bands covering the audible range, wider at high frequencies. The Bark scale (roughly one band per 100 Hz below 500 Hz). The mel scale with mel = 2595 log₁₀(1 + f/700), and the fact that it is defined so 1000 Hz maps to 1000 mel. Masking and the just-noticeable difference. Loudness levels in phon and sone, equal-loudness contours by name only. Why mel spacing gives more bands where speech energy is concentrated. Some syllabi call the critical band the Bark band.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "frequency (Hz)",
+     "min": 0,
+     "max": 8000
+    },
+    "y": {
+     "label": "mel",
+     "min": 0,
+     "max": 3000
+    },
+    "series": [
+     {
+      "name": "mel scale",
+      "expr": "2595*log10(1+x/700)",
+      "style": "accent"
+     },
+     {
+      "name": "linear Hz as mel",
+      "expr": "x",
+      "style": "muted"
+     }
+    ],
+    "aria": "A curve of the mel scale against frequency in hertz, compared with a straight line that treats hertz directly as mel."
+   },
+   "example": "Convert 300 Hz, 1000 Hz and 8000 Hz to mel. For 300 Hz: 2595 × log₁₀(1 + 300/700) = 2595 × log₁₀(1.4286) = 2595 × 0.1549 = 402 mel. For 1000 Hz: 2595 × log₁₀(2.4286) = 2595 × 0.3854 = 1000 mel. For 8000 Hz: 2595 × log₁₀(12.4286) = 2595 × 1.0945 = 2840 mel. The first 1000 Hz takes 1000 mel of room; the next 7000 Hz takes only 1840 mel.",
+   "trap": "Treating the mel scale as a physical measurement rather than a perceptual one, and mixing the units (a filter centre given in mel but compared with a frequency in Hz). Critical bands are roughly equal in width on the Bark scale, not in hertz.",
+   "prereq": "7.3 for the spectrum of a frame; 7.2 for which sounds carry most energy.",
+   "leave": "Turning mel bands into MFCC numbers to 7.5."
+  },
+  {
+   "k": 5,
+   "idea": "Compress each frame of speech into a short vector that keeps what matters for recognition, and compress the whole signal by discarding what the ear will not miss.",
+   "depth": "Feature pipeline: pre-emphasis y[n] = x[n] − 0.97x[n−1], framing, windowing, DFT, mel filterbank of 24-40 triangular filters, log of filter energies, then the DCT to get cepstral coefficients; keep c1 to c12 or c13 (c0 carries energy). Delta and delta-delta features for motion, giving 39 dimensions. Cepstral mean normalisation for channel robustness. Alternatives by name: LPC and PLP. Speech coding: waveform coders (PCM 64 kbps for 8 kHz 8-bit, companding), source coders (LPC vocoder about 2.4 kbps), hybrid coders (CELP family, GSM full rate 13 kbps, G.729 at 8 kbps, Opus). Quality measures: MOS and bit rate. Some syllabi call MFCC mel-frequency cepstral coefficients.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "MFCC computation for one frame",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Pre-emphasis",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Frame + window",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "512-point DFT",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Mel filterbank",
+      "note": "26 triangles",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Log",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "DCT",
+      "style": "accent"
+     },
+     {
+      "id": "g",
+      "label": "13 MFCC + Δ",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "style": "solid"
+     }
+    ],
+    "aria": "A chain that turns one pre-emphasised frame into mel filter energies, takes the log, applies the DCT, and outputs thirteen cepstral coefficients."
+   },
+   "example": "16 kHz speech, 25 ms frames with a 10 ms hop, 13 MFCCs plus 13 deltas plus 13 delta-deltas. Frames per second = 100. Feature numbers per second = 100 × 39 = 3900, against 16000 raw samples per second. LPC order rule of thumb: order ≈ fs(kHz) + 2, so 10 at 8 kHz and 18 at 16 kHz. Bit rate example: 8 kHz sampling with 8 bits per sample PCM = 8000 × 8 = 64 kbps; G.729 reaches 8 kbps, an 8 times saving.",
+   "trap": "Getting the order wrong: pre-emphasis comes before framing, the log comes after the filterbank and before the DCT, and the DCT output is truncated, not kept whole. Bit rate is not sample rate: a coder can keep 8 kHz sampling at 8 kbps because it sends parameters, not samples.",
+   "prereq": "7.3 for the DFT and windows; 7.4 for the mel scale and why bands are spaced that way.",
+   "leave": "Using the vectors as HMM observations to 7.6; neural front ends such as wav2vec to Unit 6, chapter on neural NLP."
+  },
+  {
+   "k": 6,
+   "idea": "Treat the acoustic frames as noisy evidence about hidden phoneme and word states, and output the word sequence that maximises P(X|W)·P(W).",
+   "depth": "Bayes rule for speech: Ŵ = argmax over W of P(X|W)P(W), where X is the frame sequence, W a word sequence, P(X|W) the acoustic likelihood and P(W) the language model prior. Argmax based computation shown on three candidates. HMM ingredients: N hidden states, transition matrix aᵢⱼ, emission bⱼ(oₜ) as a Gaussian mixture over the 39-dim vector, initial state distribution. Left-to-right three-state phoneme model. Forward algorithm (sums probabilities) versus Viterbi (keeps the single best path). Training by Baum-Welch (EM) from a flat start; embedded training with a lexicon. Context-dependent triphones. Word boundary detection from a lexicon plus language model, not from silence alone. Decoding as a search over a lexicon tree or weighted finite-state transducer. Extension to DNN-HMM hybrids where a neural net gives the emission probabilities. Evaluation by word error rate WER = (S + D + I)/N. One line on the modern all-neural speech-to-text route (CTC, attention encoder-decoder) with a pointer to Unit 6.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "HMM speech recogniser",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Speech x[n]",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "MFCC frames",
+      "note": "100 per second",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "HMM acoustic model",
+      "note": "P(X|W)",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Lexicon",
+      "note": "word to phonemes",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "N-gram language model",
+      "note": "P(W)",
+      "style": "accent"
+     },
+     {
+      "id": "f",
+      "label": "Viterbi search",
+      "note": "argmax",
+      "style": "live"
+     },
+     {
+      "id": "g",
+      "label": "Word sequence",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "style": "solid"
+     }
+    ],
+    "aria": "Speech frames feed an HMM acoustic model, and the acoustic scores plus a lexicon and a language model are combined by a Viterbi search to give the word sequence."
+   },
+   "example": "Choose between two candidate sentences. Candidate W₁: P(X|W₁) = 0.02, P(W₁) = 0.001, product = 2.0 × 10⁻⁵. Candidate W₂: P(X|W₂) = 0.01, P(W₂) = 0.0005, product = 5.0 × 10⁻⁶. Argmax picks W₁, even though its acoustic score and its prior are individually not both larger than W₂'s (the prior 0.001 is larger too here; the point is that the product decides). Word error rate: a 10-word reference, with 2 substitutions, 1 deletion and 1 insertion, has WER = (2 + 1 + 1)/10 = 0.40, that is 40 %.",
+   "trap": "Maximising P(X|W) alone and ignoring the language model prior, which makes homophone errors such as 'recognise speech' and 'wreck a nice beach' unresolvable. Also, the forward algorithm sums over paths while Viterbi takes the max; they answer different questions. Do not report accuracy for recognition: report WER, which can exceed 100 % when insertions are many.",
+   "prereq": "Unit 2 for hidden Markov models, Viterbi and n-gram language models; 7.5 for the observation vectors; 7.2 for phoneme classes.",
+   "leave": "Neural acoustic models, CTC and attention decoders to Unit 6; smoothing of the language model to Unit 2."
+  },
+  {
+   "k": 7,
+   "idea": "Synthesis runs the recognition path backwards: text becomes phonemes, phonemes become a prosody plan, and the plan becomes a waveform either by rule or by joining recorded units.",
+   "depth": "Pipeline: text normalisation (numbers, ₹ amounts, dates, abbreviations), tokenisation from Unit 1, then letter-to-sound conversion by dictionary lookup or by rules for unknown words, then prosody (phoneme durations, F0 contour, pause placement), then waveform generation. Rule-based approach: formant or diphone rules, duration rules from position and stress, F0 declination over the phrase; the Klatt formant synthesiser by name. Concatenative approach: diphone and unit-selection databases, pitch marking, and overlap-add by PSOLA to change duration and F0 without changing the spectrum. Unit selection cost function: total cost = target cost + join cost, pick the unit with minimum total. Evaluation: mean opinion score, intelligibility tests. One line that neural TTS exists, cross-referenced to Unit 6.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Text-to-speech pipeline",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Text",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Normalisation",
+      "note": "numbers, dates",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "G2P",
+      "note": "phoneme string",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Prosody model",
+      "note": "F0, duration, pauses",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Unit selection",
+      "note": "min cost",
+      "style": "live"
+     },
+     {
+      "id": "f",
+      "label": "PSOLA",
+      "note": "join and stretch",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "Speech",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "style": "solid"
+     }
+    ],
+    "aria": "Text is normalised, converted to phonemes, given a prosody plan, and realised by selecting recorded units and joining them with pitch-synchronous overlap-add."
+   },
+   "example": "Pick a recorded unit for the target diphone /a-t/ with target F0 = 180 Hz and target duration = 90 ms. Cost = 0.6 × |F0cand − 180|/100 + 0.4 × |durcand − 90|/100 + join cost. Candidate 1: F0 = 170 Hz, duration 100 ms, join cost 0.20 → 0.6 × 10/100 = 0.06, 0.4 × 10/100 = 0.04, total = 0.06 + 0.04 + 0.20 = 0.30. Candidate 2: F0 = 200 Hz, duration 80 ms, join cost 0.50 → 0.12 + 0.04 + 0.50 = 0.66. Candidate 1 wins.",
+   "trap": "Treating synthesis as plain unit concatenation with no prosody, which sounds robotic and is often marked wrong. Also, target cost measures how close a unit is to the wanted F0 and duration, join cost measures how smoothly two neighbouring units splice; do not add them into one symbol or swap them. Text normalisation is a graded step, not an afterthought: '₹250' must be spoken as words.",
+   "prereq": "7.2 for phonemes and syllables; 7.5 for frames, F0 and coding; Unit 1 for tokenisation and text normalisation.",
+   "leave": "Neural and transformer TTS to Unit 6; recognition back to 7.6."
+  },
+  {
+   "k": 8,
+   "idea": "Emotion is carried mostly by prosody and voice quality, so summary statistics of pitch, energy and spectral features over an utterance can be classified into emotion labels. Only a few universities teach this topic.",
+   "depth": "Keep it short. Emotion labels: anger, happiness, sadness, fear, disgust, surprise, plus neutral. Cues: mean and range of F0, energy, speaking rate, pause length, voice quality measures such as jitter and shimmer, spectral features such as MFCC and deltas, and standard sets such as eGeMAPS by name. Utterance-level statistics: mean, standard deviation, minimum and maximum over frames. Classifiers: SVM on statistics, or CNN and LSTM on spectrograms. Corpora: acted and natural, speaker-dependent and speaker-independent. Evaluation: confusion matrix, accuracy and unweighted average recall. Application: spotting upset customers in a call centre queue.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Emotion recognition from speech",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Speech",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Frame features",
+      "note": "F0, energy, MFCC",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Utterance statistics",
+      "note": "mean, std",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Classifier",
+      "note": "SVM or LSTM",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "Emotion label",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     }
+    ],
+    "aria": "Speech is reduced to frame-level pitch, energy and cepstral features, summarised per utterance, and passed to a classifier that outputs an emotion label."
+   },
+   "example": "Test set of 100 utterances: 40 angry, 35 happy, 25 neutral. The confusion matrix gives 32 angry correct (5 as happy, 3 as neutral), 28 happy correct (4 as angry, 3 as neutral) and 20 neutral correct (2 as angry, 3 as happy). Accuracy = (32 + 28 + 20)/100 = 0.80. Per-class recall: angry 32/40 = 0.80, happy 28/35 = 0.80, neutral 20/25 = 0.80. Unweighted average recall = (0.80 + 0.80 + 0.80)/3 = 0.80.",
+   "trap": "Reporting accuracy when classes are imbalanced: a model that always says 'angry' scores 40 % here with zero real skill, so unweighted average recall is reported. Also, splitting train and test by utterance instead of by speaker leaks the speaker's voice into the test set and inflates the score.",
+   "prereq": "7.5 for MFCC and delta features; 7.3 for spectrograms; Unit 5 for SVM and classification metrics.",
+   "leave": "Deep sequence models in full to Unit 6; standard speech recognition to 7.6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the articulators named in the source-filter model become places and manners of articulation"
+  ],
+  [
+   2,
+   3,
+   "voiced and unvoiced classes explain the two kinds of spectrogram pattern"
+  ],
+  [
+   3,
+   4,
+   "frame spectra are re-spaced onto the ear's mel bands"
+  ],
+  [
+   4,
+   5,
+   "mel bands become the filterbank that produces MFCCs"
+  ],
+  [
+   5,
+   6,
+   "MFCC frames are the observations that the HMM scores"
+  ],
+  [
+   6,
+   7,
+   "synthesis reverses the recognition pipeline from text to waveform"
+  ],
+  [
+   2,
+   7,
+   "the phoneme inventory drives letter-to-sound rules for synthesis"
+  ],
+  [
+   5,
+   8,
+   "pitch, energy and cepstral statistics feed the emotion classifier"
+  ]
+ ]
+}

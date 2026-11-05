@@ -1,0 +1,232 @@
+{
+ "lead": "A speech recogniser does not hear words. It sees a stream of feature frames and must guess the sentence behind them. The hidden Markov model turns that guess into arithmetic: each word is a small machine of hidden states, and the recogniser picks the word sequence that best explains the frames while also being likely English. This is the classic route behind dictation, voice search and telephone menus, and it still explains the scoring inside newer systems.",
+ "prereq": "You need: hidden Markov models, Viterbi and n-gram language models from <a href=\"#hidden-markov-models-and-the-viterbi-algorithm\">Unit 2</a>, feature vectors from <a href=\"#speech-features-and-speech-coding\">7.5</a>, and phoneme classes from <a href=\"#phonetics-categories-of-speech-sounds-and-articulation\">7.2</a>.",
+ "sections": [
+  {
+   "h3": "The Bayes decision rule for a whole sentence",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Let X = o<sub>1</sub>, o<sub>2</sub>, ..., o<sub>T</sub> be the sequence of feature frames, one every 10 ms. Let W = w<sub>1</sub>, ..., w<sub>M</sub> be a candidate word sequence. Bayes' rule says P(W|X) = P(X|W)P(W) / P(X). The denominator P(X) is the same for every candidate W, so it cannot change the ranking."
+    },
+    {
+     "type": "formula",
+     "text": "Ŵ = argmax<sub>W</sub> P(X|W) · P(W)",
+     "where": "Ŵ is the recognised word sequence; X is the observed frame sequence; W ranges over all word sequences; P(X|W) is the acoustic likelihood of the frames given W; P(W) is the language model prior."
+    },
+    {
+     "type": "p",
+     "text": "P(X|W) comes from the HMM acoustic model: it is high when the frames look like the sounds of W. P(W) comes from an n-gram language model: it is high for phrases that occur in English. Multiplying them is the whole idea — acoustics alone cannot separate 'recognise speech' from 'wreck a nice beach', but the prior can. In practice we add logs, log P(X|W) + log P(W), because a product of thousands of small probabilities underflows."
+    }
+   ]
+  },
+  {
+   "h3": "The HMM that scores one word",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A word HMM has N hidden states. From state i at time t it moves to state j at t+1 with transition probability a<sub>ij</sub>. While in state j it emits the frame vector o<sub>t</sub> with density b<sub>j</sub>(o<sub>t</sub>), usually a Gaussian mixture over the 39-dimensional vector from <a href=\"#speech-features-and-speech-coding\">7.5</a>. The initial distribution π<sub>i</sub> gives the probability of starting in state i."
+    },
+    {
+     "type": "p",
+     "text": "A phoneme uses a left-to-right three-state model: state 1 goes to 1 or 2, state 2 to 2 or 3, state 3 to 3 only. The self-loops absorb variation in duration. A word is a chain of such phoneme models read from the lexicon."
+    },
+    {
+     "type": "formula",
+     "text": "α<sub>t</sub>(j) = [ Σ<sub>i</sub> α<sub>t−1</sub>(i) a<sub>ij</sub> ] · b<sub>j</sub>(o<sub>t</sub>)",
+     "where": "α<sub>t</sub>(j) is the total probability of the first t frames ending in state j; the sum runs over all states i at t−1; a<sub>ij</sub> is the transition probability; b<sub>j</sub>(o<sub>t</sub>) is the emission density of frame o<sub>t</sub> in state j."
+    },
+    {
+     "type": "p",
+     "text": "The forward algorithm applies this recursion and sums over every state path, giving P(X|W). Viterbi replaces the sum by a maximum and remembers the best predecessor, giving the single most likely path. Both are needed: forward for likelihoods during training, Viterbi for decoding, where the recogniser must output one path and one sentence."
+    }
+   ]
+  },
+  {
+   "h3": "Training, context and the final word string",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Training starts from a flat start: transition probabilities uniform, emission means and variances copied from all speech. Baum-Welch, which is expectation-maximisation, alternates two steps."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "E-step: run forward-backward to get the posterior probability of every state and every transition at every frame.",
+      "M-step: re-estimate a<sub>ij</sub> from expected transition counts and the Gaussian means and variances from expected frame occupancies.",
+      "Repeat until the total log likelihood stops rising."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Embedded training strings all words together through the lexicon, so each phoneme model learns from every occurrence in every word. A triphone model replaces a phoneme by (left context, phoneme, right context), because the vowel in 'cat' and 'cab' differs; decision trees tie the many triphones that behave alike."
+    },
+    {
+     "type": "p",
+     "text": "Word boundaries do not come from silence. They come from paths through the lexicon, scored by the language model; a pause inside a word is possible and a boundary without a pause is common. The decoder searches a lexicon tree or a weighted finite-state transducer that composes HMMs, lexicon and n-gram. In a DNN-HMM hybrid, a neural network supplies P(state|frame), and the emission is b<sub>j</sub>(o<sub>t</sub>) ∝ P(j|o<sub>t</sub>)/P(j)."
+    },
+    {
+     "type": "p",
+     "text": "Accuracy is not reported. Report word error rate, WER = (S + D + I)/N, where S is substitutions, D deletions, I insertions and N is the number of reference words. WER can exceed 100 % when a system inserts many words. All-neural systems replace this pipeline with CTC or attention encoder-decoder models (see Unit 6, Neural NLP)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Speech frames feed the HMM acoustic model; its scores are combined with the lexicon and the n-gram prior in a Viterbi search, which returns the most probable word sequence.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "HMM speech recogniser",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Speech x[n]",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "MFCC frames",
+     "note": "100 per second",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "HMM acoustic model",
+     "note": "P(X|W)",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Lexicon",
+     "note": "word to phonemes",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "N-gram language model",
+     "note": "P(W)",
+     "style": "accent"
+    },
+    {
+     "id": "f",
+     "label": "Viterbi search",
+     "note": "argmax",
+     "style": "live"
+    },
+    {
+     "id": "g",
+     "label": "Word sequence",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "g",
+     "style": "solid"
+    }
+   ],
+   "aria": "Speech frames feed an HMM acoustic model, and the acoustic scores plus a lexicon and a language model are combined by a Viterbi search to give the word sequence."
+  }
+ },
+ "examples": [
+  {
+   "question": "A recogniser compares three candidate sentences for the same frame sequence X. W1: P(X|W1) = 0.02, P(W1) = 0.001. W2: P(X|W2) = 0.01, P(W2) = 0.0005. W3: P(X|W3) = 0.008, P(W3) = 0.002. (a) Which sentence does the Bayes rule choose? (b) A 10-word reference transcript gives 2 substitutions, 1 deletion and 1 insertion. Compute the word error rate.",
+   "steps": [
+    "For W1: P(X|W1) · P(W1) = 0.02 × 0.001 = 2.0 × 10⁻⁵.",
+    "For W2: P(X|W2) · P(W2) = 0.01 × 0.0005 = 5.0 × 10⁻⁶.",
+    "For W3: P(X|W3) · P(W3) = 0.008 × 0.002 = 1.6 × 10⁻⁵.",
+    "Compare the three products: 2.0 × 10⁻⁵ > 1.6 × 10⁻⁵ > 5.0 × 10⁻⁶, so the largest is W1.",
+    "WER = (S + D + I)/N = (2 + 1 + 1)/10 = 4/10 = 0.40."
+   ],
+   "answer": "The Bayes rule chooses Ŵ = W1, because 2.0 × 10⁻⁵ is the largest product; the word error rate is 0.40, that is 40 %.",
+   "check": "p1 = 0.02 * 0.001\np2 = 0.01 * 0.0005\np3 = 0.008 * 0.002\nprint(p1)\nprint(p2)\nprint(p3)\nprint((2 + 1 + 1) / 10)",
+   "values": [
+    2e-05,
+    5e-06,
+    1.6e-05,
+    0.4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Maximising P(X|W) alone and ignoring P(W). That makes homophone errors such as 'recognise speech' versus 'wreck a nice beach' impossible to resolve.",
+  "Confusing the forward algorithm with Viterbi. Forward sums over all state paths and gives P(X|W); Viterbi takes the maximum and gives one best path.",
+  "Reporting recognition accuracy instead of WER. WER can exceed 100 % when there are many insertions, so an 'accuracy' figure is misleading.",
+  "Assuming silence marks word boundaries. Boundaries come from the lexicon and the language model; pauses can occur inside words and boundaries can occur without pauses.",
+  "Mixing up the transition probability a<sub>ij</sub> with the emission density b<sub>j</sub>(o<sub>t</sub>). One moves between hidden states, the other scores the observed frame."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the emission density b<sub>j</sub>(o<sub>t</sub>) mean in a speech HMM?",
+   "marks": 2,
+   "a": "It is the probability density of observing frame vector o<sub>t</sub> while the HMM is in hidden state j. In a continuous-density HMM it is usually a Gaussian mixture over the 39-dimensional feature vector."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the recogniser multiply P(X|W) by P(W) instead of choosing the largest acoustic score alone?",
+   "marks": 3,
+   "a": "The acoustic score alone cannot separate word sequences that sound the same. P(W) from the language model penalises unlikely phrases and rewards likely ones, so the product implements the Bayes decision P(W|X) ∝ P(X|W)P(W)."
+  },
+  {
+   "level": "apply",
+   "q": "Two candidates are compared. For W_A: P(X|W_A) = 0.04 and P(W_A) = 0.0002. For W_B: P(X|W_B) = 0.02 and P(W_B) = 0.001. Which candidate wins under the Bayes rule?",
+   "marks": 4,
+   "a": "W_A product = 0.04 × 0.0002 = 8.0 × 10⁻⁶. W_B product = 0.02 × 0.001 = 2.0 × 10⁻⁵. Since 2.0 × 10⁻⁵ > 8.0 × 10⁻⁶, W_B wins even though its acoustic score is lower."
+  },
+  {
+   "level": "apply",
+   "q": "A reference transcript has 20 words. The recogniser makes 3 substitutions, 2 deletions and 1 insertion. Compute the word error rate.",
+   "marks": 4,
+   "a": "S = 3, D = 2, I = 1, N = 20. WER = (3 + 2 + 1)/20 = 6/20 = 0.30, that is 30 %."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does training use the forward-backward algorithm while decoding uses Viterbi?",
+   "marks": 5,
+   "a": "Training needs the total likelihood P(X|W) and the posterior probability of each state and transition, so it must sum over all possible state paths; forward-backward does that. Decoding must output one sentence and one state path, so it needs the single best path; Viterbi finds that maximum with backpointers."
+  },
+  {
+   "level": "analyze",
+   "q": "Why do triphone models beat monophone models, and what problem does state tying solve?",
+   "marks": 5,
+   "a": "A phoneme sounds different depending on its neighbours, so a triphone (left context, phoneme, right context) models coarticulation better. But the number of triphones is huge and most occur rarely, so their parameters cannot be trained reliably. Decision-tree tying groups triphones that share similar behaviour, giving each group enough data."
+  },
+  {
+   "level": "understand",
+   "q": "Why can word boundaries not be detected reliably from silence alone?",
+   "marks": 3,
+   "a": "Speakers pause inside words and often run words together without a pause. The reliable source of boundaries is the path through the lexicon, scored together with the language model, not the energy contour."
+  }
+ ],
+ "beyond": "Not for the exam. The DNN-HMM hybrid was the main industrial recipe for years, and toolkits such as Kaldi made lexicon trees and weighted finite-state transducers standard. Newer systems replace the HMM with CTC or attention encoder-decoder networks, trained on paired audio and text (see Unit 6). Search terms: Kaldi, DNN-HMM, triphone tying, weighted finite-state transducer, CTC, RNN-Transducer, Whisper. A useful next step is to read how a decoder lattice is converted into a word sequence with a language model."
+}
