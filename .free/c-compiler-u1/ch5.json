@@ -1,0 +1,263 @@
+{
+ "lead": "A lexer must look at one character at a time, but reading each character from disk or a terminal is slow. Input buffering reads a large block of source text into memory and lets the lexer scan it quickly. The common two-buffer scheme uses two half-buffers of N characters each, a sentinel at the end of each, and two pointers: lexemeBegin marks where the current lexeme starts, and forward scans ahead. This chapter shows how forward moves, how a refill works, and why a lexeme can safely cross a buffer boundary.",
+ "prereq": "You need: <a href=\"#role-of-the-lexical-analyzer-tokens-patterns-lexemes\">Chapter 1.4</a> for tokens, patterns and lexemes.",
+ "sections": [
+  {
+   "h3": "Why the lexer needs a buffer",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The lexical analyzer asks for characters one after another. A disk read or a terminal read is much slower than a register or cache access. If the lexer made one operating-system call per character, most time would go in waiting, not in scanning."
+    },
+    {
+     "type": "p",
+     "text": "Input buffering reads a block of source text into memory once. The lexer then serves characters from that block. A large block reduces the number of slow reads. The operating system supplies the block; file handling itself belongs to an operating systems course."
+    },
+    {
+     "type": "p",
+     "text": "The buffer also makes lookahead cheap. A scanner often needs the next character to decide whether an identifier has ended, whether = is part of ==, or whether < is part of <=. With characters already in memory, that lookahead is a pointer move, not another slow read."
+    }
+   ]
+  },
+  {
+   "h3": "Two half-buffers and two pointers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The standard arrangement is two buffers, each of N characters. N is the buffer size in characters; a common choice is a few thousand. The two buffers are used as halves of one logical input stream. At the end of each half sits one extra cell called a sentinel. The sentinel is a marker, not a source character. Some syllabi call this the two-buffer input scheme; the sentinel is also called an EOF marker."
+    },
+    {
+     "type": "p",
+     "text": "Two pointers move over the buffers. lexemeBegin points to the first character of the lexeme being built. forward points to the next character to examine. Each pointer is a position in one of the two half-buffers: forward is an index into the half-buffer currently being scanned, and lexemeBegin is an index into whichever half-buffer the current lexeme started in, which may be the other half."
+    },
+    {
+     "type": "p",
+     "text": "The scanner starts with lexemeBegin and forward on the first character. It reads the character at forward and advances forward. When forward reaches a sentinel, the scanner switches to the other half-buffer. If that half still holds characters from the previous block that have already been scanned, it refills it with the next block from the source and sets forward to its first cell. If it already holds the newly loaded next block (as after the initial fill in the example), the scanner only switches. lexemeBegin is not changed during this switch. That is what allows a lexeme to cross a buffer boundary: its start stays in the old half while its end is found in the new half."
+    }
+   ]
+  },
+  {
+   "h3": "Sentinels and boundary crossing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Sentinels turn two boundary tests into one. Without them, the scanner would test for the end of the current buffer and for the end of the input at every character. With a sentinel, it sees one marker value at the buffer end. The marker cannot be part of any token."
+    },
+    {
+     "type": "p",
+     "text": "The scanning loop has five steps:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set lexemeBegin and forward to the first character of the input.",
+      "Read the character at forward.",
+      "If the character is a sentinel: if the source is exhausted, stop; otherwise switch half-buffer (refilling it if it holds already-scanned text), set forward to the first cell of the new block, and go to step 2. If it is not a sentinel, go to step 4.",
+      "If the character can extend the current lexeme, advance forward and go to step 2.",
+      "If it cannot extend the lexeme, accept the lexeme from lexemeBegin to forward - 1, set lexemeBegin to forward, and go to step 2 for the next token."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A refill must not lose a lexeme. Keep lexemeBegin where it is, copy the next block into the other half-buffer, and move forward to the first cell of that block. If the lexeme began in the old half, the accepted text is still the range from lexemeBegin to forward - 1. The example below uses N = 5, so each half holds five characters plus one sentinel."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The identifier starts at the first cell of Buffer A; forward has crossed the sentinel into the first cell of Buffer B. The sentinel marks the end of a half-buffer and is not part of the input.",
+  "spec": {
+   "type": "array",
+   "title": "Two half buffers",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Buffer A",
+     "cells": [
+      "c",
+      "o",
+      "u",
+      "n",
+      "t",
+      "$"
+     ],
+     "marks": {
+      "0": "accent",
+      "5": "muted"
+     }
+    },
+    {
+     "label": "Buffer B",
+     "cells": [
+      "=",
+      "1",
+      "+",
+      "2",
+      ";",
+      "$"
+     ],
+     "marks": {
+      "0": "live",
+      "5": "muted"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 0,
+     "label": "lexemeBegin"
+    },
+    {
+     "row": 1,
+     "cell": 0,
+     "label": "forward"
+    }
+   ],
+   "aria": "Two buffers of six cells each hold the input with sentinels; the identifier starts at Buffer A cell zero and the forward pointer has moved to Buffer B cell zero."
+  }
+ },
+ "examples": [
+  {
+   "question": "The input count=1+2; is placed in two half-buffers of N = 5 characters each plus a sentinel. Buffer A holds count$ and Buffer B holds =1+2;$. Trace the identifier count. State the lexeme length, the index of its last character in Buffer A, the sentinel index in Buffer A, and the cell of Buffer B where forward sits after the sentinel is crossed.",
+   "steps": [
+    "Buffer A has cells A0 to A4 holding c, o, u, n, t, with the sentinel at A5. Buffer B has cells B0 to B4 holding =, 1, +, 2, ;, with the sentinel at B5.",
+    "Set lexemeBegin = A0 and forward = A0.",
+    "Read A0 = c. c can start an identifier. Advance forward to A1.",
+    "Read A1 = o. Advance forward to A2.",
+    "Read A2 = u. Advance forward to A3.",
+    "Read A3 = n. Advance forward to A4.",
+    "Read A4 = t. Advance forward to A5.",
+    "A5 is the sentinel. Switch to Buffer B and set forward = B0. Buffer B already holds the newly loaded next block, so no refill is needed; the scanner only switches.",
+    "Read B0 = =. The character = cannot continue an identifier. The lexeme ends at A4.",
+    "Accept the lexeme from A0 to A4: count. Its length is 5 characters. The last character is at index 4 in Buffer A. The sentinel in Buffer A is at index 5. forward is at B0, index 0."
+   ],
+   "answer": "The lexeme is count, length 5 characters, with its last character at A4, the sentinel at A5, and forward at B0 (index 0).",
+   "check": "input_text = \"count=1+2;\"\nN = 5\nlexeme = input_text[:N]\nprint(len(lexeme))\nprint(N - 1)\nprint(N)\nprint(0)\n",
+   "values": [
+    5,
+    4,
+    5,
+    0
+   ],
+   "dry_run": {
+    "head": [
+     "Step",
+     "lexemeBegin",
+     "forward",
+     "Action"
+    ],
+    "rows": [
+     [
+      "1-2",
+      "A0",
+      "A0",
+      "start"
+     ],
+     [
+      "3",
+      "A0",
+      "A1",
+      "read c"
+     ],
+     [
+      "4",
+      "A0",
+      "A2",
+      "read o"
+     ],
+     [
+      "5",
+      "A0",
+      "A3",
+      "read u"
+     ],
+     [
+      "6",
+      "A0",
+      "A4",
+      "read n"
+     ],
+     [
+      "7",
+      "A0",
+      "A5",
+      "read t"
+     ],
+     [
+      "8",
+      "A0",
+      "B0",
+      "sentinel; switch to B"
+     ],
+     [
+      "9",
+      "A0",
+      "B0",
+      "read =; cannot extend"
+     ],
+     [
+      "10",
+      "A0",
+      "B0",
+      "accept count"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The sentinel is not a source character. Do not include $ in the lexeme and do not count it as input length.",
+  "On refill, keep lexemeBegin where it is and move forward to the first cell of the new buffer. Resetting lexemeBegin cuts a lexeme that crosses the boundary.",
+  "The sentinel is a buffer-boundary marker, not an end-of-token signal. In the example, = at B0 is a real character that ends count.",
+  "The accepted lexeme runs from lexemeBegin to forward - 1. It is not always inside one half-buffer."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does lexemeBegin point to in the two-buffer scheme?",
+   "marks": 2,
+   "a": "It points to the first character of the lexeme being built. It stays fixed until that lexeme is accepted."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a sentinel reduce the work done at a buffer boundary?",
+   "marks": 3,
+   "a": "It combines the end-of-buffer test and the end-of-input test into one marker value. The scanner sees one sentinel at the end of each half-buffer."
+  },
+  {
+   "level": "apply",
+   "q": "Two half-buffers have N = 4 characters each. The input is total=9;. Buffer A holds t,o,t,a with sentinel A4; Buffer B holds l,=,9,; with sentinel B4. Trace the identifier total. Give its length, its last character cell, and forward's cell after the sentinel is crossed.",
+   "marks": 4,
+   "a": "lexemeBegin = A0. Read t, o, t, a and advance forward to A4. A4 is the sentinel, so switch to B0 and read l; advance forward to B1. B1 is =, which cannot extend the identifier. Accept A0 to B0: total. Length = 5 characters; last character = B0; forward = B1."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must lexemeBegin not be reset when a buffer is refilled?",
+   "marks": 4,
+   "a": "A lexeme can start in the old half-buffer and end in the new one. If lexemeBegin is reset, the start of that lexeme is lost and the token is cut. Keeping it lets the scanner accept the range from the old start to forward - 1."
+  },
+  {
+   "level": "apply",
+   "q": "forward is at sentinel A5. Buffer B is empty and the source still has characters. What happens next?",
+   "marks": 3,
+   "a": "The scanner refills Buffer B with the next block, sets forward to B0, and keeps lexemeBegin unchanged. If the source has no more characters, the scanner reports end of input."
+  },
+  {
+   "level": "analyze",
+   "q": "A student stores the sentinel as a normal source character and includes it in the lexeme. What goes wrong?",
+   "marks": 3,
+   "a": "The sentinel is not input. Including it adds a false character to the token, gives a wrong lexeme length, and confuses the buffer-boundary test."
+  },
+  {
+   "level": "remember",
+   "q": "What does N mean in the two-buffer scheme?",
+   "marks": 2,
+   "a": "N is the number of characters in each half-buffer, not the total number in both buffers."
+  }
+ ],
+ "beyond": "Not for the exam. Production scanners often read the whole file or use memory-mapped files, then scan with buffered I/O libraries. Some use SIMD instructions to test many characters at once. The two-buffer idea still explains the pointer discipline behind lexer generators such as LEX (see <a href=\"#lexical-analyzer-generator-lex\">Chapter 1.9</a>). Search for buffered input, sentinel, and scanner lookahead if you want implementation details."
+}

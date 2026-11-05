@@ -1,0 +1,286 @@
+{
+ "lead": "A lexical analyzer, or lexer, reads the source program as characters and returns the next token to the parser. It hides spaces, comments and line endings. Three terms keep the job clear: a lexeme is the exact text, a pattern describes the set of lexemes for one class, and a token is the class name plus any value needed later. The parser then works with a small set of token names instead of raw characters. Compilers, formatters, linters and syntax highlighters all use the same idea.",
+ "prereq": "You need: the phase pipeline in <a href=\"#structure-and-phases-of-a-compiler\">Chapter 1.2</a>.",
+ "sections": [
+  {
+   "h3": "From characters to tokens",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The lexer scans source text from left to right. At each step it skips whitespace and comments, then groups characters into the next lexeme. It finds which token class matches that lexeme and returns the token. The parser calls the lexer whenever it needs a token, so the lexer behaves like a subroutine of the parser."
+    },
+    {
+     "type": "p",
+     "text": "A <b>token</b> is a pair: a token name and an optional attribute value. Some syllabi call the token name the token class or token type. A <b>lexeme</b> is the actual character string. A <b>pattern</b> is the rule that says which strings belong to a token class. An <b>attribute</b> carries extra information, such as the numeric value of a number or the name of an identifier."
+    },
+    {
+     "type": "formula",
+     "text": "token = ⟨token-name, attribute⟩",
+     "where": "token-name identifies the class, such as ID or NUM; attribute is optional extra data used by later phases."
+    },
+    {
+     "type": "p",
+     "text": "For example, in <code>count = 10</code>, <code>count</code> and <code>10</code> are lexemes. The token for <code>count</code> is ID with attribute <code>count</code>; the token for <code>10</code> is NUM with attribute 10."
+    },
+    {
+     "type": "p",
+     "text": "Why separate lexical analysis from syntax analysis? Lexical rules are regular and simple. Syntax rules need nesting and recursion. Separating them keeps both parts small, lets the lexer run fast with finite automata, and allows one lexer to serve a parser generator."
+    }
+   ]
+  },
+  {
+   "h3": "Token names, attributes and the symbol table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Common token names are <code>id</code>, <code>num</code>, <code>if</code>, <code>relop</code> and <code>assign</code>. Many texts write them in capitals: ID, NUM, IF, RELOP, ASSIGN. The lexer returns ID for every identifier. The attribute tells the parser which identifier it is. For a number, the attribute is the value, not the digits. For an operator, the token name already says which operator, so the attribute may be absent."
+    },
+    {
+     "type": "p",
+     "text": "When the lexer sees an identifier, it may enter the name in the symbol table and return a pointer or index as the attribute. Later phases use that entry for type, scope and storage. Whitespace and comments are not tokens. The lexer skips them, but it still tracks line numbers for error messages."
+    },
+    {
+     "type": "p",
+     "text": "Two rules decide choices. The <b>longest-match rule</b>: choose the longest prefix that forms a lexeme. In <code>x1</code>, read <code>x1</code> as one ID, not <code>x</code> then <code>1</code>. In <code>&lt;=</code>, read one RELOP, not <code>&lt;</code> then <code>=</code>. <b>Keyword reservation</b>: keywords such as <code>if</code> are reserved before identifiers. If <code>if</code> matched the ID pattern first, the parser would never see IF."
+    }
+   ]
+  },
+  {
+   "h3": "What the parser receives",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The parser's input is a stream of tokens, not characters. For the line <code>if (count &lt;= 10) count = count + 1;</code> the lexer returns token names in order: IF, LPAREN, ID, LE, NUM, RPAREN, ID, ASSIGN, ID, PLUS, NUM, SEMI. The parser does not care that three lexemes are <code>count</code>; it sees ID each time. It uses the attributes when it builds the syntax tree."
+    },
+    {
+     "type": "p",
+     "text": "Token names depend on the grammar. A language may call <code>&lt;=</code> LE, RELOP or LEQ. The name is for the parser; the lexeme is for the source. Errors at this stage are simple: an illegal character, an unterminated string or a malformed number. The lexer reports the line and column and may skip to a safe point. A lexer error is not a syntax error; it means no token can be formed at that point."
+    },
+    {
+     "type": "p",
+     "text": "Input buffering is covered in <a href=\"#input-buffering\">Chapter 1.5</a>. Patterns are written with regular expressions in <a href=\"#specification-of-tokens-with-regular-expressions\">Chapter 1.6</a>. Parsing is Unit 2; symbol table organisation is Unit 5."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The lexer reads the source line and sends the parser a token stream; the parser never sees spaces or the original characters.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "aria": "A source text line enters the lexer and leaves as a token stream for the parser.",
+   "nodes": [
+    {
+     "id": "src",
+     "label": "Source text",
+     "note": "if (count &lt;= 10)",
+     "style": "normal"
+    },
+    {
+     "id": "lex",
+     "label": "Lexer",
+     "style": "accent"
+    },
+    {
+     "id": "tok",
+     "label": "Token stream",
+     "note": "IF ID LE NUM",
+     "style": "normal"
+    },
+    {
+     "id": "par",
+     "label": "Parser",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "src",
+     "to": "lex",
+     "style": "solid"
+    },
+    {
+     "from": "lex",
+     "to": "tok",
+     "style": "solid"
+    },
+    {
+     "from": "tok",
+     "to": "par",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "For the source line <code>if (count &lt;= 10) count = count + 1;</code> list every lexeme, its token name and any attribute. Also count the tokens, the distinct lexemes, the number of times ID appears and the number of times NUM appears.",
+   "steps": [
+    "Start at the first character. Skip the space after <code>if</code> when it comes; spaces are not tokens.",
+    "<code>if</code> → IF. No attribute: a keyword has a fixed token name.",
+    "<code>(</code> → LPAREN.",
+    "<code>count</code> → ID with attribute <code>count</code>. Enter <code>count</code> in the symbol table.",
+    "<code>&lt;=</code> → LE, also called RELOP. The longest match makes it one token, not <code>&lt;</code> then <code>=</code>.",
+    "<code>10</code> → NUM with attribute 10.",
+    "<code>)</code> → RPAREN.",
+    "<code>count</code> → ID with attribute <code>count</code>. This is the same token name as step 4.",
+    "<code>=</code> → ASSIGN.",
+    "<code>count</code> → ID with attribute <code>count</code>. Third ID.",
+    "<code>+</code> → PLUS.",
+    "<code>1</code> → NUM with attribute 1. Second NUM.",
+    "<code>;</code> → SEMI.",
+    "Total tokens: 12. Distinct lexemes: <code>if</code>, <code>(</code>, <code>count</code>, <code>&lt;=</code>, <code>10</code>, <code>)</code>, <code>=</code>, <code>+</code>, <code>1</code>, <code>;</code> = 10. ID count: 3. NUM count: 2."
+   ],
+   "answer": "The lexer returns 12 tokens from 10 distinct lexemes; ID appears 3 times and NUM appears 2 times.",
+   "check": "lexemes = ['if','(','count','<=','10',')','count','=','count','+','1',';']\ntokens = ['IF','LPAREN','ID','LE','NUM','RPAREN','ID','ASSIGN','ID','PLUS','NUM','SEMI']\nprint(len(tokens))\nprint(len(set(lexemes)))\nprint(tokens.count('ID'))\nprint(tokens.count('NUM'))",
+   "values": [
+    12,
+    10,
+    3,
+    2
+   ],
+   "dry_run": {
+    "head": [
+     "Step",
+     "Lexeme",
+     "Token name",
+     "Attribute"
+    ],
+    "rows": [
+     [
+      "1",
+      "if",
+      "IF",
+      "—"
+     ],
+     [
+      "2",
+      "(",
+      "LPAREN",
+      "—"
+     ],
+     [
+      "3",
+      "count",
+      "ID",
+      "count"
+     ],
+     [
+      "4",
+      "&lt;=",
+      "LE",
+      "—"
+     ],
+     [
+      "5",
+      "10",
+      "NUM",
+      "10"
+     ],
+     [
+      "6",
+      ")",
+      "RPAREN",
+      "—"
+     ],
+     [
+      "7",
+      "count",
+      "ID",
+      "count"
+     ],
+     [
+      "8",
+      "=",
+      "ASSIGN",
+      "—"
+     ],
+     [
+      "9",
+      "count",
+      "ID",
+      "count"
+     ],
+     [
+      "10",
+      "+",
+      "PLUS",
+      "—"
+     ],
+     [
+      "11",
+      "1",
+      "NUM",
+      "1"
+     ],
+     [
+      "12",
+      ";",
+      "SEMI",
+      "—"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A lexeme is the actual text; a token is the class. Writing 'the token count' when you mean the lexeme count loses marks.",
+  "Keywords must be reserved before identifiers; otherwise <code>if</code> is returned as ID.",
+  "Do not put the digits of a number in the token name; NUM carries the value as an attribute.",
+  "Apply the longest-match rule before rule order in hand-written lexers; <code>&lt;=</code> is one token, not <code>&lt;</code> then <code>=</code>.",
+  "Whitespace and comments are skipped; they are not tokens, but line numbers still matter."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define lexeme, token and pattern in one sentence each.",
+   "marks": 2,
+   "a": "A lexeme is the exact character string. A token is a token name plus optional attribute. A pattern is the rule that describes the lexemes of one token class."
+  },
+  {
+   "level": "understand",
+   "q": "Why is lexical analysis separated from syntax analysis?",
+   "marks": 3,
+   "a": "Lexical rules are regular and simple; syntax rules handle nesting and recursion. Separation keeps both parts small, lets the lexer use fast finite automata, and lets a parser generator reuse one lexer."
+  },
+  {
+   "level": "apply",
+   "q": "For <code>total = total + 5;</code> list the lexemes, token names and attributes.",
+   "marks": 4,
+   "a": "total → ID attribute total; = → ASSIGN; total → ID attribute total; + → PLUS; 5 → NUM attribute 5; ; → SEMI. Six tokens; ID appears twice."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must keywords be reserved before identifiers? Use <code>if</code> in your answer.",
+   "marks": 4,
+   "a": "If the ID pattern ran first, the lexeme <code>if</code> would return ID with attribute <code>if</code>. The parser would see an identifier where it expects an IF token. Reserving keywords makes IF win before the general ID rule."
+  },
+  {
+   "level": "apply",
+   "q": "Apply the longest-match rule to <code>a&lt;=b</code> and <code>x1</code>.",
+   "marks": 3,
+   "a": "In <code>a&lt;=b</code>, read <code>a</code> as ID, then <code>&lt;=</code> as LE, then <code>b</code> as ID. Do not split <code>&lt;=</code>. In <code>x1</code>, read the whole <code>x1</code> as one ID."
+  },
+  {
+   "level": "understand",
+   "q": "What does the lexer do with whitespace and comments?",
+   "marks": 2,
+   "a": "It skips them and does not return tokens for them. It still updates line numbers for error messages."
+  },
+  {
+   "level": "analyze",
+   "q": "Three lexemes are <code>count</code> and all return ID. How does the parser tell them apart?",
+   "marks": 4,
+   "a": "It does not need to tell them apart by token name; the attribute carries the name <code>count</code> or a symbol-table pointer. The parser uses that attribute in the syntax tree and later phases use the symbol-table entry."
+  },
+  {
+   "level": "remember",
+   "q": "What is an attribute of a token?",
+   "marks": 2,
+   "a": "Extra information attached to a token, such as the value 10 for NUM or the name count for ID."
+  }
+ ],
+ "beyond": "Not for the exam. Production scanners are often generated from regular expressions and compiled to table-driven DFAs; modern tools add Unicode classes and incremental rescanning for editors. Some languages need context: Python indentation, C typedef names, and JavaScript regular-expression literals blur the line between lexing and parsing. IDEs use incremental lexing to recolour only changed lines. Search for 'maximal munch lexer', 'lexer generator DFA table', and 'incremental lexical analysis'."
+}

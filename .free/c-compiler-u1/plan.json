@@ -1,0 +1,666 @@
+{
+ "lead": "This unit explains how a compiler turns source text into tokens and how a scanner is built. It covers language processors, compiler phases, input buffering, regular expressions, transition diagrams, finite automata and LEX. After it you can trace a source line through the front end, write token patterns, convert an NFA to a DFA, and read a small LEX scanner.",
+ "about": "The unit starts with language processors and the place of a compiler among interpreters and assemblers (1.1). Chapter 1.2 opens the compiler into phases and shows how the front end produces tokens and intermediate code. Chapter 1.3 lists compiler construction tools and real applications. The next chapters zoom into the scanner: 1.4 defines tokens, patterns and lexemes; 1.5 shows input buffering; 1.6 writes token patterns as regular expressions. Chapter 1.7 turns those patterns into transition diagrams, and 1.8 converts the diagrams into NFA and DFA recognizers, then minimizes the DFA. Chapter 1.9 uses LEX to generate a scanner from rules. Each chapter adds one layer to the same pipeline.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Language processors differ in when they translate and what they produce: a compiler makes a target program, an interpreter runs the source or intermediate code, and an assembler maps mnemonics to machine instructions.",
+   "depth": "Define language processor, translator, compiler, interpreter and assembler. Compare compile-then-run with interpret-as-you-go; mention hybrid bytecode execution. Explain that a compiler's output is a target program, an interpreter's output is the result of each statement, and an assembler's output is object code. Name the cousins of the compiler: preprocessor, macro processor, loader and linker. Some syllabi call this group 'language processing system' or 'cousins of the compiler'. Keep the treatment conceptual; examples in C, Python and assembly are enough.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Two execution models",
+    "nodes": [
+     {
+      "id": "s",
+      "label": "Source",
+      "note": "C or Python",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Compiler",
+      "style": "accent"
+     },
+     {
+      "id": "m",
+      "label": "Machine code",
+      "style": "normal"
+     },
+     {
+      "id": "r",
+      "label": "Run",
+      "style": "normal"
+     },
+     {
+      "id": "i",
+      "label": "Interpreter",
+      "style": "live"
+     },
+     {
+      "id": "o",
+      "label": "Output",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "s",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "m",
+      "style": "solid"
+     },
+     {
+      "from": "m",
+      "to": "r",
+      "style": "solid"
+     },
+     {
+      "from": "r",
+      "to": "o",
+      "style": "solid"
+     },
+     {
+      "from": "s",
+      "to": "i",
+      "style": "solid"
+     },
+     {
+      "from": "i",
+      "to": "o",
+      "style": "solid"
+     }
+    ],
+    "aria": "The source feeds either a compiler that makes machine code for a later run, or an interpreter that produces output directly."
+   },
+   "example": "A program has 100 statements. An interpreter costs 0.03 s per statement on every run. A compiler costs 4 s once and the compiled code costs 0.10 s per run. Find the smallest number of runs after which compiling is cheaper. Interpreted cost per run is 100 × 0.03 = 3 s. Compiled cost for r runs is 4 + 0.10r. Set 4 + 0.10r < 3r, so 4 < 2.90r and r > 1.379. The smallest integer is 2 runs: compiled total is 4.2 s, interpreted total is 6 s.",
+   "trap": "A compiler and an interpreter both translate; the difference is when. A compiler produces a target program first; an interpreter executes source or intermediate code directly. An assembler is not a compiler: it maps assembly mnemonics to machine instructions, usually one-to-one.",
+   "prereq": "",
+   "leave": "Details of phases to 1.2; parsing to Unit 2; code generation to Unit 6."
+  },
+  {
+   "k": 2,
+   "idea": "A compiler is organised as a pipeline of phases, each changing the program representation, with the symbol table and error handler serving all phases.",
+   "depth": "Split the compiler into analysis (front end) and synthesis (back end). Cover phases in order: lexical analysis, syntax analysis, semantic analysis, intermediate code generation, optimization, code generation, and machine-dependent optimization. Explain the symbol table manager and error handler as cross-cutting components. Cover grouping of phases: front end versus back end, analysis versus synthesis, and single-pass versus multi-pass. Some syllabi say 'grouping of phases' and use 'intermediate representation' for intermediate code. Show one assignment moving through the phases.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Phases of a compiler",
+    "nodes": [
+     {
+      "id": "s",
+      "label": "Source",
+      "style": "normal"
+     },
+     {
+      "id": "l",
+      "label": "Lexical",
+      "note": "tokens",
+      "style": "accent"
+     },
+     {
+      "id": "p",
+      "label": "Syntax",
+      "note": "parse tree",
+      "style": "normal"
+     },
+     {
+      "id": "se",
+      "label": "Semantic",
+      "note": "types, scope",
+      "style": "normal"
+     },
+     {
+      "id": "ic",
+      "label": "Intermediate code",
+      "note": "three-address",
+      "style": "normal"
+     },
+     {
+      "id": "op",
+      "label": "Optimizer",
+      "note": "faster code",
+      "style": "normal"
+     },
+     {
+      "id": "cg",
+      "label": "Code generator",
+      "note": "registers",
+      "style": "normal"
+     },
+     {
+      "id": "t",
+      "label": "Target",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "s",
+      "to": "l",
+      "style": "solid"
+     },
+     {
+      "from": "l",
+      "to": "p",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "se",
+      "style": "solid"
+     },
+     {
+      "from": "se",
+      "to": "ic",
+      "style": "solid"
+     },
+     {
+      "from": "ic",
+      "to": "op",
+      "style": "solid"
+     },
+     {
+      "from": "op",
+      "to": "cg",
+      "style": "solid"
+     },
+     {
+      "from": "cg",
+      "to": "t",
+      "style": "solid"
+     }
+    ],
+    "aria": "The source passes through lexical, syntax, semantic, intermediate code, optimizer and code generator stages to produce target code."
+   },
+   "example": "Trace `position = initial + rate * 60` through the phases. Lexical analysis gives `id1 = id2 + id3 * 60`. Syntax analysis builds a tree with `=` at the root, `id1` on the left, and `+` on the right; `+` has `id2` and `*`, and `*` has `id3` and `60`. Semantic analysis checks that `id1`, `id2` and `id3` are declared and type-compatible. Intermediate code: `t1 = rate * 60; t2 = initial + t1; position = t2`. Optimization can keep the same code because there is no common subexpression to remove.",
+   "trap": "Phases are logical stages, not always separate programs. The symbol table and error handler run across all phases. Optimization is not required for correctness; a simple compiler can skip it.",
+   "prereq": "Chapter 1.1",
+   "leave": "Parsing algorithms to Unit 2; semantic analysis details to Unit 4; optimization to Unit 6."
+  },
+  {
+   "k": 3,
+   "idea": "Compiler construction tools automate scanner and parser building, and compiler techniques are reused in many software tools beyond compilers.",
+   "depth": "List the main compiler-construction tools: scanner generators such as LEX, parser generators such as YACC, syntax-directed translation engines, automatic code generators, data-flow analysis engines, and compiler construction toolkits. Cover applications of compiler technology: implementation of high-level languages, domain-specific languages, program analysis and verification, optimisation, parallelisation, format translation, security checking and hardware design. Some syllabi call this 'applications of compiler technology'. Keep tool syntax for 1.9 and Unit 3.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Generators from specifications",
+    "nodes": [
+     {
+      "id": "tr",
+      "label": "Token rules",
+      "style": "normal"
+     },
+     {
+      "id": "lx",
+      "label": "LEX",
+      "style": "accent"
+     },
+     {
+      "id": "sc",
+      "label": "Scanner.c",
+      "style": "normal"
+     },
+     {
+      "id": "gr",
+      "label": "Grammar",
+      "style": "normal"
+     },
+     {
+      "id": "ya",
+      "label": "YACC",
+      "style": "accent"
+     },
+     {
+      "id": "pa",
+      "label": "Parser.c",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "tr",
+      "to": "lx",
+      "style": "solid"
+     },
+     {
+      "from": "lx",
+      "to": "sc",
+      "style": "solid"
+     },
+     {
+      "from": "gr",
+      "to": "ya",
+      "style": "solid"
+     },
+     {
+      "from": "ya",
+      "to": "pa",
+      "style": "solid"
+     }
+    ],
+    "aria": "Token rules go through LEX to produce a scanner, while a grammar goes through YACC to produce a parser."
+   },
+   "example": "A shop writes a small query language with 42 keywords and 16 token patterns. Which compiler-construction tools generate the scanner and the parser, and what input does each take? LEX takes regular definitions and rules for the 16 token patterns and produces a C scanner. YACC takes a context-free grammar for the query language, with semantic actions, and produces a parser. Neither tool writes the whole compiler; the symbol table and code generator are still needed.",
+   "trap": "LEX builds scanners and YACC builds parsers; neither builds a complete compiler. Applications reuse compiler techniques, not compiler code. A parser generator needs a grammar, not a list of token patterns.",
+   "prereq": "Chapter 1.2",
+   "leave": "LEX syntax to 1.9; YACC to Unit 3; code optimization to Unit 6."
+  },
+  {
+   "k": 4,
+   "idea": "The lexical analyzer turns a character stream into tokens, using patterns to decide which lexeme belongs to which token class.",
+   "depth": "Define token, pattern, lexeme and attribute. Treat a token as a pair: token name plus optional attribute. Show the lexer skipping whitespace and comments, returning the next token to the parser, and entering identifiers into the symbol table. Explain why lexical analysis is separated from syntax analysis. Use token names such as id, num, if, relop and assign. Some syllabi call the token name the token class or token type. Include the longest-match rule and keyword reservation.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "nodes": [
+     {
+      "id": "src",
+      "label": "Source text",
+      "note": "if (count <= 10)",
+      "style": "normal"
+     },
+     {
+      "id": "lex",
+      "label": "Lexer",
+      "style": "accent"
+     },
+     {
+      "id": "tok",
+      "label": "Token stream",
+      "note": "IF id LE NUM",
+      "style": "normal"
+     },
+     {
+      "id": "par",
+      "label": "Parser",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "src",
+      "to": "lex",
+      "style": "solid"
+     },
+     {
+      "from": "lex",
+      "to": "tok",
+      "style": "solid"
+     },
+     {
+      "from": "tok",
+      "to": "par",
+      "style": "solid"
+     }
+    ],
+    "aria": "A source text line enters the lexer and leaves as a token stream for the parser."
+   },
+   "example": "For `if (count <= 10) count = count + 1;` list the lexemes and tokens. `if` → IF; `(` → LPAREN; `count` → ID with attribute `count`; `<=` → LE; `10` → NUM with value 10; `)` → RPAREN; `count` → ID; `=` → ASSIGN; `count` → ID; `+` → PLUS; `1` → NUM with value 1; `;` → SEMI. The same token ID appears for three different lexemes.",
+   "trap": "A lexeme is the actual text; a token is the class. The same token name can have many lexemes. Keywords must be reserved before identifiers, or `if` will be returned as an ID.",
+   "prereq": "Chapter 1.2",
+   "leave": "Grammar and parsing to Unit 2; symbol table organisation to Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "Input buffering reads source characters in large blocks and uses two half-buffers with sentinels so the lexer avoids a slow check at every character.",
+   "depth": "Explain why buffering is needed: disk and terminal input are slow, so the lexer reads a block at a time. Describe the two-buffer scheme: two buffers of N characters each, a sentinel at the end of each buffer, and pointers lexemeBegin and forward. Forward advances; when it reaches a sentinel, the next buffer is used or refilled. Keep lexemeBegin fixed so a lexeme can cross a buffer boundary. Some syllabi call this the two-buffer input scheme; the sentinel is also called EOF marker.",
+   "figure": {
+    "type": "array",
+    "title": "Two half buffers",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Buffer A",
+      "cells": [
+       "c",
+       "o",
+       "u",
+       "n",
+       "t",
+       "$"
+      ],
+      "marks": {
+       "0": "accent",
+       "5": "muted"
+      }
+     },
+     {
+      "label": "Buffer B",
+      "cells": [
+       "=",
+       "1",
+       "+",
+       "2",
+       ";",
+       "$"
+      ],
+      "marks": {
+       "0": "live",
+       "5": "muted"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 0,
+      "cell": 0,
+      "label": "lexemeBegin"
+     },
+     {
+      "row": 1,
+      "cell": 0,
+      "label": "forward"
+     }
+    ],
+    "aria": "Two buffers of six cells each hold the input with sentinels; the identifier starts at Buffer A cell zero and the forward pointer has moved to Buffer B cell zero."
+   },
+   "example": "Input `count=1+2;` sits in two buffers of five characters each plus a sentinel. Buffer A holds `count` and Buffer B holds `=1+2;`. Trace the identifier `count`. Set lexemeBegin at A0. Forward moves through A0 to A4 for `c,o,u,n,t`. It reaches the sentinel at A5 and moves to B0. B0 is `=`, which cannot continue an identifier, so the lexer accepts the lexeme A0–A4 `count`. Forward stays at B0.",
+   "trap": "The sentinel is a marker, not part of the input. On refill, keep lexemeBegin and move forward to the start of the new buffer. A lexeme that crosses the boundary must not be lost.",
+   "prereq": "Chapter 1.4",
+   "leave": "Symbol table and scope to Unit 5; file handling to an operating systems course."
+  },
+  {
+   "k": 6,
+   "idea": "Regular expressions give a precise and compact way to describe the set of lexemes that belong to each token class.",
+   "depth": "Cover alphabet, string and language. Define the regular operations union, concatenation and Kleene closure, plus positive closure where used. Give precedence: closure, then concatenation, then union. Use regular definitions with names. Write patterns for identifiers, unsigned integers, floating-point numbers, keywords, relational operators and comments. Distinguish a regular expression from the strings it matches. Some syllabi say 'specification of tokens' or 'regular definitions'. Do not build automata here.",
+   "figure": {
+    "type": "tree",
+    "shape": "circle",
+    "root": {
+     "label": "·",
+     "note": "concat",
+     "style": "accent",
+     "children": [
+      {
+       "label": "L",
+       "style": "normal",
+       "edge": "left"
+      },
+      {
+       "label": "*",
+       "note": "closure",
+       "style": "normal",
+       "children": [
+        {
+         "label": "|",
+         "note": "union",
+         "style": "normal",
+         "children": [
+          {
+           "label": "L",
+           "style": "normal",
+           "edge": "left"
+          },
+          {
+           "label": "D",
+           "style": "normal",
+           "edge": "right"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A regular-expression parse tree shows concatenation of a letter with the closure of a union of a letter and a digit."
+   },
+   "example": "Use the definitions L = A|...|Z|a|...|z|_, D = 0|...|9, id = L(L|D)*, num = D+, relop = < | <= | = | <> | > | >=. Test `sum_1`, `1sum` and `_a`. `sum_1` is an id: s, u, m and _ are in L, and 1 is in D. `1sum` is not one id: it starts with a digit, so the longest match gives num `1` followed by id `sum`. `_a` is an id because _ is in L.",
+   "trap": "In a regular expression, `*` means closure, `|` means choice, and `+` may mean one or more only if your notation defines it. Operators are not literals without escaping. Longest match and rule order decide keywords versus identifiers.",
+   "prereq": "Chapter 1.4",
+   "leave": "NFA and DFA construction to 1.8; LEX rule syntax to 1.9."
+  },
+  {
+   "k": 7,
+   "idea": "A transition diagram is a flow-chart recognizer for one token class: it moves on input characters and accepts at a double circle.",
+   "depth": "Define state, start state, accepting state and transition edge. Draw transition diagrams for identifiers, unsigned integers, relational operators and keywords. Explain how a lexer tries diagrams, uses longest match, and backs up to the last accepting state when a path fails. Combine diagrams or order rules. Some syllabi call these lexical transition diagrams. Keep the treatment operational; formal NFA and DFA definitions come in 1.8.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "q0",
+      "label": "q0",
+      "x": 0,
+      "y": 0,
+      "note": "start",
+      "style": "next"
+     },
+     {
+      "id": "q1",
+      "label": "q1",
+      "x": 2,
+      "y": 1,
+      "note": "id accept",
+      "style": "accent"
+     },
+     {
+      "id": "q2",
+      "label": "q2",
+      "x": 2,
+      "y": -1,
+      "note": "num accept",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "q0",
+      "to": "q1",
+      "label": "L,_",
+      "style": "solid"
+     },
+     {
+      "from": "q1",
+      "to": "q1",
+      "label": "L,D,_",
+      "style": "solid"
+     },
+     {
+      "from": "q0",
+      "to": "q2",
+      "label": "D",
+      "style": "solid"
+     },
+     {
+      "from": "q2",
+      "to": "q2",
+      "label": "D",
+      "style": "solid"
+     }
+    ],
+    "aria": "State q0 branches on a letter to accepting state q1 or on a digit to accepting state q2; both accepting states loop on their allowed characters."
+   },
+   "example": "Use the combined diagram: q0 --letter/_--> q1; q1 loops on letter/digit/_; q0 --digit--> q2; q2 loops on digit. q1 accepts an identifier and q2 accepts an unsigned integer. Trace `rate2` and `2rate`. `rate2` goes q0→q1 on r, loops on a, t, e, 2, and accepts ID `rate2`. `2rate` goes q0→q2 on 2; r is not a digit, so it accepts NUM `2`. The lexer restarts at q0, reads `rate` and accepts ID `rate`. Tokens are NUM(2), ID(rate).",
+   "trap": "A transition diagram is not a parser; it recognises one token class. On failure, back up to the last accepting state. The longest match wins over a shorter accepting prefix.",
+   "prereq": "Chapter 1.6",
+   "leave": "Formal NFA-to-DFA conversion to 1.8; parser states to Unit 2."
+  },
+  {
+   "k": 8,
+   "idea": "NFAs and DFAs recognise regular languages; subset construction turns an NFA into a DFA, and minimisation merges equivalent DFA states.",
+   "depth": "Define NFA and DFA, including ε-moves and acceptance. Use Thompson construction to turn a regular expression into an NFA. Use subset construction with ε-closure to build a DFA. Build transition tables. Minimise a DFA by partition refinement or table filling. Some syllabi call subset construction the powerset construction. Keep parser use out of this chapter; it supplies the recogniser that LEX uses.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "From regex to DFA",
+    "nodes": [
+     {
+      "id": "re",
+      "label": "a(b|c)",
+      "style": "normal"
+     },
+     {
+      "id": "nfa",
+      "label": "NFA",
+      "style": "accent"
+     },
+     {
+      "id": "clo",
+      "label": "ε-closure",
+      "style": "normal"
+     },
+     {
+      "id": "dfa",
+      "label": "DFA",
+      "style": "normal"
+     },
+     {
+      "id": "part",
+      "label": "Partition",
+      "style": "normal"
+     },
+     {
+      "id": "min",
+      "label": "Minimal DFA",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "re",
+      "to": "nfa",
+      "style": "solid"
+     },
+     {
+      "from": "nfa",
+      "to": "clo",
+      "style": "solid"
+     },
+     {
+      "from": "clo",
+      "to": "dfa",
+      "style": "solid"
+     },
+     {
+      "from": "dfa",
+      "to": "part",
+      "style": "solid"
+     },
+     {
+      "from": "part",
+      "to": "min",
+      "style": "solid"
+     }
+    ],
+    "aria": "A regular expression becomes an NFA, then a DFA by ε-closure and subset construction, then a minimal DFA by partition refinement."
+   },
+   "example": "Convert the NFA for `a(b|c)` to a DFA and minimise it. NFA: 0 --a--> 1; 1 --ε--> 2 and 4; 2 --b--> 3; 4 --c--> 5; states 3 and 5 accept. Subset construction: A = {0}. On a, A goes to B = {1,2,4}. On b, B goes to C = {3}; on c, B goes to D = {5}; on a, B goes to ∅. C and D have no outgoing moves. DFA states are A, B, C, D, with C and D accepting. Minimise: C and D are both accepting with the same empty moves, so merge them to F. Nonfinal A and B stay separate. Result: A --a--> B; B --b--> F; B --c--> F; F accepts.",
+   "trap": "Take ε-closure before and after every move. A subset state is a set of NFA states, not one NFA state. Minimisation merges only equivalent states; not all accepting states are automatically equivalent.",
+   "prereq": "Chapter 1.7",
+   "leave": "Parser construction to Unit 2; LEX use to 1.9."
+  },
+  {
+   "k": 9,
+   "idea": "LEX turns a set of regular-expression rules into a C scanner; it chooses the longest match and then the earlier rule.",
+   "depth": "Cover the three sections of a LEX program: definitions, rules and user code. Explain `%{ %}` declarations, pattern-action rules, and variables yylex, yytext, yyleng, yyin and yyout. Cover the default ECHO rule, longest match and rule order. Write a small scanner for identifiers, integers and keywords. Mention Flex as a compatible modern version. Some syllabi say Lex/Flex. Leave parser generation with YACC to Unit 3.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "nodes": [
+     {
+      "id": "src",
+      "label": "scanner.l",
+      "note": "rules",
+      "style": "normal"
+     },
+     {
+      "id": "lex",
+      "label": "lex",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "lex.yy.c",
+      "style": "normal"
+     },
+     {
+      "id": "cc",
+      "label": "C compiler",
+      "style": "normal"
+     },
+     {
+      "id": "sc",
+      "label": "scanner",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "src",
+      "to": "lex",
+      "style": "solid"
+     },
+     {
+      "from": "lex",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "cc",
+      "style": "solid"
+     },
+     {
+      "from": "cc",
+      "to": "sc",
+      "style": "solid"
+     }
+    ],
+    "aria": "A LEX source file goes through lex to produce lex.yy.c, which a C compiler turns into a scanner."
+   },
+   "example": "A LEX scanner has rules in this order: `if` → IF; `[a-z]+` → ID; `[0-9]+` → NUM. For input `if x 12`, the tokens are IF, ID with text `x`, and NUM with text `12`. If `[a-z]+` comes before `if`, then `if` matches both rules with length 2; the earlier rule wins, so `if` becomes ID and the IF rule is never used for that input.",
+   "trap": "LEX chooses the longest match; among equal-length matches it chooses the earlier rule. The default rule ECHO copies unmatched text, so a missing rule can hide errors instead of reporting them.",
+   "prereq": "Chapter 1.8",
+   "leave": "YACC and parsing to Unit 3; code generation to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "compiler is one processor; next open its phases"
+  ],
+  [
+   2,
+   3,
+   "phases become tools and applications"
+  ],
+  [
+   2,
+   4,
+   "front end starts with lexical analysis"
+  ],
+  [
+   4,
+   5,
+   "lexer reads characters through buffers"
+  ],
+  [
+   5,
+   6,
+   "buffered text is matched by token patterns"
+  ],
+  [
+   6,
+   7,
+   "patterns become transition diagrams"
+  ],
+  [
+   7,
+   8,
+   "transition diagrams are finite automata"
+  ],
+  [
+   8,
+   9,
+   "LEX builds a DFA from rules"
+  ]
+ ]
+}
