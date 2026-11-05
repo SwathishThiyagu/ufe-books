@@ -1,15 +1,14 @@
 # c-os-u2: free-model run
 
 - Book: `books/cse/c-os/c-os-u2.html`
-- Status: problems
-- Model calls so far: 61 (207,601 tokens in, 214,292 out), 9.5 minutes
+- Status: ok
+- Model calls so far: 64 (216,637 tokens in, 226,227 out), 12.7 minutes
 
 ## Checker
 
 ```
-c-os-u2.html: 9 chapters, 12931 words, 10 figures, 156 KB
-PROBLEMS:
- - chapter "threads-multicore-programming-and-multithreading-models": needs a <div class="quiz"> with at least 5 <details data-level=...> questions
+c-os-u2.html: 9 chapters, 12993 words, 10 figures, 157 KB
+OK
 ```
 
 ## For the reviewer
@@ -56,7 +55,6 @@ collect2: error: ld returned 1 exit status
       |                ^~~~)
 - chapter 4: a c program does not run (compile error: : error: missing terminating " character
    10 |     printf("Tota)
-- checker: chapter "threads-multicore-programming-and-multithreading-models": needs a <div class="quiz"> with at least 5 <details data-level=...> questions
 
 ## Reviewer notes (after any revision)
 
