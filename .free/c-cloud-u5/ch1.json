@@ -1,0 +1,331 @@
+{
+ "lead": "A cloud program cuts one job into parts that run at the same time on rented machines. The choice of programming model decides how those parts talk and how they fail: shared-memory threads share variables, message-passing processes send packets, data-parallel workers run one function on many slices. Pick the wrong one and you lose either speed or correctness. The same three models sit under a UPI settlement batch, an IRCTC seat-availability search and a startup's log analysis on rented virtual machines.",
+ "prereq": "You need: Unit 1's parallel versus distributed computing, and Unit 2's web services and REST.",
+ "sections": [
+  {
+   "h3": "Decomposition, granularity and the cost of talking",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Decomposition is the first decision: how to cut the job into tasks. Task decomposition gives different work to different tasks. Data decomposition gives the same work to different slices of the data. Splitting 8,000,000 numbers into four slices of 2,000,000 each is data decomposition."
+    },
+    {
+     "type": "p",
+     "text": "Granularity is the amount of work inside one task. Coarse tasks need little coordination but leave workers idle when the split is uneven. Fine tasks balance better and pay more overhead per unit of work."
+    },
+    {
+     "type": "p",
+     "text": "Communication is never free. Every message costs latency (the time to start a transfer) plus transfer time. Two threads in one process pass data in nanoseconds. Two virtual machines in one data centre pay tens of microseconds per message."
+    },
+    {
+     "type": "p",
+     "text": "Synchronization makes tasks wait for each other. A barrier waits for all workers to arrive. A lock lets one thread enter a critical section at a time."
+    },
+    {
+     "type": "p",
+     "text": "Load balance sets the finish time, because the run ends when the slowest worker ends. Partial failure is the cloud's speciality: a rented machine can vanish mid-task. A distributed program must detect the lost worker and re-run its slice. Threads inside one process die together, so they cannot recover alone."
+    }
+   ]
+  },
+  {
+   "h3": "Four families of parallel models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>Shared-memory threads.</b> All threads live in one process and read the same variables. Coordination is fast and the code is simple, but there is only one address space, so the model scales to the cores of one machine and no further. A race condition appears when two threads write the same variable without a lock."
+    },
+    {
+     "type": "p",
+     "text": "<b>Message passing.</b> Each process has private memory and processes exchange explicit messages; MPI is the classic library. No variable can be read by accident, so the model scales across virtual machines and data centres. The price is writing send and receive calls and designing for messages that never arrive."
+    },
+    {
+     "type": "p",
+     "text": "<b>Data parallelism.</b> One function is applied to many slices at once and the framework spreads the slices. It suits uniform work such as scoring a million loan applications, and it is the base of <a href=\"#mapreduce-programming-model\">MapReduce</a>."
+    },
+    {
+     "type": "p",
+     "text": "<b>Master-worker.</b> One master hands tasks to idle workers and collects results. Load balancing and retries are natural; the master is the single point of failure."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Model",
+      "Data exchange",
+      "Unit that fails"
+     ],
+     "rows": [
+      [
+       "Threads",
+       "shared variables",
+       "whole process"
+      ],
+      [
+       "Message passing",
+       "send and receive",
+       "one process"
+      ],
+      [
+       "Data parallel",
+       "framework splits data",
+       "one slice"
+      ],
+      [
+       "Master-worker",
+       "master assigns",
+       "the master"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Concurrency, threads and the speedup limit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Concurrency means several activities are in progress at once. Parallelism means several instructions run at the same instant on different cores or machines. One core can be concurrent (tasks interleaved) but never parallel, so a thread program on a single-core VM is no faster than a plain loop."
+    },
+    {
+     "type": "formula",
+     "text": "S(p) = T(1) ÷ T(p)",
+     "where": "S(p) is the speedup with p workers; T(1) is the time with one worker; T(p) is the time with p workers. Efficiency is E = S(p) ÷ p."
+    },
+    {
+     "type": "formula",
+     "text": "S(p) = 1 ÷ (s + (1 − s) ÷ p)",
+     "where": "Amdahl's law: s is the serial fraction of the work (0 ≤ s ≤ 1) and p is the number of workers. As p grows, S approaches 1 ÷ s. With s = 0.2 and p = 4, S = 1 ÷ (0.2 + 0.2) = 2.5, not 4."
+    },
+    {
+     "type": "p",
+     "text": "Coordination is the second ceiling. Thread creation, locks and the final merge all sit outside the parallel part, so they add directly to the finish time."
+    }
+   ]
+  },
+  {
+   "h3": "Multithreading with Aneka threads",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Aneka is a middleware platform that runs .NET applications on a cloud of physical or virtual machines. It offers three programming models: Threads, Tasks and MapReduce. Tasks belong to <a href=\"#high-throughput-and-task-based-computing\">5.2</a> and MapReduce to <a href=\"#mapreduce-programming-model\">5.3</a>; here the subject is Threads."
+    },
+    {
+     "type": "p",
+     "text": "Aneka Threads keeps the familiar thread style. You create a thread object, give it a method to run, and call Start(). The runtime may run that thread on another machine in the Aneka cloud instead of inside your own process. You write thread code that looks local; the platform handles placement, node failure and collection of results."
+    },
+    {
+     "type": "p",
+     "text": "The cost model changes, because a thread call can become a network call. Tiny thread bodies waste more time in travel than in work, so group the work into coarser threads. Memory is no longer shared either: a remote thread body must receive its input and return its result explicitly."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Four workers of 2,000,000 numbers each feed one application, and the top box is the model choice that decides how they exchange data. Notice that a merge step follows the parallel part and adds to the finish time.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Model choice feeds the workers",
+   "nodes": [
+    {
+     "id": "mc",
+     "label": "Model choice",
+     "note": "threads, messages, data parallel",
+     "style": "accent"
+    },
+    {
+     "id": "w1",
+     "label": "Worker 1",
+     "note": "2,000,000 numbers",
+     "style": "normal"
+    },
+    {
+     "id": "w2",
+     "label": "Worker 2",
+     "note": "2,000,000 numbers",
+     "style": "normal"
+    },
+    {
+     "id": "w3",
+     "label": "Worker 3",
+     "note": "2,000,000 numbers",
+     "style": "normal"
+    },
+    {
+     "id": "w4",
+     "label": "Worker 4",
+     "note": "2,000,000 numbers",
+     "style": "normal"
+    },
+    {
+     "id": "app",
+     "label": "Cloud application",
+     "note": "merge costs 5 ms",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "mc",
+     "to": "w1",
+     "style": "solid"
+    },
+    {
+     "from": "mc",
+     "to": "w2",
+     "style": "solid"
+    },
+    {
+     "from": "mc",
+     "to": "w3",
+     "style": "solid"
+    },
+    {
+     "from": "mc",
+     "to": "w4",
+     "style": "solid"
+    },
+    {
+     "from": "w1",
+     "to": "app",
+     "label": "sum",
+     "style": "solid"
+    },
+    {
+     "from": "w2",
+     "to": "app",
+     "label": "sum",
+     "style": "solid"
+    },
+    {
+     "from": "w3",
+     "to": "app",
+     "label": "sum",
+     "style": "solid"
+    },
+    {
+     "from": "w4",
+     "to": "app",
+     "label": "sum",
+     "style": "solid"
+    }
+   ],
+   "aria": "Three programming models select four workers, each adding 2,000,000 numbers, whose partial sums merge into one cloud application."
+  }
+ },
+ "examples": [
+  {
+   "question": "A program adds 8,000,000 numbers. The sequential version takes 160 ms. The parallel version uses four worker threads, each adding 2,000,000 numbers. Creating the four threads costs 5 ms in total and merging the four partial sums costs 5 ms. Find (a) the ideal speedup, (b) the actual speedup and (c) the efficiency. A Python version of the split is below; give its output.",
+   "steps": [
+    "Work per thread: the four slices are equal, so each thread handles 8,000,000 ÷ 4 = 2,000,000 numbers and takes 160 ms ÷ 4 = 40 ms.",
+    "Parallel phase: all four threads run at once, so the phase lasts 40 ms, the time of the slowest worker.",
+    "Overhead: thread creation 5 ms + merge 5 ms = 10 ms, all of it outside the parallel phase.",
+    "Actual time: T(4) = 40 ms + 10 ms = 50 ms.",
+    "Ideal speedup, ignoring overhead: 160 ms ÷ 40 ms = 4×.",
+    "Actual speedup: 160 ms ÷ 50 ms = 3.2×.",
+    "Efficiency: E = 3.2 ÷ 4 = 0.80, that is 80%."
+   ],
+   "answer": "Ideal speedup 4×, actual speedup 3.2× and efficiency 80%.",
+   "check": "seq = 160.0\np = 4\ncreate = 5.0\nmerge = 5.0\nper = seq / p\nactual = per + create + merge\nprint(per)\nprint(actual)\nprint(seq / per)\nprint(seq / actual)\nprint((seq / actual) / p)",
+   "values": [
+    40.0,
+    50.0,
+    4.0,
+    3.2,
+    0.8
+   ],
+   "code": {
+    "lang": "python",
+    "code": "import threading\n\nN = 8000000\nP = 4\nchunk = N // P\npart = [0] * P\n\ndef work(i):\n    lo = i * chunk + 1\n    hi = lo + chunk - 1\n    part[i] = (lo + hi) * chunk // 2\n\nthreads = [threading.Thread(target=work, args=(i,)) for i in range(P)]\nfor t in threads:\n    t.start()\nfor t in threads:\n    t.join()\n\nfor i in range(P):\n    print(\"chunk\", i + 1, part[i])\nprint(\"total\", sum(part))",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "i",
+     "lo",
+     "hi",
+     "part[i]"
+    ],
+    "rows": [
+     [
+      "0",
+      "1",
+      "2000000",
+      "2000001000000"
+     ],
+     [
+      "1",
+      "2000001",
+      "4000000",
+      "6000001000000"
+     ],
+     [
+      "2",
+      "4000001",
+      "6000000",
+      "10000001000000"
+     ],
+     [
+      "3",
+      "6000001",
+      "8000000",
+      "14000001000000"
+     ]
+    ]
+   },
+   "output": "chunk 1 2000001000000\nchunk 2 6000001000000\nchunk 3 10000001000000\nchunk 4 14000001000000\ntotal 32000004000000"
+  }
+ ],
+ "traps": [
+  "Threads share one address space. They do not by themselves spread a job across virtual machines, so a four-thread program on one VM is still one machine.",
+  "Concurrency is not parallelism. Ten tasks interleaved on one core finish no sooner than the same ten tasks run one after another.",
+  "Ideal speedup uses 160 ÷ 40 = 4×; the honest figure adds the 10 ms of coordination and gives 160 ÷ 50 = 3.2×. The examiner looks for which one you reported.",
+  "Amdahl's law is an upper bound, not a measurement. Load imbalance and coordination can push the real speedup below it.",
+  "Very fine granularity raises speedup on paper and lowers it in practice, because every task pays latency before it does any work."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define granularity in a parallel program.",
+   "marks": 2,
+   "a": "Granularity is the amount of work placed in one task. Coarse granularity means few large tasks; fine granularity means many small tasks."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three programming models that Aneka offers.",
+   "marks": 2,
+   "a": "Threads, Tasks and MapReduce."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a message-passing program scale across machines when a thread program does not?",
+   "marks": 3,
+   "a": "Threads share one address space, so every thread must sit on one machine. Message passing keeps each process's memory private and moves copies over the network, so the processes can sit on any machines, including machines in another data centre."
+  },
+  {
+   "level": "apply",
+   "q": "A job has serial fraction s = 0.25. Use Amdahl's law to find the speedup with 3 workers and the maximum speedup as workers grow without limit.",
+   "marks": 4,
+   "a": "S(3) = 1 ÷ (0.25 + 0.75 ÷ 3) = 1 ÷ (0.25 + 0.25) = 1 ÷ 0.5 = 2×. Maximum: 1 ÷ 0.25 = 4×."
+  },
+  {
+   "level": "apply",
+   "q": "Four threads finish a job in 80 ms, and that figure already includes 12 ms of overhead. Sequential time is 240 ms. Find the actual speedup and the efficiency.",
+   "marks": 3,
+   "a": "S(4) = 240 ÷ 80 = 3×. Efficiency E = 3 ÷ 4 = 0.75, that is 75%."
+  },
+  {
+   "level": "analyze",
+   "q": "The same 8,000,000 numbers are split unequally as 3,000,000, 2,000,000, 2,000,000 and 1,000,000 across four threads. Thread creation and merge still cost 5 ms each. Find the new finish time and speedup, and say which property broke.",
+   "marks": 5,
+   "a": "The largest slice is 3,000,000 numbers, so that thread takes 160 ms × (3,000,000 ÷ 8,000,000) = 60 ms. The parallel phase ends when it ends: 60 ms. Finish time = 60 ms + 10 ms = 70 ms. Speedup = 160 ÷ 70 ≈ 2.29×, down from 3.2×. The property that broke is load balance."
+  },
+  {
+   "level": "analyze",
+   "q": "A master-worker cloud program loses its master node while eight workers are running. Explain what happens and give one design fix.",
+   "marks": 6,
+   "a": "Dispatch stops and the workers idle once their current task ends; finished results have nobody to return to, so the job stalls. The master was the single point of failure. Fixes: replicate the master with checkpointed state, or keep a standby master that takes over through a lease when heartbeats stop, and make each task idempotent so it can be re-issued safely."
+  }
+ ],
+ "beyond": "Not for the exam. Industry now hides these choices inside managed runtimes: serverless functions are master-worker with the scheduler invisible, the actor model (Akka, Erlang) is message passing with mailboxes, and Ray or Dask schedule Python task graphs over a cluster. Graph frameworks push data parallelism onto linked data. Search next for actor model, task graph scheduling, bulk synchronous parallel, and serverless cold start."
+}

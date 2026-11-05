@@ -1,0 +1,261 @@
+{
+ "lead": "CloudSim is an open-source Java simulator that runs a whole cloud inside one laptop: data centres, hosts, virtual machines, a broker and tasks called cloudlets. Comparing scheduling policies on rented hardware is slow, costly and never repeats exactly; a simulation gives the same answer every run. Researchers use it to test VM placement, cloudlet ordering, energy models and SLA rules before touching a real provider. This chapter builds one VM, runs five cloudlets shortest-job-first, and checks every number by hand.",
+ "prereq": "You need the scheduling vocabulary from Unit 4 (policies, mechanisms, waiting and turnaround time). <a href=\"#open-source-platforms-eucalyptus-openstack-opennebula\">Chapter 5.8</a> helps for what a real data centre looks like; no provider account is needed here.",
+ "sections": [
+  {
+   "h3": "The pieces CloudSim models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CloudSim is a discrete-event simulator written in Java. A clock jumps from one scheduled event to the next instead of ticking in real time, so a 31-second schedule finishes in milliseconds. Nothing is virtualised for real: no hypervisor, no network packet, no disk."
+    },
+    {
+     "type": "p",
+     "text": "Six entities describe the model."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "CloudSim: the engine. Holds the event queue, the clock and every entity.",
+      "Datacenter: the building. Owns the hosts and a VM allocation policy.",
+      "Host: one physical server. Has processing elements (PEs, that is cores), RAM in MB, bandwidth in Mbps and storage in MB.",
+      "VM: a slice of a host. Declares MIPS, number of PEs, image size, RAM and bandwidth.",
+      "DatacenterBroker: your agent. Submits VMs and cloudlets, then hands the results back.",
+      "Cloudlet: one task. Carries a length in MI, plus a file size and an output size in MB."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two policies drive everything. VmAllocationPolicy decides which host receives a VM. CloudletScheduler decides the order cloudlets run inside one VM; the built-in ones are TimeShared and SpaceShared. Shortest job first (SJF) is not built in, so you sort the cloudlet list yourself before submitting."
+    },
+    {
+     "type": "p",
+     "text": "Units matter. MI means million instructions, the size of a task. MIPS means million instructions per second, the speed of one PE. Divide one by the other to get seconds."
+    },
+    {
+     "type": "formula",
+     "text": "t = L ÷ P",
+     "where": "t is the run time in seconds; L is the cloudlet length in MI; P is the VM speed in MIPS. A 2000 MI cloudlet on a 1000 MIPS VM needs 2000 ÷ 1000 = 2 s."
+    }
+   ]
+  },
+  {
+   "h3": "Installing it and running a built-in example",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "Install a JDK (version 8 or newer) and confirm it with javac -version.",
+      "Download the CloudSim release zip; keep the core jar and the examples folder together. The jar file name carries the version number, not just cloudsim.jar.",
+      "Compile your own class with the jar on the classpath: javac -cp cloudsim.jar MySim.java.",
+      "Run a shipped demo first. The example classes are not inside the core jar, so both jars go on the classpath: java -cp cloudsim-x.y.jar:cloudsim-examples-x.y.jar:. org.cloudbus.cloudsim.examples.CloudSimExample1, replacing x.y with the release version. On Windows use ';' instead of ':' between classpath entries.",
+      "In your class, create CloudSim, one Datacenter with hosts, one DatacenterBroker, a VM list and a cloudlet list. Call broker.submitVmList(...), broker.submitCloudletList(...), then CloudSim.startSimulation().",
+      "After the run, read broker.getCloudletReceivedList(). Each Cloudlet reports getExecStartTime() and getExecFinishTime() in seconds."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Every finished cloudlet prints one line with the same seven columns. The two you need for waiting and turnaround are Start Time and Finish Time."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Field",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "Cloudlet ID",
+       "the id you gave the task"
+      ],
+      [
+       "STATUS",
+       "SUCCESS when it completed"
+      ],
+      [
+       "DataCenter ID",
+       "which datacenter ran it"
+      ],
+      [
+       "VM ID",
+       "which VM ran it"
+      ],
+      [
+       "Time",
+       "execution time in seconds = finish − start"
+      ],
+      [
+       "Start Time",
+       "when it began, in seconds"
+      ],
+      [
+       "Finish Time",
+       "when it ended, in seconds"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Running SJF on one VM",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CloudletSchedulerSpaceShared runs one cloudlet at a time on the VM and queues the rest in submission order. To get SJF, sort the cloudlet list by length before submitting. With one VM and one PE, that sort is the whole policy."
+    },
+    {
+     "type": "p",
+     "text": "On a dedicated VM each cloudlet runs alone at full VM speed. The order changes waiting time but never the makespan: the last cloudlet finishes at total length divided by speed, whatever the order."
+    },
+    {
+     "type": "formula",
+     "text": "makespan = Σ Lᵢ ÷ P",
+     "where": "Σ Lᵢ is the sum of all cloudlet lengths in MI and P is the VM speed in MIPS; the result is in seconds."
+    },
+    {
+     "type": "p",
+     "text": "Three numbers describe each cloudlet. Completion time C is when its run ends. Waiting time W = C − its own run time, because every cloudlet arrives at t = 0 here. Turnaround time is C − arrival, which equals C in this case. Mean waiting is ΣW ÷ n and mean turnaround is ΣC ÷ n."
+    },
+    {
+     "type": "p",
+     "text": "SJF gives the lowest mean waiting on one machine when all jobs are available at the start. Its price is that lengths must be known in advance, and a long cloudlet can starve while short ones keep arriving; real brokers add ageing to prevent that. On the same five cloudlets first-come-first-served gives mean waiting 14.6 s against 8.6 s for SJF, with the same 31 s makespan."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One 1000 MIPS VM runs the five cloudlets shortest first: C4 (2000 MI) from 0 to 2 s, then C2, C5, C3 and C1, ending at 31 s. Every bar starts where the previous one ends, so the last finish is the makespan.",
+  "spec": {
+   "type": "gantt",
+   "unit": "s",
+   "lanes": [
+    {
+     "label": "VM 1000 MIPS",
+     "bars": [
+      {
+       "label": "C4",
+       "start": 0,
+       "end": 2,
+       "style": "live"
+      },
+      {
+       "label": "C2",
+       "start": 2,
+       "end": 7,
+       "style": "accent"
+      },
+      {
+       "label": "C5",
+       "start": 7,
+       "end": 13,
+       "style": "accent"
+      },
+      {
+       "label": "C3",
+       "start": 13,
+       "end": 21,
+       "style": "accent"
+      },
+      {
+       "label": "C1",
+       "start": 21,
+       "end": 31,
+       "style": "accent"
+      }
+     ]
+    }
+   ],
+   "aria": "A single timeline for one 1000 MIPS VM showing five cloudlets back to back in shortest-job-first order: C4 from 0 to 2 s, C2 from 2 to 7 s, C5 from 7 to 13 s, C3 from 13 to 21 s and C1 from 21 to 31 s."
+  }
+ },
+ "examples": [
+  {
+   "question": "A private cloud has one host carrying one VM of 1000 MIPS. A broker submits five cloudlets at time 0, one PE each, in this order: C1 = 10000 MI, C2 = 5000 MI, C3 = 8000 MI, C4 = 2000 MI, C5 = 6000 MI. The VM uses space-shared scheduling. Sort the cloudlets shortest job first and give each run time, completion time and waiting time, then the mean waiting time, the mean turnaround time and the makespan.",
+   "steps": [
+    "Run time t = L ÷ P with P = 1000 MIPS: C1 = 10 s, C2 = 5 s, C3 = 8 s, C4 = 2 s, C5 = 6 s.",
+    "SJF order by length: C4 (2000 MI), C2 (5000), C5 (6000), C3 (8000), C1 (10000).",
+    "Run times in that order: 2, 5, 6, 8, 10 s.",
+    "Completion times, adding each run to the previous finish: 2, 7, 13, 21, 31 s.",
+    "Waiting W = C − own run time: 0, 2, 7, 13, 21 s. Sum 43 s, so mean waiting = 43 ÷ 5 = 8.6 s.",
+    "Turnaround equals completion here, since every cloudlet arrives at 0: 2, 7, 13, 21, 31 s. Sum 74 s, so mean turnaround = 74 ÷ 5 = 14.8 s.",
+    "Makespan 31 s, which also equals the total length 31000 MI ÷ 1000 MIPS."
+   ],
+   "answer": "SJF runs C4, C2, C5, C3, C1 in that order; mean waiting time 8.6 s, mean turnaround time 14.8 s, makespan 31 s.",
+   "check": "lengths = [10000, 5000, 8000, 2000, 6000]\nmips = 1000\norder = sorted(lengths)\nrun = [L / mips for L in order]\ncompletion = []\nt = 0\nfor r in run:\n    t += r\n    completion.append(t)\nwait = [c - r for c, r in zip(completion, run)]\nfor v in run:\n    print(f\"{v:g}\")\nfor v in completion:\n    print(f\"{v:g}\")\nprint(f\"{sum(wait) / len(wait):g}\")\nprint(f\"{sum(completion) / len(completion):g}\")\n",
+   "values": [
+    2,
+    5,
+    6,
+    8,
+    10,
+    2,
+    7,
+    13,
+    21,
+    31,
+    8.6,
+    14.8
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Cloudlet length is in MI, not seconds. An 8000 MI cloudlet on a 2000 MIPS VM takes 4 s; writing 8000 s loses every mark.",
+  "MIPS is per PE. A VM with 2 PEs at 500 MIPS does not run a one-PE cloudlet at 1000 MIPS.",
+  "SJF needs lengths known in advance and can starve a long cloudlet; FCFS and round robin never starve but give higher mean waiting.",
+  "CloudSim is a simulator with no hypervisor and no packets. It compares policies; it cannot benchmark a real application's speed.",
+  "A cloudlet's file size and output size are data in MB, not work. On one VM they add nothing to the run time, which comes only from length ÷ MIPS."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define MI and MIPS, and state how they give a run time.",
+   "marks": 2,
+   "a": "MI is million instructions, the work in a cloudlet. MIPS is million instructions per second, the speed of one PE. Run time t = length in MI ÷ speed in MIPS, in seconds."
+  },
+  {
+   "level": "remember",
+   "q": "Name four entities CloudSim simulates and what each holds.",
+   "marks": 2,
+   "a": "Datacenter owns hosts and the VM allocation policy; Host has PEs, RAM, bandwidth and storage; VM has MIPS, PE count and image size; Cloudlet has a length in MI; the DatacenterBroker submits work and collects results."
+  },
+  {
+   "level": "understand",
+   "q": "Why simulate a data centre instead of renting real VMs for the same experiment?",
+   "marks": 3,
+   "a": "A simulation is free, finishes in milliseconds, repeats exactly and scales to thousands of nodes. Rented hardware costs money, is affected by other tenants' load, and gives a different number on every run, so two policies cannot be compared fairly."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between VmAllocationPolicy and CloudletScheduler?",
+   "marks": 3,
+   "a": "VmAllocationPolicy chooses which host receives a VM. CloudletScheduler chooses the order cloudlets execute inside one VM. The first places machines, the second orders tasks."
+  },
+  {
+   "level": "apply",
+   "q": "A VM has 2 PEs of 2000 MIPS each. A cloudlet of 9000 MI asks for 1 PE, then for 2 PEs. Give the run time in each case.",
+   "marks": 4,
+   "a": "With 1 PE: 9000 ÷ 2000 = 4.5 s. With 2 PEs both serve it, giving 2 × 2000 = 4000 MIPS, so 9000 ÷ 4000 = 2.25 s."
+  },
+  {
+   "level": "apply",
+   "q": "Three cloudlets of 3000, 1000 and 6000 MI arrive at time 0 on one 1000 MIPS VM. Run SJF and give the completion times and mean waiting time.",
+   "marks": 4,
+   "a": "SJF order 1000, 3000, 6000 MI gives run times 1, 3, 6 s; completion 1, 4, 10 s; waiting 0, 1, 4 s; sum 5, mean 5 ÷ 3 = 1.67 s. Makespan 10 s."
+  },
+  {
+   "level": "analyze",
+   "q": "FCFS on the five cloudlets of the worked example gives mean waiting 14.6 s; SJF gives 8.6 s, yet both end at 31 s. Explain both facts.",
+   "marks": 5,
+   "a": "Every cloudlet runs alone at full VM speed, so the total work and hence the makespan depend only on the sum of lengths, not the order. Waiting time does depend on order: SJF puts short jobs first, so four jobs wait less and only the long one waits long, cutting the mean from 14.6 s to 8.6 s."
+  },
+  {
+   "level": "analyze",
+   "q": "A student runs the same CloudSim program twice and gets identical output, then runs the same policy on a rented VM and gets different times. Why?",
+   "marks": 4,
+   "a": "CloudSim is deterministic: the event order is fixed by the program, with no other tenant load, no network delay and no hardware variation. A rented VM shares physical hardware, cache and network with other tenants, so its measured time changes run to run."
+  }
+ ],
+ "beyond": "Not for the exam. CloudSim Plus is a rewritten fork with a cleaner API and is what most recent papers build on. ContainerCloudSim adds Docker-style containers, and iFogSim adds fog and edge nodes to the same model. Researchers extend the power and pricing models to study energy-aware placement, live migration and market-based billing, which links back to Unit 4."
+}

@@ -1,0 +1,236 @@
+{
+ "lead": "MapReduce is a programming model for data-intensive work on many machines. A map function reads each input record and emits key-value pairs. The system groups all values for the same key in a shuffle, then a reduce function combines each group into a result. The model hides message passing, data movement and machine failures behind two functions. It is used for word counts, log analysis, inverted indexes for search and page-rank style link analysis. Hadoop MapReduce is a widely used implementation.",
+ "prereq": "You need: <a href=\"#parallel-and-distributed-programming-models-for-the-cloud\">Chapter 5.1</a> for parallel models, and Unit 4 for the distributed file system that stores input splits.",
+ "sections": [
+  {
+   "h3": "Map and reduce functions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A MapReduce job reads input splits. An input split is a chunk of input that one map task can read on its own. The programmer writes two functions, map and reduce. The framework schedules tasks, moves intermediate data and retries failures. Optional functions are a combiner, which pre-combines map output, and a partitioner, which chooses a reducer for each key."
+    },
+    {
+     "type": "formula",
+     "text": "map(k1, v1) → list(k2, v2); reduce(k2, list(v2)) → list(v3)",
+     "where": "k1 is the input key, often a byte offset or line number; v1 is the input value, often one line; k2 is the intermediate key; v2 is an intermediate value; v3 is an output value."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Map: read one split and emit (k2, v2) pairs.",
+      "Shuffle: group pairs by k2 and sort each group.",
+      "Reduce: combine the values for each k2 and write v3."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Map output is intermediate whenever the job has reducers; only reduce output is final. If the job has zero reducers, the map output is the job output."
+    }
+   ]
+  },
+  {
+   "h3": "Shuffle, combiner and partitioner",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The shuffle moves map output to reducers and sorts it by key. For one key, a reducer sees a list of all values. In word count, map emits (cat,1) for each cat. With a per-line combiner, shuffle groups cat → [2,1]. The reducer adds 2+1 to get 3."
+    },
+    {
+     "type": "p",
+     "text": "A combiner is optional. It runs on the map side before the shuffle. It is safe only when its operation is associative and commutative: grouping and order do not change the result. Sum and maximum are safe; a naive average is not, unless you carry both a sum and a count."
+    },
+    {
+     "type": "p",
+     "text": "The partitioner maps a key to one reducer, usually hash(key) mod R, where R is the number of reducers. All values for a key must reach the same reducer. This rule keeps the reduce result correct, but one hot key can send all its values to one reducer. Adding reducers does not split that key's values. Salting adds a random prefix to hot keys, then a second job combines the partial results."
+    }
+   ]
+  },
+  {
+   "h3": "Fault tolerance and uses",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "MapReduce tolerates machine failure by re-execution. If a map task fails, the framework reruns it on another machine from the same input split. If a reduce task fails, it reruns using intermediate data that is still available. A slow task may get a speculative copy; the first copy to finish is kept. The programmer writes no recovery code."
+    },
+    {
+     "type": "p",
+     "text": "Word count is the standard example. Information retrieval builds an inverted index: map emits (term, document id) after parsing each document; reduce collects the postings for each term. Page ranking uses repeated jobs: one job sends link contributions from each page, another sums them per page and applies the damping formula. Hadoop MapReduce is an implementation that runs on a cluster. For iterative page-rank rounds, in-memory frameworks often do better; see <a href=\"#apache-spark-and-other-frameworks\">Chapter 5.4</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The shuffle note shows grouped values after per-line combining; the reducer sums each list to produce the final counts.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Word count pipeline",
+   "nodes": [
+    {
+     "id": "in",
+     "label": "Input splits",
+     "note": "cat dog cat | dog | cat",
+     "style": "normal"
+    },
+    {
+     "id": "map",
+     "label": "Map",
+     "note": "emit (word, 1)",
+     "style": "accent"
+    },
+    {
+     "id": "comb",
+     "label": "Combiner",
+     "note": "cat2,dog1 | dog1 | cat1",
+     "style": "normal"
+    },
+    {
+     "id": "shuf",
+     "label": "Shuffle/sort",
+     "note": "cat [2,1]; dog [1,1]",
+     "style": "live"
+    },
+    {
+     "id": "red",
+     "label": "Reduce",
+     "note": "cat 3; dog 2",
+     "style": "accent"
+    },
+    {
+     "id": "out",
+     "label": "Output",
+     "note": "cat 3; dog 2",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "in",
+     "to": "map",
+     "style": "solid"
+    },
+    {
+     "from": "map",
+     "to": "comb",
+     "style": "solid"
+    },
+    {
+     "from": "comb",
+     "to": "shuf",
+     "style": "solid"
+    },
+    {
+     "from": "shuf",
+     "to": "red",
+     "style": "solid"
+    },
+    {
+     "from": "red",
+     "to": "out",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Input lines: 1) cat dog cat; 2) dog; 3) cat. Use one map task per line, one per-line combiner and one reducer. Show the map output, combiner output, shuffled groups and reduce output. Write a Python simulation and give its exact output.",
+   "steps": [
+    "Map line 1: (cat,1), (dog,1), (cat,1). Line 2: (dog,1). Line 3: (cat,1).",
+    "Combiner line 1: cat → 2, dog → 1. Line 2: dog → 1. Line 3: cat → 1.",
+    "Shuffle and sort: cat → [2,1]; dog → [1,1].",
+    "Reduce: cat: 2+1 = 3. dog: 1+1 = 2.",
+    "Total words: 3+2 = 5.",
+    "The Python program prints cat 3, dog 2 and total 5."
+   ],
+   "answer": "cat appears 3 times, dog appears 2 times, and the input has 5 words in total.",
+   "check": "lines = [\"cat dog cat\", \"dog\", \"cat\"]\nwords = [w for line in lines for w in line.split()]\ncat = words.count(\"cat\")\ndog = words.count(\"dog\")\ntotal = len(words)\nprint(cat)\nprint(dog)\nprint(total)",
+   "values": [
+    3,
+    2,
+    5
+   ],
+   "code": {
+    "lang": "python",
+    "code": "lines = [\"cat dog cat\", \"dog\", \"cat\"]\ndef mapper(line):\n    return [(w, 1) for w in line.split()]\ndef combiner(pairs):\n    out = {}\n    for k, v in pairs:\n        out[k] = out.get(k, 0) + v\n    return list(out.items())\ncombined = []\nfor line in lines:\n    combined += combiner(mapper(line))\ngroups = {}\nfor k, v in combined:\n    groups.setdefault(k, []).append(v)\nfor k in sorted(groups):\n    print(k, sum(groups[k]))\nprint(\"total\", sum(sum(v) for v in groups.values()))",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Line",
+     "Map output",
+     "Combiner output",
+     "Shuffle groups so far"
+    ],
+    "rows": [
+     [
+      "1",
+      "(cat,1),(dog,1),(cat,1)",
+      "cat 2, dog 1",
+      "cat [2], dog [1]"
+     ],
+     [
+      "2",
+      "(dog,1)",
+      "dog 1",
+      "cat [2], dog [1,1]"
+     ],
+     [
+      "3",
+      "(cat,1)",
+      "cat 1",
+      "cat [2,1], dog [1,1]"
+     ]
+    ]
+   },
+   "output": "cat 3\ndog 2\ntotal 5"
+  }
+ ],
+ "traps": [
+  "Map output is intermediate whenever the job has reducers. The final answer comes only after reduce, so a combiner cannot be treated as the job output.",
+  "A combiner is optional and must be associative and commutative. Sum is safe; a plain average is not.",
+  "All values for one key go to one reducer. More reducers do not split a hot key's values.",
+  "An input split is a unit of map input, not a key group. Shuffle/sort creates key groups.",
+  "Rerunning a failed task is normal fault tolerance; the whole job does not restart from the input."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the map and reduce signatures in MapReduce.",
+   "marks": 2,
+   "a": "map(k1, v1) → list(k2, v2); reduce(k2, list(v2)) → list(v3)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a combiner optional, and when is it unsafe?",
+   "marks": 3,
+   "a": "It only reduces map-side traffic before shuffle. It is unsafe when the operation is not associative and commutative, for example a plain average without a count."
+  },
+  {
+   "level": "apply",
+   "q": "Input lines are \"a b a\" and \"b a\". Use a per-line combiner and one reducer. Give the final counts.",
+   "marks": 4,
+   "a": "Line 1 combiner: a 2, b 1. Line 2: b 1, a 1. Shuffle: a [2,1]; b [1,1]. Final: a 3, b 2."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does adding more reducers not fix a hot-key skew?",
+   "marks": 5,
+   "a": "The partitioner must send all values for one key to the same reducer, so the hot key still lands on one reducer; only salting or splitting the key helps."
+  },
+  {
+   "level": "apply",
+   "q": "A partitioner uses hash(key) mod 4. Reducers are numbered 0 to 3. A key has hash 13. Which reducer receives it?",
+   "marks": 3,
+   "a": "13 mod 4 = 1, so reducer 1."
+  },
+  {
+   "level": "analyze",
+   "q": "How does MapReduce recover from a failed map task and a failed reduce task?",
+   "marks": 4,
+   "a": "A failed map task is rerun from its input split on another machine. A failed reduce task is rerun from available intermediate data; lost map outputs may be recomputed."
+  }
+ ],
+ "beyond": "Not for the exam. MapReduce ideas survive in distributed SQL engines, log pipelines and batch ETL, where the shuffle is still the expensive step. Modern systems often keep data in memory and express the same grouping with groupBy or reduceByKey. Search terms: combiners and partitioners, skewed joins, salting hot keys, speculative execution, and MapReduce as a special case of bulk synchronous processing."
+}

@@ -1,0 +1,303 @@
+{
+ "lead": "Amazon Web Services (AWS) sells cloud computing as separate building blocks you rent one at a time. EC2 gives you virtual machines, EBS gives each machine a disk, S3 stores files as objects, a VPC gives your machines a private network with subnets and firewalls, and SQS or SNS carries messages between parts of your system. You assemble these pieces into an application instead of buying a server. Most Indian startups, banks and government portals run at least part of their stack this way, paying by the hour or by the gigabyte.",
+ "prereq": "You need: Unit 1 service models (IaaS, PaaS) and Unit 2 load balancing and high availability; see <a href=\"#parallel-and-distributed-programming-models-for-the-cloud\">5.1</a> for how the parts communicate.",
+ "sections": [
+  {
+   "h3": "EC2: a virtual machine you rent",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "EC2 (Elastic Compute Cloud) rents you a virtual machine, called an instance. A hypervisor on AWS hardware boots it from an image, so you get a fresh Linux or Windows machine in about a minute (Unit 3 covers the hypervisor layer). You pay for the time it runs."
+    },
+    {
+     "type": "p",
+     "text": "An AMI (Amazon Machine Image) is the template: an operating system, some preinstalled software, and disk snapshots. Ten instances launched from one AMI are identical. An instance type names the hardware size, for example t3.micro or m5.large. The letter is the family — t for burstable general purpose, m for balanced, c for compute-heavy, r for memory-heavy — and the size after the dot sets vCPUs and RAM."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Pick an AMI, for example Amazon Linux.",
+      "Pick an instance type and a subnet.",
+      "Choose or create a key pair; the private key file is your SSH login.",
+      "Attach a security group that allows SSH on port 22 from your own address only.",
+      "Set the root EBS volume size and launch.",
+      "Connect with: ssh -i key.pem ec2-user@<public-ip>."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An instance moves through pending, running, stopped and terminated. A stopped instance keeps its disk and loses its public IP; a terminated one is gone. Tag every instance with Name, Owner and Environment, or a bill listing forty instances becomes unreadable."
+    }
+   ]
+  },
+  {
+   "h3": "EBS and S3: two kinds of storage",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "EBS (Elastic Block Store) is a virtual hard disk. You attach a volume to one instance in the same Availability Zone, format it with a filesystem, and read and write fixed-size blocks. The operating system cannot tell it from a local disk. The volume outlives the instance."
+    },
+    {
+     "type": "p",
+     "text": "S3 (Simple Storage Service) stores objects. An object is a byte sequence plus metadata, kept in a bucket under a key such as photos/chennai-2024/IMG_0412.jpg. Bucket names are globally unique. You PUT and GET whole objects over HTTPS; there is no seek and no partial write. S3 copies each object across devices and zones for very high durability."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "EBS",
+      "S3"
+     ],
+     "rows": [
+      [
+       "Unit",
+       "Fixed-size blocks",
+       "Whole objects"
+      ],
+      [
+       "Attached to",
+       "One instance, one zone",
+       "Any client over HTTPS"
+      ],
+      [
+       "Typical use",
+       "OS disk, database files",
+       "Images, backups, logs"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Rule of thumb: anything a program opens as a file lives on EBS; anything a user uploads or downloads lives in S3."
+    }
+   ]
+  },
+  {
+   "h3": "VPC, subnets and security groups",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A VPC (Virtual Private Cloud) is your own network inside AWS. You choose its address range in CIDR form, for example 10.0.0.0/16, which holds 2¹⁶ = 65,536 addresses. Nothing outside reaches in unless you allow it."
+    },
+    {
+     "type": "p",
+     "text": "A subnet is a slice of that range pinned to one Availability Zone. A /24 subnet such as 10.0.1.0/24 has 2⁸ = 256 addresses; AWS reserves 5 in every subnet, so 251 are usable by instances."
+    },
+    {
+     "type": "p",
+     "text": "A route table decides where packets from a subnet go. A subnet is public only when its route table sends 0.0.0.0/0 to an internet gateway and the instance has a public IP. A private subnet has no such route; it reaches the internet, if at all, through a NAT gateway."
+    },
+    {
+     "type": "p",
+     "text": "A security group is a stateful firewall on an instance. You write allow rules only: port, protocol, source. Replies to allowed traffic return automatically — that is what stateful means. A network ACL is the stateless filter at the subnet edge. An Application Load Balancer sits in front of the web instances, ends TLS on port 443, and health-checks each target."
+    }
+   ]
+  },
+  {
+   "h3": "SQS, SNS and CloudWatch",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SQS (Simple Queue Service) is a durable message queue. A producer sends a message; a worker polls, processes, and deletes it. While a worker holds a message it is invisible to others for the visibility timeout; if the worker dies, the message reappears. Delivery is at-least-once, so make processing idempotent."
+    },
+    {
+     "type": "p",
+     "text": "SNS (Simple Notification Service) is publish/subscribe. You publish to a topic and every subscriber gets a copy — an email, an SMS, an SQS queue, a function. Use SQS when one worker should take each job, SNS when many listeners should hear each event."
+    },
+    {
+     "type": "p",
+     "text": "CloudWatch collects metrics such as CPUUtilization, keeps logs, and fires alarms. An alarm can add instances to an Auto Scaling group or publish to an SNS topic. Auto Scaling holds a group at a target count and replaces unhealthy instances; a launch template says which AMI and instance type the new ones get."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Two web instances sit in the public subnet behind the internet gateway on port 443; the database sits in the private subnet and accepts port 3306 only from the web servers. The S3 bucket and SQS queue are regional services outside the VPC.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Web app on AWS",
+   "nodes": [
+    {
+     "id": "igw",
+     "label": "Internet gateway",
+     "note": "port 443 in",
+     "style": "accent"
+    },
+    {
+     "id": "vpc",
+     "label": "VPC 10.0.0.0/16",
+     "style": "accent"
+    },
+    {
+     "id": "pub",
+     "label": "Public subnet",
+     "note": "10.0.1.0/24",
+     "style": "normal"
+    },
+    {
+     "id": "web1",
+     "label": "Web EC2 A",
+     "style": "live"
+    },
+    {
+     "id": "web2",
+     "label": "Web EC2 B",
+     "style": "live"
+    },
+    {
+     "id": "priv",
+     "label": "Private subnet",
+     "note": "10.0.2.0/24",
+     "style": "normal"
+    },
+    {
+     "id": "db",
+     "label": "DB EC2",
+     "note": "port 3306",
+     "style": "next"
+    },
+    {
+     "id": "s3",
+     "label": "S3 bucket",
+     "note": "100 GB images",
+     "style": "normal"
+    },
+    {
+     "id": "sqs",
+     "label": "SQS queue",
+     "note": "jobs",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "igw",
+     "to": "vpc",
+     "label": "443",
+     "style": "solid"
+    },
+    {
+     "from": "vpc",
+     "to": "pub",
+     "style": "solid"
+    },
+    {
+     "from": "vpc",
+     "to": "priv",
+     "style": "solid"
+    },
+    {
+     "from": "pub",
+     "to": "web1",
+     "style": "solid"
+    },
+    {
+     "from": "pub",
+     "to": "web2",
+     "style": "solid"
+    },
+    {
+     "from": "priv",
+     "to": "db",
+     "style": "solid"
+    },
+    {
+     "from": "web1",
+     "to": "db",
+     "label": "3306",
+     "style": "solid"
+    },
+    {
+     "from": "web2",
+     "to": "db",
+     "label": "3306",
+     "style": "solid"
+    },
+    {
+     "from": "web1",
+     "to": "s3",
+     "label": "images",
+     "style": "dashed"
+    },
+    {
+     "from": "web2",
+     "to": "sqs",
+     "label": "jobs",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A web application needs 2 web servers, 1 database server, 100 GB of user images and a job queue. Design it on AWS using VPC 10.0.0.0/16, public subnet 10.0.1.0/24 and private subnet 10.0.2.0/24. State the usable addresses per subnet, where each resource sits, and which traffic flows are allowed.",
+   "steps": [
+    "10.0.0.0/16 gives 2^(32−16) = 65,536 addresses. Each /24 gives 2^(32−24) = 256 addresses.",
+    "AWS reserves 5 addresses per subnet, so 256 − 5 = 251 usable in each subnet, 502 across both.",
+    "Public subnet 10.0.1.0/24 holds the 2 web EC2 instances and the Application Load Balancer. Its route table sends 0.0.0.0/0 to the internet gateway.",
+    "Private subnet 10.0.2.0/24 holds the 1 database EC2 instance. Its route table has only the local route, so no direct internet path.",
+    "The 100 GB of images goes to 1 S3 bucket and the jobs go to 1 SQS queue. Both are regional services outside the VPC, reached over their HTTPS endpoints.",
+    "web-sg: inbound 443 from 0.0.0.0/0, inbound 22 from the admin address. db-sg: inbound 3306 with source = web-sg (a group reference, not a CIDR block).",
+    "Total EC2 instances = 3. Flows allowed: user → 443 → load balancer → web; web → 3306 → database. A direct internet → 3306 → database attempt matches no rule and is dropped."
+   ],
+   "answer": "251 usable addresses in each subnet (502 in total), 3 EC2 instances (2 web in 10.0.1.0/24, 1 database in 10.0.2.0/24), a 100 GB S3 bucket and one SQS queue, with port 443 open from the internet to the web group and port 3306 open only from the web group to the database group.",
+   "check": "reserved = 5\npub = 2**(32-24) - reserved\npriv = 2**(32-24) - reserved\nprint(pub)\nprint(priv)\nprint(pub + priv)\nprint(2 + 1)\nprint(100)\n",
+   "values": [
+    251,
+    251,
+    502,
+    3,
+    100
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A security group is not a subnet. It is a stateful firewall on an instance's network interface; the subnet-level filter is the network ACL, which is stateless.",
+  "S3 is object storage. You cannot mount it as a block disk and run a database on it; a filesystem needs EBS, whole objects are PUT and GET.",
+  "A subnet is public because of its route table, not its name. Without a 0.0.0.0/0 route to an internet gateway it stays private even if an instance has a public IP.",
+  "An EBS volume lives in one Availability Zone and cannot attach to an instance in another zone. Snapshot it, then create the volume from the snapshot in the new zone.",
+  "Stopping is not terminating. A stopped instance keeps its EBS volume and data; a terminated instance deletes the root volume by default."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is an AMI and why launch several instances from one?",
+   "marks": 2,
+   "a": "An Amazon Machine Image is a template holding an operating system, preinstalled software and disk snapshots. Instances launched from the same AMI are identical."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a database engine run on EBS but not on S3?",
+   "marks": 3,
+   "a": "A database reads and writes fixed-size blocks and seeks inside files. EBS presents a block device with a filesystem. S3 accepts only whole objects over HTTPS, with no seek and no in-place write."
+  },
+  {
+   "level": "apply",
+   "q": "A VPC uses 10.0.0.0/16 and you create subnet 10.0.4.0/24. How many addresses does the subnet have, and how many can instances use?",
+   "marks": 3,
+   "a": "2^(32−24) = 256 addresses; AWS reserves 5, so 256 − 5 = 251 are usable by instances."
+  },
+  {
+   "level": "apply",
+   "q": "web-sg allows inbound 443 from 0.0.0.0/0 and has no outbound rules. A request arrives. Can the reply leave? Can the server start a connection to the internet?",
+   "marks": 4,
+   "a": "The reply leaves, because security groups are stateful and return traffic for an allowed inbound flow is permitted. A new outbound connection fails, since no outbound rule allows it and the default is deny."
+  },
+  {
+   "level": "analyze",
+   "q": "The queue between the web tier and the workers is removed and the web tier calls workers directly. What breaks during a traffic spike?",
+   "marks": 5,
+   "a": "Each request waits for a worker, so a slow job slows the user; a spike overflows the workers and jobs are lost. A queue buffers the burst, retries failures, and lets worker count scale separately."
+  },
+  {
+   "level": "analyze",
+   "q": "Both web instances sit in one public subnet in one Availability Zone. That zone fails. State the impact and the fix.",
+   "marks": 6,
+   "a": "Both instances and the load balancer's nodes in that zone fail together and the site is down. Fix: add a second public subnet in another zone, register instances from both in the load balancer's target group, and let Auto Scaling spread the group across both subnets."
+  }
+ ],
+ "beyond": "Not for the exam. In practice nobody clicks the console forty times: infrastructure is written as code in CloudFormation or Terraform and reviewed like software. Many teams now run containers on ECS or EKS rather than raw EC2, and serverless functions for short bursts of work, but the VPC, security-group and S3 ideas stay the same underneath. Search next for the AWS Well-Architected Framework, the Terraform AWS provider, and EKS versus ECS."
+}

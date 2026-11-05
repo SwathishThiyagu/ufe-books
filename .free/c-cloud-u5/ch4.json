@@ -1,0 +1,220 @@
+{
+ "lead": "Apache Spark is a cluster computing engine that keeps working data in memory between steps. It stores data as immutable, partitioned collections called RDDs (Resilient Distributed Datasets). A program describes transformations, and Spark records a lineage graph until an action asks for a result. On failure, it rebuilds only lost partitions from that lineage. Spark suits iterative machine learning, log analysis and near-real-time streams. Only a few universities teach this in depth; many stop at MapReduce.",
+ "prereq": "You need: <a href=\"#mapreduce-programming-model\">Chapter 5.3</a> for map, shuffle and reduce, and the distributed storage ideas of Unit 4.",
+ "sections": [
+  {
+   "h3": "RDDs, laziness and lineage",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An RDD is an immutable, partitioned collection spread over executor processes (workers). Every transformation creates a new RDD; actions return a value or write output. Partitions are slices processed by tasks. Transformations (map, flatMap, filter, reduceByKey) only build the plan; no job runs until an action such as collect, count or saveAsTextFile. This is lazy evaluation: no job runs until an action. The driver program (the process running main()) then schedules stages, cutting the lineage DAG (directed acyclic graph) at shuffles. A shuffle moves all pairs with the same key to one partition; reduceByKey needs it, map does not."
+    },
+    {
+     "type": "p",
+     "text": "Lineage is the record of transformations. If a partition is lost, Spark recomputes it from its parents instead of reading a replica. Long lineage slows recovery, so checkpointing writes an RDD to reliable storage and truncates the graph. cache() uses executor memory; persist() can use memory, disk or both. Both are lazy. For memory-only storage, partitions that do not fit are evicted and recomputed; MEMORY_AND_DISK spills to disk instead."
+    }
+   ]
+  },
+  {
+   "h3": "DataFrames, streams and graphs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "DataFrames add named columns and a schema to RDDs. Spark SQL's Catalyst optimizer rewrites queries, so DataFrames usually beat raw RDDs on structured data."
+    },
+    {
+     "type": "p",
+     "text": "Spark Streaming cuts a live stream into micro-batches at a fixed interval, such as 1 second. Each batch is an RDD; a DStream (discretized stream) is the sequence. Latency is seconds, not milliseconds."
+    },
+    {
+     "type": "p",
+     "text": "GraphX runs graph algorithms on Spark: vertices and edges are RDDs, and vertex programs exchange messages. GraphLab is a separate distributed graph framework with update functions over vertices and edges; it allows asynchronous execution."
+    },
+    {
+     "type": "p",
+     "text": "MapReduce writes map output (intermediate data) to local disk before the reduce phase within a job, then follows a fixed map-shuffle-reduce plan. Spark keeps cached data in memory, plans a general DAG, and reuses RDDs across iterations. MapReduce stays simple for one-pass batch jobs; Spark wins on iterative and streaming work."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Lazy transformations go from textFile through flatMap and map to reduceByKey; collect() is the action that starts the job. The map stage is marked to be cached in memory.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "textFile",
+     "label": "textFile",
+     "x": 0,
+     "y": 2,
+     "note": "2 lines",
+     "style": "normal"
+    },
+    {
+     "id": "flatMap",
+     "label": "flatMap",
+     "x": 1,
+     "y": 2,
+     "note": "5 words",
+     "style": "normal"
+    },
+    {
+     "id": "map",
+     "label": "map",
+     "x": 2,
+     "y": 2,
+     "note": "cached",
+     "style": "accent"
+    },
+    {
+     "id": "reduceByKey",
+     "label": "reduceByKey",
+     "x": 3,
+     "y": 2,
+     "note": "3 keys",
+     "style": "normal"
+    },
+    {
+     "id": "collect",
+     "label": "collect",
+     "x": 4,
+     "y": 2,
+     "note": "driver",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "textFile",
+     "to": "flatMap",
+     "label": "split",
+     "style": "solid"
+    },
+    {
+     "from": "flatMap",
+     "to": "map",
+     "label": "emit",
+     "style": "solid"
+    },
+    {
+     "from": "map",
+     "to": "reduceByKey",
+     "label": "shuffle",
+     "style": "solid"
+    },
+    {
+     "from": "reduceByKey",
+     "to": "collect",
+     "label": "action",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A Spark job reads two lines: 'a b a' and 'b c'. Trace lines.flatMap(split).map(w -> (w,1)).reduceByKey(add).collect() and give the collected pairs in sorted order.",
+   "steps": [
+    "1. Input RDD: ['a b a', 'b c'], 2 records.",
+    "2. flatMap splits each line and emits every word: a, b, a, b, c. That is 5 words.",
+    "3. map makes pairs: (a,1), (b,1), (a,1), (b,1), (c,1).",
+    "4. reduceByKey groups by key and adds: a gets 1+1=2, b gets 1+1=2, c gets 1. collect() returns [(a,2), (b,2), (c,1)]."
+   ],
+   "answer": "The collected result is [(a,2), (b,2), (c,1)]: two keys have count 2 and one key has count 1.",
+   "check": "lines = [\"a b a\", \"b c\"]\nwords = [w for L in lines for w in L.split()]\ncounts = {}\nfor w in words:\n    counts[w] = counts.get(w, 0) + 1\nfor k in sorted(counts):\n    print(counts[k])",
+   "values": [
+    2,
+    2,
+    1
+   ],
+   "code": {
+    "lang": "python",
+    "code": "lines = [\"a b a\", \"b c\"]\nflat = [w for L in lines for w in L.split()]\npairs = [(w, 1) for w in flat]\nd = {}\nfor w, c in pairs:\n    d[w] = d.get(w, 0) + c\nprint(flat)\nprint(pairs)\nprint(sorted(d.items()))",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Stage",
+     "Output"
+    ],
+    "rows": [
+     [
+      "Input",
+      "a b a ; b c"
+     ],
+     [
+      "flatMap",
+      "a, b, a, b, c"
+     ],
+     [
+      "map",
+      "(a,1), (b,1), (a,1), (b,1), (c,1)"
+     ],
+     [
+      "reduceByKey",
+      "(a,2), (b,2), (c,1)"
+     ],
+     [
+      "collect",
+      "[(a,2), (b,2), (c,1)]"
+     ]
+    ]
+   },
+   "output": "['a', 'b', 'a', 'b', 'c']\n[('a', 1), ('b', 1), ('a', 1), ('b', 1), ('c', 1)]\n[('a', 2), ('b', 2), ('c', 1)]"
+  }
+ ],
+ "traps": [
+  "Transformations are lazy; no Spark job runs until an action such as collect() or count().",
+  "collect() moves every result to driver memory and can crash it; use take() or save output to storage.",
+  "cache() uses executor memory; persist() can use memory, disk or both. Both are lazy. For memory-only storage, partitions that do not fit are evicted and recomputed; MEMORY_AND_DISK spills to disk instead.",
+  "reduceByKey aggregates before the shuffle; groupByKey shuffles every value. For sums and counts, reduceByKey is cheaper.",
+  "Long lineage slows recovery because more parent stages must be rerun; caching does not shorten lineage, checkpointing does."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define RDD.",
+   "marks": 2,
+   "a": "An immutable, partitioned collection of records spread over executors, rebuilt through lineage."
+  },
+  {
+   "level": "remember",
+   "q": "What does collect() do?",
+   "marks": 2,
+   "a": "It is an action that returns all elements of an RDD to the driver program."
+  },
+  {
+   "level": "understand",
+   "q": "Why is lineage enough for fault tolerance?",
+   "marks": 3,
+   "a": "A lost partition is recomputed by rerunning its parent transformations from the stored input."
+  },
+  {
+   "level": "apply",
+   "q": "Lines are ['x y x', 'y z']. Give flatMap(split).map((w,1)).reduceByKey(add).collect() sorted.",
+   "marks": 4,
+   "a": "flatMap: x,y,x,y,z. map: pairs with 1. reduceByKey: [(x,2), (y,2), (z,1)]."
+  },
+  {
+   "level": "analyze",
+   "q": "When can caching an RDD hurt performance?",
+   "marks": 5,
+   "a": "When the RDD is used once or does not fit in memory; eviction, recomputation and memory pressure add cost."
+  },
+  {
+   "level": "understand",
+   "q": "How does Spark Streaming differ from MapReduce?",
+   "marks": 3,
+   "a": "Spark Streaming runs micro-batches of RDDs at fixed intervals; MapReduce runs one fixed batch job over stored data."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does long lineage slow recovery?",
+   "marks": 5,
+   "a": "More parent stages must be rerun to rebuild a lost partition, so recovery time grows with lineage length."
+  }
+ ],
+ "beyond": "Not for the exam. DataFrames and Structured Streaming now carry most new Spark workloads, while the older DStream API remains in legacy code. GraphX has been less actively developed than DataFrame-based graph libraries. GraphLab's update-function ideas reappear in newer graph engines. Search for Catalyst optimizer, Tungsten, watermarking and Pregel to go deeper."
+}

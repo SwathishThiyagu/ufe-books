@@ -1,0 +1,271 @@
+{
+ "lead": "Google App Engine is a managed platform as a service (PaaS): you upload code, and Google runs it, scales it and patches the servers underneath. Google Cloud Platform (GCP) is the wider family around it — virtual machines, disks, object storage, messaging and monitoring, all held inside a project. App Engine suits a web app that must absorb sudden traffic without a capacity plan; Compute Engine suits software that needs a whole machine. This chapter covers both and ends by comparing App Engine with AWS EC2.",
+ "prereq": "You need: <a href=\"#amazon-web-services-compute-storage-and-communication\">Chapter 5.5</a> for the modular AWS picture, and Unit 2 (elastic and on-demand computing, automated scaling) for the scaling idea.",
+ "sections": [
+  {
+   "h3": "App Engine: a PaaS that runs your code",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "App Engine runs your source code on Google's machines. You never see the operating system, the load balancer or the patch schedule. You pick a runtime, write handlers that answer HTTP requests, and deploy; App Engine creates instances, adds them when traffic rises and removes them when traffic falls."
+    },
+    {
+     "type": "p",
+     "text": "There are two environments, and the exam expects you to tell them apart."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Standard: code runs in a sandbox with fixed runtimes (Java, Python, Go, PHP, Node.js). It starts in milliseconds, scales to zero instances when idle, cannot write to local disk (use Cloud Storage instead), and has per-request time limits.",
+      "Flexible: your app is packaged as a container and runs inside a Compute Engine VM. Any runtime, native libraries, background threads and SSH are allowed. Start-up is slower and at least one instance stays running, so it never reaches zero."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Both scale automatically. You set a target CPU utilization, a maximum instance count and, if you wish, a maximum number of concurrent requests per instance. The scheduler compares measured CPU with the target and adds or removes instances."
+    },
+    {
+     "type": "formula",
+     "text": "N = ⌈ R × c ÷ (60 × u) ⌉",
+     "where": "N is the number of instances needed; R is the request rate in requests per minute; c is the CPU time of one request in CPU-seconds; u is the target utilization as a fraction (0.5 means 50%); 60 is the CPU-seconds per minute one instance supplies at 100% utilization."
+    },
+    {
+     "type": "p",
+     "text": "The request path is short. A client sends HTTPS to the App Engine front end, which terminates TLS, routes by service and version, load-balances, and forwards to one or more instances. Anything slow is pushed to Pub/Sub instead of being done inside the request."
+    }
+   ]
+  },
+  {
+   "h3": "Projects, Compute Engine and VPC firewall rules",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every GCP resource lives inside a project. A project holds the resources, the billing account and the list of enabled APIs; you enable the Compute Engine API before creating a machine. Projects sit in folders, and folders sit in an organization, so one policy can cover many projects. Identity and access control at these levels is in Unit 6, Identity and access management."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Choose a region and zone; the zone decides which data centre holds the machine (for example asia-south1-a for Mumbai).",
+      "Choose a machine type, which fixes vCPUs and memory (e2-small gives 2 vCPUs and 2 GB of RAM).",
+      "Choose a boot image: a public image such as Debian or Ubuntu, or a custom image you built earlier from a disk. An image is a read-only template; a snapshot is a copy of one disk.",
+      "Attach the instance to a VPC network and give it a network tag such as web.",
+      "Open the ports it needs with a firewall rule, then connect over SSH."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Firewall rules belong to the VPC network, not to the instance. Each rule states a direction (ingress or egress), an action (allow or deny), a source or destination range in CIDR form, a protocol and port, and a target. The target is a network tag or a service account, so a rule whose target tag is web applies only to instances carrying that tag. GCP denies incoming traffic and allows outgoing traffic by default, so a fresh web server answers nothing until you add an allow rule for tcp:80 and tcp:443."
+    }
+   ]
+  },
+  {
+   "h3": "Cloud Storage, Pub/Sub and Cloud Monitoring",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Cloud Storage keeps objects in buckets. A bucket name is globally unique and an object is named by a key such as photos/2024/chennai.jpg. Objects are immutable: to change one you upload a replacement. Pick a storage class — Standard, Nearline, Coldline or Archive — by how often you read the data; colder classes cost less to store and more to read. Buckets hold static files, backups, and the uploads an App Engine standard instance cannot keep on local disk."
+    },
+    {
+     "type": "p",
+     "text": "Pub/Sub is the messaging service. A publisher sends a message to a topic; each subscription on that topic gets a copy; a subscriber pulls messages or receives them pushed to an endpoint. Delivery is at-least-once, so the subscriber must tolerate a duplicate. Use it to move slow work — sending email, rendering a PDF, calling a payment gateway — off the request path, so the user waits 30 ms instead of 3 s."
+    },
+    {
+     "type": "p",
+     "text": "Cloud Monitoring collects metrics such as instance CPU, request latency and instance count, draws dashboards and fires alerting policies when a metric crosses a threshold. Uptime checks probe your URL from several regions. Logs go to Cloud Logging, where you filter by severity and set log-based alerts."
+    }
+   ]
+  },
+  {
+   "h3": "App Engine PaaS against EC2 IaaS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "EC2 gives you a virtual machine; you install OS updates, the runtime and an Auto Scaling group. App Engine gives you a runtime; Google does that work. The trade is control for convenience."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Aspect",
+      "App Engine (PaaS)",
+      "EC2 (IaaS)"
+     ],
+     "rows": [
+      [
+       "What you deploy",
+       "Source code plus a runtime choice",
+       "A machine image with the whole stack"
+      ],
+      [
+       "Operating system",
+       "Hidden; sandbox in standard",
+       "Full root shell"
+      ],
+      [
+       "Scaling",
+       "Automatic, from request rate and CPU",
+       "Auto Scaling group you configure"
+      ],
+      [
+       "Idle cost",
+       "Zero instances in standard",
+       "You pay while the instance runs"
+      ],
+      [
+       "Control",
+       "Limited: fixed runtimes, request limits",
+       "Complete: any kernel, protocol or port"
+      ],
+      [
+       "Best for",
+       "Web back ends and APIs with spiky traffic",
+       "Custom stacks, databases, legacy software"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A client request reaches the App Engine front end, which routes it to the single automatic instance sized at a 50% CPU target; the instance writes files to Cloud Storage and publishes slow work to the Pub/Sub queue.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "App Engine request path",
+   "nodes": [
+    {
+     "id": "client",
+     "label": "Client",
+     "note": "HTTPS request",
+     "style": "normal"
+    },
+    {
+     "id": "fe",
+     "label": "App Engine front end",
+     "note": "TLS, routing, balancing",
+     "style": "normal"
+    },
+    {
+     "id": "inst",
+     "label": "1 automatic instance",
+     "note": "target CPU 50%",
+     "style": "accent"
+    },
+    {
+     "id": "gcs",
+     "label": "Cloud Storage",
+     "note": "files, backups",
+     "style": "normal"
+    },
+    {
+     "id": "ps",
+     "label": "Pub/Sub queue",
+     "note": "slow tasks",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "client",
+     "to": "fe",
+     "label": "HTTPS",
+     "style": "solid"
+    },
+    {
+     "from": "fe",
+     "to": "inst",
+     "label": "routes",
+     "style": "solid"
+    },
+    {
+     "from": "inst",
+     "to": "gcs",
+     "label": "writes",
+     "style": "solid"
+    },
+    {
+     "from": "inst",
+     "to": "ps",
+     "label": "publishes",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An App Engine standard service receives 900 requests per minute. Each request needs 30 ms of CPU time. The operator sets the target CPU utilization to 50%. One instance supplies 60 CPU-seconds per minute at 100% utilization. (a) How much CPU time per minute does the traffic need? (b) How much does one instance supply at the target? (c) How many instances are required? (d) Repeat (c) if traffic doubles to 1,800 requests per minute.",
+   "steps": [
+    "Convert one request's CPU time to seconds: c = 30 ms = 0.030 CPU-s.",
+    "Demand at 900 requests/min: 900 × 0.030 = 27 CPU-s/min.",
+    "Capacity of one instance at the 50% target: 60 × 0.50 = 30 CPU-s/min.",
+    "Instances needed: N = ⌈27 ÷ 30⌉ = ⌈0.9⌉ = 1 instance.",
+    "At 1,800 requests/min: 1,800 × 0.030 = 54 CPU-s/min of demand.",
+    "N = ⌈54 ÷ 30⌉ = ⌈1.8⌉ = 2 instances.",
+    "Check the trap: dividing by the 100% figure 60 would give ⌈27 ÷ 60⌉ = 1 and ⌈54 ÷ 60⌉ = 1, which under-provisions the doubled load."
+   ],
+   "answer": "One instance carries 900 requests/min at a 50% CPU target; 1,800 requests/min needs 2 instances.",
+   "check": "import math\nR1, R2 = 900, 1800\nc = 0.030\nu = 0.50\nneed1 = R1 * c\nneed2 = R2 * c\ncap = 60 * u\nprint(round(need1, 6))\nprint(round(cap, 6))\nprint(math.ceil(need1 / cap))\nprint(round(need2, 6))\nprint(math.ceil(need2 / cap))\n",
+   "values": [
+    27.0,
+    30.0,
+    1,
+    54.0,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Standard App Engine is a sandbox, not a raw VM: no SSH, no root, no local disk writes. Flexible runs your container inside a Compute Engine VM — do not write 'App Engine gives you a VM' without saying which environment.",
+  "Size instances at the target utilization, not at 100%. Using 60 CPU-s/min with a 50% target halves your answer and under-provisions.",
+  "Take the ceiling, not the round: 1.8 instances means 2 instances, because a fractional instance cannot serve traffic.",
+  "Cloud Storage objects are replaced whole, never edited in place, and the bucket name is globally unique across all of GCP — a name taken by someone else cannot be reused.",
+  "A VPC firewall rule with a target tag applies only to instances carrying that tag, and ingress is denied by default; exam questions love an instance that 'has a web server' but no allow rule."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What service model is App Engine, and what does the user supply?",
+   "marks": 2,
+   "a": "It is PaaS. The user supplies source code and a runtime choice; Google supplies the OS, the load balancer, scaling and patching."
+  },
+  {
+   "level": "remember",
+   "q": "Name the five fields every VPC firewall rule carries.",
+   "marks": 2,
+   "a": "Direction (ingress or egress), action (allow or deny), source or destination CIDR range, protocol and port, and target (network tag or service account)."
+  },
+  {
+   "level": "understand",
+   "q": "Why can standard App Engine scale to zero instances while the flexible environment cannot?",
+   "marks": 3,
+   "a": "Standard runs code in a sandbox that starts in milliseconds, so an instance can be created on demand and discarded when idle. Flexible runs your container inside a Compute Engine VM, whose boot and container pull take seconds, so it keeps a minimum of one instance warm."
+  },
+  {
+   "level": "understand",
+   "q": "Why is Pub/Sub placed between the front end and slow work such as sending email?",
+   "marks": 3,
+   "a": "The request handler publishes a message and returns at once, so user latency stays in milliseconds. The subscriber does the slow work asynchronously and retries on failure; delivery is at-least-once, so handlers must be idempotent."
+  },
+  {
+   "level": "apply",
+   "q": "A service gets 600 requests/min, each using 40 ms of CPU, with a 60% CPU target. How many instances are needed?",
+   "marks": 4,
+   "a": "Demand = 600 × 0.040 = 24 CPU-s/min. Capacity per instance = 60 × 0.60 = 36 CPU-s/min. N = ⌈24 ÷ 36⌉ = 1 instance."
+  },
+  {
+   "level": "apply",
+   "q": "The same service rises to 1,400 requests/min at 25 ms per request with a 50% target. How many instances?",
+   "marks": 4,
+   "a": "Demand = 1,400 × 0.025 = 35 CPU-s/min. Capacity per instance = 60 × 0.50 = 30 CPU-s/min. N = ⌈35 ÷ 30⌉ = 2 instances."
+  },
+  {
+   "level": "analyze",
+   "q": "A team must host a UDP game server that keeps state in RAM for hours and needs a custom kernel module. App Engine or Compute Engine? Justify with two properties.",
+   "marks": 6,
+   "a": "Compute Engine. App Engine standard serves HTTP through a sandbox with request time limits and no UDP or kernel access; flexible allows containers but still targets HTTP services and does not give kernel module control. A Compute Engine VM gives root, any protocol and port (opened by a firewall rule) and long-lived in-memory state, at the cost of patching and an Auto Scaling group you configure."
+  }
+ ],
+ "beyond": "Not for the exam. App Engine now sits beside Cloud Run, which runs a container per request without the sandbox limits, and Google Kubernetes Engine for teams that want cluster control; most new Google-hosted services pick one of those three. Event-driven designs lean on Pub/Sub plus Eventarc, and reliability work follows site reliability engineering ideas such as error budgets and service level objectives. Search next for Cloud Run versus App Engine, Pub/Sub at-least-once delivery, and VPC firewall rule priorities."
+}
