@@ -16,7 +16,7 @@ echo "$reqs" | while read -r unit out; do
   echo "::group::$unit"
   if git ls-remote --exit-code --heads origin "$br" >/dev/null 2>&1; then
     git fetch -q origin "$br"
-    if git show "origin/$br:.free/$unit/status.json" 2>/dev/null | grep -q '"state": "ok"'; then
+    if [ -z "${REDO_FLAGGED:-}" ] && git show "origin/$br:.free/$unit/status.json" 2>/dev/null | grep -q '"state": "ok"'; then
       echo "$unit is already done on $br"; echo "::endgroup::"; continue
     fi
     git checkout -q -B "$br" "origin/$br"

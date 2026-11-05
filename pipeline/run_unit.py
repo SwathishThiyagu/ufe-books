@@ -115,6 +115,8 @@ def check_chapter(P, k, final=False):
                 if not isinstance(b, dict) or b.get('type') not in ('p', 'steps', 'bullets', 'formula', 'code', 'table'):
                     p.append(f'section {i} has a block with an unknown "type" (use p, steps, bullets, formula, code, table)'); break
         qz = ch.get('quiz') or []
+        if any(not isinstance(q, dict) for q in qz): p.append('every quiz item must be an object {level, q, marks, a}')
+        if any(not isinstance(x, dict) for x in (ch.get('examples') or [])): p.append('every worked example must be an object')
         if not 5 <= len(qz) <= 9: p.append('give 6 to 8 quiz questions')
         lv = {str(q.get('level', '')).lower() for q in qz if isinstance(q, dict)}
         miss = [x for x in R.LEVELS if x not in lv]
@@ -200,6 +202,15 @@ def main():
     else:
         ask = Gemini.from_env(log)
     flags = S.get('flags') or []
+    if os.environ.get('REDO_FLAGGED'):
+        # review again (with the current code) every chapter whose revision failed, and re-check the book
+        for f in list(flags):
+            m = re.match(r'chapter (\d+): the reviewer found', f)
+            if m and os.path.exists(S.path(f'ch{m.group(1)}.reviewed')): os.remove(S.path(f'ch{m.group(1)}.reviewed'))
+        flags = [f for f in flags if not re.match(r'chapter \d+: the reviewer found|checker: ', f)]
+        S.put('flags', flags)
+        for fn in os.listdir(S.d):
+            if re.match(r'(chfix|resize|spill)\d+', fn): os.remove(os.path.join(S.d, fn))
     def flag(m):
         with lock:
             if m not in flags: flags.append(m); S.put('flags', flags)
@@ -225,7 +236,11 @@ def main():
                 log(f'  review {N}.{k}: {len(high)} high, {len(issues) - len(high)} low')
                 if high:
                     fixed = ask.json(f'revise{k}', PR.SYSTEM, PR.revise(P, k, ch, issues), check=check_chapter(P, k))
-                    if isinstance(fixed, dict) and not [x for x in check_chapter(P, k)(fixed) if not x.startswith('~')]:
+                    hard = lambda c: [x for x in check_chapter(P, k)(c) if not x.startswith('~')]
+                    # keep the revision when it fixes the reviewer's errors without adding check failures;
+                    # figure and quiz-count problems left over are repaired later by figfix / chfix
+                    minor = lambda xs: all(x.startswith(('the figure', 'give 6 to 8', 'give 3 to 5', 'the quiz needs')) for x in xs)
+                    if isinstance(fixed, dict) and fixed.get('sections') and (not hard(fixed) or minor(hard(fixed)) or len(hard(fixed)) <= len(hard(ch))):
                         ch = fixed
                         for m in settle_code(ch, log, k): flag(m)
                         S.put(key, ch)
@@ -333,8 +348,10 @@ def main():
         S.put('status', {'state': 'quota', 'at': f'{datetime.datetime.now():%Y-%m-%d %H:%M}'})
         report(S, a.unit, ask, flags, t0, None, out)
         sys.exit(75)
-    except ModelError as e:
-        log(f'model error: {e}')
+    except (ModelError, Exception) as e:
+        if isinstance(e, SystemExit): raise
+        import traceback
+        log(f'error: {type(e).__name__}: {e}\n' + traceback.format_exc()[-1500:])
         S.put('status', {'state': 'error', 'error': str(e)[:300]})
         report(S, a.unit, ask, flags, t0, None, out)
         sys.exit(1)
