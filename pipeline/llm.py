@@ -43,13 +43,15 @@ def _http(method, url, key, body=None, timeout=240):
 def parse_json(text):
     t = text.strip()
     t = re.sub(r'^```(?:json)?\s*|\s*```$', '', t)
+    a, b = t.find('{'), t.rfind('}')
+    if a >= 0 and b > a: t = t[a:b + 1]
     try:
-        return json.loads(t)
+        return json.loads(t, strict=False)          # strict=False: raw newlines/tabs inside strings are fine
     except json.JSONDecodeError:
-        a, b = t.find('{'), t.rfind('}')
-        if a >= 0 and b > a:
-            return json.loads(t[a:b + 1])
-        raise
+        # code and formulas often carry backslashes that are not valid JSON escapes (\d, \s, \%); double them
+        fixed = re.sub(r'\\(?![\\"/bfnrtu])', r'\\\\', t)
+        fixed = re.sub(r',\s*([}\]])', r'\1', fixed)   # trailing commas
+        return json.loads(fixed, strict=False)
 
 
 def version_key(name):
@@ -173,6 +175,7 @@ class Gemini:
         p = prompt
         for attempt in range(3):
             raw = self.text(task, system, p, role, temperature)
+            self._last_raw = raw
             try:
                 data = parse_json(raw)
             except (json.JSONDecodeError, ValueError) as e:
@@ -181,11 +184,15 @@ class Gemini:
             probs = check(data) if check else []
             if not probs:
                 return data
-            if attempt == 2:
-                self.log(f'  {task}: still has problems after retries: {probs[:3]}')
+            soft = all(x.startswith('~') for x in probs)
+            if attempt == 2 or (soft and attempt >= 1):
+                self.log(f'  {task}: kept with problems: {probs[:3]}')
                 return data
             p = (prompt + '\n\nYour last reply had these problems; fix all of them and reply with the whole JSON again:\n- '
                  + '\n- '.join(probs[:12]))
+        try:
+            os.makedirs('.free/bad', exist_ok=True); open(f'.free/bad/{task}.txt', 'w').write(getattr(self, '_last_raw', ''))
+        except OSError: pass
         raise ModelError(f'{task}: no valid JSON after 3 tries')
 
 

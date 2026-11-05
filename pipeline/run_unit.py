@@ -113,8 +113,9 @@ def check_chapter(P, k, final=False):
             probs, real = V.check_code(cont.get('lang'), cont.get('code', ''), cont.get('stdin', ''), shown)
             p += probs
         w = R.word_count(ch)
-        if w < lo: p.append(f'the chapter has about {w} words; it needs {lo + 100}-{hi - 200} (expand the sections, not with filler)')
-        if w > hi + 100: p.append(f'the chapter has about {w} words; keep it under {hi} (cut repetition)')
+        # word count: '~' marks a soft problem (sent back once, then accepted); the checker's own limits are 650-1900
+        if w < lo: p.append(f'~the chapter has about {w} words; it needs {lo + 100}-{hi - 200} (expand the sections, not with filler)')
+        if w > hi + 150: p.append(f'~the chapter has about {w} words; keep it under {hi} (cut repetition)')
         p += college_problems(json.dumps(ch, ensure_ascii=False))
         return p
     return f
@@ -187,7 +188,7 @@ def main():
                 ch = ask.json(key, PR.SYSTEM, PR.chapter(P, k, plan), check=check_chapter(P, k))
                 for m in settle_code(ch, log, k): flag(m)
                 for x in check_chapter(P, k)(ch):
-                    if 'words' not in x: flag(f'chapter {k}: {x}')
+                    if not x.startswith('~'): flag(f'chapter {k}: {x}')
                 S.put(key, ch)
             if not a.no_review and not S.get(key + '.reviewed'):
                 rv = ask.json(f'review{k}', PR.SYSTEM, PR.review(P, k, R.plain_text(P, k, ch)), role='review', temperature=0.2)
@@ -196,7 +197,7 @@ def main():
                 log(f'  review {N}.{k}: {len(high)} high, {len(issues) - len(high)} low')
                 if high:
                     fixed = ask.json(f'revise{k}', PR.SYSTEM, PR.revise(P, k, ch, issues), check=check_chapter(P, k))
-                    if isinstance(fixed, dict) and not [x for x in check_chapter(P, k)(fixed) if 'words' not in x]:
+                    if isinstance(fixed, dict) and not [x for x in check_chapter(P, k)(fixed) if not x.startswith('~')]:
                         ch = fixed
                         for m in settle_code(ch, log, k): flag(m)
                         S.put(key, ch)
