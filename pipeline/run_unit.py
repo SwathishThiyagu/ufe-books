@@ -65,10 +65,23 @@ def college_problems(text):
 
 
 def unescape_code(s):
-    """Open models sometimes double-escape code inside JSON, so a program arrives as one line full of \\n."""
-    if isinstance(s, str) and '\n' not in s.strip() and '\\n' in s:
-        s = s.replace('\\r\\n', '\n').replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
-    return s
+    """Open models sometimes double-escape code inside JSON, so a program arrives as one line full of \\n.
+    Turn those into real line breaks, but keep escapes inside string and char literals (printf("...\\n"))."""
+    if not (isinstance(s, str) and '\n' not in s.strip() and '\\n' in s):
+        return s
+    out, q, i = [], None, 0
+    while i < len(s):
+        c = s[i]
+        if q:
+            if c == '\\' and i + 1 < len(s):
+                out.append(s[i:i + 2]); i += 2; continue
+            if c == q: q = None
+            out.append(c); i += 1; continue
+        if c in '"\'': q = c; out.append(c); i += 1; continue
+        if s.startswith('\\n', i): out.append('\n'); i += 2; continue
+        if s.startswith('\\t', i): out.append('    '); i += 2; continue
+        out.append(c); i += 1
+    return ''.join(out)
 
 
 def normalise(ch):
