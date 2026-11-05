@@ -1,0 +1,252 @@
+{
+ "lead": "Frame allocation decides how many page frames each process may use. It keeps the system responsive when many processes compete for memory. Policies such as proportional allocation, global replacement, and local replacement control this sharing. When allocation is too small, processes generate many page faults. The resulting thrashing makes the CPU spend most time handling faults instead of useful work. Detecting thrashing early helps the OS to adjust allocation or to swap out processes. This chapter explains the policies, shows how to spot thrashing, and works through a small numeric example.",
+ "prereq": "You need: <a href=\"#page-replacement-algorithms-fifo-lru-optimal\">Chapter 4.8</a> on page‑replacement algorithms.",
+ "sections": [
+  {
+   "h3": "Proportional frame allocation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The OS knows the size of each process in pages. Let p_i be the number of pages of process i. Let F be the total number of free frames. The OS gives process i a share F_i = (p_i / Σ p_j) × F. This is called proportional allocation."
+    },
+    {
+     "type": "formula",
+     "text": "F_i = (p_i ÷ Σ p_j) × F",
+     "where": "F_i is frames for process i; p_i is pages of process i; Σ p_j is total pages of all active processes; F is total free frames."
+    },
+    {
+     "type": "p",
+     "text": "Proportional allocation is fair when processes have similar working sets. It can still cause thrashing if the working set of a process exceeds its allocated frames."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Collect p_i for each running process.",
+      "Compute Σ p_j.",
+      "Apply the formula to get F_i for each process.",
+      "Round F_i to the nearest integer."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Global vs local replacement",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When a page fault occurs, the OS must choose a victim page to evict. In global replacement the victim can belong to any process. In local replacement the victim must be from the faulting process."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Global replacement can improve overall throughput because the OS can free a rarely used page from any process.",
+      "Local replacement protects a process from losing all its frames. It avoids starvation of a process that needs many frames."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A trap is to ignore that global replacement may starve a small process while a large process holds most frames."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "def select_victim(frames, global_policy=True):\n    if global_policy:\n        # Choose the oldest page among all frames (FIFO example)\n        return min(frames, key=lambda f: f.load_time)\n    else:\n        # Choose oldest page of the faulting process only\n        return min(frames, key=lambda f: (f.proc_id != faulting_proc, f.load_time))",
+     "stdin": "",
+     "output": ""
+    }
+   ]
+  },
+  {
+   "h3": "Working‑set model and thrashing detection",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The working set W(t, Δ) of a process is the set of pages referenced in the last Δ time units before time t. If the sum of all working‑set sizes exceeds the total frames, the system thrashes."
+    },
+    {
+     "type": "formula",
+     "text": "Σ |W_i(t, Δ)| > F  →  thrashing",
+     "where": "|W_i| is the number of distinct pages used by process i in the window Δ; F is total frames."
+    },
+    {
+     "type": "p",
+     "text": "A practical symptom is a high page‑fault rate. The OS can monitor faults per second. If the rate exceeds a threshold (for example 20 faults/second per process) it flags thrashing."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Measure page faults for each process over a sliding window.",
+      "Compute the average faults per second.",
+      "If the average > threshold, declare thrashing.",
+      "Reduce load by swapping out a process or increasing its frames."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Example: two processes, six frames",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Process A needs 4 pages. Process B needs 4 pages. Total frames F = 6. Using proportional allocation each gets F_i = (4 ÷ (4+4)) × 6 = 3 frames."
+    },
+    {
+     "type": "p",
+     "text": "Both processes now have fewer frames than pages. Each will fault on every reference that is not in its 3‑frame set. The page‑fault rate becomes high. The OS sees Σ |W_i| = 4+4 = 8 > 6 and flags thrashing."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Process",
+      "Pages needed",
+      "Frames allocated"
+     ],
+     "rows": [
+      [
+       "A",
+       "4",
+       "3"
+      ],
+      [
+       "B",
+       "4",
+       "3"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The Gantt chart shows frequent page faults for two processes that lead to thrashing.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "Process A",
+     "bars": [
+      {
+       "label": "PF",
+       "start": 0,
+       "end": 30,
+       "style": "accent"
+      }
+     ]
+    },
+    {
+     "label": "Process B",
+     "bars": [
+      {
+       "label": "PF",
+       "start": 5,
+       "end": 35,
+       "style": "accent"
+      }
+     ]
+    }
+   ],
+   "aria": "Gantt chart showing frequent page faults for two processes that lead to thrashing."
+  }
+ },
+ "examples": [
+  {
+   "question": "Two processes each require 4 pages. The system has 6 free frames. Using proportional allocation compute the frames per process. Then determine if thrashing occurs by checking Σ |W_i| > F. Assume each process's working set equals its page demand.",
+   "steps": [
+    "Compute total pages needed: 4 + 4 = 8.",
+    "Apply proportional formula: F_A = (4 ÷ 8) × 6 = 3 frames.",
+    "Similarly, F_B = 3 frames.",
+    "Working set size of A = 4 pages, of B = 4 pages.",
+    "Sum of working sets = 4 + 4 = 8 pages.",
+    "Compare with total frames 6: 8 > 6, so thrashing occurs."
+   ],
+   "answer": "Each process gets 3 frames. The system thrashes because the combined working set (8 pages) exceeds the available frames (6).",
+   "check": "F = 6\npages_A = 4\npages_B = 4\ntotal_pages = pages_A + pages_B\nF_A = (pages_A / total_pages) * F\nF_B = (pages_B / total_pages) * F\nworking_set_sum = pages_A + pages_B\nthrash = working_set_sum > F\nprint(int(F_A))\nprint(int(F_B))\nprint(thrash)",
+   "values": [
+    3,
+    3,
+    true
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int F = 6, pagesA = 4, pagesB = 4;\n    int total = pagesA + pagesB;\n    int FA = (pagesA * F) / total; // integer arithmetic gives 3\n    int FB = (pagesB * F) / total;\n    int working = pagesA + pagesB;\n    int thrash = working > F;\n    printf(\"%d %d %d\\n\", FA, FB, thrash);\n    return 0;\n}",
+    "stdin": "",
+    "output": "3 3 1"
+   },
+   "dry_run": {
+    "head": [
+     "i",
+     "FA",
+     "FB",
+     "thrash"
+    ],
+    "rows": [
+     [
+      "1",
+      "3",
+      "3",
+      "1"
+     ]
+    ]
+   },
+   "output": "3 3 1"
+  }
+ ],
+ "traps": [
+  "Confusing proportional allocation with equal allocation; equal allocation ignores process size.",
+  "Assuming global replacement always improves performance; it can cause a small process to lose all frames.",
+  "Using the page‑fault rate alone without checking working‑set size; a high rate may be temporary and not thrashing."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What symbol F_i represents in proportional allocation?",
+   "marks": 2,
+   "a": "F_i is the number of frames allocated to process i."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why Σ |W_i(t, Δ)| > F indicates thrashing.",
+   "marks": 3,
+   "a": "The sum of all processes' working‑set sizes exceeds the total frames, so at least one process cannot keep its needed pages in memory, causing frequent faults."
+  },
+  {
+   "level": "apply",
+   "q": "A system has 12 frames. Process X needs 5 pages, process Y needs 7 pages. Compute frames for each using proportional allocation.",
+   "marks": 4,
+   "a": "Total pages = 12. F_X = (5 ÷ 12) × 12 = 5 frames. F_Y = (7 ÷ 12) × 12 = 7 frames."
+  },
+  {
+   "level": "apply",
+   "q": "If a process experiences 25 page faults per second and the threshold is 20 faults/s, what should the OS do?",
+   "marks": 3,
+   "a": "The OS should treat the situation as potential thrashing and consider reducing the process's load or increasing its frame allocation."
+  },
+  {
+   "level": "analyze",
+   "q": "Two processes share 8 frames. Process A’s working set is 6 pages, B’s is 3 pages. Is the system thrashing? Justify your answer.",
+   "marks": 5,
+   "a": "Σ |W| = 6 + 3 = 9 > 8, so the system is thrashing. Process A cannot keep all needed pages, leading to many faults."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the effect of global vs local replacement when a large process dominates frame usage.",
+   "marks": 5,
+   "a": "Global replacement may evict pages from the large process to give frames to others, improving overall throughput but possibly starving the large process. Local replacement protects the large process but can starve smaller ones, increasing their fault rates."
+  },
+  {
+   "level": "remember",
+   "q": "What is the typical unit for measuring a page fault rate?",
+   "marks": 2,
+   "a": "Faults per second."
+  },
+  {
+   "level": "understand",
+   "q": "Why does thrashing make CPU utilisation appear low?",
+   "marks": 3,
+   "a": "The CPU spends time handling page faults and waiting for I/O, so less time executes user instructions."
+  }
+ ],
+ "beyond": "Not for the exam. In modern cloud platforms the hypervisor monitors frame allocation across virtual machines to avoid host‑level thrashing. Research explores machine‑learning models that predict thrashing before it occurs. Container orchestration systems like Kubernetes can adjust pod memory limits dynamically based on working‑set estimates. Emerging curricula include adaptive memory management for heterogeneous memory (DRAM + NVRAM). Searching for \"dynamic frame allocation\" and \"working set prediction\" will reveal recent papers."
+}

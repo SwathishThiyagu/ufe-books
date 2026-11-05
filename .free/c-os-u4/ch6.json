@@ -1,0 +1,234 @@
+{
+ "lead": "Segmentation splits a process address space into logical parts such as code, data, stack, and heap. Each part gets its own base address and size limit, so the OS can protect and relocate them independently. It is used in some older operating systems, such as early Intel x86 OSes, or in certain embedded controllers.",
+ "prereq": "You need: page‑table structure from <a href=\"#page-table-structure\">Chapter 5</a>.",
+ "sections": [
+  {
+   "h3": "Concept of segmentation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A segment is a contiguous block that contains a logically related set of bytes. Typical segments are code, global data, heap, and stack. The programmer or compiler assigns a segment number to each logical block. The OS stores a base‑limit pair for every segment in a segment table."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Base: physical start address of the segment.",
+      "Limit: maximum length of the segment in bytes.",
+      "Protection bits: read, write, execute flags for the segment; may also include privilege level (user vs. kernel)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "When a process generates a logical address, it consists of a segment number s and an offset o. The OS first checks that o < limit[s]. If the check passes, the physical address is computed as base[s] + o."
+    },
+    {
+     "type": "formula",
+     "text": "PA = Base[s] + Offset",
+     "where": "PA is the physical address; Base[s] is the base stored for segment s; Offset is the offset part of the logical address."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Extract segment number s and offset o from the logical address.",
+      "Read Base[s] and Limit[s] from the segment table.",
+      "If o ≥ Limit[s] raise a segment‑fault.",
+      "Otherwise compute PA = Base[s] + o."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Segment table and address translation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each process has its own segment table. The table is indexed by segment number and holds a base‑limit pair plus protection bits. The table itself resides in main memory; a small cache called the segment‑table register (STR) may hold the most recent entry for fast access."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Entry size is usually 8 bytes (4 bytes base, 4 bytes limit) on a 32‑bit machine.",
+      "Protection bits are added as a separate word or packed into the limit field."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n\nint main(void) {\n    unsigned int segment = 2;        // segment number\n    unsigned int offset  = 0x0500;   // offset within segment 2\n    unsigned int base    = 0x3000;   // base of segment 2\n    unsigned int limit   = 0x2000;   // size of segment 2\n    if (offset >= limit) {\n        printf(\"Segment fault\\n\");\n        return 1;\n    }\n    unsigned int physical = base + offset;\n    printf(\"Physical address = 0x%X\\n\", physical);\n    return 0;\n}\n",
+     "stdin": "",
+     "output": "Physical address = 0x3500"
+    },
+    {
+     "type": "p",
+     "text": "The same translation steps are used when segmentation is combined with paging. First the segment table gives a page‑table base, then the page table supplies the final frame number. This two‑level lookup is shown in the figure."
+    }
+   ]
+  },
+  {
+   "h3": "External fragmentation and hybrid schemes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Because each segment must be placed in a contiguous hole, free memory can become split into many small pieces. This is external fragmentation. Compaction can move segments to coalesce free space, but it is costly and rarely done in modern systems."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Segmentation alone cannot guarantee that a process will fit even if total free memory is sufficient.",
+      "Paging eliminates external fragmentation by breaking each segment into fixed‑size pages."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A hybrid called segmented paging keeps the logical convenience of segments while using paging to avoid external fragmentation. The segment table points to a page table; each segment can grow independently as pages are added."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Identify the segment number from the logical address.",
+      "Use the segment table to locate the page table for that segment.",
+      "Translate the page number and offset using the page table as in pure paging."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Shows the two‑step translation when segmentation is combined with paging; notice the segment table feeds the page table.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Segment → page lookup",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Logical address",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Segment table",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Page table",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Physical memory",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    }
+   ],
+   "aria": "Shows the two‑step translation when segmentation is combined with paging."
+  }
+ },
+ "examples": [
+  {
+   "question": "Segment 2 has base = 0x3000 and limit = 0x2000. A program generates the logical address 0x3500 within segment 2. Compute the physical address after performing the segment‑fault check.",
+   "steps": [
+    "Convert hexadecimal values to decimal (optional, the calculation works in hex).",
+    "Offset = Logical address – Base = 0x3500 – 0x3000 = 0x500.",
+    "Check: Offset (0x500) < Limit (0x2000). Condition holds, so no segment fault.",
+    "Physical address = Base + Offset = 0x3000 + 0x500 = 0x3500."
+   ],
+   "answer": "The physical address is 0x3500 (decimal 13568).",
+   "check": "base = 0x3000\nlimit = 0x2000\nlogical = 0x3500\noffset = logical - base\nif offset >= limit:\n    raise SystemExit('segment fault')\nphysical = base + offset\nprint(physical)\n",
+   "values": [
+    13568
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){ unsigned int base=0x3000, limit=0x2000, logical=0x3500; unsigned int offset=logical-base; if(offset>=limit){printf(\"segment fault\\n\"); return 1;} unsigned int physical=base+offset; printf(\"%u\\n\", physical); return 0; }",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Value (hex)",
+     "Value (dec)"
+    ],
+    "rows": [
+     [
+      "Base",
+      "0x3000",
+      "12288"
+     ],
+     [
+      "Logical",
+      "0x3500",
+      "13568"
+     ],
+     [
+      "Offset",
+      "0x500",
+      "1280"
+     ],
+     [
+      "Physical",
+      "0x3500",
+      "13568"
+     ]
+    ]
+   },
+   "output": "13568"
+  }
+ ],
+ "traps": [
+  "Using the limit as an inclusive upper bound and allowing offset = limit, which would point one byte past the segment.",
+  "Subtracting the base from the limit instead of from the logical address, producing a wrong offset.",
+  "Treating the segment number as part of the offset and adding it to the base, which yields an address outside the segment."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What two fields are stored for each entry in a segment table?",
+   "marks": 2,
+   "a": "Base address and limit (size) of the segment."
+  },
+  {
+   "level": "understand",
+   "q": "Why does segmentation allow different protection bits for code and data?",
+   "marks": 3,
+   "a": "Each segment has its own protection bits, so the OS can mark the code segment as execute‑only and the data segment as read/write, preventing accidental modification of code."
+  },
+  {
+   "level": "apply",
+   "q": "A segment has base 0x8000 and limit 0x1000. A program accesses address 0x8500. Is the access valid? Show your calculation.",
+   "marks": 4,
+   "a": "Offset = 0x8500 – 0x8000 = 0x500. Since 0x500 < 0x1000, the access is valid."
+  },
+  {
+   "level": "apply",
+   "q": "Given segment table entries: S0 → (base=0x2000, limit=0x0800), S1 → (base=0x5000, limit=0x0400). Translate logical address (segment=1, offset=0x0300).",
+   "marks": 5,
+   "a": "Offset 0x0300 ≤ limit 0x0400, so physical = 0x5000 + 0x0300 = 0x5300."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain how segmented paging reduces external fragmentation compared to pure segmentation.",
+   "marks": 6,
+   "a": "In segmented paging each segment is broken into fixed‑size pages. Pages can be placed in any free frame, so the requirement for a contiguous hole disappears. Only internal fragmentation (last page) remains, eliminating the external holes that pure segmentation suffers."
+  }
+ ],
+ "beyond": "Not for the exam. Modern 64‑bit operating systems use a flat address space for user programs, but they keep segmentation internally for kernel protection rings and for implementing address‑space layout randomisation (ASLR). Research continues on capability‑based segmentation for fine‑grained memory safety, as seen in CHERI. If you want to explore further, look at the Intel x86 segmentation manual and the CHERI architecture papers."
+}
