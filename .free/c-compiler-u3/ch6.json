@@ -1,0 +1,203 @@
+{
+ "lead": "YACC is a parser generator. You give it a context-free grammar with small C actions, and it writes a C program that parses according to LALR tables. It exists so you do not hand-build tables for every language. The file also carries token declarations, precedence lines, and a link to the lexer through yylex(). The output is ordinary C: compile it with cc and run. It is used for calculators, config readers, small language front ends, and as the standard example of parser generators in compiler courses.",
+ "prereq": "You need <a href=\"#lalr-parsers\">LALR parsers</a> and the <a href=\"#lexical-analyzer-generator-lex\">LEX interface</a> from Unit 1.",
+ "sections": [
+  {
+   "h3": "The .y file has three parts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "YACC (Yet Another Compiler Compiler) reads a .y file and writes a C parser that uses LALR tables. The file has three parts separated by %% lines. The declarations part holds C code in %{ ... %} and token declarations such as %token NUM. It also holds precedence lines. The rules part has productions with actions: expr: expr '+' expr { $$ = $1 + $3; }. The third part is C code: main calls yyparse(), and yyerror reports errors. At run time the parser calls yylex() for the next token. yylex returns the token number and stores the token value in yylval. yacc -d writes y.tab.c and y.tab.h; y.tab.h gives the lexer the token numbers. Compile with cc y.tab.c lex.yy.c -o calc. In an action, $$ is the value of the left side; $1, $2, $3 are values of right-side symbols. Bison accepts the same files with bison -y."
+    }
+   ]
+  },
+  {
+   "h3": "Precedence declarations resolve conflicts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An ambiguous expression grammar has a shift/reduce conflict: after expr '+' expr, a lookahead '+' can be shifted or the rule reduced. YACC reports shift/reduce conflicts. With no declaration, YACC chooses shift. That makes '+' right-associative: 5-2-1 becomes 5-(2-1)=4, not 2. Precedence lines change the table choice, not the grammar. Lines are listed low to high: %left '+' '-' then %left '*' '/' means * and / bind tighter. Tokens on one line share a level; %left means left-associative, %right right-associative. A rule's precedence is its last terminal. At a conflict compare lookahead token with rule: higher wins; equal uses associativity; left reduces, right shifts, %nonassoc gives an error. If either lacks precedence, shift/reduce defaults to shift. Reduce/reduce defaults to the earlier rule. %nonassoc rejects chains such as a < b < c."
+    }
+   ]
+  },
+  {
+   "h3": "Build steps and the calculator file",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The build path is short. The parser executable is linked with the lexer, then reads tokens at run time."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write calc.y with declarations, rules and actions.",
+      "Run yacc -d calc.y (or bison -y -d calc.y). It prints conflict counts and writes y.tab.c and y.tab.h.",
+      "Write a lexer whose yylex returns NUM for integers and character codes for '+', '-', '*', '/', '(' and ')', setting yylval for NUM.",
+      "Compile: cc y.tab.c lex.yy.c -o calc.",
+      "Run ./calc and type expressions, one per line."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "%{\n#include <stdio.h>\nint yylex(void);\nvoid yyerror(char *s);\n%}\n%token NUM\n%start top\n%left '+' '-'\n%left '*' '/'\n%%\ntop: top expr '\\n' { printf(\"%d\\n\", $2); }\n   | expr '\\n' { printf(\"%d\\n\", $1); }\n   ;\nexpr: expr '+' expr { $$ = $1 + $3; }\n    | expr '-' expr { $$ = $1 - $3; }\n    | expr '*' expr { $$ = $1 * $3; }\n    | expr '/' expr { $$ = $1 / $3; }\n    | '(' expr ')' { $$ = $2; }\n    | NUM { $$ = $1; }\n    ;\n%%\nint main(void) { return yyparse(); }\nvoid yyerror(char *s) { fprintf(stderr, \"%s\\n\", s); }\n",
+     "stdin": "",
+     "output": ""
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "YACC reads calc.y, builds LALR tables, and writes y.tab.c; the C compiler links the parser with the lexer into the executable. Notice the parser calls yylex at run time.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "YACC build path",
+   "nodes": [
+    {
+     "id": "y",
+     "label": "calc.y",
+     "note": "grammar and actions",
+     "style": "accent"
+    },
+    {
+     "id": "p",
+     "label": "yacc",
+     "note": "builds LALR tables",
+     "style": "next"
+    },
+    {
+     "id": "c",
+     "label": "y.tab.c",
+     "note": "parser source",
+     "style": "normal"
+    },
+    {
+     "id": "cc",
+     "label": "cc",
+     "note": "C compiler",
+     "style": "normal"
+    },
+    {
+     "id": "x",
+     "label": "parser",
+     "note": "reads tokens",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "y",
+     "to": "p",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "cc",
+     "style": "solid"
+    },
+    {
+     "from": "cc",
+     "to": "x",
+     "style": "solid"
+    }
+   ],
+   "aria": "YACC reads calc.y, writes y.tab.c, the C compiler builds the parser executable, and the parser reads tokens."
+  }
+ },
+ "examples": [
+  {
+   "question": "Using the YACC specification in the section, what does the program print if you type 2+3*4 and (2+3)*4 on separate lines? Explain the conflict choice for the '*' lookahead.",
+   "steps": [
+    "The declarations give '+' and '-' level 1 with left associativity, and '*' and '/' level 2 with left associativity. Higher level binds tighter.",
+    "The rule expr '+' expr takes the precedence of '+', level 1. When the parser has read 2+3 and sees '*', the lookahead '*' has level 2, higher than the rule. Shift wins, so 3*4 is grouped first.",
+    "Therefore 2+3*4 = 2+(3*4) = 2+12 = 14. The top rule prints 14.",
+    "For (2+3)*4, parentheses force the inner expr to be 2+3 = 5. Then 5*4 = 20. The top rule prints 20.",
+    "If the %left '*' '/' line is removed, '*' has no precedence. At the conflict after 2+3 with lookahead '*', the lookahead lacks precedence, so the default is shift. The parser still groups 3*4 first and 2+3*4 gives 14, but this now relies on the default, not on declared precedence."
+   ],
+   "answer": "The program prints 14 then 20. The '*' lookahead shifts because its declared precedence is higher than '+'. If the '*' precedence line is removed, the same input still gives 14 by the default shift, but the choice is no longer controlled by precedence.",
+   "check": "print(2 + 3 * 4)\nprint((2 + 3) * 4)",
+   "values": [
+    14,
+    20
+   ],
+   "code": {
+    "lang": "text",
+    "code": "$ ./calc\n2+3*4\n(2+3)*4\n14\n20",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Input",
+     "Decision",
+     "Value"
+    ],
+    "rows": [
+     [
+      "2+3*4",
+      "shift *",
+      "14"
+     ],
+     [
+      "(2+3)*4",
+      "parentheses force +",
+      "20"
+     ]
+    ]
+   },
+   "output": "14\n20"
+  }
+ ],
+ "traps": [
+  "Precedence declarations do not rewrite the grammar or remove its ambiguity. They only resolve table conflicts by assigned levels and associativity.",
+  "Declaration order matters. Later lines have higher precedence, so writing %left '*' '/' before %left '+' '-' makes * and / bind looser, not tighter.",
+  "Without precedence, a shift/reduce conflict defaults to shift, not reduce. For subtraction this makes the parser right-associative and gives wrong answers such as 5-(2-1)=4.",
+  "A rule's precedence comes from its last terminal, not its first. In expr '+' expr, the rule gets the precedence of '+'.",
+  "%nonassoc is not the same as no precedence. It makes a chain such as a < b < c a syntax error instead of choosing shift or reduce."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does YACC read and what does it write?",
+   "marks": 2,
+   "a": "YACC reads a .y grammar file with actions and writes a C parser source file, normally y.tab.c, containing LALR parsing tables."
+  },
+  {
+   "level": "understand",
+   "q": "Why are %left '+' '-' declarations needed for subtraction?",
+   "marks": 3,
+   "a": "They make the conflict at expr '-' expr followed by '-' reduce, so 5-2-1 is (5-2)-1=2. Without them YACC shifts by default, giving 5-(2-1)=4."
+  },
+  {
+   "level": "apply",
+   "q": "With %left '+' '-' and %left '*' '/', compute 8-3-2 and 2+3*4.",
+   "marks": 4,
+   "a": "8-3-2 = (8-3)-2 = 3 because '-' is left-associative. 2+3*4 = 2+(3*4) = 14 because '*' has higher precedence than '+'."
+  },
+  {
+   "level": "analyze",
+   "q": "YACC reports one shift/reduce conflict but still writes a parser. What does the default shift do to 5-2-1, and why is it a problem?",
+   "marks": 5,
+   "a": "Default shift makes '-' right-associative, so the parser groups 2-1 first and computes 5-(2-1)=4. The intended left-associative result is (5-2)-1=2, so the default gives a wrong value."
+  },
+  {
+   "level": "remember",
+   "q": "What does yylex return and what does it set?",
+   "marks": 2,
+   "a": "yylex returns the next token number. For tokens with a value, such as NUM, it also sets yylval to that value."
+  },
+  {
+   "level": "analyze",
+   "q": "What effect does %nonassoc have on the expression a < b < c?",
+   "marks": 5,
+   "a": "It gives equal precedence to the '<' tokens and forbids chaining. At the conflict the parser reports a syntax error instead of shifting or reducing, so a < b < c is rejected."
+  }
+ ],
+ "beyond": "Not for the exam. Bison is the GNU replacement and accepts YACC files with bison -y; it can also produce C++ parsers and GLR parsers for ambiguous grammars. Industrial parsers for SQL, JSON and configuration files often use generated LALR parsers, while hand-written recursive descent is common when good error messages matter. Search for the Bison manual, LALR(1) table construction, and GLR parsing."
+}
