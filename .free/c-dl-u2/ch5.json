@@ -1,0 +1,1212 @@
+{
+ "lead": "Backpropagation sends the error backward one layer at a time. At every layer it multiplies the gradient by that layer's Jacobian, the matrix of local derivatives. A deep network therefore multiplies one such factor per layer. If each factor is below 1, the product shrinks toward zero; that is the vanishing gradient. If each is above 1, it grows without bound; that is the exploding gradient. The same product appears in recurrent nets unrolled over time. Recognising it explains why early layers stop learning, why losses turn into NaN, and why clipping, ReLU, careful initialization and normalization exist.",
+ "prereq": "You need: backpropagation from Unit 1, and <a href=\"#gradient-descent-and-its-limitations\">2.1</a> for what happens to the gradient after it is computed.",
+ "sections": [
+  {
+   "h3": "One Jacobian per layer",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Backpropagation computes the gradient of the loss with respect to every layer's activations by working backward. At each step it multiplies by one local Jacobian. A Jacobian is the matrix that holds every partial derivative of a layer's output with respect to its input."
+    },
+    {
+     "type": "formula",
+     "text": "∂E/∂h<sup>(1)</sup> = J<sub>2</sub><sup>T</sup> J<sub>3</sub><sup>T</sup> ⋯ J<sub>L</sub><sup>T</sup> · ∂E/∂h<sup>(L)</sup>",
+     "where": "E is the loss; h<sup>(1)</sup> is the first hidden layer's activation vector; h<sup>(L)</sup> is the output-side activation vector; L is the number of layers; ℓ indexes a layer; J<sub>ℓ</sub> is the Jacobian ∂h<sup>(ℓ)</sup>/∂h<sup>(ℓ−1)</sup>, of size n<sub>ℓ</sub> × n<sub>ℓ−1</sub>, where n<sub>ℓ</sub> is the number of units in layer ℓ; J<sub>ℓ</sub><sup>T</sup> is its transpose, of size n<sub>ℓ−1</sub> × n<sub>ℓ</sub>."
+    },
+    {
+     "type": "p",
+     "text": "Read the product from the right. The first step is J<sub>L</sub><sup>T</sup> times ∂E/∂h<sup>(L)</sup>, then J<sub>L−1</sub><sup>T</sup> times that result, and so on down to J<sub>2</sub><sup>T</sup>. Each J<sub>ℓ</sub><sup>T</sup> maps a gradient on layer ℓ back to layer ℓ−1, so the transpose is what applies, not J<sub>ℓ</sub> itself. A network with L layers has L − 1 Jacobians between h<sup>(L)</sup> and h<sup>(1)</sup>."
+    },
+    {
+     "type": "p",
+     "text": "For a dense layer h<sup>(ℓ)</sup> = f(W<sup>(ℓ)</sup> h<sup>(ℓ−1)</sup> + b<sup>(ℓ)</sup>), the Jacobian is diag(f′(z<sup>(ℓ)</sup>)) W<sup>(ℓ)</sup>. Here W<sup>(ℓ)</sup> is the weight matrix, b<sup>(ℓ)</sup> the bias vector, z<sup>(ℓ)</sup> = W<sup>(ℓ)</sup> h<sup>(ℓ−1)</sup> + b<sup>(ℓ)</sup> the pre-activation, and f′ the derivative of the activation. The scale of this Jacobian decides whether the gradient shrinks or grows as it passes that layer."
+    },
+    {
+     "type": "p",
+     "text": "For the sigmoid, f′(z) = σ(z)(1 − σ(z)). This derivative is largest at z = 0, where it equals 0.25, and it approaches 0 for large positive or negative z. One sigmoid layer can therefore cut the gradient to a quarter. L sigmoid layers in a row cut it to 0.25<sup>L</sup> if the weight matrices add no gain."
+    }
+   ]
+  },
+  {
+   "h3": "Small factors vanish, large factors explode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The full gradient at layer 1 is the product of the Jacobians between the output side and layer 1. For L layers there are L − 1 such Jacobians. Their norms control the size of the gradient, and a matrix-norm bound makes this exact: ‖J<sub>2</sub><sup>T</sup> ⋯ J<sub>L</sub><sup>T</sup>‖ ≤ ‖J<sub>2</sub>‖ ⋯ ‖J<sub>L</sub>‖. So if every per-layer factor has norm at most 0.25, the whole product has norm at most 0.25<sup>L−1</sup>. In the table below, L counts the number of factors, that is the number of layers the gradient passes through, so L = 10 means ten multiplicative steps. Small factors compound like compound interest in reverse."
+    },
+    {
+     "type": "table",
+     "head": [
+      "L",
+      "0.25<sup>L</sup>",
+      "1.0<sup>L</sup>",
+      "1.5<sup>L</sup>"
+     ],
+     "rows": [
+      [
+       "1",
+       "0.25",
+       "1",
+       "1.5"
+      ],
+      [
+       "2",
+       "0.0625",
+       "1",
+       "2.25"
+      ],
+      [
+       "3",
+       "0.015625",
+       "1",
+       "3.375"
+      ],
+      [
+       "4",
+       "0.00390625",
+       "1",
+       "5.0625"
+      ],
+      [
+       "5",
+       "0.0009765625",
+       "1",
+       "7.59375"
+      ],
+      [
+       "10",
+       "9.54 × 10<sup>−7</sup>",
+       "1",
+       "57.665"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "At L = 10, the factor 0.25 gives 0.25<sup>10</sup> ≈ 9.5 × 10<sup>−7</sup>. A gradient of 1.0 at the output reaches the first layer as roughly one-millionth of that. The factor 1.5 gives 1.5<sup>10</sup> ≈ 57.7, so the same gradient is multiplied almost sixtyfold. Vanishing gradients show up as early layers whose weights barely change, features that stay near their random starting point, and a loss that improves and then stalls. Exploding gradients show up as weights that jump, a loss that oscillates or becomes NaN, and gradient values that overflow to infinity."
+    }
+   ]
+  },
+  {
+   "h3": "Mitigations and checks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The fixes attack either the factors or the product. Gradient clipping is the standard guard against exploding gradients."
+    },
+    {
+     "type": "formula",
+     "text": "g ← g · min(1, c / ‖g‖)",
+     "where": "g is the gradient vector; ‖g‖ is its Euclidean norm; c is the clipping threshold, a positive number chosen in advance. If ‖g‖ ≤ c the vector is unchanged. If ‖g‖ > c, the direction stays the same and the norm becomes exactly c."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Use ReLU instead of sigmoid in hidden layers (see Unit 1, Activation functions). Its derivative is 1 for positive pre-activations, so it does not shrink the gradient by itself.",
+      "Initialize each weight matrix with a variance suited to its fan-in and activation; He initialization is in <a href=\"#weight-initialization-methods\">2.6</a>.",
+      "Normalize pre-activations across each mini-batch with batch normalization (<a href=\"#batch-normalization\">2.7</a>).",
+      "Add residual connections in very deep feedforward and convolutional nets (see Unit 3, Deeper architectures: Inception and ResNet) and gated units in recurrent nets (see Unit 4, Long short-term memory (LSTM) and gated units).",
+      "Clip gradients when they explode; clipping never restores a vanished gradient."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Check the per-layer gradient norms during training, not only the loss. A first layer with a norm a million times smaller than the last layer is direct evidence of vanishing. A dead ReLU shows a zero gradient for one unit, not a shrinking trend across all layers."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "At layer 5 the 0.25 factor has shrunk the product to about 0.001, the 1.0 factor still gives 1, and the 1.5 factor has grown it to about 7.6.",
+  "spec": {
+   "type": "plot",
+   "x": {
+    "label": "layers L",
+    "min": 1,
+    "max": 5
+   },
+   "y": {
+    "label": "product of factors",
+    "min": 0,
+    "max": 8
+   },
+   "series": [
+    {
+     "name": "factor 0.25",
+     "expr": "0.25**x",
+     "style": "muted",
+     "_pts": [
+      [
+       1.0,
+       0.25
+      ],
+      [
+       1.05,
+       0.23325824788420185
+      ],
+      [
+       1.1,
+       0.217637640824031
+      ],
+      [
+       1.15,
+       0.2030630990890589
+      ],
+      [
+       1.2,
+       0.18946457081379978
+      ],
+      [
+       1.25,
+       0.1767766952966369
+      ],
+      [
+       1.3,
+       0.16493848884661177
+      ],
+      [
+       1.35,
+       0.1538930516681145
+      ],
+      [
+       1.4,
+       0.1435872943746294
+      ],
+      [
+       1.45,
+       0.13397168281703664
+      ],
+      [
+       1.5,
+       0.125
+      ],
+      [
+       1.55,
+       0.11662912394210093
+      ],
+      [
+       1.6,
+       0.1088188204120155
+      ],
+      [
+       1.65,
+       0.10153154954452945
+      ],
+      [
+       1.7,
+       0.09473228540689989
+      ],
+      [
+       1.75,
+       0.08838834764831845
+      ],
+      [
+       1.8,
+       0.08246924442330589
+      ],
+      [
+       1.85,
+       0.07694652583405726
+      ],
+      [
+       1.9,
+       0.0717936471873147
+      ],
+      [
+       1.95,
+       0.06698584140851832
+      ],
+      [
+       2.0,
+       0.0625
+      ],
+      [
+       2.05,
+       0.05831456197105048
+      ],
+      [
+       2.1,
+       0.05440941020600775
+      ],
+      [
+       2.15,
+       0.050765774772264724
+      ],
+      [
+       2.2,
+       0.04736614270344993
+      ],
+      [
+       2.25,
+       0.04419417382415922
+      ],
+      [
+       2.3,
+       0.04123462221165296
+      ],
+      [
+       2.35,
+       0.03847326291702863
+      ],
+      [
+       2.4,
+       0.03589682359365735
+      ],
+      [
+       2.45,
+       0.03349292070425915
+      ],
+      [
+       2.5,
+       0.03125
+      ],
+      [
+       2.55,
+       0.02915728098552524
+      ],
+      [
+       2.6,
+       0.027204705103003875
+      ],
+      [
+       2.65,
+       0.025382887386132362
+      ],
+      [
+       2.7,
+       0.023683071351724965
+      ],
+      [
+       2.75,
+       0.02209708691207961
+      ],
+      [
+       2.8,
+       0.02061731110582648
+      ],
+      [
+       2.85,
+       0.019236631458514314
+      ],
+      [
+       2.9,
+       0.017948411796828673
+      ],
+      [
+       2.95,
+       0.016746460352129577
+      ],
+      [
+       3.0,
+       0.015625
+      ],
+      [
+       3.05,
+       0.01457864049276262
+      ],
+      [
+       3.1,
+       0.013602352551501938
+      ],
+      [
+       3.15,
+       0.012691443693066181
+      ],
+      [
+       3.2,
+       0.011841535675862483
+      ],
+      [
+       3.25,
+       0.011048543456039806
+      ],
+      [
+       3.3,
+       0.01030865555291324
+      ],
+      [
+       3.35,
+       0.009618315729257157
+      ],
+      [
+       3.4,
+       0.008974205898414337
+      ],
+      [
+       3.45,
+       0.008373230176064788
+      ],
+      [
+       3.5,
+       0.0078125
+      ],
+      [
+       3.55,
+       0.00728932024638131
+      ],
+      [
+       3.6,
+       0.006801176275750969
+      ],
+      [
+       3.65,
+       0.0063457218465330905
+      ],
+      [
+       3.7,
+       0.005920767837931241
+      ],
+      [
+       3.75,
+       0.005524271728019903
+      ],
+      [
+       3.8,
+       0.00515432777645662
+      ],
+      [
+       3.85,
+       0.0048091578646285785
+      ],
+      [
+       3.9,
+       0.004487102949207168
+      ],
+      [
+       3.95,
+       0.004186615088032394
+      ],
+      [
+       4.0,
+       0.00390625
+      ],
+      [
+       4.05,
+       0.003644660123190655
+      ],
+      [
+       4.1,
+       0.0034005881378754866
+      ],
+      [
+       4.15,
+       0.0031728609232665435
+      ],
+      [
+       4.2,
+       0.0029603839189656206
+      ],
+      [
+       4.25,
+       0.0027621358640099515
+      ],
+      [
+       4.3,
+       0.00257716388822831
+      ],
+      [
+       4.35,
+       0.002404578932314291
+      ],
+      [
+       4.4,
+       0.002243551474603583
+      ],
+      [
+       4.45,
+       0.002093307544016197
+      ],
+      [
+       4.5,
+       0.001953125
+      ],
+      [
+       4.55,
+       0.0018223300615953274
+      ],
+      [
+       4.6,
+       0.0017002940689377433
+      ],
+      [
+       4.65,
+       0.0015864304616332718
+      ],
+      [
+       4.7,
+       0.0014801919594828103
+      ],
+      [
+       4.75,
+       0.0013810679320049757
+      ],
+      [
+       4.8,
+       0.001288581944114155
+      ],
+      [
+       4.85,
+       0.0012022894661571455
+      ],
+      [
+       4.9,
+       0.0011217757373017914
+      ],
+      [
+       4.95,
+       0.0010466537720080985
+      ],
+      [
+       5.0,
+       0.0009765625
+      ]
+     ]
+    },
+    {
+     "name": "factor 1.0",
+     "expr": "1.0**x",
+     "style": "next",
+     "_pts": [
+      [
+       1.0,
+       1.0
+      ],
+      [
+       1.05,
+       1.0
+      ],
+      [
+       1.1,
+       1.0
+      ],
+      [
+       1.15,
+       1.0
+      ],
+      [
+       1.2,
+       1.0
+      ],
+      [
+       1.25,
+       1.0
+      ],
+      [
+       1.3,
+       1.0
+      ],
+      [
+       1.35,
+       1.0
+      ],
+      [
+       1.4,
+       1.0
+      ],
+      [
+       1.45,
+       1.0
+      ],
+      [
+       1.5,
+       1.0
+      ],
+      [
+       1.55,
+       1.0
+      ],
+      [
+       1.6,
+       1.0
+      ],
+      [
+       1.65,
+       1.0
+      ],
+      [
+       1.7,
+       1.0
+      ],
+      [
+       1.75,
+       1.0
+      ],
+      [
+       1.8,
+       1.0
+      ],
+      [
+       1.85,
+       1.0
+      ],
+      [
+       1.9,
+       1.0
+      ],
+      [
+       1.95,
+       1.0
+      ],
+      [
+       2.0,
+       1.0
+      ],
+      [
+       2.05,
+       1.0
+      ],
+      [
+       2.1,
+       1.0
+      ],
+      [
+       2.15,
+       1.0
+      ],
+      [
+       2.2,
+       1.0
+      ],
+      [
+       2.25,
+       1.0
+      ],
+      [
+       2.3,
+       1.0
+      ],
+      [
+       2.35,
+       1.0
+      ],
+      [
+       2.4,
+       1.0
+      ],
+      [
+       2.45,
+       1.0
+      ],
+      [
+       2.5,
+       1.0
+      ],
+      [
+       2.55,
+       1.0
+      ],
+      [
+       2.6,
+       1.0
+      ],
+      [
+       2.65,
+       1.0
+      ],
+      [
+       2.7,
+       1.0
+      ],
+      [
+       2.75,
+       1.0
+      ],
+      [
+       2.8,
+       1.0
+      ],
+      [
+       2.85,
+       1.0
+      ],
+      [
+       2.9,
+       1.0
+      ],
+      [
+       2.95,
+       1.0
+      ],
+      [
+       3.0,
+       1.0
+      ],
+      [
+       3.05,
+       1.0
+      ],
+      [
+       3.1,
+       1.0
+      ],
+      [
+       3.15,
+       1.0
+      ],
+      [
+       3.2,
+       1.0
+      ],
+      [
+       3.25,
+       1.0
+      ],
+      [
+       3.3,
+       1.0
+      ],
+      [
+       3.35,
+       1.0
+      ],
+      [
+       3.4,
+       1.0
+      ],
+      [
+       3.45,
+       1.0
+      ],
+      [
+       3.5,
+       1.0
+      ],
+      [
+       3.55,
+       1.0
+      ],
+      [
+       3.6,
+       1.0
+      ],
+      [
+       3.65,
+       1.0
+      ],
+      [
+       3.7,
+       1.0
+      ],
+      [
+       3.75,
+       1.0
+      ],
+      [
+       3.8,
+       1.0
+      ],
+      [
+       3.85,
+       1.0
+      ],
+      [
+       3.9,
+       1.0
+      ],
+      [
+       3.95,
+       1.0
+      ],
+      [
+       4.0,
+       1.0
+      ],
+      [
+       4.05,
+       1.0
+      ],
+      [
+       4.1,
+       1.0
+      ],
+      [
+       4.15,
+       1.0
+      ],
+      [
+       4.2,
+       1.0
+      ],
+      [
+       4.25,
+       1.0
+      ],
+      [
+       4.3,
+       1.0
+      ],
+      [
+       4.35,
+       1.0
+      ],
+      [
+       4.4,
+       1.0
+      ],
+      [
+       4.45,
+       1.0
+      ],
+      [
+       4.5,
+       1.0
+      ],
+      [
+       4.55,
+       1.0
+      ],
+      [
+       4.6,
+       1.0
+      ],
+      [
+       4.65,
+       1.0
+      ],
+      [
+       4.7,
+       1.0
+      ],
+      [
+       4.75,
+       1.0
+      ],
+      [
+       4.8,
+       1.0
+      ],
+      [
+       4.85,
+       1.0
+      ],
+      [
+       4.9,
+       1.0
+      ],
+      [
+       4.95,
+       1.0
+      ],
+      [
+       5.0,
+       1.0
+      ]
+     ]
+    },
+    {
+     "name": "factor 1.5",
+     "expr": "1.5**x",
+     "style": "live",
+     "_pts": [
+      [
+       1.0,
+       1.5
+      ],
+      [
+       1.05,
+       1.5307202304741792
+      ],
+      [
+       1.1,
+       1.562069615988616
+      ],
+      [
+       1.15,
+       1.5940610417352044
+      ],
+      [
+       1.2,
+       1.626707656796548
+      ],
+      [
+       1.25,
+       1.6600228795504823
+      ],
+      [
+       1.3,
+       1.6940204031852832
+      ],
+      [
+       1.35,
+       1.7287142013278256
+      ],
+      [
+       1.4,
+       1.7641185337870102
+      ],
+      [
+       1.45,
+       1.8002479524148156
+      ],
+      [
+       1.5,
+       1.8371173070873836
+      ],
+      [
+       1.55,
+       1.874741751808602
+      ],
+      [
+       1.6,
+       1.9131367509386863
+      ],
+      [
+       1.65,
+       1.9523180855503253
+      ],
+      [
+       1.7,
+       1.9923018599150013
+      ],
+      [
+       1.75,
+       2.033104508122151
+      ],
+      [
+       1.8,
+       2.0747428008338873
+      ],
+      [
+       1.85,
+       2.1172338521780616
+      ],
+      [
+       1.9,
+       2.1605951267824905
+      ],
+      [
+       1.95,
+       2.204844446953255
+      ],
+      [
+       2.0,
+       2.25
+      ],
+      [
+       2.05,
+       2.2960803457112684
+      ],
+      [
+       2.1,
+       2.3431044239829237
+      ],
+      [
+       2.15,
+       2.3910915626028064
+      ],
+      [
+       2.2,
+       2.440061485194822
+      ],
+      [
+       2.25,
+       2.4900343193257237
+      ],
+      [
+       2.3,
+       2.5410306047779248
+      ],
+      [
+       2.35,
+       2.5930713019917384
+      ],
+      [
+       2.4,
+       2.6461778006805154
+      ],
+      [
+       2.45,
+       2.7003719286222236
+      ],
+      [
+       2.5,
+       2.7556759606310752
+      ],
+      [
+       2.55,
+       2.812112627712903
+      ],
+      [
+       2.6,
+       2.8697051264080295
+      ],
+      [
+       2.65,
+       2.9284771283254876
+      ],
+      [
+       2.7,
+       2.988452789872502
+      ],
+      [
+       2.75,
+       3.0496567621832265
+      ],
+      [
+       2.8,
+       3.112114201250831
+      ],
+      [
+       2.85,
+       3.175850778267092
+      ],
+      [
+       2.9,
+       3.240892690173736
+      ],
+      [
+       2.95,
+       3.3072666704298825
+      ],
+      [
+       3.0,
+       3.375
+      ],
+      [
+       3.05,
+       3.4441205185669026
+      ],
+      [
+       3.1,
+       3.514656635974386
+      ],
+      [
+       3.15,
+       3.5866373439042096
+      ],
+      [
+       3.2,
+       3.660092227792233
+      ],
+      [
+       3.25,
+       3.7350514789885856
+      ],
+      [
+       3.3,
+       3.8115459071668867
+      ],
+      [
+       3.35,
+       3.8896069529876076
+      ],
+      [
+       3.4,
+       3.969266701020773
+      ],
+      [
+       3.45,
+       4.050557892933336
+      ],
+      [
+       3.5,
+       4.133513940946613
+      ],
+      [
+       3.55,
+       4.218168941569354
+      ],
+      [
+       3.6,
+       4.304557689612044
+      ],
+      [
+       3.65,
+       4.392715692488232
+      ],
+      [
+       3.7,
+       4.482679184808753
+      ],
+      [
+       3.75,
+       4.574485143274839
+      ],
+      [
+       3.8,
+       4.668171301876247
+      ],
+      [
+       3.85,
+       4.763776167400638
+      ],
+      [
+       3.9,
+       4.861339035260603
+      ],
+      [
+       3.95,
+       4.960900005644824
+      ],
+      [
+       4.0,
+       5.0625
+      ],
+      [
+       4.05,
+       5.166180777850354
+      ],
+      [
+       4.1,
+       5.271984953961578
+      ],
+      [
+       4.15,
+       5.379956015856315
+      ],
+      [
+       4.2,
+       5.49013834168835
+      ],
+      [
+       4.25,
+       5.602577218482878
+      ],
+      [
+       4.3,
+       5.71731886075033
+      ],
+      [
+       4.35,
+       5.8344104294814105
+      ],
+      [
+       4.4,
+       5.953900051531161
+      ],
+      [
+       4.45,
+       6.075836839400003
+      ],
+      [
+       4.5,
+       6.20027091141992
+      ],
+      [
+       4.55,
+       6.327253412354032
+      ],
+      [
+       4.6,
+       6.456836534418065
+      ],
+      [
+       4.65,
+       6.5890735387323485
+      ],
+      [
+       4.7,
+       6.7240187772131295
+      ],
+      [
+       4.75,
+       6.861727714912259
+      ],
+      [
+       4.8,
+       7.00225695281437
+      ],
+      [
+       4.85,
+       7.145664251100956
+      ],
+      [
+       4.9,
+       7.292008552890907
+      ],
+      [
+       4.95,
+       7.441350008467236
+      ],
+      [
+       5.0,
+       7.59375
+      ]
+     ]
+    }
+   ],
+   "aria": "A line plot over five layers showing one curve falling almost to zero, one flat line, and one curve climbing steeply above the others."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 10-layer network has an output gradient of 1.0. (a) Find the gradient reaching layer 1 if every per-layer Jacobian factor has norm 0.25. (b) Repeat for a factor of 1.5. (c) A gradient vector has norm 12 and the clipping threshold is c = 5. Find its norm after clipping and state what happens to its direction.",
+   "steps": [
+    "1. The gradient at layer 1 is the output gradient times the product of the 10 per-layer factors: g₁ = 1.0 × 0.25<sup>10</sup>.",
+    "2. 0.25<sup>10</sup> = 1/4<sup>10</sup> = 1/1,048,576 ≈ 9.5367 × 10<sup>−7</sup>, so g₁ ≈ 9.54 × 10<sup>−7</sup>. The signal has vanished.",
+    "3. For the growing case, 1.5<sup>10</sup> ≈ 57.665, so g₁ ≈ 57.7. The signal has exploded.",
+    "4. Clipping compares the norm ‖g‖ = 12 with c = 5. Since 12 > 5, the scale is c/‖g‖ = 5/12 ≈ 0.4167.",
+    "5. The clipped vector is g × (5/12). Its norm is 12 × (5/12) = 5.0. Multiplying by a positive scalar leaves the direction unchanged."
+   ],
+   "answer": "The first-layer gradient is about 9.54 × 10<sup>−7</sup> for factor 0.25 and about 57.7 for factor 1.5; clipping the norm-12 vector gives a norm of 5.0 with the same direction.",
+   "check": "print(0.25**10)\nprint(1.5**10)\nprint(5/12)\nprint(12*(5/12))",
+   "values": [
+    9.5367431640625e-07,
+    57.6650390625,
+    0.4166666666666667,
+    5.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A flat loss curve is not proof of vanishing gradients. A learning rate that is too small, dead ReLU units and a saturated output layer all produce the same picture.",
+  "Gradient clipping treats exploding gradients only. Applying it to a vanishing gradient changes nothing, because the norm is already below the threshold.",
+  "Read the question carefully: a per-layer factor is not the full product. A per-layer factor of 0.5 applied over 8 layers gives 0.5⁸ ≈ 0.0039, not 0.5. Always raise the per-layer factor to the number of layers before comparing with the output gradient.",
+  "The sigmoid derivative's maximum is 0.25 at z = 0. Do not use 0.25 for tanh or ReLU; their derivatives have different bounds.",
+  "Large weights can also cause vanishing: they push the sigmoid into saturation, where its derivative is near zero."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the largest value of the derivative of the sigmoid function, and where does it occur?",
+   "marks": 2,
+   "a": "0.25, at pre-activation z = 0."
+  },
+  {
+   "level": "remember",
+   "q": "Define the vanishing gradient problem in one sentence.",
+   "marks": 2,
+   "a": "In a deep network, the gradient of the loss with respect to early layers becomes extremely small because backpropagation multiplies many per-layer factors smaller than 1."
+  },
+  {
+   "level": "understand",
+   "q": "Why does depth turn a small per-layer factor into a serious problem?",
+   "marks": 3,
+   "a": "The gradient is multiplied once per layer, so the effect is exponential, not additive: a factor of 0.25 over 10 layers gives 0.25¹⁰ ≈ 9.5 × 10⁻⁷, while over 2 layers it is only 0.0625."
+  },
+  {
+   "level": "apply",
+   "q": "A 6-layer chain has per-layer factor 0.5. Compute the full product and the gradient at layer 1 for an output gradient of 8.",
+   "marks": 3,
+   "a": "Product = 0.5⁶ = 0.015625. Gradient = 8 × 0.015625 = 0.125."
+  },
+  {
+   "level": "apply",
+   "q": "A gradient vector has norm 30 and the clipping threshold is c = 6. Give the scale factor, the clipped norm, and whether the direction changes.",
+   "marks": 2,
+   "a": "Scale = 6/30 = 0.2. Clipped norm = 30 × 0.2 = 6. Direction unchanged, because scaling is by a positive number."
+  },
+  {
+   "level": "analyze",
+   "q": "A deep network with large initial weights produces a loss of NaN after two updates. Which gradient problem is likely, and which two mitigations would you apply first? Why is switching to ReLU alone not enough?",
+   "marks": 4,
+   "a": "Exploding gradients. Apply gradient-norm clipping and reduce or normalize the initialization (He scaling or batch normalization). ReLU stops the activation derivative from shrinking, but a large weight matrix still multiplies the gradient by a large factor, so the product can still blow up."
+  },
+  {
+   "level": "analyze",
+   "q": "A 50-layer sigmoid network trains, but the first five layers' weights hardly change. Suggest two changes and explain how each changes the product of Jacobians.",
+   "marks": 4,
+   "a": "Use ReLU hidden units, so each activation derivative is 1 for positive pre-activations, and add batch normalization or He initialization so each layer's Jacobian has scale near 1. Both push the per-layer factors toward 1, stopping the product from shrinking exponentially with depth."
+  },
+  {
+   "level": "understand",
+   "q": "Why does gradient clipping not help a vanishing gradient?",
+   "marks": 2,
+   "a": "Clipping only scales down vectors whose norm exceeds c. A vanished gradient is already far below c, so it is left unchanged."
+  }
+ ],
+ "beyond": "Not for the exam. Gradient clipping by global norm is standard when training large language models, and residual streams are a main reason very deep transformers train at all. Orthogonal initialization and spectral normalization keep the product of Jacobians close to 1 in recurrent and deep networks. Search for residual connections, orthogonal initialization, and gradient clipping by global norm."
+}

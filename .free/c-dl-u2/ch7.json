@@ -1,0 +1,231 @@
+{
+ "lead": "Batch normalization rescales each layer's pre-activations using the mean and variance of the current mini-batch, then learns a per-feature scale γ and shift β. It exists because deep networks are sensitive to the scale of activations: small changes in early layers can push later pre-activations into saturated or tiny regions. Normalizing before the activation keeps that scale controlled, so larger learning rates survive and initialization matters less. It is standard in convolutional and fully connected networks, and its batch-independent cousin LayerNorm appears in transformers.",
+ "prereq": "You need: <a href=\"#gradient-descent-and-its-limitations\">2.1</a> for the update rule, <a href=\"#vanishing-and-exploding-gradients\">2.5</a> for the scale problem it fixes, and <a href=\"#weight-initialization-methods\">2.6</a> for the initialization it makes less critical.",
+ "sections": [
+  {
+   "h3": "The normalization step",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take one layer. For one feature, the layer receives B pre-activation values z<sub>1</sub>, …, z<sub>B</sub> from the B examples in the mini-batch. Batch normalization computes the batch mean and batch variance:"
+    },
+    {
+     "type": "formula",
+     "text": "μ = (1/B) Σ z<sub>i</sub>,    σ² = (1/B) Σ (z<sub>i</sub> − μ)²",
+     "where": "B is the number of examples in the mini-batch; z<sub>i</sub> is the pre-activation for example i; μ is the batch mean; σ² is the batch variance; the sum runs over i = 1 to B."
+    },
+    {
+     "type": "p",
+     "text": "It then standardizes each value:"
+    },
+    {
+     "type": "formula",
+     "text": "ẑ<sub>i</sub> = (z<sub>i</sub> − μ) / √(σ² + ε)",
+     "where": "ẑ<sub>i</sub> is the normalized value; ε is a small positive constant, often 10⁻⁵, added so the denominator never becomes zero. Across the batch, ẑ has mean 0 and variance 1, up to the effect of ε."
+    },
+    {
+     "type": "p",
+     "text": "Finally the layer applies a learned scale and shift:"
+    },
+    {
+     "type": "formula",
+     "text": "y<sub>i</sub> = γ ẑ<sub>i</sub> + β",
+     "where": "y<sub>i</sub> is the batch-normalized output; γ is a learned scale parameter; β is a learned shift parameter. Both are one pair per feature, learned by the same gradient descent as weights and biases. If γ = 1 and β = 0, the output is exactly the standardized value."
+    },
+    {
+     "type": "p",
+     "text": "In a layer with d features, where d is the number of features in the layer, the procedure repeats independently for each feature: d means, d variances, and d pairs of γ and β. The normalization sits before the activation, so the activation receives y, not z."
+    }
+   ]
+  },
+  {
+   "h3": "Training uses batch statistics; inference does not",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "While training, the layer uses μ and σ² computed from the current mini-batch. That ties the output for one example to the other examples in the same batch. The tie is acceptable during training because the gradient step already uses the whole batch."
+    },
+    {
+     "type": "p",
+     "text": "At inference there is no safe batch to borrow statistics from. A user's single image or single sentence must get a prediction that does not change when other items appear alongside it. So the layer stores running averages during training:"
+    },
+    {
+     "type": "formula",
+     "text": "μ<sub>run</sub> ← ρ μ<sub>run</sub> + (1 − ρ) μ<sub>batch</sub>,    σ²<sub>run</sub> ← ρ σ²<sub>run</sub> + (1 − ρ) σ²<sub>batch</sub>",
+     "where": "μ<sub>run</sub> and σ²<sub>run</sub> are the stored running averages; μ<sub>batch</sub> and σ²<sub>batch</sub> are the current batch statistics; ρ is the decay rate, commonly 0.9. A value near 1 keeps a long memory; a value near 0 follows the latest batch."
+    },
+    {
+     "type": "p",
+     "text": "At prediction time the layer uses μ<sub>run</sub> and σ²<sub>run</sub> in place of μ and σ², and applies the same learned γ and β. The result depends only on the input example and the stored parameters."
+    },
+    {
+     "type": "p",
+     "text": "This split is the usual source of bugs. If code uses batch statistics at test time, a prediction changes with its batch-mates. If code uses running averages during training, the training signal no longer matches the forward pass. Frameworks switch between the two modes explicitly: PyTorch calls them train() and eval(); Keras passes training=True or training=False."
+    }
+   ]
+  },
+  {
+   "h3": "Why it helps, what it costs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Batch normalization helps optimization in three connected ways. First, it keeps the scale of each pre-activation roughly fixed as earlier layers change, so a learning rate that worked at the start does not suddenly become too large. Second, it makes the loss less sensitive to the initial scale of weights: <a href=\"#weight-initialization-methods\">2.6</a> still matters, but poor scaling is partly corrected. Third, because μ and σ² come from a random mini-batch, they add slight noise to every forward pass, which can regularize a little, similar in spirit to the noise in <a href=\"#stochastic-and-mini-batch-gradient-descent\">2.2</a>."
+    },
+    {
+     "type": "p",
+     "text": "The costs are real. Each normalized layer computes extra sums, square roots and divisions, and stores running averages. The method depends on batch size: with B = 1 the batch variance is zero, so normalization becomes degenerate; with very small batches the statistics are noisy. It can interact badly with recurrent networks, where sequence lengths and batch shapes vary, and with distributed training, where each device may see only a slice of the batch. It also adds two parameter vectors per layer."
+    },
+    {
+     "type": "p",
+     "text": "LayerNorm is the batch-independent cousin. It normalizes across the features of each single example, so it needs no running averages and behaves the same in training and inference. Transformer blocks use it heavily; see Unit 5, Attention, Transformers and Language Models. Normalization inside convolutional layers, often called batch norm over the channel dimension, is covered in Unit 3, Convolutional Neural Networks."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The batch mean and variance (μ = 4, σ² = 5 for z = 1, 3, 5, 7) feed normalization, then learned scale and shift; the dashed branch stores running averages for inference.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Batch normalization in one layer",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Batch values z",
+     "note": "1, 3, 5, 7",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Mean and variance",
+     "note": "μ = 4, σ² = 5",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Normalize",
+     "note": "(z − 4) / 2.236",
+     "style": "live"
+    },
+    {
+     "id": "d",
+     "label": "Scale and shift",
+     "note": "γ = 1, β = 0",
+     "style": "next"
+    },
+    {
+     "id": "e",
+     "label": "Activation",
+     "note": "ReLU or similar",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "Running averages",
+     "note": "used at inference",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "f",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A vertical flow from batch values z = 1, 3, 5, 7 through mean 4 and variance 5, normalization by 2.236, learned scale 1 and shift 0, and the activation, with a dashed side branch storing running averages."
+  }
+ },
+ "examples": [
+  {
+   "question": "A mini-batch has four pre-activations for one feature: z = [1, 3, 5, 7]. Use ε = 0, γ = 1 and β = 0. Compute μ, σ², σ, and the four normalized outputs. Round to two decimal places where needed.",
+   "steps": [
+    "The batch size is B = 4. The mean is μ = (1 + 3 + 5 + 7)/4 = 16/4 = 4.",
+    "The deviations from the mean are 1 − 4 = −3, 3 − 4 = −1, 5 − 4 = 1, and 7 − 4 = 3.",
+    "The squared deviations are 9, 1, 1 and 9. Their sum is 20, so σ² = 20/4 = 5.",
+    "The standard deviation is σ = √5 = 2.236, to three decimal places.",
+    "The normalized values are (1 − 4)/2.236 = −1.34, (3 − 4)/2.236 = −0.45, (5 − 4)/2.236 = 0.45, and (7 − 4)/2.236 = 1.34.",
+    "With γ = 1 and β = 0 the layer output is exactly this standardized list: [−1.34, −0.45, 0.45, 1.34]."
+   ],
+   "answer": "μ = 4, σ² = 5, σ = 2.236, and the outputs are [−1.34, −0.45, 0.45, 1.34].",
+   "check": "import math\nz = [1, 3, 5, 7]\nB = len(z)\nmu = sum(z) / B\nvar = sum((x - mu) ** 2 for x in z) / B\nsigma = math.sqrt(var)\nzhat = [(x - mu) / math.sqrt(var) for x in z]\nprint(f\"{mu:.1f}\")\nprint(f\"{var:.1f}\")\nprint(f\"{sigma:.3f}\")\nfor v in zhat:\n    print(f\"{v:.2f}\")",
+   "values": [
+    4.0,
+    5.0,
+    2.236,
+    -1.34,
+    -0.45,
+    0.45,
+    1.34
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using the current batch's μ and σ² at inference. Then one prediction changes with its batch-mates; use the stored running averages instead.",
+  "Normalizing after the activation. Batch normalization is placed before ReLU or tanh, on the pre-activation z.",
+  "Treating γ and β as fixed constants. They are learned parameters, one pair per feature, updated by backpropagation.",
+  "Forgetting ε. With zero variance a feature would divide by zero; ε keeps the denominator positive.",
+  "Setting B = 1 and expecting stable statistics. The batch variance is zero, so the normalized value carries no useful signal."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the batch normalization output y<sub>i</sub> in terms of z<sub>i</sub>, μ, σ², ε, γ and β.",
+   "marks": 2,
+   "a": "y<sub>i</sub> = γ (z<sub>i</sub> − μ)/√(σ² + ε) + β, where μ and σ² are the batch mean and variance and γ, β are learned per feature."
+  },
+  {
+   "level": "understand",
+   "q": "Why use running averages at inference instead of the current batch's statistics?",
+   "marks": 3,
+   "a": "A prediction must not depend on the other items in its batch. Running averages give a fixed normalization per feature, so one input gets one output."
+  },
+  {
+   "level": "apply",
+   "q": "A feature has batch values [2, 4, 6, 8], with ε = 0, γ = 2 and β = 1. Compute μ, σ², and the first two outputs y<sub>1</sub> and y<sub>2</sub>.",
+   "marks": 4,
+   "a": "μ = (2+4+6+8)/4 = 5. σ² = ((−3)² + (−1)² + 1² + 3²)/4 = 20/4 = 5, so σ = 2.236. ẑ<sub>1</sub> = (2−5)/2.236 = −1.3416, so y<sub>1</sub> = 2(−1.3416) + 1 = −1.68. ẑ<sub>2</sub> = (4−5)/2.236 = −0.4472, so y<sub>2</sub> = 2(−0.4472) + 1 = 0.11."
+  },
+  {
+   "level": "analyze",
+   "q": "A model trained with batch norm gives different predictions for the same image depending on which other images share its test batch. What is the likely bug, and what should the code do?",
+   "marks": 5,
+   "a": "The code is using current batch statistics at inference. It should switch to evaluation mode and use the stored running μ and σ²; then the same image gets the same prediction regardless of batch-mates."
+  },
+  {
+   "level": "understand",
+   "q": "State two benefits and two costs of batch normalization.",
+   "marks": 3,
+   "a": "Benefits: larger learning rates survive, and initialization matters less. Costs: extra computation, and dependence on batch size."
+  },
+  {
+   "level": "analyze",
+   "q": "With B = 1, what are μ and σ², and why is batch normalization unstable?",
+   "marks": 4,
+   "a": "μ = z and σ² = 0. Then ẑ = (z − z)/√ε = 0, so the output is just β; the feature's value is lost. Small batches also give noisy μ and σ²."
+  }
+ ],
+ "beyond": "Not for the exam. In practice, batch normalization is often replaced by LayerNorm or GroupNorm when batch size is small or when training is distributed across many devices. Researchers study normalization-free networks and adaptive normalization, and newer architectures sometimes use RMSNorm because it drops the mean subtraction and is cheaper. Search for internal covariate shift, batch norm folding and GroupNorm to go further."
+}

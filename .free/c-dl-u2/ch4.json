@@ -1,0 +1,290 @@
+{
+ "lead": "A single learning rate forces every parameter to move by the same scale. Adaptive optimizers give each parameter its own step size, built from a running summary of that parameter's recent gradients. AdaGrad sums squared gradients; RMSProp forgets old ones; Adam tracks both a mean and a variance. They are default choices for deep networks, including image classifiers and language models, because they train reliably with little tuning of the step size.",
+ "prereq": "You need: <a href=\"#momentum-and-nesterov-accelerated-gradient-descent\">2.3</a> for the running-average idea, and the chain rule from Unit 1 for where g comes from.",
+ "sections": [
+  {
+   "h3": "AdaGrad: accumulate squared gradients",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Plain gradient descent uses one step size η for all parameters. A rare feature may need a large step while a common feature already has large gradients and needs a small one. AdaGrad keeps a separate accumulator s for each parameter, starting at 0."
+    },
+    {
+     "type": "formula",
+     "text": "s ← s + g²",
+     "where": "s is the accumulator for one parameter; g is that parameter's gradient at the current step."
+    },
+    {
+     "type": "formula",
+     "text": "θ ← θ − η g / (√s + ε)",
+     "where": "θ is the parameter; η is the base learning rate; ε is a tiny positive number such as 1e-8."
+    },
+    {
+     "type": "p",
+     "text": "The accumulator only grows. If a parameter keeps receiving large gradients, s becomes large and √s makes its effective step small. If a parameter is rarely active, s stays small and its steps stay relatively large. This helps sparse features, such as rare words in a language model."
+    },
+    {
+     "type": "p",
+     "text": "The weakness is the same growth. After many steps s can be so large that the effective step is near zero. Training then slows or stalls, even when the parameter still needs to move. AdaGrad is historically important but rarely the first choice for long deep-network training today."
+    }
+   ]
+  },
+  {
+   "h3": "RMSProp: forget old gradients",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "RMSProp replaces the sum with a leaky average. Old squared gradients are multiplied by ρ and the new one by 1−ρ. With ρ = 0.9, the average mostly covers roughly the last ten gradients, so old large gradients fade."
+    },
+    {
+     "type": "formula",
+     "text": "s ← ρs + (1 − ρ)g²",
+     "where": "ρ is the decay rate, usually 0.9; s is the running average of squared gradients for one parameter."
+    },
+    {
+     "type": "p",
+     "text": "The update is the same as AdaGrad: θ ← θ − η g / (√s + ε). Because s no longer only grows, the effective step can rise again when gradients shrink. RMSProp works well on non-stationary problems and on mini-batch noise, where the scale of gradients changes over training."
+    },
+    {
+     "type": "p",
+     "text": "The decay rate controls memory: ρ close to 1 remembers longer; ρ smaller reacts faster but is noisier. The name comes from root mean square: √s is an estimate of the root mean square gradient for that parameter. RMSProp remains a strong baseline for mini-batch training."
+    }
+   ]
+  },
+  {
+   "h3": "Adam: mean and variance",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Adam adds momentum to RMSProp. It keeps a first moment m, an average of gradients, and a second moment v, an average of squared gradients. Both start at 0."
+    },
+    {
+     "type": "formula",
+     "text": "m ← β₁m + (1 − β₁)g",
+     "where": "m is the first moment for one parameter; β₁ is its decay rate, usually 0.9."
+    },
+    {
+     "type": "formula",
+     "text": "v ← β₂v + (1 − β₂)g²",
+     "where": "v is the second moment; β₂ is its decay rate, usually 0.999."
+    },
+    {
+     "type": "p",
+     "text": "At step t, both averages are biased toward 0 because they started at 0. Adam corrects this by dividing by 1 − βᵗ: m̂ = m / (1 − β₁ᵗ) and v̂ = v / (1 − β₂ᵗ). The corrected values estimate the true mean and the true mean square (uncentered second moment) of recent gradients."
+    },
+    {
+     "type": "formula",
+     "text": "θ ← θ − η m̂ / (√v̂ + ε)",
+     "where": "η is the step size, often 0.001 for Adam; ε is a tiny constant, often 1e-8."
+    },
+    {
+     "type": "p",
+     "text": "The defaults β₁ = 0.9, β₂ = 0.999 and ε = 1e-8 are standard. AdamW decouples weight decay from the adaptive step, a detail only a few universities teach; see <a href=\"#regularization-weight-penalties-dropout-and-early-stopping\">2.8</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Reading the update",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ε has two jobs. It prevents division by zero when v̂ or s is 0, and it damps the step when gradients are tiny. If ε is too large, it blunts Adam's per-parameter scaling."
+    },
+    {
+     "type": "p",
+     "text": "The first Adam steps are about η in size, even if g is large, because m̂/√v̂ is near 1 or −1. Later steps follow the ratio of mean gradient to root-mean-square gradient. This is why Adam is less sensitive to the gradient scale than plain gradient descent."
+    },
+    {
+     "type": "p",
+     "text": "Do not copy η from one optimizer to another. η = 0.001 suits Adam; η = 0.1 often suits SGD with momentum. Tune η and the decay rates on a validation split; see <a href=\"#dataset-augmentation-and-hyperparameter-tuning\">2.9</a>."
+    },
+    {
+     "type": "p",
+     "text": "All three methods are still gradient descent. They change only the step taken for each parameter, using history; the gradient g still comes from backpropagation."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "Adam keeps two running averages per parameter and corrects both before dividing them into the step. Notice that the first moment and second moment are computed from the same gradient.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One Adam step",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Gradient g",
+     "note": "one parameter",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "First moment m",
+     "note": "β₁ = 0.9",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Second moment v",
+     "note": "β₂ = 0.999",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Bias correction",
+     "note": "m/(1−β₁ᵗ), v/(1−β₂ᵗ)",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "Update θ",
+     "note": "η m̂/(√v̂ + ε)",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "a",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    }
+   ],
+   "aria": "A flowchart where one gradient feeds a mean accumulator and a squared-gradient accumulator, both pass through bias correction, and the result sets the parameter update."
+  }
+ },
+ "examples": [
+  {
+   "question": "Use Adam with η = 0.01, β₁ = 0.9, β₂ = 0.999, ε = 1e-8. The gradient for one parameter is g = 1 at step t = 1 and g = 1 again at t = 2. Both moments start at 0. Find m, v, m̂, v̂ and the parameter step at each step.",
+   "steps": [
+    "t = 1: m = 0.9×0 + 0.1×1 = 0.1. v = 0.999×0 + 0.001×1² = 0.001.",
+    "correction at t = 1: m̂ = 0.1/(1−0.9¹) = 0.1/0.1 = 1. v̂ = 0.001/(1−0.999¹) = 0.001/0.001 = 1.",
+    "update at t = 1: step = η m̂/(√v̂ + ε) = 0.01×1/(1 + 1e-8) ≈ 0.01.",
+    "t = 2: m = 0.9×0.1 + 0.1×1 = 0.19. v = 0.999×0.001 + 0.001×1² = 0.000999 + 0.001 = 0.001999.",
+    "correction at t = 2: m̂ = 0.19/(1−0.9²) = 0.19/0.19 = 1. v̂ = 0.001999/(1−0.999²) = 0.001999/0.001999 = 1.",
+    "update at t = 2: step = 0.01×1/(1 + 1e-8) ≈ 0.01."
+   ],
+   "answer": "At t = 1 the step is about 0.01, with m = 0.1, v = 0.001; at t = 2 the step is about 0.01 again, with m = 0.19, v = 0.001999. Both corrected moments equal 1 at both steps.",
+   "check": "b1=0.9\nb2=0.999\neta=0.01\neps=1e-8\nm=0.0\nv=0.0\nfor t,g in [(1,1.0),(2,1.0)]:\n    m=b1*m+(1-b1)*g\n    v=b2*v+(1-b2)*g*g\n    mh=m/(1-b1**t)\n    vh=v/(1-b2**t)\n    step=eta*mh/(vh**0.5+eps)\n    print(round(m,6))\n    print(round(v,6))\n    print(round(mh,6))\n    print(round(vh,6))\n    print(round(step,6))",
+   "values": [
+    0.1,
+    0.001,
+    1.0,
+    1.0,
+    0.01,
+    0.19,
+    0.001999,
+    1.0,
+    1.0,
+    0.01
+   ],
+   "dry_run": {
+    "head": [
+     "t",
+     "m",
+     "v",
+     "m̂",
+     "v̂",
+     "step"
+    ],
+    "rows": [
+     [
+      "1",
+      "0.1",
+      "0.001",
+      "1",
+      "1",
+      "0.01"
+     ],
+     [
+      "2",
+      "0.19",
+      "0.001999",
+      "1",
+      "1",
+      "0.01"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Skipping bias correction in Adam. Without it, the first steps are far too large. Both m and v start at 0, and v is biased toward 0 more strongly than m (β₂ is closer to 1), so m/√v is inflated: with the defaults it is about 3.16 instead of 1 at t = 1. Bias correction divides this out, so the first step is about η.",
+  "Dividing by s instead of √s in AdaGrad or RMSProp. The formulas divide by the square root of the accumulated squared gradient.",
+  "Reusing a learning rate across optimizers. η = 0.001 suits Adam, while η = 0.1 often suits SGD with momentum.",
+  "Thinking AdaGrad's accumulator can shrink. In AdaGrad s only grows; RMSProp and Adam use decayed averages, so old gradients fade."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the AdaGrad accumulator and update equations, defining each symbol.",
+   "marks": 2,
+   "a": "s ← s + g²; θ ← θ − η g/(√s + ε). s is the squared-gradient accumulator for one parameter, g is its gradient, η is the base step size, and ε is a tiny constant."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Adam need bias correction?",
+   "marks": 3,
+   "a": "m and v start at 0, so early values are pulled toward 0. Dividing m by 1−β₁ᵗ and v by 1−β₂ᵗ removes that startup bias."
+  },
+  {
+   "level": "apply",
+   "q": "At t = 1, g = 2, η = 0.1, β₁ = 0.9, β₂ = 0.999, ε = 1e-8, with m = v = 0. Find m, v, m̂, v̂ and the step.",
+   "marks": 4,
+   "a": "m = 0.2; v = 0.004; m̂ = 0.2/0.1 = 2; v̂ = 0.004/0.001 = 4; step = 0.1×2/(2 + 1e-8) ≈ 0.1."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can AdaGrad stall after many steps?",
+   "marks": 4,
+   "a": "s only grows. Large or repeated gradients make √s large, so the effective step η/(√s+ε) becomes very small and the parameter stops moving."
+  },
+  {
+   "level": "apply",
+   "q": "RMSProp: s₀ = 0, ρ = 0.9. Gradients are g₁ = 2 and g₂ = 1. Find s₁ and s₂.",
+   "marks": 3,
+   "a": "s₁ = 0.1×2² = 0.4; s₂ = 0.9×0.4 + 0.1×1² = 0.46."
+  },
+  {
+   "level": "analyze",
+   "q": "In the worked example, why are both Adam steps about η even though the gradient is 1 at both steps?",
+   "marks": 5,
+   "a": "With constant g = 1, bias correction makes m̂/√v̂ = 1. The step is η/(1+ε) ≈ η; the corrected ratio, not the raw moment size, sets the step."
+  },
+  {
+   "level": "understand",
+   "q": "What are the two jobs of ε in Adam?",
+   "marks": 3,
+   "a": "It avoids division by zero when v̂ is 0, and it damps the step when gradients are tiny. Too large an ε weakens per-parameter scaling."
+  },
+  {
+   "level": "remember",
+   "q": "State the usual Adam defaults for β₁, β₂ and ε.",
+   "marks": 2,
+   "a": "β₁ = 0.9, β₂ = 0.999, ε = 1e-8."
+  }
+ ],
+ "beyond": "Not for the exam. AdamW is now common in transformer training because it keeps weight decay separate from the adaptive step. Modern large language models often use AdamW with a warmup and a cosine decay schedule, tuned with the rest of the training recipe. Other adaptive methods such as Lion and Sophia search for cheaper or better-conditioned updates. Search for 'AdamW weight decay decoupled' and 'adaptive optimizer warmup schedule' to go further."
+}

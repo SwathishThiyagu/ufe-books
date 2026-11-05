@@ -1,0 +1,194 @@
+{
+ "lead": "A deep network can drive its training loss to zero by memorising noise, and then fail on new data. Regularization is any rule that charges the model for complexity, so fitting the data becomes a trade-off instead of the only goal. The charge can sit in the loss (weight penalties), in the activations (dropout), or in the number of training steps (early stopping). All three are a few lines of code in a modern framework, and all three are used in real systems: dropout in classifiers, weight decay in almost every Adam recipe, early stopping in most training scripts.",
+ "prereq": "You need: overfitting and the bias-variance trade-off from Unit 1, and <a href=\"#batch-normalization\">2.7</a> for the other stabiliser often used in the same models.",
+ "sections": [
+  {
+   "h3": "Weight penalties: L2 and L1",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A network with many weights can memorise its training set, noise included. A weight penalty adds a small charge for large weights to the loss, so the optimizer shrinks them unless the data insists otherwise. Backpropagation is unchanged: the penalty is simply one more term to differentiate."
+    },
+    {
+     "type": "formula",
+     "text": "J(w) = L(w) + (λ/2)·||w||²",
+     "where": "J is the penalised loss the optimizer minimises; L is the ordinary data loss (cross-entropy or squared error); w is the vector of weights; ||w||² = Σᵢ wᵢ² is the sum of squared weights; λ ≥ 0 (lambda) is the penalty strength, a hyperparameter you choose."
+    },
+    {
+     "type": "p",
+     "text": "Differentiate the penalty. The derivative of (λ/2)·Σⱼ wⱼ² with respect to wᵢ is λwᵢ. So every weight receives one extra gradient proportional to its own size, and the update becomes:"
+    },
+    {
+     "type": "formula",
+     "text": "wᵢ ← wᵢ − η(∂L/∂wᵢ + λwᵢ) = (1 − ηλ)·wᵢ − η·∂L/∂wᵢ",
+     "where": "η (eta) is the learning rate. The factor (1 − ηλ) shrinks the weight by a fixed fraction every step, even when the data gradient is zero; this is why L2 is called weight decay."
+    },
+    {
+     "type": "p",
+     "text": "L1 uses absolute values instead of squares. Its gradient is λ·sign(wᵢ): a constant push towards zero whatever the weight's size."
+    },
+    {
+     "type": "formula",
+     "text": "J(w) = L(w) + λ·||w||₁",
+     "where": "||w||₁ = Σᵢ |wᵢ| is the sum of absolute weight values; λ is the same kind of strength hyperparameter."
+    },
+    {
+     "type": "p",
+     "text": "The difference matters. An L2 force grows with the weight, so it shrinks large weights fast and never reaches exactly zero. The L1 force is constant all the way down, so unhelpful weights land on exactly zero — sparsity, which is why L1 doubles as feature selection. Larger λ means a simpler model and more bias. Bias terms are usually left out of the penalty: shrinking a bias shifts an activation threshold rather than smoothing the function, and it rarely reduces overfitting."
+    }
+   ]
+  },
+  {
+   "h3": "Dropout",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Dropout randomly deletes units while training, so no unit can depend on a particular partner being present. Each mini-batch trains a different thinned network, and the full network at test time behaves like an average of all of them. It is the standard regularizer for fully connected layers."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "During training, draw a random mask: each unit survives with probability 1 − p and is set to 0 with probability p.",
+      "Divide every surviving activation by (1 − p). This is inverted dropout.",
+      "Run the forward and backward pass as usual on the masked, scaled values. Dropped units receive no gradient this step.",
+      "At test time do nothing: no mask, no scaling. Dropout is the identity."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The scaling is what makes step 4 legal. Without it, train-time activations would average a·(1 − p) while test-time activations average a, and every downstream layer would see the wrong scale."
+    },
+    {
+     "type": "formula",
+     "text": "E[a] = (1 − p)·(a/(1 − p)) + p·0 = a",
+     "where": "a is one activation value; 1 − p is the fraction of masks in which the unit survives. The average over masks equals the unscaled activation, so test time needs no correction."
+    },
+    {
+     "type": "p",
+     "text": "Typical rates are p = 0.5 for hidden units and p = 0.1 to 0.2 for inputs, since dropping an input deletes a feature outright. In convolutional layers plain dropout damages neighbouring pixels, so structured variants drop whole channels."
+    }
+   ]
+  },
+  {
+   "h3": "Early stopping",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "As training runs, validation loss falls, bottoms out, and then climbs while training loss keeps dropping — the model has moved from fitting the pattern to fitting the noise. Early stopping turns that observation into a rule."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Hold out a validation split and compute its loss after every epoch, with dropout switched off.",
+      "If the validation loss is the lowest seen so far, save a copy of the weights and reset a counter.",
+      "Otherwise increase the counter. Stop when the counter reaches the patience — the number of epochs without improvement.",
+      "Restore the best saved weights, not the weights from the last epoch."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Patience is usually 5 to 20 epochs, because validation loss is noisy and a single bad epoch proves nothing. The cost is that you cannot know the stopping point in advance, so a run takes longer than a fixed schedule. The prize is a free hyperparameter: no λ to choose."
+    },
+    {
+     "type": "p",
+     "text": "In a simple quadratic loss, early stopping behaves like an L2 penalty. Gradient descent started from zero on a quadratic shrinks the solution's components much as weight decay does, and stopping after t steps acts like a penalty of strength roughly 1/(ηt) — more steps, weaker penalty. The identity is exact only for that quadratic case, but the intuition carries over: both methods limit how far the weights travel from their starting point."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Weight penalties are one family inside regularization; dropout and early stopping are the loss-free relatives outside that inner box.",
+  "spec": {
+   "type": "sets",
+   "mode": "nested",
+   "sets": [
+    {
+     "label": "Regularization",
+     "items": [
+      "Dropout",
+      "Early stopping"
+     ]
+    },
+    {
+     "label": "Weight penalty",
+     "items": [
+      "L2",
+      "L1"
+     ]
+    }
+   ],
+   "aria": "One box inside another: the outer box is regularization holding dropout and early stopping, and the inner box is the weight-penalty family holding L2 and L1."
+  }
+ },
+ "examples": [
+  {
+   "question": "A network has a single weight w = 2.0 and no bias, and the data-loss gradient with respect to it is currently zero. L2 regularization uses λ = 0.01 and the learning rate is η = 0.1. (a) Find the penalty value. (b) Find the penalty's gradient contribution. (c) Find how much the weight moves in one step. (d) Give the weight after that step. (e) A hidden unit has activation 3.0 and dropout uses p = 0.5; give its scaled value when it survives the mask, and its expected activation over both masks.",
+   "steps": [
+    "(a) Penalty = (λ/2)·w² = (0.01/2)·2.0² = 0.005 × 4.0 = 0.02.",
+    "(b) Gradient of the penalty = λw = 0.01 × 2.0 = 0.02.",
+    "(c) The data gradient is zero, so the whole update comes from the penalty: η × 0.02 = 0.1 × 0.02 = 0.002.",
+    "(d) w ← 2.0 − 0.002 = 1.998. Check with the decay factor: (1 − ηλ) = 1 − 0.001 = 0.999, and 2.0 × 0.999 = 1.998.",
+    "(e) If the unit survives, its activation is divided by (1 − p) = 0.5, giving 3.0/0.5 = 6.0.",
+    "(e, continued) Expected activation = 0.5 × 6.0 + 0.5 × 0 = 3.0, the same as the un-dropped value."
+   ],
+   "answer": "Penalty 0.02, extra gradient 0.02, step 0.002, weight 1.998; surviving activation 6.0, expected activation 3.0.",
+   "check": "lam = 0.01\nw = 2.0\neta = 0.1\npenalty = (lam/2)*w**2\ngrad = lam*w\nstep = eta*grad\nw_new = w - step\np = 0.5\na = 3.0\nscaled = a/(1-p)\nexpected = (1-p)*scaled + p*0\nprint(round(penalty, 6))\nprint(round(grad, 6))\nprint(round(step, 6))\nprint(round(w_new, 6))\nprint(round(scaled, 6))\nprint(round(expected, 6))",
+   "values": [
+    0.02,
+    0.02,
+    0.002,
+    1.998,
+    6.0,
+    3.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Leaving dropout on at test time. The model keeps sampling masks, so the same input gives a different, random prediction on every call.",
+  "Forgetting the 1/(1 − p) scaling. Train-time activations then average a·(1 − p) against a at test time, and every downstream layer sees a shifted input.",
+  "Watching the training loss for early stopping. Training loss almost always keeps falling; the only useful signal is the validation loss, measured with dropout off.",
+  "Penalising bias terms and batch-norm scale and shift parameters. Bias shrinkage just moves activation thresholds, and normalisation parameters are normally excluded too.",
+  "Confusing λ with η in the factor (1 − ηλ). With λ = 0.01 and η = 0.1 the weight loses 0.1 % per step, not 1 %."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the L2 penalty term and its gradient with respect to one weight wᵢ.",
+   "marks": 2,
+   "a": "Penalty = (λ/2)·Σᵢ wᵢ², and its gradient with respect to wᵢ is λwᵢ. λ ≥ 0 is the penalty strength hyperparameter."
+  },
+  {
+   "level": "understand",
+   "q": "Why does inverted dropout divide surviving activations by (1 − p) during training instead of rescaling at test time?",
+   "marks": 3,
+   "a": "So the expected activation stays a: (1 − p)·a/(1 − p) = a. Test time is then the identity, with no rescaling and no mismatch between the scale seen in training and the scale seen at inference."
+  },
+  {
+   "level": "apply",
+   "q": "A weight is w = 1.5, its data-loss gradient is 0, λ = 0.02 and η = 0.1. Give the weight after one L2 step.",
+   "marks": 4,
+   "a": "Penalty gradient = λw = 0.02 × 1.5 = 0.03. Step = η × 0.03 = 0.1 × 0.03 = 0.003. So w ← 1.5 − 0.003 = 1.497. Check: (1 − ηλ) = 1 − 0.002 = 0.998, and 1.5 × 0.998 = 1.497."
+  },
+  {
+   "level": "apply",
+   "q": "Dropout uses p = 0.2. An activation of 5.0 survives the mask. What value is passed on, and what is the expected value over both masks?",
+   "marks": 3,
+   "a": "Surviving value = 5.0/(1 − 0.2) = 5.0/0.8 = 6.25. Expected value = 0.8 × 6.25 + 0.2 × 0 = 5.0, matching the plain activation."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain why L1 regularization produces weights that are exactly zero while L2 does not.",
+   "marks": 4,
+   "a": "The L1 gradient is λ·sign(w), a constant push towards zero, so the optimizer reaches zero and stays there whenever the data gradient is smaller than λ — zero lies in the subgradient interval at that point. The L2 gradient is λw, which vanishes as w approaches zero, so the weight keeps shrinking but never lands exactly on it."
+  },
+  {
+   "level": "analyze",
+   "q": "A student stops training when the training loss stops improving, and keeps the weights from the last epoch. Give two things wrong with this.",
+   "marks": 5,
+   "a": "First, training loss keeps falling as the model overfits, so it is a poor stopping signal; early stopping must track validation loss. Second, the best point is the minimum of the validation curve, so the weights from that epoch must be saved and restored, not the weights from the epoch where the counter ran out."
+  }
+ ],
+ "beyond": "Not for the exam. Adversarial training — adding small worst-case perturbations to inputs during training — is a regularizer for robustness, and only a few universities cover it in a deep-learning course; most meet it in later security or robustness electives. Weight decay interacts with adaptive optimizers: in the Adam family it is usually decoupled, so the shrink is not divided by the running second moment of the gradient. Topics to search next: dropout variants such as spatial dropout for CNNs and variational dropout, stochastic depth for very deep networks, and label smoothing as another cheap loss-based regularizer."
+}

@@ -1,0 +1,563 @@
+{
+ "lead": "This unit is about how a deep network's weights actually get set: the optimizers that take the steps, the failures that stop those steps from working, and the controls that keep the model from memorizing. After it you can derive the update rule of gradient descent, momentum, AdaGrad, RMSProp and Adam, compute one step of each by hand, explain why deep gradients vanish or explode, and choose initialization, normalization, regularization and tuning settings for a training run.",
+ "about": "The unit follows one training run from the first step to the final model choice. Chapter 2.1 sets the baseline, plain gradient descent, and lists where it fails; 2.2 makes each step cheaper with mini-batches; 2.3 and 2.4 add momentum and per-parameter step sizes. Chapter 2.5 explains why gradients in deep stacks vanish or explode, and 2.6 and 2.7 give two structural fixes, careful initialization and batch normalization. Chapter 2.8 covers regularization, dropout and early stopping, and 2.9 closes with dataset augmentation and the practical work of tuning hyperparameters on a validation split. Every chapter ends with the numbers of a small worked step, so the formulas can be checked by hand.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Move every parameter a small step opposite the gradient, with one fixed step size for all of them, and repeat.",
+   "depth": "The update θ ← θ − η∇L(θ): θ is the whole parameter vector, L is the average loss over all N training samples, and η is the learning rate (same units as θ). Cover the loop: forward pass over the full dataset, backpropagation, one update, check convergence. Some syllabi call this batch gradient descent or steepest descent. List the limitations: one update per full pass, so slow on large data; a single η for parameters that need very different scales; slow crawling along narrow ravines; stalling on flat regions and saddle points; divergence when η is too large. Mention the standard heuristics for bad local minima, random restarts and added noise, and say that 2.2 develops the noise idea.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One gradient descent step",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Full dataset",
+      "note": "all N samples",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Forward pass",
+      "note": "compute loss L",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Backprop gradient",
+      "note": "average over N",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Update theta",
+      "note": "θ ← θ − η∇L",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Loss flat?",
+      "note": "stop if yes",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "b",
+      "label": "no",
+      "style": "dashed"
+     }
+    ],
+    "caption": "One pass over all the data gives exactly one gradient and one weight update; the back edge is the next pass.",
+    "aria": "A flowchart from the full dataset through forward pass, backpropagated gradient and weight update, with a decision box that loops back when the loss is still falling."
+   },
+   "example": "Take L(θ) = θ², so ∇L = 2θ. Start at θ₀ = 4 with η = 0.1: θ₁ = 4 − 0.1 × 8 = 3.2, then θ₂ = 3.2 − 0.1 × 6.4 = 2.56, θ₃ = 2.048. Each step multiplies θ by |1 − 2η| = 0.8, so the loss falls by a factor 0.64 per step. Now take η = 1.1: the factor is |1 − 2.2| = 1.2, so θ goes 4 → 4.8 → 5.76 and the loss grows without bound.",
+   "trap": "Reading a too-large learning rate as a local minimum. A loss curve that jumps up and down, or turns into NaN, is divergence, not a bad minimum. Also, one epoch here is one step, not many.",
+   "prereq": "Unit 1: loss functions, forward propagation and backpropagation.",
+   "leave": "Mini-batch and noisy gradients to 2.2, momentum to 2.3, per-parameter step sizes to 2.4. Sigmoid, tanh and ReLU definitions stay in Unit 1."
+  },
+  {
+   "k": 2,
+   "idea": "Estimate the gradient from a small random batch, so each step is cheap and the noise itself helps the search.",
+   "depth": "Plain SGD uses one sample per step (some syllabi call it on-line learning); mini-batch gradient descent uses B samples, usually a power of two such as 32, 64, 128 or 256 for hardware efficiency. Define epoch (one pass over all N samples) and iteration (one update); iterations per epoch = N/B. Shuffle the order every epoch. The mini-batch gradient is an unbiased estimate of the full gradient with variance σ²/B if σ² is the single-sample gradient variance, which is why the noise shrinks as B grows and why the noise shakes the run out of saddles and flat regions. State the linear scaling heuristic: multiply B by k, try multiplying η by k.",
+   "figure": {
+    "type": "array",
+    "title": "One epoch, batch size 4, 12 samples",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Epoch 1",
+      "cells": [
+       "7",
+       "3",
+       "11",
+       "2",
+       "9",
+       "5",
+       "12",
+       "1",
+       "8",
+       "4",
+       "10",
+       "6"
+      ],
+      "marks": {
+       "0": "accent",
+       "4": "live",
+       "8": "next"
+      }
+     },
+     {
+      "label": "Epoch 2",
+      "cells": [
+       "5",
+       "12",
+       "4",
+       "8",
+       "1",
+       "10",
+       "3",
+       "7",
+       "6",
+       "2",
+       "11",
+       "9"
+      ],
+      "marks": {
+       "0": "accent",
+       "4": "live",
+       "8": "next"
+      }
+     }
+    ],
+    "caption": "Three batches of four samples make one epoch; the order is reshuffled before the next epoch starts.",
+    "aria": "Two rows of twelve sample indices, each row split into three groups of four, with the second row in a different order from the first."
+   },
+   "example": "N = 1000 training samples with B = 100 gives 10 iterations per epoch, so 20 epochs give 200 weight updates; full-batch gradient descent on the same data gives only 20 updates. If one sample's gradient has variance 0.4, the batch mean has variance 0.4/100 = 0.004 and standard deviation √0.004 ≈ 0.063, so the step direction is noisy but not random.",
+   "trap": "Treating an epoch as one iteration, and then comparing 'SGD steps' with 'gradient descent epochs'. Not shuffling, so every epoch presents the classes in the same order. Forgetting that a very small batch makes the gradient estimate itself unreliable.",
+   "prereq": "2.1 for the update rule and the learning rate.",
+   "leave": "Momentum to 2.3; learning-rate schedules and batch-size search to 2.9; the bias-variance view of this noise to Unit 1."
+  },
+  {
+   "k": 3,
+   "idea": "Accumulate past gradients into a velocity so steady directions speed up and zig-zag directions cancel.",
+   "depth": "Momentum (also called the heavy-ball method): v ← βv + η∇L(θ), then θ ← θ − v, with β around 0.9. The velocity sums roughly the last 1/(1 − β) ≈ 10 gradients, so in a consistent direction the effective step is about η/(1 − β) — raising β acts like raising η. Nesterov accelerated gradient (NAG; some syllabi spell the name Nestrov) evaluates the gradient at the look-ahead point θ − βv instead of at θ, so the correction happens before the overshoot. Cover both forms, what β means, and the extra memory (one velocity per parameter).",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "step k",
+     "min": 1,
+     "max": 10
+    },
+    "y": {
+     "label": "position θ",
+     "min": 0,
+     "max": 10
+    },
+    "series": [
+     {
+      "name": "GD, η = 0.1",
+      "expr": "0.2*x",
+      "style": "muted"
+     },
+     {
+      "name": "momentum, β = 0.9",
+      "expr": "2*x - 18*(1-0.9**x)",
+      "style": "accent"
+     }
+    ],
+    "caption": "With a constant gradient of 2, the momentum run covers more ground every step and pulls away from plain gradient descent.",
+    "aria": "A line plot of position against step number, where the straight line for plain gradient descent rises slowly and the momentum curve rises faster and faster."
+   },
+   "example": "Constant gradient g = 2, η = 0.1, β = 0.9, starting from v = 0. v₁ = 0.9 × 0 + 0.1 × 2 = 0.2; v₂ = 0.9 × 0.2 + 0.2 = 0.38; v₃ = 0.9 × 0.38 + 0.2 = 0.542. Positions after three steps are 0.2, 0.58 and 1.122, against 0.2, 0.4 and 0.6 for plain gradient descent with the same η. The steady-state velocity is ηg/(1 − β) = 0.2/0.1 = 2, ten times the plain step.",
+   "trap": "Mishandling η in the velocity term (writing βv + ∇L and then also multiplying by η in the update), which silently changes the learning rate. Comparing momentum with plain gradient descent at the same η without noting the 1/(1 − β) factor. In NAG the gradient is taken at the look-ahead point, not at the current θ.",
+   "prereq": "2.1 and 2.2.",
+   "leave": "Adaptive per-parameter step sizes to 2.4; why deep chains need this in the first place to 2.5."
+  },
+  {
+   "k": 4,
+   "idea": "Give every parameter its own step size, computed from a running summary of that parameter's own gradients.",
+   "depth": "AdaGrad: s ← s + g², θ ← θ − η g/(√s + ε). The accumulator s only grows, so steps shrink and training can stall. RMSProp: s ← ρs + (1 − ρ)g² with ρ = 0.9, a leaky average that forgets old gradients. Adam: m ← β₁m + (1 − β₁)g, v ← β₂v + (1 − β₂)g², bias corrected as m̂ = m/(1 − β₁ᵗ) and v̂ = v/(1 − β₂ᵗ) at step t, then θ ← θ − η m̂/(√v̂ + ε), with defaults β₁ = 0.9, β₂ = 0.999, ε = 1e-8. Explain the job of ε (no division by zero, damps tiny gradients) and add one line that AdamW decouples weight decay from the adaptive step, a detail only a few universities teach.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One Adam step",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Gradient g",
+      "note": "one parameter",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "First moment m",
+      "note": "β₁ = 0.9",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Second moment v",
+      "note": "β₂ = 0.999",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Bias correction",
+      "note": "m/(1−β₁ᵗ), v/(1−β₂ᵗ)",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "Update θ",
+      "note": "η m̂/(√v̂ + ε)",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "a",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     }
+    ],
+    "caption": "Adam keeps two running averages per parameter and corrects both before dividing them into the step.",
+    "aria": "A flowchart where one gradient feeds a mean accumulator and a squared-gradient accumulator, both pass through bias correction, and the result sets the parameter update."
+   },
+   "example": "Adam with η = 0.01, β₁ = 0.9, β₂ = 0.999 and gradient g = 1 at both t = 1 and t = 2. At t = 1: m = 0.1, v = 0.001, m̂ = 0.1/(1 − 0.9) = 1, v̂ = 0.001/(1 − 0.999) = 1, step = 0.01 × 1/(1 + 1e-8) ≈ 0.01. At t = 2: m = 0.19, v = 0.001999, m̂ = 0.19/(1 − 0.81) = 1, v̂ = 0.001999/(1 − 0.998001) = 1, step ≈ 0.01 again. The first steps are about η whatever the gradient size.",
+   "trap": "Skipping bias correction, which makes the first Adam steps far too small. Dividing by s instead of √s in AdaGrad and RMSProp. Copying a learning rate across optimizers: η = 0.001 suits Adam, while η = 0.1 often suits SGD with momentum.",
+   "prereq": "2.3 for the running-average idea; the chain rule from Unit 1 for where g comes from.",
+   "leave": "Choosing and scheduling η and the decay rates to 2.9; weight decay as a regularizer to 2.8."
+  },
+  {
+   "k": 5,
+   "idea": "Backpropagation multiplies one Jacobian per layer, so a long product of small factors vanishes and a product of large factors explodes.",
+   "depth": "The gradient with respect to an early layer is a product of L Jacobians, so its scale behaves like the product of the per-layer factors. The sigmoid derivative is at most 0.25, so a plain sigmoid stack shrinks the signal by 0.25ᴸ; per-layer factors above 1 blow up the same way. Symptoms: early layers barely move (vanishing) or the loss becomes NaN (exploding). Give the mitigations as pointers, not lessons: ReLU from Unit 1, He initialization in 2.6, batch normalization in 2.7, gradient-norm clipping to a threshold c, residual connections in Unit 3, gated units such as LSTM in Unit 4.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "layers L",
+     "min": 1,
+     "max": 5
+    },
+    "y": {
+     "label": "product of factors",
+     "min": 0,
+     "max": 8
+    },
+    "series": [
+     {
+      "name": "factor 0.25",
+      "expr": "0.25**x",
+      "style": "muted"
+     },
+     {
+      "name": "factor 1.0",
+      "expr": "1.0**x",
+      "style": "next"
+     },
+     {
+      "name": "factor 1.5",
+      "expr": "1.5**x",
+      "style": "live"
+     }
+    ],
+    "caption": "Multiplying by 0.25 per layer kills the gradient within a few layers, while a factor above 1 makes it grow past any stable value.",
+    "aria": "A line plot over five layers showing one curve falling almost to zero, one flat line, and one curve climbing steeply above the others."
+   },
+   "example": "A 10-layer chain whose per-layer Jacobian factor is 0.25 gives 0.25¹⁰ ≈ 9.5 × 10⁻⁷, so a gradient of 1 at the output reaches the first layer as roughly one-millionth of that. With a factor of 1.5 the product is 1.5¹⁰ ≈ 57.7. Clipping: a gradient vector of norm 12 with threshold c = 5 is multiplied by 5/12, so its norm becomes 5 and its direction is unchanged.",
+   "trap": "Calling any flat training curve a vanishing gradient: dead ReLU units, too small a learning rate and saturated output layers look identical. Clipping fixes only exploding gradients and never a vanishing one. Check whether the question wants the per-layer factor or the full L-fold product.",
+   "prereq": "Backpropagation in Unit 1; 2.1 for what happens to the gradient afterwards.",
+   "leave": "Sigmoid, tanh and ReLU formulas to Unit 1; ResNet skip connections to Unit 3; LSTM gates to Unit 4; the normalization fix to 2.7."
+  },
+  {
+   "k": 6,
+   "idea": "Choose the starting spread of each weight matrix so activations and gradients keep roughly the same scale layer after layer.",
+   "depth": "All-zero or all-equal weights keep every hidden unit identical, so random initialization is what breaks symmetry. Define fan_in (number of inputs to a unit) and fan_out (number of units it feeds). Xavier or Glorot initialization for tanh and sigmoid: Var = 2/(n_in + n_out), with a uniform form in ±√(6/(n_in + n_out)). He or Kaiming initialization for ReLU: Var = 2/n_in. Biases start at zero. Mention orthogonal initialization for very deep stacks as an option only a few universities teach, and note that a wrong scale simply re-creates the problem of 2.5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "He initialization for one layer",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Count fan-in",
+      "note": "n_in inputs",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Set variance",
+      "note": "2/n_in for ReLU",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Sample weights",
+      "note": "normal, mean 0",
+      "style": "live"
+     },
+     {
+      "id": "d",
+      "label": "Zero the biases",
+      "note": "b = 0",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     }
+    ],
+    "caption": "The fan-in of the layer alone decides the variance of its initial weights when the activation is ReLU.",
+    "aria": "A four-step left-to-right flow: count the inputs, set the variance to two over the fan-in, draw the weights from a zero-mean normal, and set all biases to zero."
+   },
+   "example": "A layer with n_in = 100 inputs and fan_out = 50 units, so n_in + n_out = 150. He: Var = 2/100 = 0.02, standard deviation √0.02 ≈ 0.141. Xavier: Var = 2/150 ≈ 0.0133, standard deviation ≈ 0.115. He therefore draws visibly larger weights, which is what ReLU needs because it sets about half the inputs to zero.",
+   "trap": "Using Xavier with ReLU (too small, gradients shrink) or He with tanh (too large, activations saturate). Swapping n_in and n_out in the formula. Randomly initializing the biases, which adds noise and fixes nothing.",
+   "prereq": "2.5 for why the scale matters; Unit 1 for layer shapes and fan-in.",
+   "leave": "Normalizing activations during training to 2.7; choosing the activation function itself to Unit 1."
+  },
+  {
+   "k": 7,
+   "idea": "Normalize each layer's pre-activations across the mini-batch, then let the network learn a scale and a shift for them.",
+   "depth": "For one pre-activation z with B values in the batch: μ = (1/B)Σz, σ² = (1/B)Σ(z − μ)², ẑ = (z − μ)/√(σ² + ε), and output y = γẑ + β, where γ and β are learned per feature and ε is a small constant for stability. It is placed before the activation. Training uses the current batch statistics; inference uses a running average (an exponential moving average, common decay 0.9), so a prediction never depends on the other items in its batch. Benefits: larger learning rates survive, initialization matters less, and the batch noise regularizes a little. Costs: extra computation, dependence on batch size, awkward for tiny batches. Mention that LayerNorm is the batch-independent cousin, used in Unit 5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Batch normalization in one layer",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Batch values z",
+      "note": "B samples per feature",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Mean and variance",
+      "note": "across the batch",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Normalize",
+      "note": "(z − μ)/√(σ² + ε)",
+      "style": "live"
+     },
+     {
+      "id": "d",
+      "label": "Scale and shift",
+      "note": "γẑ + β, both learned",
+      "style": "next"
+     },
+     {
+      "id": "e",
+      "label": "Activation",
+      "note": "ReLU or similar",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Running averages",
+      "note": "used at inference",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "f",
+      "style": "dashed"
+     }
+    ],
+    "caption": "The batch mean and variance are used while training and also collected into running averages that inference reuses.",
+    "aria": "A vertical flow from batch values through batch mean and variance, normalization, learned scale and shift, and the activation, with a dashed side branch storing running averages."
+   },
+   "example": "Pre-activations in one mini-batch, z = [1, 3, 5, 7]. μ = 4, and σ² = ((1−4)² + (3−4)² + (5−4)² + (7−4)²)/4 = 20/4 = 5, so σ = 2.236. Normalized values: (1 − 4)/2.236 = −1.34, −0.45, 0.45 and 1.34. With γ = 1 and β = 0 the output is exactly this list, with mean 0 and variance 1.",
+   "trap": "Using the current batch's statistics at test time, so a single prediction changes with its batch-mates. Normalizing after the activation instead of before. Treating γ and β as fixed constants rather than parameters learned by the same gradient steps.",
+   "prereq": "2.5 and 2.6 for the instability it fixes.",
+   "leave": "LayerNorm and transformer blocks to Unit 5; normalization inside convolutional layers to Unit 3."
+  },
+  {
+   "k": 8,
+   "idea": "Charge the model for complexity, in the loss, in the activations or in the number of training steps, so it cannot fit noise.",
+   "depth": "Weight penalties: L2 adds (λ/2)||w||² to the loss, whose gradient is λw, the weight-decay term; L1 adds λ||w||₁ and drives weights to exactly zero, giving sparsity. λ is a hyperparameter and bias terms are usually not penalized. Dropout: during training, zero each unit with probability p and scale the survivors by 1/(1 − p) (inverted dropout); at test time it is the identity. Typical p is 0.5 for hidden units and 0.1 to 0.2 for inputs. Early stopping: record validation loss every epoch, stop after the patience number of epochs without improvement, restore the best weights; in a simple quadratic case it behaves like an L2 penalty. One line that adversarial training is a robustness regularizer only a few universities teach.",
+   "figure": {
+    "type": "sets",
+    "mode": "nested",
+    "sets": [
+     {
+      "label": "Regularization",
+      "items": [
+       "Dropout",
+       "Early stopping"
+      ]
+     },
+     {
+      "label": "Weight penalty",
+      "items": [
+       "L2",
+       "L1"
+      ]
+     }
+    ],
+    "caption": "Weight penalties are one family inside regularization; the loss-based methods sit outside that inner box.",
+    "aria": "One box inside another: the outer box is regularization holding dropout and early stopping, and the inner box is the weight-penalty family holding L2 and L1."
+   },
+   "example": "L2 with λ = 0.01 and a single weight w = 2: penalty = (0.01/2) × 2² = 0.02 and its gradient is λw = 0.02, so with η = 0.1 the weight is pulled by 0.002 every step even when the data gradient is zero. Dropout with p = 0.5: an activation of 3 that survives is scaled to 3/(1 − 0.5) = 6, so its expected value across masks stays 3.",
+   "trap": "Leaving dropout on at test time, which makes predictions random, or forgetting the 1/(1 − p) scaling, which makes train and test scales differ. Stopping early on training loss instead of validation loss. Penalizing bias terms, which mostly reduces flexibility without reducing overfitting.",
+   "prereq": "Overfitting and the bias-variance trade-off in Unit 1; 2.7 for the other stabilizer used in the same models.",
+   "leave": "Cross-validation and the choice of λ and p to 2.9; dimensional reduction and autoencoder regularization to Unit 6; general overfitting theory to Unit 1."
+  },
+  {
+   "k": 9,
+   "idea": "Grow the training set with label-preserving changes, and search the settings that gradient descent cannot learn on a validation split.",
+   "depth": "Augmentation for images: flips, random crops, small rotations, colour jitter, cutout, and mixup as an advanced extra. For audio: time shifts and added noise. For text: paraphrasing or back-translation, used with care. The rule is that the label must survive the change, and augmented copies go only into the training set. Distinguish hyperparameters (learning rate η, batch size B, weight decay λ, dropout p, depth) from parameters learned by gradient descent. Tuning: split off a validation set, grid search with the learning rate on a log scale, random search which usually finds a good configuration in fewer runs, coarse-to-fine refinement, and the same seed and epoch budget for every run. Mention step decay and cosine schedules, and note that Bayesian optimization is advanced.",
+   "figure": {
+    "type": "array",
+    "title": "Grid search, 9 runs",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "lr 0.1",
+      "cells": [
+       "0.71",
+       "0.76",
+       "0.72"
+      ],
+      "marks": {}
+     },
+     {
+      "label": "lr 0.01",
+      "cells": [
+       "0.79",
+       "0.88",
+       "0.85"
+      ],
+      "marks": {
+       "1": "live"
+      }
+     },
+     {
+      "label": "lr 0.001",
+      "cells": [
+       "0.62",
+       "0.70",
+       "0.74"
+      ],
+      "marks": {}
+     }
+    ],
+    "caption": "Each cell is one validation accuracy for a learning rate and batch size pair; the middle run of the middle row is the best of the nine.",
+    "aria": "A three by three table of validation accuracies, one row per learning rate and one column per batch size, with the highest value marked in the centre."
+   },
+   "example": "A 3 × 3 grid of learning rates 0.1, 0.01, 0.001 against batch sizes 32, 128, 512 gives 9 runs of 10 epochs each on the same split. Validation accuracies come back as 0.71, 0.76, 0.72 for lr 0.1; 0.79, 0.88, 0.85 for lr 0.01; 0.62, 0.70, 0.74 for lr 0.001. The best is lr 0.01 with batch 128 at 0.88, so a finer grid at 0.03, 0.01, 0.003 follows, and the test set is scored once with the final model.",
+   "trap": "Tuning on the test set and then reporting that score as generalization. Augmenting the validation or test data, or using random crops at test time instead of one fixed centre crop. Comparing runs that used different epoch budgets or different seeds.",
+   "prereq": "2.2 for batch size and epochs, 2.4 for which optimizer settings to tune, 2.8 for λ and dropout p.",
+   "leave": "The bias-variance decomposition to Unit 1; PCA, autoencoders and dimensional reduction to Unit 6; transfer learning and fine-tuning to Unit 3."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "one full-batch step becomes many cheap noisy steps"
+  ],
+  [
+   2,
+   3,
+   "the noisy mini-batch gradient is what momentum averages"
+  ],
+  [
+   3,
+   4,
+   "running averages of gradients become per-parameter step sizes"
+  ],
+  [
+   1,
+   5,
+   "the chain rule behind one step explains the vanishing gradient"
+  ],
+  [
+   5,
+   6,
+   "a shrinking signal is first fixed by the initial weight scale"
+  ],
+  [
+   6,
+   7,
+   "normalization removes the remaining scale sensitivity"
+  ],
+  [
+   7,
+   8,
+   "both stabilize training, one by design and one by penalty"
+  ],
+  [
+   8,
+   9,
+   "λ and dropout p are exactly what the tuning loop searches"
+  ],
+  [
+   2,
+   9,
+   "batch size and epoch count are the other search knobs"
+  ]
+ ]
+}

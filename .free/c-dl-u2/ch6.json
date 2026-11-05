@@ -1,0 +1,241 @@
+{
+ "lead": "Weight initialization sets each weight matrix's starting spread before training. The aim is to keep activations and gradients at roughly the same scale layer after layer. Equal starting weights make all hidden units learn the same thing, so random draws are used to break symmetry. The correct variance depends on fan-in, fan-out and the activation function. This idea is used in every deep network, from a small classifier on a phone to a large language model.",
+ "prereq": "You need: <a href=\"#vanishing-and-exploding-gradients\">2.5</a> for why the scale matters, and Unit 1 for layer shapes and fan-in.",
+ "sections": [
+  {
+   "h3": "Symmetry and what fan-in means",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A dense layer computes z<sub>i</sub> = Σ<sub>j</sub> w<sub>ij</sub> x<sub>j</sub> + b<sub>i</sub>. Here x<sub>j</sub> is input j, w<sub>ij</sub> is the weight from input j to unit i, b<sub>i</sub> is the bias, and z<sub>i</sub> is the pre-activation. If every weight and bias starts equal, every hidden unit computes the same z<sub>i</sub> and the same activation. Backpropagation then sends the same gradient to each unit. A wide layer acts like one unit. Random draws break this symmetry."
+    },
+    {
+     "type": "p",
+     "text": "Fan-in n<sub>in</sub> is the number of inputs to one unit. Fan-out n<sub>out</sub> is the number of units that unit feeds. For a weight matrix W of shape n<sub>out</sub> × n<sub>in</sub>, each output unit has n<sub>in</sub> weights. A layer with 100 inputs and 50 ReLU units has n<sub>in</sub> = 100 and n<sub>out</sub> = 50. Fan-in controls how many terms add into z<sub>i</sub>. Fan-out controls how many places the gradient of one input goes. Both matter because the same matrix is used forward and backward."
+    },
+    {
+     "type": "p",
+     "text": "Randomness alone is not enough. The scale of the random draws sets the scale of z<sub>i</sub> and of the gradients. A too-small scale shrinks the signal. A too-large scale saturates tanh or sigmoid, or makes ReLU activations grow. The rules below keep variance near one through the stack."
+    }
+   ]
+  },
+  {
+   "h3": "Xavier for tanh and sigmoid, He for ReLU",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Use Xavier or Glorot initialization for tanh and sigmoid layers. It averages fan-in and fan-out:"
+    },
+    {
+     "type": "formula",
+     "text": "Var(W) = 2 / (n_in + n_out)",
+     "where": "Var(W) is the variance of each weight; n_in is fan-in; n_out is fan-out. Use this for tanh and sigmoid."
+    },
+    {
+     "type": "p",
+     "text": "The matching uniform form uses the same variance:"
+    },
+    {
+     "type": "formula",
+     "text": "W ~ U(-√(6/(n_in + n_out)), +√(6/(n_in + n_out)))",
+     "where": "U(a,b) is a uniform draw between a and b. The bound gives the same variance as the rule above."
+    },
+    {
+     "type": "p",
+     "text": "Here Var(W) is the variance of each weight, σ(W) = √Var(W) is its standard deviation, n<sub>in</sub> is fan-in, and n<sub>out</sub> is fan-out. The sum n<sub>in</sub> + n<sub>out</sub> balances the forward signal and the backward gradient. For tanh and sigmoid, this stops activations from collapsing or saturating."
+    },
+    {
+     "type": "p",
+     "text": "Use He or Kaiming initialization for ReLU layers. ReLU sets negative pre-activations to zero, so about half the inputs to a unit are inactive. The weights must be larger to keep the active signal at the same scale:"
+    },
+    {
+     "type": "formula",
+     "text": "Var(W) = 2 / n_in",
+     "where": "Var(W) is the weight variance; n_in is fan-in. Use this for ReLU."
+    },
+    {
+     "type": "p",
+     "text": "The matching uniform half-width is √(6/n<sub>in</sub>). Biases start at zero in both schemes. A zero bias adds no noise and lets the random weights do the symmetry breaking. Orthogonal initialization draws a matrix with orthonormal columns; only a few universities teach it, and it is an option for very deep stacks. A wrong scale brings back the shrinking or exploding gradients of <a href=\"#vanishing-and-exploding-gradients\">2.5</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Procedure and comparison",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "Read n<sub>in</sub> and n<sub>out</sub> from the layer shapes. n<sub>in</sub> is the previous layer width; n<sub>out</sub> is the current layer width.",
+      "Pick the rule by activation: Xavier for tanh or sigmoid, He for ReLU.",
+      "Compute the variance. Convert it to a standard deviation σ = √Var for normal draws.",
+      "Draw every weight independently from a zero-mean normal with that standard deviation, or use the matching uniform bound.",
+      "Set every bias to zero. Do not draw biases at random."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The table uses the worked example: n<sub>in</sub> = 100 and n<sub>out</sub> = 50. The uniform half-width is the bound a; draws lie in −a to +a."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Activation",
+      "Variance",
+      "Standard deviation",
+      "Uniform half-width"
+     ],
+     "rows": [
+      [
+       "tanh or sigmoid",
+       "2/(100+50) = 0.01333",
+       "√0.01333 ≈ 0.115",
+       "√(6/150) = 0.2"
+      ],
+      [
+       "ReLU",
+       "2/100 = 0.02",
+       "√0.02 ≈ 0.141",
+       "√(6/100) ≈ 0.245"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "He draws visibly larger weights than Xavier here. The ratio of standard deviations is √(0.02/0.01333) ≈ 1.22. That extra spread is what ReLU needs because roughly half its inputs are zeroed. Using Xavier with ReLU makes gradients shrink. Using He with tanh makes activations saturate. The initialization must match the activation."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "For the example layer, the fan-in fixes the variance at 0.02 and the standard deviation at 0.141; the weights are drawn around zero and the biases stay at zero.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "He initialization for one layer",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Count fan-in",
+     "note": "n_in = 100",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Set variance",
+     "note": "2/100 = 0.02",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Sample weights",
+     "note": "mean 0, sd 0.141",
+     "style": "live"
+    },
+    {
+     "id": "d",
+     "label": "Zero the biases",
+     "note": "b = 0",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    }
+   ],
+   "aria": "A four-step left-to-right flow: count 100 inputs, set variance to 2/100 = 0.02, draw weights with mean 0 and standard deviation 0.141, and set all biases to zero."
+  }
+ },
+ "examples": [
+  {
+   "question": "A fully connected layer receives n_in = 100 inputs and has n_out = 50 ReLU units. Compute the He initialization variance and standard deviation. Compute the Xavier variance and standard deviation for comparison. State which scheme draws larger weights and why.",
+   "steps": [
+    "List the layer sizes: n<sub>in</sub> = 100 and n<sub>out</sub> = 50, so n<sub>in</sub> + n<sub>out</sub> = 150.",
+    "For ReLU, He variance = 2/n<sub>in</sub> = 2/100 = 0.02. He standard deviation = √0.02 ≈ 0.141. Weights are dimensionless.",
+    "For tanh or sigmoid, Xavier variance = 2/(n<sub>in</sub> + n<sub>out</sub>) = 2/150 ≈ 0.01333. Xavier standard deviation = √0.01333 ≈ 0.115.",
+    "Compare the spreads: 0.141 > 0.115, so He draws larger weights. The ratio is 0.141/0.115 ≈ 1.22.",
+    "Reason: ReLU sets about half the pre-activations to zero, so fewer active terms add into each unit. Larger weights keep the active signal at a useful scale."
+   ],
+   "answer": "He variance = 0.02 with standard deviation ≈ 0.141; Xavier variance ≈ 0.01333 with standard deviation ≈ 0.115. He draws larger weights, as ReLU needs.",
+   "check": "import math\nvar_he = 2/100\nsd_he = math.sqrt(var_he)\nvar_x = 2/(100+50)\nsd_x = math.sqrt(var_x)\nprint(round(var_he, 6))\nprint(round(sd_he, 3))\nprint(round(var_x, 6))\nprint(round(sd_x, 3))",
+   "values": [
+    0.02,
+    0.141,
+    0.013333,
+    0.115
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using Xavier with ReLU, which makes weights too small and gradients shrink, or He with tanh, which makes weights too large and activations saturate.",
+  "Swapping n_in and n_out in the formula. Xavier uses their sum, so order does not matter there; He uses n_in only.",
+  "Randomly initializing biases. Biases start at zero; random bias adds noise and fixes no symmetry problem.",
+  "Confusing variance with standard deviation. A variance of 0.02 means a standard deviation of about 0.141, not 0.02.",
+  "Thinking any small random number is fine. The scale must match fan-in, fan-out and the activation, or the problem of 2.5 returns."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define fan-in and fan-out for a dense layer.",
+   "marks": 2,
+   "a": "Fan-in is the number of inputs to one unit, equal to the previous layer width. Fan-out is the number of units it feeds, equal to the current layer width."
+  },
+  {
+   "level": "remember",
+   "q": "What value should the biases take at initialization?",
+   "marks": 2,
+   "a": "Zero. Random biases add noise and do not break symmetry between units."
+  },
+  {
+   "level": "understand",
+   "q": "Why do all-zero hidden weights fail in a multilayer network?",
+   "marks": 3,
+   "a": "All hidden units compute the same output and receive the same gradient, so they stay identical. The hidden layer cannot learn different features."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Xavier use n_in + n_out instead of only n_in?",
+   "marks": 3,
+   "a": "It balances the forward activation scale, which depends on fan-in, with the backward gradient scale, which depends on fan-out."
+  },
+  {
+   "level": "apply",
+   "q": "A ReLU layer has n_in = 200. Give the He variance and standard deviation.",
+   "marks": 4,
+   "a": "Variance = 2/200 = 0.01. Standard deviation = √0.01 = 0.1."
+  },
+  {
+   "level": "apply",
+   "q": "For n_in = 100 and n_out = 50, give the Xavier uniform half-width. State the interval.",
+   "marks": 4,
+   "a": "Half-width = √(6/150) = √0.04 = 0.2. Weights lie in −0.2 to +0.2."
+  },
+  {
+   "level": "analyze",
+   "q": "A deep ReLU network is initialized with Xavier. Predict the symptom and explain the cause.",
+   "marks": 5,
+   "a": "Activations and gradients shrink layer by layer. Xavier gives variance 2/(n_in+n_out), which is smaller than the ReLU need 2/n_in, so each layer reduces the signal."
+  },
+  {
+   "level": "analyze",
+   "q": "A tanh network is initialized with He. What goes wrong?",
+   "marks": 5,
+   "a": "Weights are too large for tanh. Pre-activations saturate near the flat ends, gradients become small, and learning slows."
+  }
+ ],
+ "beyond": "Not for the exam. In practice, frameworks expose Xavier and He as one-line initializers, and transformer code often adds careful scaling for residual stacks. Researchers study how initialization interacts with depth, normalization and learning rate, for example in variance scaling and maximal update parameterization. Search for Kaiming initialization, orthogonal initialization, transformer initialization and muP if you meet very deep models. The main habit to keep is simple: match the starting variance to the fan-in, fan-out and activation."
+}
