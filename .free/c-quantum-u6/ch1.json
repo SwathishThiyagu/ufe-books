@@ -1,0 +1,240 @@
+{
+ "lead": "Many useful problems ask for a ground state: the lowest energy of a molecule, or the best cut of a graph. A variational quantum algorithm guesses a state with a short circuit of adjustable angles, measures its energy, and lets a classical optimiser update the angles until the energy stops falling. The shallow circuit suits noisy hardware. VQE targets molecules and materials; QAOA targets combinatorial costs such as MaxCut.",
+ "prereq": "You need eigenvalues and Hermitian matrices (Unit 1), measurement and expectation values (Unit 2), and rotation and CNOT circuits (Unit 3).",
+ "sections": [
+  {
+   "h3": "The variational principle gives an upper bound",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A Hermitian H has real eigenvalues; call the smallest E₀. For any state |ψ⟩, the average energy is ⟨H⟩ = ⟨ψ|H|ψ⟩. The variational principle says ⟨H⟩ ≥ E₀, with equality only for a ground state. Expand |ψ⟩ = Σₖ cₖ|Eₖ⟩ in eigenvectors. Then ⟨H⟩ = Σₖ |cₖ|²Eₖ ≥ E₀ Σₖ |cₖ|² = E₀, because squared amplitudes sum to 1."
+    },
+    {
+     "type": "p",
+     "text": "Every prepared state gives an upper bound. Push the bound down to approach E₀. The exact expectation ⟨H⟩ can never fall below E₀. A finite-shot estimate is random and can land on either side of the true value, which is why many shots are needed."
+    },
+    {
+     "type": "p",
+     "text": "The state comes from an ansatz: a fixed circuit with angles θ = (θ₁, θ₂, …) preparing |ψ(θ)⟩ = U(θ)|0…0⟩. Hardware-efficient ansätze use layers of RY(θ) and CNOTs; problem-inspired ansätze copy the physics, such as unitary coupled cluster for a molecule. Write H = Σₖ hₖPₖ, where Pₖ is a tensor product of I, X, Y, Z and hₖ is real. Then ⟨H⟩ = Σₖ hₖ⟨Pₖ⟩, each ⟨Pₖ⟩ estimated from shots. Shot noise falls as 1/√S: 1000 shots give about 0.03 error per term; chemical accuracy is 0.0016 hartree."
+    },
+    {
+     "type": "formula",
+     "text": "⟨H⟩ = ⟨ψ(θ)|H|ψ(θ)⟩ = Σₖ hₖ⟨Pₖ⟩ ≥ E₀",
+     "where": "θ are ansatz angles; hₖ and Pₖ are the coefficient and Pauli string of term k; ⟨Pₖ⟩ is its shot average; E₀ is the smallest eigenvalue of H."
+    },
+    {
+     "type": "p",
+     "text": "Quantum phase estimation (see Unit 4) reads an eigenvalue of H into ancilla qubits. Started from a state with large overlap on the ground state, and with enough ancillas, it returns E₀ with high probability; poor overlap can return an excited energy. It needs long coherent circuits and fault tolerance. Grover search and amplitude amplification (see Unit 4) speed up search problems such as finding a marked solution; they are not alternatives for ground-state energy estimation. Both are out of reach on noisy hardware today."
+    }
+   ]
+  },
+  {
+   "h3": "The hybrid loop: optimiser, gradients, plateaus",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "Choose an ansatz and starting angles θ₀, often small random values.",
+      "Run the circuit and measure one Pauli term of H over many shots; repeat for each term.",
+      "Multiply each average by its coefficient and add to estimate ⟨H⟩.",
+      "Give the estimate to a classical optimiser; it returns new angles θ.",
+      "Repeat until the energy changes by less than a tolerance; report θ* and E."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "∂⟨H⟩/∂θ = (⟨H⟩ at θ + π/2 − ⟨H⟩ at θ − π/2) ÷ 2",
+     "where": "the parameter-shift rule, valid when θ enters as e^(−iθP/2) with P a Pauli. Each shifted value is a full batch of shots. It is exact for the analytic expectation; no finite-difference error."
+    },
+    {
+     "type": "p",
+     "text": "COBYLA is derivative-free and copes with noise, so tutorials often start with it. SPSA estimates a gradient from two circuit evaluations whatever the parameter count, suiting wide noisy circuits. Parameter-shift gradient descent is common when the shot budget allows it."
+    },
+    {
+     "type": "p",
+     "text": "Barren plateaus: for random hardware-efficient ansätze the gradient of ⟨H⟩ shrinks exponentially with qubit count, so the optimiser stalls on a flat landscape rather than a minimum. Local cost functions, structured ansätze and informed initialisation help."
+    }
+   ]
+  },
+  {
+   "h3": "VQE on the hydrogen molecule",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "H₂ in a minimal basis has four spin orbitals, so four qubits in principle. Symmetry cuts it to 2 qubits after the Jordan–Wigner mapping. The electronic Hamiltonian has six Pauli terms: H = c₀I + c₁Z₀ + c₂Z₁ + c₃Z₀Z₁ + c₄X₀X₁ + c₅Y₀Y₁, with coefficients computed classically at the chosen bond length."
+    },
+    {
+     "type": "p",
+     "text": "The ansatz is a few layers of RY on both qubits and a CNOT between them, so four or six angles (two per layer). Z terms are read directly. X₀X₁ needs H on both qubits before measurement; Y₀Y₁ needs S† then H on both. Each term gets its own shots."
+    },
+    {
+     "type": "p",
+     "text": "Near equilibrium bond length 0.74 Å the exact ground energy in this basis is about −1.14 hartree. Hartree–Fock sits roughly 0.02 hartree higher; that difference is the correlation energy VQE recovers. Repeating at many bond lengths gives the potential curve; its minimum gives bond length and dissociation energy. Each extra spatial orbital adds qubits."
+    }
+   ]
+  },
+  {
+   "h3": "QAOA on MaxCut",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "MaxCut splits vertices into two sets so as many edges as possible cross. Write vertex spin zᵢ ∈ {+1, −1}; edge (i,j) is cut when zᵢ ≠ zⱼ, indicator (1 − zᵢzⱼ)/2. Replacing zᵢ by Zᵢ gives H_C = Σ over edges (1 − ZᵢZⱼ)/2. Its eigenvalues are cut sizes, so QAOA maximises ⟨H_C⟩, equivalently minimises −H_C."
+    },
+    {
+     "type": "p",
+     "text": "Start in |+⟩^⊗n, H on every qubit. Then p alternating layers: cost unitary U_C(γ)=e^(−iγH_C), a ZZ rotation on each edge; mixer U_X(β)=e^(−iβH_X) with H_X=ΣᵢXᵢ, one rotation per qubit. The 2p angles γ=(γ₁…γ_p), β=(β₁…β_p) are variational parameters; their count does not grow with the graph."
+    },
+    {
+     "type": "p",
+     "text": "Each ⟨ZᵢZⱼ⟩ is estimated from shots and summed for the classical optimiser. Report approximation ratio r = ⟨H_C⟩ ÷ C_max ≤ 1, where C_max is the largest cut. Even p=1 guarantees a ratio comfortably above ½ on 3-regular graphs; larger p approaches 1. QAOA is a special case of the quantum alternating operator ansatz, where the mixer fits constraints instead of being a plain X sum."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The loop every variational algorithm runs: re-execute the parameterised circuit with new angles until the measured energy stops falling.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Hybrid variational loop",
+   "aria": "A loop in which a parameterised circuit is run, its energy measured, and the angles updated by a classical optimiser until the energy stops falling.",
+   "nodes": [
+    {
+     "id": "start",
+     "label": "Start θ₀",
+     "note": "random angles"
+    },
+    {
+     "id": "circ",
+     "label": "Ansatz U(θ)",
+     "note": "p layers",
+     "style": "accent"
+    },
+    {
+     "id": "meas",
+     "label": "Measure ⟨H⟩",
+     "note": "many shots"
+    },
+    {
+     "id": "opt",
+     "label": "Classical optimiser",
+     "note": "updates θ"
+    },
+    {
+     "id": "check",
+     "label": "Energy settled?",
+     "style": "next"
+    },
+    {
+     "id": "ans",
+     "label": "θ*, E",
+     "note": "answer",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "start",
+     "to": "circ"
+    },
+    {
+     "from": "circ",
+     "to": "meas"
+    },
+    {
+     "from": "meas",
+     "to": "opt"
+    },
+    {
+     "from": "opt",
+     "to": "check"
+    },
+    {
+     "from": "check",
+     "to": "circ",
+     "label": "no",
+     "style": "live"
+    },
+    {
+     "from": "check",
+     "to": "ans",
+     "label": "yes"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "One qubit starts in |0⟩. RY(θ) prepares |ψ(θ)⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩, and H = Z. (a) Write ⟨H⟩(θ). (b) Find θ minimising it and the state. (c) Check the bound. (d) If 0 ≤ θ ≤ π/2, give the best energy and gap to E₀. (e) What does shot noise add?",
+   "steps": [
+    "Z|0⟩ = +|0⟩ and Z|1⟩ = −|1⟩, so H = Z has eigenvalues +1, −1; E₀ = −1, ground state |1⟩.",
+    "⟨H⟩ = cos²(θ/2)(+1) + sin²(θ/2)(−1) = cos θ.",
+    "cos θ is smallest at θ = π, giving −1. The state is cos(π/2)|0⟩ + sin(π/2)|1⟩ = |1⟩.",
+    "The bound is tight here. For every θ, cos θ ≥ −1.",
+    "On 0 ≤ θ ≤ π/2, cos θ falls from 1 to 0; best is 0 at θ = π/2, state |+⟩. Gap = 0 − (−1) = 1 energy unit.",
+    "With S = 100 shots, the standard deviation of measured ⟨Z⟩ is about 1/√100 = 0.1 energy unit. A finite-shot estimate is random and can land on either side of the true ⟨H⟩; more shots shrink noise but cannot remove the gap in (d)."
+   ],
+   "answer": "⟨H⟩ = cos θ, minimised at θ = π with −1 energy unit = E₀, so the bound is tight; restricting θ to [0, π/2] leaves a gap of 1 energy unit.",
+   "check": "import math\n\ndef energy(theta):\n    return math.cos(theta / 2) ** 2 - math.sin(theta / 2) ** 2\n\nprint(round(energy(math.pi), 6))\nprint(round(energy(math.pi / 2), 6))\nprint(round(energy(math.pi / 2) - energy(math.pi), 6))",
+   "values": [
+    -1.0,
+    0.0,
+    1.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Treating the optimiser's output as exact. The variational principle promises only ⟨H⟩ ≥ E₀; a weak ansatz or local minimum leaves a gap no extra shots can close.",
+  "Sign slip in MaxCut: H_C = Σ (1 − ZᵢZⱼ)/2 is maximised. Its ground state is the worst cut, not the best one.",
+  "Believing the parameter-shift rule is a finite difference. It uses two runs at θ ± π/2 and gives the exact derivative of the analytic expectation value; only shot noise is left, not a finite-difference approximation error.",
+  "Mixing up the two algorithms. VQE minimises a Hamiltonian energy from chemistry or physics; QAOA alternates a cost unitary with a mixer and is a special case of the alternating operator ansatz.",
+  "Forgetting basis changes. X and Y Pauli terms must be measured after H or S†H rotations; reading them in the Z basis gives a meaningless number."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the variational principle and name the quantity it bounds.",
+   "marks": 2,
+   "a": "For any state |ψ⟩ and Hermitian H with smallest eigenvalue E₀, ⟨ψ|H|ψ⟩ ≥ E₀. It bounds E₀ from above."
+  },
+  {
+   "level": "understand",
+   "q": "Why write H as a sum of Pauli strings, and how is ⟨H⟩ built?",
+   "marks": 3,
+   "a": "Pauli strings have eigenvalues ±1 and are easy to measure. Linearity gives ⟨H⟩ = Σₖ hₖ⟨Pₖ⟩; each ⟨Pₖ⟩ is shot-averaged after any basis rotation, then weighted and summed."
+  },
+  {
+   "level": "understand",
+   "q": "What is a barren plateau and why does it matter?",
+   "marks": 3,
+   "a": "For random deep ansätze the gradient of ⟨H⟩ falls exponentially with qubit count, so the landscape is nearly flat and the optimiser cannot choose a direction. Training cost grows exponentially unless local costs, structured ansätze or good initialisation are used."
+  },
+  {
+   "level": "apply",
+   "q": "Using |ψ(θ)⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩ and H = Z, evaluate ⟨H⟩ at θ = π/2 and θ = 0.",
+   "marks": 4,
+   "a": "⟨H⟩ = cos θ. At θ = π/2, ⟨H⟩ = 0 (state |+⟩). At θ = 0, ⟨H⟩ = 1 (state |0⟩). Both are ≥ E₀ = −1."
+  },
+  {
+   "level": "apply",
+   "q": "A 4-cycle graph 1-2-3-4-1 is solved by QAOA. Write H_C, state C_max, and give r for ⟨H_C⟩ = 3.",
+   "marks": 4,
+   "a": "H_C = (1 − Z₁Z₂)/2 + (1 − Z₂Z₃)/2 + (1 − Z₃Z₄)/2 + (1 − Z₄Z₁)/2. The best cut scores 4, so C_max = 4 and r = 3/4 = 0.75."
+  },
+  {
+   "level": "apply",
+   "q": "A VQE run gives 2000 shots per Pauli term and standard deviation 0.02. How many shots give 0.005?",
+   "marks": 4,
+   "a": "Error scales as 1/√S. To divide the error by 4, multiply shots by 16: S = 2000 × 16 = 32000 shots."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare VQE with quantum phase estimation for a molecular ground energy on today's hardware.",
+   "marks": 6,
+   "a": "Quantum phase estimation (QPE; see Unit 4) reads an eigenvalue of H into ancillas. With large ground-state overlap and enough ancillas it returns E₀ with high probability; poor overlap can return an excited energy. It needs long coherent circuits and fault tolerance. VQE uses a short parameterised circuit plus repeated measurement and a classical optimiser, suiting noisy devices. Its price is an upper bound only: ansatz limits, local minima or shot noise can leave it above E₀; QPE avoids that but demands fault tolerance."
+  }
+ ],
+ "beyond": "Not for the exam. ADAPT-VQE grows the circuit one operator at a time, keeping terms that lower the energy. Grouping commuting Pauli terms and classical shadows cut the shot bill. Error mitigation—zero-noise extrapolation, readout correction—sits between hardware and optimiser. Search next for ADAPT-VQE, qubit-ADAPT, parameter-shift rule and barren plateau mitigation."
+}

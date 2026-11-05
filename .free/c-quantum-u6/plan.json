@@ -1,0 +1,339 @@
+{
+ "lead": "This unit shows how a quantum circuit is trained, not just run once: a shallow circuit with adjustable angles, measured, and tuned by a classical computer, becomes a molecule's energy, a classifier, or a schedule. By the end you can write the VQE and QAOA loop, compute a quantum kernel by hand, turn a rupee problem into qubits, and say plainly which industry claims are real today.",
+ "about": "Chapter 6.1 builds the one pattern the whole unit uses: a shallow circuit with adjustable angles, measured, fed back to a classical optimiser that turns the angles. VQE and QAOA are its two faces — ground-state energy and combinatorial cost. Chapter 6.2 replaces the energy with a loss and gives the quantum SVM, where a circuit defines a kernel, plus hybrid quantum-classical networks. Chapter 6.3 takes those models to language and vision, at the small scale today's hardware allows. Chapter 6.4 shows where industry applies them: power grids, portfolios, drug molecules. Chapter 6.5 closes with what a large quantum computer does to cryptography, and the fairness questions that follow.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A shallow parameterised quantum circuit is trained by a classical optimiser to minimise a measured energy — VQE does this for molecules, QAOA for combinatorial cost functions.",
+   "depth": "Start with the variational principle: for any state the measured energy satisfies ⟨H⟩ ≥ E₀, the true ground energy, so a good ansatz plus a good optimiser gives an upper bound you push down. Define the ansatz (hardware-efficient layers of RY and CNOT, or problem-inspired layers), the cost Hamiltonian H built from Pauli Z terms, and the estimate of ⟨H⟩ from many shots. Explain the classical loop: COBYLA and SPSA as common optimisers, the parameter-shift rule to get gradients from circuit runs, and barren plateaus in one short paragraph (gradients vanish as qubit count grows). Do VQE concretely on H₂ in a minimal basis: 2 qubits, a few Pauli terms, energy in hartree. Do QAOA on MaxCut: cost unitary e^(−iγH_C), mixer e^(−iβH_X), p layers, angles (γ,β) optimised, approximation ratio defined. Some syllabi call the whole family variational quantum algorithms (VQA), and QAOA a quantum alternating operator ansatz. Add one paragraph each on the two exact alternatives: the quantum phase estimation algorithm (QPEA) gives the exact eigenvalue when the machine is fault tolerant, and Grover diffusion / amplitude amplification speeds up the search over candidate solutions — both derived in Unit 4, only their role here matters.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Hybrid variational loop",
+    "aria": "A loop in which a parameterised circuit is run, its energy measured, and the angles updated by a classical optimiser until the energy stops falling.",
+    "nodes": [
+     {
+      "id": "start",
+      "label": "Start θ₀",
+      "note": "random angles"
+     },
+     {
+      "id": "circ",
+      "label": "Ansatz U(θ)",
+      "note": "p layers of gates",
+      "style": "accent"
+     },
+     {
+      "id": "meas",
+      "label": "Measure ⟨H⟩",
+      "note": "average many shots"
+     },
+     {
+      "id": "opt",
+      "label": "Classical optimiser",
+      "note": "updates θ"
+     },
+     {
+      "id": "check",
+      "label": "Energy settled?",
+      "style": "next"
+     },
+     {
+      "id": "ans",
+      "label": "θ*, E",
+      "note": "variational answer",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "start",
+      "to": "circ"
+     },
+     {
+      "from": "circ",
+      "to": "meas"
+     },
+     {
+      "from": "meas",
+      "to": "opt"
+     },
+     {
+      "from": "opt",
+      "to": "check"
+     },
+     {
+      "from": "check",
+      "to": "circ",
+      "label": "no",
+      "style": "live"
+     },
+     {
+      "from": "check",
+      "to": "ans",
+      "label": "yes"
+     }
+    ]
+   },
+   "example": "One qubit starts in |0⟩. An RY(θ) gate prepares |ψ(θ)⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩ and the cost Hamiltonian is H = Z. Write ⟨H⟩ as a function of θ, find the θ that minimises it, and check the variational bound. Answer: ⟨Z⟩ = cos²(θ/2) − sin²(θ/2) = cos θ. The minimum −1 is at θ = π, giving |1⟩. The exact ground energy of Z is −1, so here the bound is tight; a coarser ansatz would stop above −1.",
+   "trap": "Treating the optimiser's output as the exact answer. The variational principle only promises E_measured ≥ E_exact, so a weak ansatz or a local minimum leaves a gap that no extra shots can close.",
+   "prereq": "Unit 1 (eigenvalues, Hermitian matrices), Unit 2 (measurement, expectation values), Unit 3 (circuits and gates).",
+   "leave": "QPEA, Grover and amplitude amplification are derived in Unit 4; molecular basis sets and Hamiltonian simulation are not needed here."
+  },
+  {
+   "k": 2,
+   "idea": "Encode classical data into a quantum state with a feature-map circuit; the overlap of two encoded states is a kernel estimated on hardware, while margins, support vectors and weight updates stay classical.",
+   "depth": "Recap the classical SVM briefly: separating hyperplane w·x + b = 0, margin 2/‖w‖, the kernel trick K(x,x′) = φ(x)·φ(x′), and the dual with multipliers α that are nonzero only for support vectors. Then the quantum step: a feature map U_φ(x) is a circuit whose gates carry the data values; the fidelity kernel is K(x,x′) = |⟨0…0| U_φ(x)† U_φ(x′) |0…0⟩|², estimated by running the circuit and reading the probability of measuring all zeros. Stress that K must be real and positive semidefinite, that the kernel matrix costs O(N²) circuit runs for N data points, and that kernel concentration (values bunching near a constant) destroys the advantage as qubits grow. Then the hybrid model: a circuit with trainable angles θ plus data re-uploading, a loss such as mean squared error or cross-entropy, gradients by the parameter-shift rule, and a classical layer after measurement. Some syllabi call the network a quantum neural network (QNN) and the method quantum kernel methods.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Quantum kernel SVM",
+    "aria": "A pipeline that encodes data points into qubits, estimates their overlap, fills a kernel matrix and hands it to a classical SVM, looping back for each new pair of points.",
+    "nodes": [
+     {
+      "id": "data",
+      "label": "Data x"
+     },
+     {
+      "id": "enc",
+      "label": "Feature map U_φ(x)",
+      "note": "encode x into qubits",
+      "style": "accent"
+     },
+     {
+      "id": "ov",
+      "label": "Measure overlap",
+      "note": "probability of all zeros",
+      "style": "live"
+     },
+     {
+      "id": "k",
+      "label": "Kernel matrix K"
+     },
+     {
+      "id": "svm",
+      "label": "Classical SVM",
+      "note": "margin and support vectors"
+     }
+    ],
+    "edges": [
+     {
+      "from": "data",
+      "to": "enc"
+     },
+     {
+      "from": "enc",
+      "to": "ov"
+     },
+     {
+      "from": "ov",
+      "to": "k"
+     },
+     {
+      "from": "k",
+      "to": "svm"
+     },
+     {
+      "from": "svm",
+      "to": "ov",
+      "label": "next pair x, x′",
+      "style": "dashed"
+     }
+    ]
+   },
+   "example": "One qubit encodes each point with U_φ(x) = RY(2x), so |φ(x)⟩ = cos x|0⟩ + sin x|1⟩ and K(x,x′) = cos²(x − x′). Compute K(0, π/4), then the 3×3 kernel matrix for x = 0, π/4, π/2, and check that it is positive semidefinite. Answer: K(0, π/4) = cos²(π/4) = 0.5. The matrix is rows [1, 0.5, 0], [0.5, 1, 0.5], [0, 0.5, 1]; its eigenvalues are 1.71, 1.00 and 0.29, all positive, so it is a valid kernel.",
+   "trap": "Using the amplitude ⟨φ(x)|φ(x′)⟩ instead of its squared modulus. The quantum computer hands you a probability, which is |⟨0…0|U_φ(x)†U_φ(x′)|0…0⟩|²; dropping the square gives a kernel that can be negative and is not a valid SVM kernel.",
+   "prereq": "Chapter 6.1 (parameterised circuits, measuring expectation values), Unit 2 (inner products, measurement probabilities), Unit 3 (building circuits).",
+   "leave": "Deriving the classical SVM dual and its solver internals belongs to a machine-learning course; classical kernel theory is used here, not re-derived."
+  },
+  {
+   "k": 3,
+   "idea": "Quantum models for language and vision exist only at toy scale: a handful of pixels or a short sentence encoded into a few qubits, classified by a kernel or a variational circuit, with no demonstrated advantage over classical deep learning.",
+   "depth": "Only a few universities teach this, so keep it short and honest. Cover image encoding: angle encoding (one qubit per pixel, gate angle = pixel value) versus amplitude encoding (2ⁿ pixels into n qubits after normalising the pixel vector). Show a quantum convolution as a small unitary acting on neighbouring qubits, with the output read by measuring a few qubits and discarding the rest (a partial trace, i.e. a reduced state, from Unit 2) — that discarding is the pooling step. Cover quantum generative models (Born machines, quantum GANs) that sample images or sentences, and the grammar-to-circuit route for a short sentence, where words combine by fixed rules into a circuit shape. Name the tasks and the measurement: classification accuracy on downsampled digits, next-word choice on tiny corpora. State the status in one sentence: no experiment has shown a speed or accuracy advantage on a task classical deep learning does not already solve.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Toy quantum image pipeline",
+    "aria": "A short pipeline taking a small image through amplitude encoding, a quantum convolution layer, measurement of two qubits and a classical classifier.",
+    "nodes": [
+     {
+      "id": "img",
+      "label": "4×4 image"
+     },
+     {
+      "id": "enc",
+      "label": "Amplitude encode",
+      "note": "4 qubits",
+      "style": "accent"
+     },
+     {
+      "id": "conv",
+      "label": "Quantum conv layer",
+      "style": "live"
+     },
+     {
+      "id": "m",
+      "label": "Measure 2 qubits"
+     },
+     {
+      "id": "cls",
+      "label": "Classical classifier"
+     }
+    ],
+    "edges": [
+     {
+      "from": "img",
+      "to": "enc"
+     },
+     {
+      "from": "enc",
+      "to": "conv"
+     },
+     {
+      "from": "conv",
+      "to": "m"
+     },
+     {
+      "from": "m",
+      "to": "cls"
+     }
+    ]
+   },
+   "example": "A 2×2 greyscale patch has pixel values 3, 4, 0, 5. Amplitude-encode it: how many qubits are needed and what are the four amplitudes? Answer: normalise first, ‖v‖ = √(9 + 16 + 0 + 25) = √50 = 7.071, so the state is (3|00⟩ + 4|01⟩ + 0|10⟩ + 5|11⟩)/7.071 with amplitudes 0.424, 0.566, 0 and 0.707. Four amplitudes need 2 qubits, since 2² = 4. Check: 0.18 + 0.32 + 0 + 0.50 = 1.00.",
+   "trap": "Confusing pixels with qubits. Amplitude encoding fits 2ⁿ values into n qubits, so a 4×4 image needs 4 qubits, not 16 — and a 4-qubit model is not comparable to a classical network with millions of parameters.",
+   "prereq": "Chapter 6.2 (feature maps, kernels), Unit 2 (composite systems, reduced states), Unit 3 (state preparation on a simulator).",
+   "leave": "Hardware noise and error correction to Unit 5; large deep-learning architectures to a machine-learning course."
+  },
+  {
+   "k": 4,
+   "idea": "Industry uses a quantum computer as one solver inside a classical pipeline: map the real problem to a Hamiltonian or a QUBO, run VQE, QAOA or amplitude estimation, then let classical software verify and refine the answer.",
+   "depth": "Energy: molecular electronic structure for batteries and catalysts solved with VQE (link back to 6.1); grid unit commitment and vehicle routing written as QUBO and solved with QAOA or quantum annealing. Finance: the Markowitz portfolio as a QUBO with a risk weight λ, option pricing by Monte Carlo with amplitude estimation for a quadratic speedup (Unit 4), and credit or fraud features handled by the kernels of 6.2. Drug discovery: potential energy surfaces of small molecules, docking as a binary optimisation, toy protein-folding models. For each, give the mapping (variables to qubits, objective to Pauli terms) and one honest line on status: instances today are small enough to check by classical simulation, and no commercial advantage has been demonstrated. Mention hybrid practice — classical pre-processing, quantum sampling, classical post-processing.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "aria": "A tree of three industrial areas — energy, finance and drug discovery — each with two concrete problems that are mapped to a Hamiltonian or QUBO.",
+    "root": {
+     "label": "Industry uses",
+     "note": "mapped to Hamiltonian or QUBO",
+     "children": [
+      {
+       "label": "Energy",
+       "edge": "grid and materials",
+       "children": [
+        {
+         "label": "Grid scheduling"
+        },
+        {
+         "label": "Battery materials"
+        }
+       ]
+      },
+      {
+       "label": "Finance",
+       "edge": "risk and price",
+       "children": [
+        {
+         "label": "Portfolio QUBO"
+        },
+        {
+         "label": "Option pricing"
+        }
+       ]
+      },
+      {
+       "label": "Drug discovery",
+       "edge": "molecules",
+       "children": [
+        {
+         "label": "Molecular energy"
+        },
+        {
+         "label": "Docking"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "A fund may hold assets 1, 2, 3. The cost to minimise is f(x) = −2x₁ − 3x₂ − 4x₃ + 4x₁x₃ with each x_i in {0, 1}. Find the best subset by enumeration, then write f as an Ising Hamiltonian in Pauli Z. Answer: the eight subsets give 0, −2, −3, −4, −5, −2, −7, −5, so the minimum is −7 at x = (0, 1, 1), that is, hold assets 2 and 3. Using x_i = (1 − Z_i)/2 gives f = −3.5 + 0·Z₁ + 1.5 Z₂ + 1.0 Z₃ + 1.0 Z₁Z₃, which returns −7 at Z = (+1, −1, −1).",
+   "trap": "Dropping the constant in x = (1 − Z)/2. The Ising energy and the classical cost then differ by a fixed offset, so a correct quantum answer looks wrong against the classical benchmark.",
+   "prereq": "Chapter 6.1 (VQE, QAOA), Unit 4 (amplitude estimation, Grover).",
+   "leave": "Quantum chemistry basis sets, density functional theory and the mathematics of option pricing are used as black boxes, not taught here."
+  },
+  {
+   "k": 5,
+   "idea": "A large fault-tolerant quantum computer breaks today's public-key cryptography and halves symmetric key strength, so migrating to post-quantum schemes is an engineering necessity; the same machines raise questions of access, bias and dual use.",
+   "depth": "Only a few universities teach this, so stay brief. Shor's algorithm (Unit 4) breaks RSA and elliptic-curve key exchange outright; Grover (Unit 4) halves symmetric strength, so AES-128 falls to about 64-bit security and AES-256 keeps about 128 bits. Explain harvest-now-decrypt-later: recorded traffic can be attacked years later, so the migration clock starts now, not when the machine exists. Name post-quantum cryptography as the replacement: lattice-based and hash-based schemes selected through an open standards process, running on today's classical hardware. Put QKD beside it as an option with its own limits — it needs an authenticated channel, trusted nodes over distance, and dedicated fibre (Unit 5). Then ethics: who can rent a quantum cloud, bias in models built with hybrid training, energy and cryogenic cooling costs, dual use, and privacy of data sent to a remote machine. End with migration practice: inventory cryptography, trial, migrate, retire.",
+   "figure": {
+    "type": "sequence",
+    "aria": "A timeline in which an attacker copies today's encrypted session, stores it, and decrypts it years later on a future quantum computer.",
+    "actors": [
+     "User",
+     "Attacker",
+     "Future quantum computer"
+    ],
+    "messages": [
+     {
+      "from": "User",
+      "to": "Attacker",
+      "label": "encrypted session, today",
+      "dashed": false
+     },
+     {
+      "from": "Attacker",
+      "to": "Future quantum computer",
+      "label": "stored ciphertext, later",
+      "dashed": false
+     },
+     {
+      "from": "Future quantum computer",
+      "to": "Attacker",
+      "label": "recovered plaintext",
+      "dashed": true
+     }
+    ]
+   },
+   "example": "A hospital stores records under AES-128 and exchanges session keys with RSA-2048. For each scheme, state what a future quantum computer does, how many bits of security remain, and what the hospital should change. Answer: RSA-2048 is broken outright by Shor's algorithm, leaving zero security, so key exchange moves to a post-quantum scheme now. AES-128 loses half its strength under Grover to roughly 64 bits, so it moves to AES-256 for about 128 bits. Records already copied must be treated as exposed and re-encrypted under the new keys.",
+   "trap": "Believing a quantum computer cracks everything. Shor breaks the number-theoretic public-key systems; Grover only halves symmetric strength, so longer keys and post-quantum schemes are the fix, not panic.",
+   "prereq": "Unit 4 (Shor, Grover), Unit 5 (QKD protocols, error correction).",
+   "leave": "The mathematics of lattice problems and the full BB84/E91 protocols stay in Unit 5; policy detail is beyond this book."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the same parameterised circuit and measurement loop now defines a kernel or a classifier"
+  ],
+  [
+   1,
+   3,
+   "variational training is what toy quantum vision models reuse"
+  ],
+  [
+   2,
+   3,
+   "feature maps become the encoder for pixels and words"
+  ],
+  [
+   1,
+   4,
+   "VQE and QAOA are the workhorse solvers industry maps its problems onto"
+  ],
+  [
+   2,
+   4,
+   "QUBOs and kernels turn portfolios and molecules into qubits"
+  ],
+  [
+   2,
+   5,
+   "models trained on personal data raise the privacy questions of 6.5"
+  ],
+  [
+   3,
+   5,
+   "bias in quantum-trained AI is part of the societal impact"
+  ]
+ ]
+}
