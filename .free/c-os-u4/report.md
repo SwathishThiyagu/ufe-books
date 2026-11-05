@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-os/c-os-u4.html`
 - Status: ok
-- Model calls so far: 41 (131,344 tokens in, 143,337 out), 6.1 minutes
+- Model calls so far: 45 (144,638 tokens in, 157,636 out), 7.5 minutes
 
 ## Checker
 
 ```
-c-os-u4.html: 9 chapters, 11951 words, 10 figures, 148 KB
+c-os-u4.html: 9 chapters, 12051 words, 10 figures, 152 KB
 OK
 ```
 
@@ -20,7 +20,6 @@ OK
 - chapter 8: a c program's shown output was replaced by its real output; check the text around it
 - chapter 9: a c program's shown output was replaced by its real output; check the text around it
 - chapter 9: worked example 1: the worked example states [1.0] but recomputing it gives [3.0, 3.0]; fix the steps and the answer so they match the correct values
-- chapter 9: the reviewer found 1 serious problem(s) and the revision did not pass the checks; read the review in the state folder
 
 ## Reviewer notes (after any revision)
 
@@ -48,7 +47,9 @@ OK
 - ch 8 [high] answer section: The answer states FIFO incurs 10 faults, but the correct number of FIFO page faults for the given reference string with 3 frames is 9 (as shown by the C code output and by manual FIFO simulation).
 - ch 8 [low] Section 2 (LRU and Optimal): The statement "LRU needs hardware support (e.g., reference bits)" is inaccurate; pure LRU requires full ordering of accesses, which is usually approximated with hardware reference bits in the Clock algorithm.
 - ch 8 [low] Figure description: The description of the reference‑string simulation figure is vague and the JSON‑like spec is not explained, making it hard for students to understand what the marks mean.
-- ch 9 [high] Section 2 (Global vs local replacement): The Python function select_victim uses the variable faulting_proc without defining it or passing it as a parameter, causing a NameError. The lambda for local replacement also relies on this undefined variable.
-- ch 9 [low] Section 1 (Proportional frame allocation): The description calls F "the total number of free frames" which can be confusing because the formula uses the total number of frames available for allocation, not only currently free ones.
-- ch 9 [low] Section 2 (Global vs local replacement): The placeholder "[shown output]" is left without any actual output, leaving the reader without a concrete example.
-- ch 9 [low] Section 3 (Working‑set model and thrashing detection): The statement "If the sum of all working‑set sizes exceeds the total frames, the system thrashes" is presented as a definition, but it is actually a sufficient condition for thrashing, not a strict definition.
+- ch 9 [high] Section 2 (Global vs local replacement): The Python function select_victim uses the variable faulting_proc without it being defined or passed as a parameter, causing a NameError.
+- ch 9 [high] Section 1 (Proportional frame allocation): F is described as "total number of free frames" which is misleading; proportional allocation works with the total number of frames available for allocation, not only the free ones.
+- ch 9 [low] Section 1 (Proportional frame allocation): Rounding each F_i to the nearest integer can make the sum of allocated frames differ from F, but the text does not mention how to handle the discrepancy.
+- ch 9 [low] Section 2 (Global vs local replacement): The placeholder "[shown output]" is left without any actual output, which may confuse readers.
+- ch 9 [low] Quiz Q3 (apply, 4 marks): The answer states "Total pages = 12" without showing the addition of the two processes' pages, which could be unclear.
+- ch 9 [low] Section 3 (Working‑set model and thrashing detection): The example threshold of 20 faults/second is given without context; thresholds are system‑dependent.
