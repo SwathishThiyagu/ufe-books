@@ -1,0 +1,252 @@
+{
+ "lead": "A web server treats every HTTP request as a stranger. Login on one page means nothing on the next; HTTP carries no memory. Cookies and sessions restore memory. A cookie is a small name=value pair the server asks the browser to keep and resend. A session keeps data on the server and gives the browser only an ID. Shopping carts, UPI logins and IRCTC bookings use this pair. This chapter shows PHP calls for both, and settings that stop leaks.",
+ "prereq": "You need: HTTP request and response headers (see Unit 1, HTTP and HTTPS: URLs, requests, responses and methods) and form handling from <a href=\"#form-processing-with-get-and-post\">4.5 Form processing with GET and POST</a>.",
+ "sections": [
+  {
+   "h3": "Cookies: state kept in the browser",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A cookie is a small name=value string. The server sends it in a Set-Cookie response header. The browser stores it and attaches it in a Cookie request header to later requests to the same site. That round trip is the mechanism. Some syllabi call this state management or session tracking."
+    },
+    {
+     "type": "formula",
+     "text": "setcookie(name, value, expires, path, domain, secure, httponly)",
+     "where": "name is the cookie name; value is its text; expires is a Unix timestamp in seconds (time()+1800 means 30 minutes from now); path is the URL prefix that receives it, \"/\" for the whole site; domain limits it to one domain; secure=true sends it only over HTTPS; httponly=true hides it from JavaScript. Later arguments may be left out. SameSite cannot be passed positionally; set it with the options array, for example setcookie('user', 'Anu', ['expires' => time()+1800, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax'])."
+    },
+    {
+     "type": "p",
+     "text": "PHP reads a cookie back from $_COOKIE, for example $_COOKIE['user']. The array is filled from the request header before your script runs."
+    },
+    {
+     "type": "p",
+     "text": "To delete a cookie, send it again with an expiry in the past: setcookie('user', '', time() - 3600, '/'). The browser then drops it. Setting an empty value alone does not delete it."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "A cookie holds about 4 KB and a browser keeps a few dozen per site, so store an ID, never a whole cart.",
+      "setcookie writes a response header, so it must run before any output, including a blank line or a space before <?php."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Sessions: state kept on the server",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A session flips the idea. The data stays on the server, and the browser gets only a random key called the session ID. The server keeps a small file (or a database row) per ID holding that visitor's values."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The script calls session_start() before any output.",
+      "PHP looks for the session cookie in the request. If none exists, it creates a random ID and sends it back as a Set-Cookie header. The default cookie name is PHPSESSID.",
+      "You read and write the session array: $_SESSION['user'] = 'Anu';.",
+      "At the end of the script PHP saves $_SESSION back to the session store under that ID.",
+      "The next request carries the same cookie, so session_start() finds the same store and your $_SESSION values are there again."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "session_id() returns the current ID as a string. session_regenerate_id(true) issues a fresh ID, copies the data to it and deletes the old one; call it right after a successful login, so an ID known to an attacker becomes useless."
+    },
+    {
+     "type": "p",
+     "text": "session_destroy() deletes the stored data. The cookie may remain in the browser, so also clear $_SESSION and expire the cookie if the logout must be complete."
+    },
+    {
+     "type": "p",
+     "text": "Old session files are removed by garbage collection. On some requests PHP runs a clean-up that deletes files untouched for gc_maxlifetime seconds, by default 1440 seconds (24 minutes). The trigger is random, set by gc_probability divided by gc_divisor. This is why a session can vanish without anyone calling session_destroy()."
+    }
+   ]
+  },
+  {
+   "h3": "Keeping cookies and sessions safe",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "httponly = true stops JavaScript from reading the cookie, so an XSS bug cannot steal the session ID. See Unit 6, Authentication and web security.",
+      "secure = true sends the cookie only over HTTPS. Without it, the browser would also send the cookie on a plain-HTTP request, where anyone sharing the Wi-Fi can read the header.",
+      "samesite = \"Lax\" or \"Strict\" stops another site from triggering a request that carries your cookie, which blocks most CSRF attacks.",
+      "A cookie is plain text, not encrypted. It travels in a header anyone on the path can read. Never put a password, an OTP, a card number or a secret in it.",
+      "Session fixation: an attacker plants a known session ID, waits for the victim to log in, then reuses the ID. session_regenerate_id(true) after login defeats it.",
+      "In PHP 7.3 and later use session_set_cookie_params([...]) before session_start() to set these flags for the session cookie itself."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The browser holds only the session ID; user Anu and the ₹750 cart stay in the server-side store. Notice the ID in the cookie is the same before and after login only if you forget to regenerate it.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A login creates session abc123 on the server; the browser stores the session ID and sends it back when asking for the cart.",
+   "actors": [
+    "Browser",
+    "Server",
+    "Session store"
+   ],
+   "messages": [
+    {
+     "from": "Browser",
+     "to": "Server",
+     "label": "POST /login user=Anu",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Session store",
+     "label": "create abc123",
+     "dashed": false
+    },
+    {
+     "from": "Session store",
+     "to": "Server",
+     "label": "cart ₹750",
+     "dashed": true
+    },
+    {
+     "from": "Server",
+     "to": "Browser",
+     "label": "Set-Cookie PHPSESSID=abc123",
+     "dashed": true
+    },
+    {
+     "from": "Browser",
+     "to": "Server",
+     "label": "GET /cart Cookie abc123",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Session store",
+     "label": "read abc123",
+     "dashed": false
+    },
+    {
+     "from": "Session store",
+     "to": "Server",
+     "label": "user Anu; ₹750",
+     "dashed": true
+    },
+    {
+     "from": "Server",
+     "to": "Browser",
+     "label": "HTML cart ₹750",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Anu logs in. PHP creates session ID abc123 and stores user = Anu and cart_total = 750 rupees on the server. (a) Show the Set-Cookie header for a session cookie that lives 30 minutes. (b) Show the cookie header of the next request. (c) Write the PHP that sets it up. (d) What happens after 30 minutes?",
+   "steps": [
+    "Convert the lifetime: 30 minutes × 60 = 1800 seconds. Max-Age=1800 tells the browser to drop the cookie 1800 seconds after receiving it.",
+    "Set the flags before starting the session: lifetime 1800, httponly true, samesite Lax.",
+    "A header such as: Set-Cookie: PHPSESSID=abc123; Expires=Wed, 01 Jan 2025 10:30:00 GMT; Max-Age=1800; Path=/; HttpOnly; SameSite=Lax.",
+    "Server side, the store now holds: user = Anu, cart_total = 750 (rupees). The browser never sees these values, only abc123.",
+    "Next request from the browser: GET /cart HTTP/1.1 with the header Cookie: PHPSESSID=abc123. PHP reads it, finds session abc123 and restores $_SESSION['cart_total'] = 750.",
+    "Max-Age=1800 counts from the moment the browser receives the header, so the cookie is dropped 1800 seconds after login whether Anu is active or idle. The next visit then starts a new, empty session with a new ID. The old session file survives until garbage collection removes it after gc_maxlifetime seconds of inactivity, so the ₹750 is not erased at the 30-minute mark."
+   ],
+   "answer": "The server sends Set-Cookie: PHPSESSID=abc123; Max-Age=1800; Path=/; HttpOnly; SameSite=Lax, the browser answers later with Cookie: PHPSESSID=abc123, and 1800 seconds after the login response the cookie is gone while the ₹750 server data survives until garbage collection.",
+   "check": "lifetime_minutes = 30\nmax_age = lifetime_minutes * 60\ncart_total = 750\nprint(max_age)\nprint(cart_total)\n",
+   "values": [
+    1800,
+    750
+   ],
+   "code": {
+    "lang": "text",
+    "code": "<?php\nsession_set_cookie_params([\n    'lifetime' => 1800,\n    'path'     => '/',\n    'httponly' => true,\n    'samesite' => 'Lax'\n]);\nsession_start();\nsession_regenerate_id(true);\n$_SESSION['user'] = 'Anu';\n$_SESSION['cart_total'] = 750;\necho 'Session ' . session_id() . ' saved for ' . $_SESSION['user'];\n?>\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Header or value",
+     "Meaning"
+    ],
+    "rows": [
+     [
+      "Login reply",
+      "Set-Cookie: PHPSESSID=abc123; Max-Age=1800; Path=/; HttpOnly; SameSite=Lax",
+      "browser stores ID for 1800 s"
+     ],
+     [
+      "Store write",
+      "user = Anu, cart_total = 750",
+      "data lives on server"
+     ],
+     [
+      "Next request",
+      "Cookie: PHPSESSID=abc123",
+      "browser proves who it is"
+     ],
+     [
+      "After 1800 s",
+      "cookie removed by browser",
+      "new session on next visit"
+     ]
+    ]
+   },
+   "output": "response header: Set-Cookie: PHPSESSID=abc123; Expires=Wed, 01 Jan 2025 10:30:00 GMT; Max-Age=1800; Path=/; HttpOnly; SameSite=Lax\nbody output: Session abc123 saved for Anu"
+  }
+ ],
+ "traps": [
+  "Calling session_start() or setcookie() after any output gives the warning 'headers already sent' and the cookie is lost. Both must sit before the first echo, HTML tag, blank line or BOM.",
+  "A cookie is not encrypted or signed by default. Marks are lost for storing a password, OTP or price total in it; keep those in $_SESSION.",
+  "Deleting a cookie needs a past expiry, not an empty value. setcookie('user','') still leaves a cookie in the browser.",
+  "session_destroy() removes the server data but not the browser cookie; a complete logout also expires the cookie and clears $_SESSION.",
+  "The session ID in the cookie is not the data. In the figure, abc123 alone tells the server nothing until it looks the ID up in the session store."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the default name of the PHP session cookie, and which function starts a session?",
+   "marks": 2,
+   "a": "The default cookie name is PHPSESSID. session_start() creates or resumes the session and must be called before any output."
+  },
+  {
+   "level": "understand",
+   "q": "Why can plain HTTP not remember that a user has logged in?",
+   "marks": 3,
+   "a": "HTTP is stateless: each request is handled independently and carries no reference to an earlier one. The server cannot tell that request 2 came from the same person as request 1 unless the client sends some identifier, which a cookie or session ID supplies."
+  },
+  {
+   "level": "apply",
+   "q": "Write the PHP call for a cookie named theme with value dark that lasts one day, is visible on the whole site, and is hidden from JavaScript.",
+   "marks": 4,
+   "a": "One day is 24 × 60 × 60 = 86400 seconds, so: setcookie('theme', 'dark', time() + 86400, '/', '', false, true); The true in the httponly position hides it from JavaScript."
+  },
+  {
+   "level": "analyze",
+   "q": "A student writes echo '<h1>Hi</h1>'; and then session_start();. What goes wrong and how is it fixed?",
+   "marks": 4,
+   "a": "echo sends the response body, so the response headers are flushed. session_start() must send a Set-Cookie header and cannot, giving 'headers already sent'. Fix: move session_start() to the first line of the script, before any output."
+  },
+  {
+   "level": "analyze",
+   "q": "Why should session_regenerate_id(true) be called right after a successful login?",
+   "marks": 5,
+   "a": "Before login the session ID may be one an attacker planted or knows (session fixation). Regenerating gives a new random ID, copies the data, and deletes the old ID, so the known ID now maps to nothing. The true argument deletes the old session file."
+  },
+  {
+   "level": "apply",
+   "q": "A session is idle for 40 minutes. gc_maxlifetime is 1440 seconds and the browser cookie had Max-Age 1800. Which is gone: the cookie, the server data, or both?",
+   "marks": 4,
+   "a": "Max-Age 1800 s = 30 minutes, so at 40 minutes the browser has deleted the cookie. The server file is only removed by garbage collection once it is untouched for gc_maxlifetime = 1440 s = 24 minutes; the clean-up runs on a random later request, so the file may still exist but is unreachable."
+  },
+  {
+   "level": "understand",
+   "q": "Give one advantage of a session over a cookie for storing a shopping cart.",
+   "marks": 3,
+   "a": "The cart stays on the server, so it can be larger than the 4 KB cookie limit, cannot be edited by the user, and is not visible in the request headers. The browser carries only the session ID."
+  }
+ ],
+ "beyond": "Not for the exam. Modern browsers treat SameSite=None as valid only when Secure is also set, so cross-site cookies always need HTTPS. Frameworks such as Laravel and Express wrap these same primitives in their own session middleware, and a signed cookie (value plus an HMAC) is how they detect tampering. Token-based login with JWT is covered in Unit 6; it moves the state into the token itself, which changes the logout and revocation story completely. Search next for 'OWASP session fixation', 'SameSite cookies explained' and the PHP session configuration directives.",
+ "traps_note": ""
+}

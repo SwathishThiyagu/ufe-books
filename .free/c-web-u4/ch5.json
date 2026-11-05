@@ -1,0 +1,223 @@
+{
+ "lead": "A form collects values in input controls and sends them to a server script as name=value pairs. The method decides where the pairs travel: GET appends them to the URL as a query string, POST puts them in the request body. PHP exposes the first in $_GET and the second in $_POST. This is how a login, a marks lookup or a UPI payment request reaches server code. The rule is simple: GET for reading, POST for secrets and changes.",
+ "prereq": "You need: HTML forms from Unit 2 (input names and submit buttons), HTTP methods from Unit 1, and PHP arrays from <a href=\"#php-decisions-loops-functions-and-arrays\">4.3</a>.",
+ "sections": [
+  {
+   "h3": "One form, two places for the pairs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A form is a set of controls inside <code>&lt;form action='result.php' method='post'&gt;</code>. The <b>action</b> is the URL of the script. The <b>method</b> is the HTTP method: <code>get</code> or <code>post</code>. Each control that has a <code>name</code> sends one <code>name=value</code> pair when the user presses the submit button. A control without a name is not sent."
+    },
+    {
+     "type": "p",
+     "text": "With <code>method='get'</code>, the browser puts the pairs after a <code>?</code> at the end of the action URL. Pairs are joined by <code>&amp;</code>. Spaces and special characters are percent-encoded. A form with <code>name=Anu</code> and <code>marks=78</code> sent to <code>result.php</code> becomes <code>result.php?name=Anu&amp;marks=78</code>. The URL is visible, bookmarkable and can be cached."
+    },
+    {
+     "type": "p",
+     "text": "With <code>method='post'</code>, the same pairs go into the request body, not the URL. The browser sends <code>POST /result.php</code> and a body such as <code>name=Anu&amp;marks=78</code>, usually with <code>Content-Type: application/x-www-form-urlencoded</code>. The URL stays clean, but the request is not bookmarkable in the same way."
+    },
+    {
+     "type": "p",
+     "text": "GET is for reading. A GET is safe (it should not change data on the server) and idempotent (sending it twice leaves the server in the same state as sending it once). POST is neither safe nor idempotent in general. POST is for changes and secrets: login passwords, payment confirmations, inserting a record. URL length is limited by browsers and servers, so GET is not for large data. A file upload needs <code>enctype='multipart/form-data'</code>; file storage is outside this chapter."
+    }
+   ]
+  },
+  {
+   "h3": "PHP reads GET, POST and the request method",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "PHP fills two superglobal arrays from the request. <code>$_GET</code> holds pairs from the query string; <code>$_POST</code> holds pairs from the body. The key is the control name. If the form sends <code>name=Anu</code>, then <code>$_POST['name']</code> is <code>'Anu'</code>. If the same form used GET, <code>$_GET['name']</code> is <code>'Anu'</code>. Values arrive as strings unless a filter converts them."
+    },
+    {
+     "type": "p",
+     "text": "<code>$_REQUEST</code> merges GET, POST and (depending on the <code>request_order</code> setting) cookies, in an order set by configuration. With the common default order 'GP' a query-string value overrides a POST value of the same name, and cookies are left out. Read <code>$_GET</code> or <code>$_POST</code> instead. Cookies are covered in <a href=\"#cookies-and-session-tracking\">4.6</a>."
+    },
+    {
+     "type": "p",
+     "text": "Three checks make input safe. <code>isset($_POST['marks'])</code> is true when the key exists and is not null. <code>empty($_POST['marks'])</code> is true for missing, <code>''</code>, <code>'0'</code>, <code>0</code> and null, so it is not a good marks check. <code>filter_input(INPUT_POST, 'marks', FILTER_VALIDATE_INT)</code> returns the integer when the value is a valid integer, <code>false</code> when the value is present but not a valid integer, and <code>null</code> when the field is missing. Check for null as well as false. For GET use <code>INPUT_GET</code>."
+    },
+    {
+     "type": "p",
+     "text": "<code>$_SERVER['REQUEST_METHOD']</code> is <code>'GET'</code> or <code>'POST'</code>. A script can send the form to itself and branch on this value. That is a <b>self-submit</b>: first request shows the form, second request processes it."
+    },
+    {
+     "type": "p",
+     "text": "Validate before use. Marks must be an integer from 0 to 100. Escape before printing: <code>htmlspecialchars($name, ENT_QUOTES, 'UTF-8')</code> turns <code>&lt;</code> into <code>&amp;lt;</code> and stops script injection. After a successful POST, send <code>header('Location: thanks.php')</code> and <code>exit</code> so a refresh does not resend the data."
+    }
+   ]
+  },
+  {
+   "h3": "A safe processing order",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "Show the form with method='post' and action pointing to the processing script, or to the same script.",
+      "If REQUEST_METHOD is POST, read each field with filter_input, or with isset plus validation.",
+      "Reject bad values; keep the error and show the form again.",
+      "Escape every value before printing it in HTML.",
+      "On success, redirect with header('Location: ...') and exit.",
+      "For uploads, set enctype='multipart/form-data' and read $_FILES; storage is not covered here."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The order matters. Validate raw input, then escape for output. Redirect after POST prevents duplicate inserts when the user refreshes. Never put a password in a GET URL: it enters browser history, server logs and the Referer header sent to other sites. A POST body is not shown in the URL, but it is still untrusted input, and it is plain text on the network; use HTTPS so the whole request is encrypted."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "GET puts name and marks in the URL; POST puts the same fields in the request body. In the self-submit pattern, the GET response is the form and the POST response is the result.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Browser",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Browser",
+     "to": "Server",
+     "label": "GET /result.php?name=Anu&marks=78",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Browser",
+     "label": "200 HTML the form",
+     "dashed": true
+    },
+    {
+     "from": "Browser",
+     "to": "Server",
+     "label": "POST /result.php",
+     "dashed": false
+    },
+    {
+     "from": "Browser",
+     "to": "Server",
+     "label": "body name=Anu&marks=78 (Content-Type: application/x-www-form-urlencoded)",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Browser",
+     "label": "200 HTML Anu scored 78",
+     "dashed": true
+    }
+   ],
+   "aria": "Two request-response pairs: a GET with name and marks in the URL returns the form, then a POST with the same fields in the body returns the result."
+  }
+ },
+ "examples": [
+  {
+   "question": "A form sends <code>name=Anu</code> and <code>marks=78</code> to <code>result.php</code>. Give the GET URL and the POST request body. Then write PHP that prints <code>Anu scored 78</code> after checking that marks is from 0 to 100.",
+   "steps": [
+    "The controls have names name and marks, so the pairs are name=Anu and marks=78.",
+    "GET: put the action result.php, then ?, then name=Anu, then &, then marks=78. The URL is result.php?name=Anu&marks=78.",
+    "POST: the request line is POST /result.php. The body is name=Anu&marks=78 with Content-Type application/x-www-form-urlencoded.",
+    "PHP reads $_POST['name'] as 'Anu'. filter_input(INPUT_POST, 'marks', FILTER_VALIDATE_INT) returns 78.",
+    "Check 0 ≤ 78 ≤ 100: true, so the value is accepted.",
+    "Escape the name with htmlspecialchars and print 'Anu scored 78'."
+   ],
+   "answer": "GET URL is result.php?name=Anu&marks=78; the POST body is name=Anu&marks=78; the PHP prints Anu scored 78 because 78 passes the 0–100 check.",
+   "check": "marks = 78\nif not (0 <= marks <= 100):\n    raise SystemExit('invalid')\nprint(marks)",
+   "values": [
+    78
+   ],
+   "code": {
+    "lang": "text",
+    "code": "<?php\n$name = '';\n$marks = null;\n\nif ($_SERVER['REQUEST_METHOD'] === 'POST') {\n    $name = isset($_POST['name']) ? trim($_POST['name']) : '';\n    $marks = filter_input(INPUT_POST, 'marks', FILTER_VALIDATE_INT);\n\n    if ($name === '' || $marks === false || $marks === null || $marks < 0 || $marks > 100) {\n        http_response_code(400);\n        echo 'Invalid input';\n        exit;\n    }\n\n    echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ' scored ' . $marks;\n    exit;\n}\n?>\n<!DOCTYPE html>\n<html>\n<body>\n<form action='result.php' method='post'>\nName: <input type='text' name='name'>\nMarks: <input type='text' name='marks'>\n<input type='submit' value='Send'>\n</form>\n</body>\n</html>",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "method",
+     "name",
+     "marks",
+     "check",
+     "output"
+    ],
+    "rows": [
+     [
+      "GET",
+      "Anu",
+      "78",
+      "URL only",
+      "result.php?name=Anu&marks=78"
+     ],
+     [
+      "POST",
+      "Anu",
+      "78",
+      "0 ≤ 78 ≤ 100",
+      "Anu scored 78"
+     ]
+    ]
+   },
+   "output": "Anu scored 78"
+  }
+ ],
+ "traps": [
+  "Trusting $_REQUEST: it merges GET, POST and (depending on the request_order setting) cookies in a configured order. With the common default order 'GP' a query-string value overrides a POST value of the same name, and cookies are left out. Read $_GET or $_POST directly.",
+  "Printing user input without htmlspecialchars: if the name is <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>, the &lt; and &gt; characters are sent as characters and the browser treats the value as markup, so it runs as script (XSS).",
+  "Using GET for a password: the password appears in the URL, browser history, server logs and the Referer header. Use POST.",
+  "Forgetting the name attribute: the control is not sent at all, so $_POST['field'] is unset.",
+  "Calling header('Location: ...') after any output gives 'headers already sent'. Redirect before printing, then exit."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does method='get' do with form fields?",
+   "marks": 2,
+   "a": "It appends them to the action URL as a query string of name=value pairs joined by &."
+  },
+  {
+   "level": "understand",
+   "q": "Why is POST preferred over GET for a login password?",
+   "marks": 3,
+   "a": "GET puts the password in the URL, where it can be saved in history, logs and the Referer header. POST puts it in the request body, so it is not visible in the URL. But the POST body is plain text on the network unless HTTPS is used, so use HTTPS to encrypt the whole request."
+  },
+  {
+   "level": "apply",
+   "q": "A form sends name=Anu and marks=78 to result.php with method='get'. Write the resulting URL.",
+   "marks": 3,
+   "a": "result.php?name=Anu&marks=78"
+  },
+  {
+   "level": "apply",
+   "q": "If $_POST['marks'] is '78', what does filter_input(INPUT_POST, 'marks', FILTER_VALIDATE_INT) return?",
+   "marks": 2,
+   "a": "The integer 78."
+  },
+  {
+   "level": "analyze",
+   "q": "A page prints $_GET['name'] directly inside HTML. Explain the risk with one example value.",
+   "marks": 4,
+   "a": "The value is untrusted. If name is <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>, the browser receives it as markup, not text, and runs it as script. Escape with htmlspecialchars before printing."
+  },
+  {
+   "level": "analyze",
+   "q": "A script uses a self-submit and redirects after a successful POST. Explain both choices.",
+   "marks": 4,
+   "a": "Self-submit lets one script show the form on GET and process it on POST. The redirect after POST makes the browser send a new GET, so a refresh does not resubmit the POST and insert twice."
+  },
+  {
+   "level": "remember",
+   "q": "What does $_SERVER['REQUEST_METHOD'] contain?",
+   "marks": 2,
+   "a": "The HTTP method of the current request, such as 'GET' or 'POST'."
+  },
+  {
+   "level": "understand",
+   "q": "Why is $_REQUEST a poor choice for reading a form field?",
+   "marks": 3,
+   "a": "It merges GET, POST and (depending on request_order) cookies, so the value can come from an unexpected source. The order depends on configuration."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems add CSRF tokens to POST forms so another site cannot submit on a user's behalf. Frameworks such as Laravel and Symfony wrap validation and escaping in request objects. APIs often send JSON bodies instead of form-encoded pairs, and the server parses the body differently. Search next for CSRF, SameSite cookies, OWASP input validation and PHP filter_input."
+}
