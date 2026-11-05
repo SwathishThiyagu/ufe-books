@@ -225,7 +225,11 @@ def main():
                 log(f'  review {N}.{k}: {len(high)} high, {len(issues) - len(high)} low')
                 if high:
                     fixed = ask.json(f'revise{k}', PR.SYSTEM, PR.revise(P, k, ch, issues), check=check_chapter(P, k))
-                    if isinstance(fixed, dict) and not [x for x in check_chapter(P, k)(fixed) if not x.startswith('~')]:
+                    hard = lambda c: [x for x in check_chapter(P, k)(c) if not x.startswith('~')]
+                    # keep the revision when it fixes the reviewer's errors without adding check failures;
+                    # figure and quiz-count problems left over are repaired later by figfix / chfix
+                    minor = lambda xs: all(x.startswith(('the figure', 'give 6 to 8', 'give 3 to 5', 'the quiz needs')) for x in xs)
+                    if isinstance(fixed, dict) and fixed.get('sections') and (not hard(fixed) or minor(hard(fixed)) or len(hard(fixed)) <= len(hard(ch))):
                         ch = fixed
                         for m in settle_code(ch, log, k): flag(m)
                         S.put(key, ch)
