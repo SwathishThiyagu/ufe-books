@@ -1,0 +1,45 @@
+name: RunPod book writer (second lane)
+# Same pipeline as the free writer, but the model is an open model served by vLLM on your RunPod pod.
+# Secrets: RUNPOD_BASE_URL (https://<pod-id>-8000.proxy.runpod.net/v1) and RUNPOD_VLLM_KEY (the --api-key given to vLLM).
+# Start the pod first; stop it when the run ends (it bills by the second while running).
+on:
+  workflow_dispatch:
+    inputs:
+      units:
+        description: "Unit ids separated by spaces (leave empty to use pipeline/requests-runpod-2.txt)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths: ["pipeline/requests-runpod-2.txt"]
+permissions:
+  contents: write
+concurrency:
+  group: runpod-books-2
+  cancel-in-progress: true   # a new request replaces a run that is still waiting
+jobs:
+  write:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the render checker
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Write the books
+        env:
+          OPENAI_BASE_URL: ${{ secrets.RUNPOD_BASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.RUNPOD_VLLM_KEY }}
+          OPENAI_MODEL: openai/gpt-oss-120b
+          REASONING_EFFORT: medium
+          PARALLEL: "9"
+          REQ_FILE: pipeline/requests-runpod-2.txt
+          UNITS: ${{ github.event.inputs.units }}
+          REDO_FLAGGED: ${{ contains(github.event.head_commit.message, '[redo]') && '1' || '' }}
+        run: bash pipeline/ci.sh

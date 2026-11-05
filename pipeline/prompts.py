@@ -191,6 +191,8 @@ def revise(P, k, chapter_json, issues):
 Problems:
 {json.dumps(issues, ensure_ascii=False, indent=1)}
 
+Keep every quiz item an object exactly like {{"level": "apply", "q": "the question", "marks": 3, "a": "the answer"}}, 6 to 8 of them with all four levels (remember, understand, apply, analyze).
+
 Chapter JSON:
 {json.dumps(chapter_json, ensure_ascii=False)}"""
 
