@@ -1,0 +1,271 @@
+{
+ "lead": "Network attacks usually drown a service, sit in the middle of a conversation, or capture and resend a message. This chapter names each family, shows the mechanism, and gives the fix. It also covers port scanning and the LAN tricks behind a man-in-the-middle position.",
+ "prereq": "You need <a href=\"#security-attacks-services-and-mechanisms\">1.2</a> for passive and active attacks, and <a href=\"#threats-vulnerabilities-and-attack-vectors\">1.3</a> for attack vector and attack surface.",
+ "sections": [
+  {
+   "h3": "Drowning a service: DoS and DDoS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A denial-of-service (DoS) attack makes a service unusable for legitimate users, attacking availability, the A in CIA (see <a href=\"#security-goals-confidentiality-integrity-availability-cia\">1.1</a>). One machine can do this against a small target. A distributed denial-of-service (DDoS) attack uses thousands of hosts, usually a botnet (see <a href=\"#bots-botnets-and-remote-access-attacks\">1.7</a>). Scale changes the defence."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Volumetric: fills the network link, measured in bits per second (Mbps, Gbps). The server sits idle while the pipe is full.",
+      "Protocol-level: exhausts a state table in the server or firewall. A SYN flood is the standard case.",
+      "Application-layer: valid-looking requests burn server CPU. Low bandwidth, high damage; an HTTP flood asking for an expensive search page is the usual example."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A SYN flood attacks the TCP handshake. The server reserves a half-open table slot on seeing a SYN, before it knows the client is real."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Attacker sends a TCP SYN with a spoofed source address.",
+      "Server reserves a half-open slot and replies SYN-ACK.",
+      "The final ACK never comes; the address is not the attacker's.",
+      "The slot stays until a timer expires. A few thousand SYNs per second fill a table of a few thousand entries, and real clients are refused."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The fix is the SYN cookie: the server allocates nothing, packs connection state into the SYN-ACK sequence number, and creates a table entry only when a valid ACK returns. Reflection and amplification turn a small attacker into a big flood. In reflection the attacker spoofs the victim's address, so replies go to the victim. In amplification the reply is larger than the request. Open DNS resolvers and NTP servers are classic reflectors."
+    },
+    {
+     "type": "formula",
+     "text": "A = R ÷ Q",
+     "where": "A is the amplification factor (a pure number); R is the reply size in bytes; Q is the request size in bytes. Load reaching the victim = A × the attacker's sending rate."
+    }
+   ]
+  },
+  {
+   "h3": "Sitting in the middle: MITM",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In a man-in-the-middle (MITM) attack the attacker stands between client and server and relays traffic, so both sides believe they talk directly. It breaks confidentiality and integrity and lets the attacker edit messages. The attacker must first get into the path."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "ARP cache poisoning on a local network.",
+      "DNS spoofing: a forged answer reaches the client before the real resolver's.",
+      "A rogue Wi-Fi access point using a trusted network name (SSID).",
+      "BGP hijack: a network announces an IP prefix it does not own."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "ARP poisoning is the LAN version. ARP has no authentication: any host may claim any IP address. The attacker broadcasts 'the gateway 192.168.1.1 is at my MAC address'. Client and gateway update their ARP caches and send frames to the attacker, who forwards them unchanged. Every later packet, including clear-text passwords, passes through the attacker."
+    },
+    {
+     "type": "p",
+     "text": "Three more LAN tricks build the same position. MAC flooding fills the switch CAM table with fake entries; a full table makes the switch flood frames out of every port. DHCP starvation exhausts the DHCP pool, so a rogue server can answer and name the attacker as default gateway. VLAN hopping moves the attacker into a VLAN that should be out of reach."
+    }
+   ]
+  },
+  {
+   "h3": "Reusing a captured message: replay",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A replay attack records a valid message and sends it again later. Encryption does not stop it: the recorded message is valid ciphertext and the server decrypts it happily. One captured 'transfer ₹5,000 to account X' replayed ten times moves ₹50,000. The defence is freshness: the receiver must tell a new message from an old one."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Nonce: a random value used once. The server sends a fresh challenge; the reply must contain it. A replayed reply carries the old nonce and is rejected.",
+      "Timestamp: accept only if the message time is within a window, say ±2 minutes. Needs loosely synchronised clocks.",
+      "Sequence number: accept only if the number is greater than the last seen in this session. Cheap, but the receiver must store that value."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The figure shows the sequence-number version. The attacker forwards seq = 1000, then resends the same seq = 1000. A server that checks freshness rejects the duplicate; one that only decrypts accepts it again."
+    }
+   ]
+  },
+  {
+   "h3": "Port scanning: reading the replies",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A port scan probes TCP or UDP ports to learn which services are listening. It is the reconnaissance step before an attack and the first thing an administrator runs against their own firewall. The replies matter, not the number of ports tried. A port looks open, closed or filtered."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Scan type",
+      "Open port",
+      "Closed port",
+      "Filtered port"
+     ],
+     "rows": [
+      [
+       "TCP connect",
+       "handshake completes",
+       "RST",
+       "no reply"
+      ],
+      [
+       "SYN (half-open)",
+       "SYN-ACK",
+       "RST",
+       "no reply"
+      ],
+      [
+       "FIN / NULL",
+       "no reply",
+       "RST",
+       "no reply"
+      ],
+      [
+       "UDP",
+       "reply or nothing",
+       "ICMP port unreachable",
+       "no reply"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "For FIN and NULL scans an open port and a filtered port both stay silent, so the result is reported as open|filtered, exactly as with UDP."
+    },
+    {
+     "type": "p",
+     "text": "A TCP connect scan finishes the handshake, so the service logs the connection; it needs no special privilege. A SYN scan sends SYN, reads SYN-ACK or RST, then sends RST before the connection completes; it needs raw sockets. FIN and NULL scans send unusual flag combinations; a closed port answers RST while an open port ignores them, which slips past simple stateless filters. UDP scans rely on ICMP port-unreachable for closed ports. nmap is the common tool, and its state names (open, closed, filtered, open|filtered) are the ones above. Scanning a host you do not own, or have no written permission to test, is illegal in most places, including under India's IT Act."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The attacker forwards the first message, then later resends seq = 1000. The server accepts the duplicate because it checks nothing about freshness.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Client",
+    "Attacker",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Attacker",
+     "label": "data, seq = 1000",
+     "dashed": false
+    },
+    {
+     "from": "Attacker",
+     "to": "Server",
+     "label": "forward seq = 1000",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Attacker",
+     "label": "reply seq = 5000",
+     "dashed": false
+    },
+    {
+     "from": "Attacker",
+     "to": "Server",
+     "label": "replay seq = 1000",
+     "dashed": true
+    },
+    {
+     "from": "Server",
+     "to": "Attacker",
+     "label": "accepts duplicate",
+     "dashed": false
+    },
+    {
+     "from": "Attacker",
+     "to": "Client",
+     "label": "old reply resent",
+     "dashed": true
+    }
+   ],
+   "aria": "Client and server talk through an attacker who later resends seq = 1000, and the server accepts it a second time."
+  }
+ },
+ "examples": [
+  {
+   "question": "A botnet of 50,000 hosts sends 200 HTTP requests per second each at one web server. (a) What request rate reaches the server? (b) The server serves 20,000 requests per second; how many times over capacity is that? (c) Each request has a different spoofed source address. Why does per-IP rate limiting fail, and what is the correct defence? (d) A scan shows 22, 80, 443 open and 3306 filtered. Explain.",
+   "steps": [
+    "(a) Offered load = 50,000 × 200 = 10,000,000 requests per second.",
+    "(b) Overload ratio = 10,000,000 ÷ 20,000 = 500.",
+    "(c) Different spoofed addresses defeat per-IP rate limiting. Local filtering saves CPU but not bandwidth, because load arrives on the target's own link. The defence must be upstream: scrubbing centres or a CDN, anycast to spread traffic, and SYN cookies so half-open state is not allocated.",
+    "(d) 22, 80 and 443 open means SSH, HTTP and HTTPS answered. 3306 is MySQL; filtered means no reply, so a firewall silently dropped the probes. The host is up, so silence is policy, not a crash."
+   ],
+   "answer": "The botnet offers 10,000,000 requests per second, 500 times capacity; spoofed addresses defeat per-IP filtering, so the fix is upstream scrubbing plus SYN cookies, and the filtered port 3306 is dropped by a firewall rule.",
+   "check": "hosts = 50000\nrps = 200\ncapacity = 20000\noffered = hosts * rps\nratio = offered / capacity\nprint(offered)\nprint(ratio)",
+   "values": [
+    10000000,
+    500.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Calling DDoS 'many DoS'. One address cannot be blocked, so you need upstream filtering or anycast, not a bigger blocklist.",
+  "Believing encryption stops replay. A captured ciphertext is still valid; only freshness (nonce, timestamp, sequence number) stops the resend.",
+  "Mixing up reflection and amplification. Reflection is who receives the reply; amplification is the reply being larger.",
+  "Confusing closed with filtered in a scan. Closed means RST came back, so the host is up and no service listens. Filtered means nothing came back.",
+  "Treating a SYN flood as bandwidth. It exhausts the half-open table using little bandwidth; SYN cookies are the fix, not a bigger link."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define DoS and DDoS in one line each.",
+   "marks": 2,
+   "a": "A DoS attack makes a service unavailable from one source or a few. A DDoS attack does the same from many distributed hosts, usually a botnet, so traffic cannot be blocked at one address."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a SYN flood exhaust a server with little bandwidth, and how do SYN cookies prevent it?",
+   "marks": 3,
+   "a": "The server reserves a half-open entry on the first SYN. Spoofed SYNs never send the final ACK, so entries pile up. A SYN cookie allocates nothing: it encodes the connection in the SYN-ACK sequence number and creates the entry only on a valid ACK."
+  },
+  {
+   "level": "apply",
+   "q": "An NTP server replies with 480 bytes to a 48-byte request. Find the amplification factor. If the attacker sends 1,000 spoofed requests per second towards a victim, what bit rate reaches the victim?",
+   "marks": 4,
+   "a": "A = 480 ÷ 48 = 10. The victim receives 480 × 1,000 = 480,000 bytes per second = 3,840,000 bit/s = 3.84 Mbps. The attacker uploaded only 48 × 1,000 × 8 = 384 kbps."
+  },
+  {
+   "level": "apply",
+   "q": "A receiver using a sequence-number defence has last accepted seq = 5000. Messages arrive in this order: 6000, 5000, 7000. Which are accepted, and what is the stored value after each?",
+   "marks": 4,
+   "a": "6000 > 5000, accept; stored becomes 6000. 5000 is not greater than 6000, reject; stored stays 6000. 7000 > 6000, accept; stored becomes 7000. Two accepted, one replay rejected."
+  },
+  {
+   "level": "analyze",
+   "q": "A port scan of a host returns: 22 open, 80 open, 3306 filtered, 8080 closed. Explain each result and say which shows a firewall rule.",
+   "marks": 5,
+   "a": "22 and 80 answered, so SSH and HTTP run. 8080 answered RST: host up, nothing listening. 3306 gave no reply, so a firewall dropped those packets, hiding whether a database runs. Silence on one port while others answer proves the host is alive."
+  },
+  {
+   "level": "understand",
+   "q": "Why does ARP poisoning work on a switched LAN, and why does the switch not stop it?",
+   "marks": 3,
+   "a": "ARP has no authentication, so any host may claim that an IP is at its MAC; client and gateway overwrite their caches. The switch forwards by MAC, and the attacker's MAC is now the destination, so traffic flows to the attacker."
+  },
+  {
+   "level": "analyze",
+   "q": "Which LAN attacks make a MITM position possible, and what does each actually break?",
+   "marks": 5,
+   "a": "ARP poisoning breaks IP-to-MAC binding, redirecting traffic. MAC flooding overflows the CAM table, so frames reach every port and can be sniffed. DHCP starvation lets a rogue server name the attacker as gateway. VLAN hopping breaks VLAN isolation."
+  },
+  {
+   "level": "remember",
+   "q": "Name three port scan types and state what a closed port replies to each.",
+   "marks": 2,
+   "a": "TCP connect and SYN scan both get RST from a closed port. A FIN or NULL scan also gets RST from a closed port, while an open port ignores the packet."
+  }
+ ],
+ "beyond": "Not for the exam. Industry rents DDoS defence: scrubbing centres and anycast absorb traffic before it reaches your rack. Reflection persists because the fix sits on the reflector's side, so open resolvers stay a shared problem. Route signing (RPKI) aims to stop BGP hijacks. Internet-wide survey engines now scan the whole address space, which makes the line between research and attack a legal question more than a technical one."
+}
