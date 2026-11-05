@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import figures as F, render as R, verify as V, prompts as PR
-from llm import Gemini, Mock, QuotaExhausted, ModelError
+from llm import Gemini, OpenAICompat, Mock, QuotaExhausted, ModelError
 
 
 class State:
@@ -164,23 +164,29 @@ def main():
     out = os.path.join(ROOT, a.out or ent['out'])
     S = State(a.state or os.path.join(ROOT, '.free', a.unit))
     logf = open(os.path.join(S.d, 'log.txt'), 'a', encoding='utf-8')
+    import threading
+    lock = threading.Lock()
     def log(m):
-        line = f'{datetime.datetime.now():%H:%M:%S} {m}'; print(line, flush=True); logf.write(line + '\n'); logf.flush()
+        line = f'{datetime.datetime.now():%H:%M:%S} {m}'
+        with lock: print(line, flush=True); logf.write(line + '\n'); logf.flush()
     log(f'=== {a.unit}: {P["subject"]["name"]}, Unit {P["unit"]["n"]} {P["unit"]["name"]} -> {os.path.relpath(out, ROOT)}')
     if a.mock:
         import mock
         ask = Mock(mock.answer(P), log)
+    elif os.environ.get('OPENAI_BASE_URL'):
+        ask = OpenAICompat.from_env(log)
     else:
         ask = Gemini.from_env(log)
     flags = S.get('flags') or []
     def flag(m):
-        if m not in flags: flags.append(m); S.put('flags', flags)
+        with lock:
+            if m not in flags: flags.append(m); S.put('flags', flags)
     t0 = time.time()
     N = P['unit']['n']; subs = P['unit']['subtopics']; ids = {s['id'] for s in subs}
     try:
         plan = S.get('plan') or S.put('plan', ask.json('plan', PR.SYSTEM, PR.plan(P), check=check_plan(P)))
         while len(plan.get('chapters', [])) < len(subs): plan.setdefault('chapters', []).append({})
-        for k in range(1, len(subs) + 1):
+        def do_chapter(k):
             key = f'ch{k}'
             ch = S.get(key)
             if ch is None:
@@ -204,6 +210,13 @@ def main():
                     else:
                         flag(f'chapter {k}: the reviewer found {len(high)} serious problem(s) and the revision did not pass the checks; read the review in the state folder')
                 S.put(f'review{k}', issues); S.put(key + '.reviewed', True)
+        workers = max(1, int(os.environ.get('PARALLEL', '1')))
+        if workers == 1:
+            for k in range(1, len(subs) + 1): do_chapter(k)
+        else:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(workers) as pool:
+                for f in [pool.submit(do_chapter, k) for k in range(1, len(subs) + 1)]: f.result()
         us = S.get('unit')
         if us is None:
             brief = []

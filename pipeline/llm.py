@@ -201,6 +201,76 @@ class Gemini:
         raise ModelError(f'{task}: no valid JSON after 3 tries')
 
 
+class OpenAICompat(Gemini):
+    """Any server with the OpenAI chat API: a vLLM pod on RunPod, Groq, SambaNova, a local Ollama.
+    Set OPENAI_BASE_URL (ending in /v1), OPENAI_API_KEY and OPENAI_MODEL; REVIEW_MODEL is optional."""
+
+    def __init__(self, base, key, model, review_model, log):
+        super().__init__(key, log, [model], [review_model or model], 0)
+        self.base = base.rstrip('/')
+        import threading; self._lk = threading.Lock()
+        self.effort = os.environ.get('REASONING_EFFORT', '')
+
+    @classmethod
+    def from_env(cls, log):
+        base = os.environ['OPENAI_BASE_URL']; key = os.environ.get('OPENAI_API_KEY', '')
+        model = os.environ.get('OPENAI_MODEL', '')
+        for i in range(40):                       # a fresh pod may still be loading the model
+            st, js = _openai('GET', f'{base.rstrip("/")}/models', key, timeout=30)
+            if st == 200 and js.get('data'):
+                names = [m.get('id') for m in js['data']]
+                model = model or names[0]
+                log(f'server ready; models {names[:4]}, using {model}'); break
+            log(f'waiting for the model server (HTTP {st}) ...'); time.sleep(30)
+        else:
+            raise SystemExit('The model server at OPENAI_BASE_URL did not answer for 20 minutes. Is the pod running?')
+        return cls(base, key, model, os.environ.get('REVIEW_MODEL', ''), log)
+
+    def text(self, task, system, prompt, role='write', temperature=0.6, json_mode=True, max_tokens=16000):
+        model = self.reviewer[0] if role == 'review' else self.writer[0]
+        body = {'model': model, 'temperature': temperature, 'max_tokens': max_tokens,
+                'messages': [{'role': 'system', 'content': system}, {'role': 'user', 'content': prompt}]}
+        if json_mode: body['response_format'] = {'type': 'json_object'}
+        if self.effort: body['reasoning_effort'] = self.effort
+        for attempt in range(8):
+            t0 = time.time()
+            st, js = _openai('POST', f'{self.base}/chat/completions', self.key, body, timeout=600)
+            if st == 200 and js.get('choices'):
+                msg = js['choices'][0].get('message') or {}
+                out = msg.get('content') or ''
+                um = js.get('usage') or {}
+                with self._lk:
+                    self.calls += 1; self.tokens_in += um.get('prompt_tokens', 0); self.tokens_out += um.get('completion_tokens', 0)
+                self.log(f'  {task}: {model} {time.time() - t0:.0f}s in {um.get("prompt_tokens", 0)} out {um.get("completion_tokens", 0)}')
+                if out.strip(): return out
+                continue
+            msg = str((js.get('error') or {}).get('message', js) if isinstance(js, dict) else js)[:200]
+            if st == 400 and 'response_format' in msg and 'response_format' in body:
+                body.pop('response_format'); continue
+            if st == 400 and 'reasoning_effort' in msg:
+                body.pop('reasoning_effort', None); continue
+            if st == 429 and 'quota' in msg.lower():
+                raise QuotaExhausted(msg)
+            wait = min(90, 5 * 2 ** attempt)
+            self.log(f'  {task}: HTTP {st} {msg[:120]}; retry in {wait}s'); time.sleep(wait)
+        raise ModelError(f'{task}: the model server kept failing')
+
+
+def _openai(method, url, key, body=None, timeout=600):
+    data = json.dumps(body).encode() if body is not None else None
+    h = {'Content-Type': 'application/json'}
+    if key: h['Authorization'] = f'Bearer {key}'
+    req = urllib.request.Request(url, data=data, method=method, headers=h)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, json.loads(r.read().decode('utf-8') or '{}')
+    except urllib.error.HTTPError as e:
+        try: return e.code, json.loads(e.read().decode('utf-8') or '{}')
+        except Exception: return e.code, {}
+    except Exception as e:
+        return 0, {'error': {'message': str(e)}}
+
+
 class Mock:
     """Offline stand-in used for tests: answers come from a function (task, prompt) -> dict."""
 

@@ -8,7 +8,7 @@ git checkout -q main
 if [ -n "${UNITS:-}" ]; then
   reqs=$(echo "$UNITS" | tr ' ,' '\n\n' | sed '/^$/d')
 else
-  reqs=$(grep -v '^[[:space:]]*#' pipeline/requests.txt | sed '/^[[:space:]]*$/d')
+  reqs=$(grep -v '^[[:space:]]*#' "${REQ_FILE:-pipeline/requests.txt}" | sed '/^[[:space:]]*$/d')
 fi
 [ -z "$reqs" ] && { echo "nothing requested"; exit 0; }
 echo "$reqs" | while read -r unit out; do
