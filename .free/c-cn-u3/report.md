@@ -2,7 +2,7 @@
 
 - Book: `books/cse/c-cn/c-cn-u3.html`
 - Status: problems
-- Model calls so far: 15 (58,437 tokens in, 74,665 out), 9.1 minutes
+- Model calls so far: 18 (67,597 tokens in, 90,139 out), 11.5 minutes
 
 ## Checker
 
