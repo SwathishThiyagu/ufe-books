@@ -1,0 +1,235 @@
+{
+ "lead": "Word embeddings map each word to a dense vector learned from context. Word2Vec trains a small predictor: CBOW predicts a target from its neighbours, skip-gram predicts neighbours from the target, with negative sampling or hierarchical softmax for speed. GloVe fits vectors to global co-occurrence counts by weighted least squares. Doc2Vec adds a learned vector for a whole document. The vectors support similarity search, clustering, classification features, and analogies such as king − man + woman ≈ queen. The mechanisms matter because cosine comparison decides whether two vectors count as similar.",
+ "prereq": "You need one-hot and dense word vectors plus cosine similarity from <a href=\"#word-representations-one-hot-encoding-and-word-vectors\">5.5</a>.",
+ "sections": [
+  {
+   "h3": "Word2Vec: local context predicts words",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Word2Vec learns a dense vector for each word from local context windows. It keeps input vectors U, with row u<sub>w</sub> for word w, and output vectors V, with row v<sub>w</sub>. The usual embedding is u<sub>w</sub>, or sometimes u<sub>w</sub>+v<sub>w</sub>. Dimension d is commonly 50 to 300."
+    },
+    {
+     "type": "p",
+     "text": "CBOW (continuous bag of words) predicts a target word w<sub>t</sub> from its neighbours. Skip-gram reverses the task: it predicts each neighbour from the target. Skip-gram makes more training pairs for rare words and is slower. Window size k is often 2 to 10."
+    },
+    {
+     "type": "formula",
+     "text": "p(c|w) = exp(v<sub>c</sub>·u<sub>w</sub>) / Σ<sub>w′∈V</sub> exp(v<sub>w′</sub>·u<sub>w</sub>)",
+     "where": "V is the vocabulary; c is a context word; u<sub>w</sub> is the input vector of target w; v<sub>c</sub> is the output vector of c; · is the dot product."
+    },
+    {
+     "type": "p",
+     "text": "The denominator sums over every word, which is costly for large V. Negative sampling replaces it with a binary task: a true pair (w,c) gets label 1, and k noise words get label 0. A common noise distribution is P<sub>n</sub>(w) ∝ count(w)<sup>0.75</sup>. Hierarchical softmax puts words at leaves of a binary tree and multiplies sigmoid probabilities along the path, giving O(log V) cost."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Tokenize the corpus and build the vocabulary.",
+      "Slide a window over each sentence to make (target, context) pairs.",
+      "Update U and V by stochastic gradient descent on the prediction loss.",
+      "Keep U as the word vectors."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "GloVe: global co-occurrence counts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "GloVe (Global Vectors) starts from a word–context co-occurrence matrix X. X<sub>ij</sub> is the number of times word j appears within a window of word i. The matrix is large and sparse: V rows and V columns. GloVe uses these counts once, not a stream of windows."
+    },
+    {
+     "type": "formula",
+     "text": "J = Σ<sub>i,j=1</sub><sup>V</sup> f(X<sub>ij</sub>) (w<sub>i</sub>·c<sub>j</sub> + b<sub>i</sub> + b<sub>j</sub> − log X<sub>ij</sub>)²",
+     "where": "J is the loss; X<sub>ij</sub> is the co-occurrence count; w<sub>i</sub> is the word vector; c<sub>j</sub> is the context vector; b<sub>i</sub> and b<sub>j</sub> are scalar biases; f is a weighting function."
+    },
+    {
+     "type": "p",
+     "text": "A standard choice is f(x)=min(1,(x/x<sub>max</sub>)<sup>0.75</sup>) with x<sub>max</sub>=100, which stops very frequent pairs from dominating. The log turns counts into additive geometry: a large X<sub>ij</sub> should make w<sub>i</sub>·c<sub>j</sub> large."
+    },
+    {
+     "type": "p",
+     "text": "Why it works: ratios of co-occurrence probabilities carry meaning. If word i co-occurs with ice more than with steam, and word j does the opposite, the vectors encode that contrast. Training runs gradient descent on the nonzero entries of X. GloVe often gives similar nearest neighbours to Word2Vec but can be faster on a fixed corpus."
+    }
+   ]
+  },
+  {
+   "h3": "Doc2Vec: a vector for a document",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Doc2Vec extends Word2Vec with a learned vector for each document. The document ID is treated like an extra word that is always present in that document. In PV-DM (paragraph vector distributed memory), the model predicts a target word from the average of the context word vectors and the document vector. In PV-DBOW (distributed bag of words), the document vector predicts randomly sampled words from the document, like skip-gram with the document as the only input."
+    },
+    {
+     "type": "formula",
+     "text": "p(w<sub>t</sub> | context, d) = exp(v<sub>w<sub>t</sub></sub>·h) / Σ<sub>w′∈V</sub> exp(v<sub>w′</sub>·h)",
+     "where": "w<sub>t</sub> is the target word; d is the document vector; h is the concatenation or average of the context vectors and d; V is the vocabulary."
+    },
+    {
+     "type": "p",
+     "text": "The document vector acts as a memory of what the document is about. Training uses the same negative sampling or hierarchical softmax as Word2Vec. To embed a new document, freeze the word vectors and learn only its document vector by the same prediction task. Document vectors are used for similarity search, clustering, and as features for a classifier. They are dense and learned from context, not a bag-of-words count."
+    }
+   ]
+  },
+  {
+   "h3": "Analogies, nearest neighbours and cosine",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Word vectors support approximate arithmetic. A famous pattern is king − man + woman ≈ queen. The model was never told about gender; the relation appears because man and woman occur in similar contexts and king and queen occur in similar contexts. The result is approximate: it depends on the corpus, window size, dimension, and training time."
+    },
+    {
+     "type": "formula",
+     "text": "cos(a,b) = (a·b) / (||a|| ||b||)",
+     "where": "a·b is the dot product; ||a||=√(a·a) is the Euclidean length; the value lies in [−1,1]."
+    },
+    {
+     "type": "p",
+     "text": "Raw dot products are not comparable across vectors of different lengths: a long vector can have a large dot product with everything. Cosine divides out length. Use cosine for word similarity, document similarity, and analogy scoring. For an analogy a is to b as c is to d, compute x = b − a + c and choose the word whose vector has the highest cosine with x, excluding a, b, c. In the figure, man=[1,0], woman=[0,1], king=[1,1], queen=[0,2]; king − man + woman = [0,2], exactly queen. On real vectors the match is close, not exact."
+    },
+    {
+     "type": "p",
+     "text": "FastText adds subword n-gram vectors, which helps with morphology; only a few universities teach it. Transformers such as BERT are covered in Unit 6."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The points use man=[1,0], woman=[0,1], king=[1,1], queen=[0,2]. Adding the woman vector to man lands on king, and the dashed step king − man + woman lands on queen.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "aria": "A two-dimensional graph places man, woman, king and queen as points; the vector step from king to queen is minus man plus woman.",
+   "nodes": [
+    {
+     "id": "man",
+     "label": "man",
+     "x": 1,
+     "y": 0,
+     "note": "[1,0]",
+     "style": "normal"
+    },
+    {
+     "id": "woman",
+     "label": "woman",
+     "x": 0,
+     "y": 1,
+     "note": "[0,1]",
+     "style": "normal"
+    },
+    {
+     "id": "king",
+     "label": "king",
+     "x": 1,
+     "y": 1,
+     "note": "[1,1]",
+     "style": "accent"
+    },
+    {
+     "id": "queen",
+     "label": "queen",
+     "x": 0,
+     "y": 2,
+     "note": "[0,2]",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "man",
+     "to": "king",
+     "label": "woman",
+     "style": "solid"
+    },
+    {
+     "from": "woman",
+     "to": "queen",
+     "label": "woman",
+     "style": "solid"
+    },
+    {
+     "from": "king",
+     "to": "queen",
+     "label": "−man+woman",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Given man=[1,0], woman=[0,1], king=[1,1] and queen=[0,2], compute king − man + woman. Does it equal queen? Give the cosine similarity between the result and queen.",
+   "steps": [
+    "Subtract man from king: [1,1] − [1,0] = [0,1].",
+    "Add woman: [0,1] + [0,1] = [0,2].",
+    "Compare with queen [0,2]: the difference is [0,0], so the vectors are equal.",
+    "Dot product with queen: 0×0 + 2×2 = 4.",
+    "Length of result = √(0²+2²) = 2. Length of queen = √(0²+2²) = 2.",
+    "Cosine = 4 / (2×2) = 1.0."
+   ],
+   "answer": "The result is [0,2], which equals queen; the cosine similarity is 1.0.",
+   "check": "man = [1, 0]\nwoman = [0, 1]\nking = [1, 1]\nqueen = [0, 2]\nresult = [king[i] - man[i] + woman[i] for i in range(2)]\ndot = sum(result[i] * queen[i] for i in range(2))\nnorm_result = sum(x * x for x in result) ** 0.5\nnorm_queen = sum(x * x for x in queen) ** 0.5\ncosine = dot / (norm_result * norm_queen)\nprint(result[0])\nprint(result[1])\nprint(cosine)\n",
+   "values": [
+    0,
+    2,
+    1.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Raw dot product is not cosine. A long vector can win on dot product even when its direction is a poor match; normalise by length.",
+  "Analogy arithmetic is approximate. Results change with corpus, window size, dimension and training; do not expect an exact queen every time.",
+  "CBOW and skip-gram are reversed. CBOW predicts the target from context; skip-gram predicts context from the target.",
+  "Negative sampling does not mean antonyms or negative sentiment. It samples noise words for a binary classifier.",
+  "GloVe uses log X<sub>ij</sub>, not X<sub>ij</sub>, inside the squared error, and f(0)=0 so zero counts are skipped."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In Word2Vec, what does CBOW predict?",
+   "marks": 2,
+   "a": "A target word from its context words."
+  },
+  {
+   "level": "understand",
+   "q": "Why does negative sampling avoid the full softmax?",
+   "marks": 3,
+   "a": "It replaces the sum over V with a few binary true/noise decisions, so cost depends on k, not V."
+  },
+  {
+   "level": "apply",
+   "q": "Given a=[2,0] and b=[0,3], compute cos(a,b).",
+   "marks": 4,
+   "a": "a·b=0; ||a||=2, ||b||=3; cos=0/(2×3)=0."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a word with a large dot product with many words still have low cosine similarity to them?",
+   "marks": 4,
+   "a": "Its length is large; cosine divides by both lengths, so direction matters, not magnitude."
+  },
+  {
+   "level": "apply",
+   "q": "Skip-gram target w has u<sub>w</sub>=[1,2], context c has v<sub>c</sub>=[3,1]. Compute u<sub>w</sub>·v<sub>c</sub>.",
+   "marks": 2,
+   "a": "1×3 + 2×1 = 5."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can Doc2Vec embed a new document while keeping word vectors fixed?",
+   "marks": 4,
+   "a": "Only the new document vector is unknown; the word vectors are already trained, and the same prediction loss gives gradients for the document vector."
+  },
+  {
+   "level": "remember",
+   "q": "What count matrix does GloVe use?",
+   "marks": 2,
+   "a": "A word–context co-occurrence count matrix X, where X<sub>ij</sub> counts context j near word i."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, word and document vectors power search ranking, recommendation, deduplication and topic grouping. Vector databases store embeddings and answer nearest-neighbour queries at scale. Newer systems often use contextual embeddings from transformers, but the same cosine and negative-sampling ideas return. Search next for word2vec negative sampling, GloVe co-occurrence matrix and doc2vec PV-DM. FastText subword vectors are useful for Indian languages with rich morphology."
+}
