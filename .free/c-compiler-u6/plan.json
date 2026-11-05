@@ -1,0 +1,537 @@
+{
+ "lead": "This unit shows how a compiler turns three-address code into target instructions and then improves that code without changing its results. After it, a student can generate code for a basic block, build flow graphs and DAGs, apply standard optimizations, and compute reaching definitions by hand.",
+ "about": "This unit turns three-address code into target code and then makes that code faster. Chapter 6.1 gives the code generator's design issues and a simple register-based generator. 6.2 splits code into basic blocks and draws the flow graph. 6.3 summarizes each block as a DAG, which exposes repeated work. 6.4 names the principal sources of optimization. 6.5 applies function-preserving rewrites, loop optimization and peephole cleanup. 6.6 adds global data-flow analysis so optimizations can cross block boundaries. The worked examples stay small so every descriptor, set and instruction can be checked by hand.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A code generator maps three-address code to target instructions while choosing registers and keeping descriptors correct.",
+   "depth": "Input: three-address code from Unit 4. Output forms: assembly, relocatable machine code, or code for a virtual machine. Design issues: instruction selection, register allocation, evaluation order, memory addressing, and the cost of each. The simple code generator: for each three-address instruction call getreg, emit load/operation/store, update the register descriptor (which registers hold which names) and the address descriptor (where each name is found). Use next-use information to free a register. Some syllabi call this target code generation. Keep the algorithm for arithmetic, copy and unconditional jump; leave calls to Unit 5.",
+   "figure": {
+    "type": "array",
+    "title": "Descriptors for x = a*b + c*d",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "LD R0,a",
+      "cells": [
+       "a",
+       "—",
+       "—"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "MUL R0,b",
+      "cells": [
+       "t1",
+       "—",
+       "—"
+      ]
+     },
+     {
+      "label": "LD R1,c",
+      "cells": [
+       "t1",
+       "c",
+       "—"
+      ]
+     },
+     {
+      "label": "MUL R1,d",
+      "cells": [
+       "t1",
+       "t2",
+       "—"
+      ]
+     },
+     {
+      "label": "ADD R0,R1",
+      "cells": [
+       "t3",
+       "—",
+       "—"
+      ],
+      "marks": {
+       "0": "live"
+      }
+     },
+     {
+      "label": "ST x,R0",
+      "cells": [
+       "t3",
+       "—",
+       "t3"
+      ],
+      "marks": {
+       "2": "next"
+      }
+     }
+    ],
+    "aria": "A table of register and address descriptors after each of six target instructions, showing R0 and R1 contents and where x is stored."
+   },
+   "example": "Generate target code for the basic block t1 = a * b; t2 = c * d; t3 = t1 + t2; x = t3 using a simple code generator with registers R0 and R1. Show the register descriptor and address descriptor after each instruction. The code is LD R0, a; MUL R0, b; LD R1, c; MUL R1, d; ADD R0, R1; ST x, R0. R0 holds a then t1; R1 holds c then t2; the ADD makes R0 hold t3 and frees R1; the ST records x in memory and in R0.",
+   "trap": "getreg must not return a register that holds a live value. Update both descriptors after every instruction, or the next getreg call will make a wrong choice.",
+   "prereq": "Unit 4 for three-address code; Unit 5 for activation records and variable addresses.",
+   "leave": "Graph-colouring global register allocation, instruction scheduling and machine-specific peephole patterns."
+  },
+  {
+   "k": 2,
+   "idea": "Basic blocks are maximal straight-line runs; the flow graph connects them and exposes control flow.",
+   "depth": "Leaders: first statement, any jump target, any statement after a jump. Build blocks from leaders and extend each to the statement before the next leader. Flow graph: nodes are blocks, edges are possible transfers (fall-through and jumps). Define predecessor, successor, entry and exit. Show a loop as a cycle. Explain why optimizations work block by block and then use the graph. Some syllabi say 'partition into basic blocks'. Do not compute dominators or data flow here.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "B1",
+      "label": "B1",
+      "x": 0,
+      "y": 1,
+      "note": "1: i = 1",
+      "style": "normal"
+     },
+     {
+      "id": "B2",
+      "label": "B2",
+      "x": 2,
+      "y": 2,
+      "note": "2-3: t1, branch",
+      "style": "accent"
+     },
+     {
+      "id": "B3",
+      "label": "B3",
+      "x": 2,
+      "y": 0,
+      "note": "4-6: body",
+      "style": "live"
+     },
+     {
+      "id": "B4",
+      "label": "B4",
+      "x": 4,
+      "y": 2,
+      "note": "7: return",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "B1",
+      "to": "B2",
+      "style": "solid"
+     },
+     {
+      "from": "B2",
+      "to": "B3",
+      "label": "false",
+      "style": "solid"
+     },
+     {
+      "from": "B2",
+      "to": "B4",
+      "label": "t1>100",
+      "style": "solid"
+     },
+     {
+      "from": "B3",
+      "to": "B2",
+      "label": "goto 2",
+      "style": "accent"
+     }
+    ],
+    "aria": "A flow graph with four basic blocks: B1 falls into B2; B2 branches to B3 or B4; B3 jumps back to B2."
+   },
+   "example": "Partition this three-address code into basic blocks and draw the flow graph: 1 i = 1; 2 t1 = 4 * i; 3 if t1 > 100 goto 7; 4 A[i] = 0; 5 i = i + 1; 6 goto 2; 7 return. Leaders are 1, 2, 4 and 7. Blocks are B1 = {1}, B2 = {2, 3}, B3 = {4, 5, 6}, B4 = {7}. Edges are B1 to B2; B2 to B3 when the test is false; B2 to B4 when true; B3 back to B2.",
+   "trap": "The statement after a conditional jump is a leader even if no jump targets it; a target can be above the jump, so leaders are not only forward.",
+   "prereq": "Unit 4 for three-address code; Unit 3 for jump instructions.",
+   "leave": "Dominator trees and loop detection to 6.6; the DAG inside a block to 6.3."
+  },
+  {
+   "k": 3,
+   "idea": "A DAG for a basic block shares repeated subexpressions and shows which assignments are copies or dead.",
+   "depth": "Construction: leaves for variables; an interior node for each operation, labelled with the statement numbers that compute it; an assignment adds the left-hand variable as a label on the node. Two nodes merge only if the operator and ordered children are identical. Use the DAG to find common subexpressions, copy assignments and dead code. Reordering is safe only for operations without side effects. An array assignment kills earlier array nodes. Some syllabi call it 'directed acyclic graph of a basic block'. Keep construction and simple use.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "a",
+      "label": "a",
+      "x": 0,
+      "y": 0,
+      "note": "leaf",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "b",
+      "x": 1,
+      "y": 0,
+      "note": "leaf",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "c",
+      "x": 2,
+      "y": 0,
+      "note": "leaf",
+      "style": "normal"
+     },
+     {
+      "id": "p",
+      "label": "+",
+      "x": 0,
+      "y": 1,
+      "note": "t1,t2",
+      "style": "accent"
+     },
+     {
+      "id": "m",
+      "label": "*",
+      "x": 1,
+      "y": 1,
+      "note": "t3,d",
+      "style": "live"
+     },
+     {
+      "id": "s",
+      "label": "−",
+      "x": 1,
+      "y": 2,
+      "note": "e",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "p",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "p",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "m",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "m",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "s",
+      "style": "solid"
+     },
+     {
+      "from": "m",
+      "to": "s",
+      "style": "solid"
+     }
+    ],
+    "aria": "A DAG for the block: a single plus node labelled t1 and t2 feeds both the multiply node labelled t3 and d, and the minus node for e."
+   },
+   "example": "Draw the DAG for the basic block t1 = a + b; t2 = a + b; t3 = t1 * c; d = t3; e = t2 - d. Label each node with the statements that define it. The plus node is shared by t1 and t2, so a + b is computed once. The multiply node is shared by t3 and d, so d = t3 is a copy. The minus node computes e from the shared plus and multiply nodes.",
+   "trap": "Do not merge a−b with b−a; subtraction is not commutative. An assignment to an array element must kill earlier nodes that read or write that array.",
+   "prereq": "6.2 for the basic block; Unit 4 for syntax trees and DAGs of expressions.",
+   "leave": "Global value numbering and SSA to advanced courses."
+  },
+  {
+   "k": 4,
+   "idea": "Optimization has a small set of repeated sources: remove work that is repeated, useless, constant or costly.",
+   "depth": "Classify machine-independent vs machine-dependent, local vs global. Define and give one example each: common subexpression elimination, copy propagation, dead-code elimination, constant folding, constant propagation, algebraic simplification, strength reduction, code motion. Explain safety: a transformation must preserve behaviour. Note that 'function-preserving' is the same as 'semantics-preserving'. Leave loop-specific forms to 6.5 and cross-block facts to 6.6. Some syllabi group these as 'principal sources of optimization'.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Principal sources",
+    "nodes": [
+     {
+      "id": "code",
+      "label": "Intermediate code",
+      "note": "three-address form",
+      "style": "normal"
+     },
+     {
+      "id": "cse",
+      "label": "Common subexpressions",
+      "note": "b+c reused",
+      "style": "accent"
+     },
+     {
+      "id": "dead",
+      "label": "Dead code",
+      "note": "x, y unused",
+      "style": "normal"
+     },
+     {
+      "id": "fold",
+      "label": "Constant folding",
+      "note": "2*3 → 6",
+      "style": "normal"
+     },
+     {
+      "id": "copy",
+      "label": "Copy propagation",
+      "note": "e = a",
+      "style": "normal"
+     },
+     {
+      "id": "strength",
+      "label": "Strength reduction",
+      "note": "i*2 → i+i",
+      "style": "normal"
+     },
+     {
+      "id": "out",
+      "label": "Optimized code",
+      "note": "same results",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "code",
+      "to": "cse",
+      "style": "solid"
+     },
+     {
+      "from": "code",
+      "to": "dead",
+      "style": "solid"
+     },
+     {
+      "from": "code",
+      "to": "fold",
+      "style": "solid"
+     },
+     {
+      "from": "code",
+      "to": "copy",
+      "style": "solid"
+     },
+     {
+      "from": "code",
+      "to": "strength",
+      "style": "solid"
+     },
+     {
+      "from": "cse",
+      "to": "out",
+      "style": "solid"
+     },
+     {
+      "from": "dead",
+      "to": "out",
+      "style": "solid"
+     },
+     {
+      "from": "fold",
+      "to": "out",
+      "style": "solid"
+     },
+     {
+      "from": "copy",
+      "to": "out",
+      "style": "solid"
+     },
+     {
+      "from": "strength",
+      "to": "out",
+      "style": "solid"
+     }
+    ],
+    "aria": "A block diagram showing five principal sources of optimization applied to intermediate code to produce optimized code."
+   },
+   "example": "Apply constant folding, constant propagation, common subexpression elimination, copy propagation, strength reduction and dead-code elimination to: x = 2 * 3; y = x + 0; a = b + c; d = b + c; e = d * 1; f = i * 2; print(a, e, f). Constant folding gives x = 6; propagation and folding give y = 6. y is never used, so y and then x are dead. d = b + c is the same expression as a, so d = a; e = d * 1 becomes e = d then e = a by copy propagation. f = i * 2 becomes f = i + i. Final code: a = b + c; e = a; f = i + i; print(a, e, f).",
+   "trap": "A common subexpression is not common if a variable in it is redefined between the two uses. Dead-code removal must not delete calls, I/O or assignments to volatile names.",
+   "prereq": "6.2 and 6.3 for blocks and DAGs; Unit 4 for three-address code.",
+   "leave": "Loop-invariant motion and induction variables to 6.5; data-flow computation to 6.6."
+  },
+  {
+   "k": 5,
+   "idea": "Function-preserving transformations rewrite code without changing results; loop optimization applies them where they pay most.",
+   "depth": "Function-preserving (semantics-preserving) transformations: common subexpression elimination, copy propagation, constant folding and propagation, dead-code elimination, algebraic simplification, strength reduction. Loop optimization: loop-invariant code motion to a preheader, induction-variable strength reduction, induction-variable elimination, loop unrolling, loop jamming. Peephole optimization: a small window over target instructions; remove redundant load/store, jump to jump, unreachable code, and fold constants. Some syllabi list peephole separately. Keep examples small and check safety.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Loop optimization",
+    "nodes": [
+     {
+      "id": "pre",
+      "label": "Preheader",
+      "note": "t2 = x*y",
+      "style": "accent"
+     },
+     {
+      "id": "init",
+      "label": "t1 = 0",
+      "note": "before loop",
+      "style": "normal"
+     },
+     {
+      "id": "head",
+      "label": "Loop header",
+      "note": "t1 ≤ 396",
+      "style": "normal"
+     },
+     {
+      "id": "body",
+      "label": "Body",
+      "note": "A[t1] = t2",
+      "style": "live"
+     },
+     {
+      "id": "inc",
+      "label": "t1 = t1 + 4",
+      "note": "strength reduced",
+      "style": "normal"
+     },
+     {
+      "id": "exit",
+      "label": "Exit",
+      "note": "after 100 turns",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "pre",
+      "to": "init",
+      "style": "solid"
+     },
+     {
+      "from": "init",
+      "to": "head",
+      "style": "solid"
+     },
+     {
+      "from": "head",
+      "to": "body",
+      "label": "yes",
+      "style": "solid"
+     },
+     {
+      "from": "body",
+      "to": "inc",
+      "style": "solid"
+     },
+     {
+      "from": "inc",
+      "to": "head",
+      "label": "back",
+      "style": "accent"
+     },
+     {
+      "from": "head",
+      "to": "exit",
+      "label": "no",
+      "style": "solid"
+     }
+    ],
+    "aria": "A loop flow graph with the invariant t2 = x*y in a preheader and the induction variable t1 incremented by 4."
+   },
+   "example": "Apply loop-invariant code motion, strength reduction and induction-variable elimination to: for i = 0 to 99 do { t1 = 4 * i; t2 = x * y; A[t1] = t2 }. Move t2 = x * y to a preheader. Replace 4 * i by an induction variable t1 that starts at 0 and adds 4 each turn; since t1 takes 0, 4, ..., 396, the loop runs 100 times. Final code: t2 = x * y; t1 = 0; while t1 ≤ 396 do { A[t1] = t2; t1 = t1 + 4 }.",
+   "trap": "Hoisting x*y out of a loop is invalid if x or y is assigned inside the loop, or if the operation can trap and the loop may run zero times. Strength reduction must keep exactly the same iteration count.",
+   "prereq": "6.4 for the sources; 6.2 for flow graphs; Unit 4 for loops in three-address code.",
+   "leave": "Data-flow proofs of invariance to 6.6; advanced loop transformations such as tiling to later courses."
+  },
+  {
+   "k": 6,
+   "idea": "Global data-flow analysis computes facts at every block boundary by iterating transfer functions over the flow graph.",
+   "depth": "A data-flow equation has a meet operator (union for may, intersection for must) and a transfer function. Reaching definitions: forward may analysis; gen/kill; IN[B] = union of OUT of predecessors; OUT[B] = gen ∪ (IN − kill). Live variables: backward may analysis. Available expressions: forward must analysis. Build the iterative algorithm; a worklist version is the efficient data-flow algorithm some syllabi mention. Define conservative solution and def-use chains. Use the result to justify constant propagation and common subexpression elimination across blocks.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "B1",
+      "label": "B1",
+      "x": 0,
+      "y": 1,
+      "note": "OUT {d1,d2}",
+      "style": "accent"
+     },
+     {
+      "id": "B2",
+      "label": "B2",
+      "x": 2,
+      "y": 2,
+      "note": "OUT {d2,d3}",
+      "style": "normal"
+     },
+     {
+      "id": "B3",
+      "label": "B3",
+      "x": 2,
+      "y": 0,
+      "note": "IN {d1,d2,d3}",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "B1",
+      "to": "B2",
+      "style": "solid"
+     },
+     {
+      "from": "B1",
+      "to": "B3",
+      "style": "solid"
+     },
+     {
+      "from": "B2",
+      "to": "B3",
+      "style": "solid"
+     }
+    ],
+    "aria": "A three-block flow graph with reaching-definition sets: B1 and B2 both send definitions into B3."
+   },
+   "example": "Flow graph: B1 has d1: x = 1 and d2: y = 2. B2 has d3: x = 3. B3 has d4: z = x + y. Edges are B1→B2, B1→B3, B2→B3. Compute gen and kill sets and the reaching-definition IN/OUT sets. B1: gen {d1,d2}, kill {d3}. B2: gen {d3}, kill {d1}. B3: gen {d4}, kill {}. IN[B1] = {}. OUT[B1] = {d1,d2}. IN[B2] = {d1,d2}. OUT[B2] = {d2,d3}. IN[B3] = {d1,d2,d3}. OUT[B3] = {d1,d2,d3,d4}. At d4, x may come from d1 or d3, so x is not constant.",
+   "trap": "Use union for reaching definitions and intersection for available expressions. The kill set contains every definition of a variable in the whole flow graph, not just definitions seen before.",
+   "prereq": "6.2 for flow graphs; basic set theory (union, intersection, difference).",
+   "leave": "Interprocedural analysis, SSA and complexity proofs to advanced courses."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "emitted code is split into blocks"
+  ],
+  [
+   2,
+   3,
+   "a block becomes a DAG"
+  ],
+  [
+   3,
+   4,
+   "DAG exposes repeated work"
+  ],
+  [
+   4,
+   5,
+   "local rewrites become loop-wide"
+  ],
+  [
+   2,
+   6,
+   "the flow graph carries data-flow sets"
+  ],
+  [
+   5,
+   6,
+   "loop facts need global analysis"
+  ]
+ ]
+}

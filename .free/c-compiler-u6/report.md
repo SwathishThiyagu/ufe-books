@@ -1,0 +1,38 @@
+# c-compiler-u6: free-model run
+
+- Book: `books/cse/c-compiler/c-compiler-u6.html`
+- Status: ok
+- Model calls so far: 18 (63,938 tokens in, 148,793 out), 4.4 minutes
+
+## Checker
+
+```
+c-compiler-u6.html: 6 chapters, 11662 words, 7 figures, 126 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 2 rule vs Worked example 1 step 7, the figure's last row and its caption, and the example's answer: Section 2 says: for a copy x = y, if y is in a register and y is dead, rename that register to x and emit nothing. Step 7 breaks this rule: it emits ST x, R0 at once and says 'R0 still holds t3'. The figure's final row also shows R0 = t3, x = t3. But Quiz Q3's answer follows the rule (after ADD R0,R1 it says R0={x}), and Q6 repeats the rule. A student cannot tell whether the register descriptor after the last instruction is {x} or {t3}, which is exactly what an exam asks for.
+- ch 1 [low] Figure caption: The caption says 'the descriptor updates for a four-instruction block', but the table has six rows, one per target instruction. A student may think rows and three-address instructions should match one to one.
+- ch 1 [low] Section 2, third bullet of the getreg steps: 'Emit OP R, Ry or OP R, Rz' is unclear. On a two-address machine OP R, Ry computes R = R op Ry, so R must already hold one of the operands; if getreg returned a register that holds neither y nor z, the instruction as written gives a wrong result.
+- ch 2 [high] Section 2, third edge rule: The rule contradicts itself. It says: 'If the last statement is not a jump, or the block ends in a return, connect B to the next block in the listing. A return has no successor.' A return is not a jump, so the first clause tells the student to draw an edge out of a returning block, and the very next sentence says it has none. In the worked example the student is then told B4 (which ends in return) has no outgoing edge, so the rule as written will be marked wrong in the exam.
+- ch 2 [low] Quiz Q3, answer: The answer names the backward edge with statement numbers ('the edge 4 → 2') while the rest of the answer talks about blocks ({2}, {3, 4}). A student may read '4 → 2' as an edge between block 4 and block 2, and think a block 4 exists.
+- ch 3 [low] Figure (before Worked example 1): The figure is placed before the worked example, but its caption and node notes use t1, t2, t3, d, e and the leaf c — names that only exist once the block t1 = a + b; t2 = a + b; t3 = t1 * c; d = t3; e = t2 − d has been stated. A reader meets the picture with no source code to check it against.
+- ch 3 [low] Quiz Q6: The question says the next statement reads a[j] "with i ≠ j", but the answer then says "The indices can be equal at run time". Read literally the two statements contradict each other, and a student may quote a reason that is false for the case given.
+- ch 3 [low] Section 1 and Quiz Q1: A leaf is defined only as "a variable whose value enters the block". A constant operand, as in x = a + 5, is also drawn as a leaf with no defining statement, and the definition leaves it out.
+- ch 4 [high] Section 2, copy propagation bullet: The rewrite given for copy propagation is "e = d * 1 becomes e = d". That is algebraic simplification (x * 1 → x), not copy propagation, and it contradicts the chapter's own worked example, where step 5 classifies d * 1 → d as algebraic simplification and step 6 classifies using d in place of a as copy propagation. A student who follows the bullet will lose marks.
+- ch 4 [high] Quiz Q3: The answer is internally inconsistent. It first folds b = 16 and c = 16 from a = 4, but then gives the final block as "b = a * a; d = b + b; print(d)" with the statement a = 4 removed. In that block a has no definition, so b and the printed value are not determined. It also says "Nothing is dead except c", although a = 4 becomes dead once b and c are folded to 16.
+- ch 4 [low] Exam traps, third bullet, and Quiz Q5: x * 1 → x is safe for floating point except when x is a signalling NaN (the operation quiets it); the standard counterexample the exam wants for the addition identity is x + 0 → x, which is wrong at x = −0.0, since −0.0 + 0.0 gives +0.0. The chapter states x + 0 → x in the algebraic simplification list without that caveat and uses the weaker NaN argument for multiplication.
+- ch 4 [low] Figure: The text names eight sources, but the figure has only five boxes (CSE, dead code, constant folding, copy propagation, strength reduction) and the aria says "five principal sources". Constant propagation, algebraic simplification and code motion are missing, so a reader may think the list has five entries.
+- ch 4 [low] Lead: "Every optimizing compiler uses this same list" is an overclaim: real compilers also perform inlining, loop unrolling, partial redundancy elimination and other transformations that are not among these eight.
+- ch 5 [low] Quiz Q2 (answer): Saying the preheader "runs exactly once" is too strong. A preheader runs once each time the loop is entered. If the loop sits inside an outer loop, or the routine containing it is called many times, the preheader runs many times. As written, a student may think hoisting to the preheader always means one execution in the whole program.
+- ch 5 [low] Worked example 1, code block: The C program is introduced as the transformed loop that stores a constant into every fourth element of A, but the code never performs A[t1] = t2. It only accumulates sum and n. The printed output is right, but the code does not match the stated transformed loop, so a student comparing step 7 with the listing sees a mismatch.
+- ch 6 [low] Section 1 (definition of kill[B]) and Worked example 1, step 2: The text says kill[B] contains every definition in the whole flow graph of a variable that B redefines. Taken literally, that includes B's own definitions. For B1 that would give kill[B1] = {d1,d2,d3}, because B1 redefines x (d1, d3) and y (d2). Step 2 instead says kill[B1] = {d3}. A student following the definition will not get the example's set, and standard textbooks exclude a block's own definitions by putting them in gen[B].
+- ch 6 [low] Section 1, last paragraph (available expressions): The phrase 'and not killed before the end of B' describes availability at the exit of B, not at its entry, which is what IN[B] means. An expression computed on every path to B but killed inside B is still available at the entry to B, so the definition wrongly excludes it.
+- ch 6 [low] Section 3, last paragraph, and exam trap 5: 'A conservative solution keeps every fact that might be true' and 'may keep extra facts' are only correct for may analyses such as reaching definitions. For a must analysis such as available expressions, the safe answer keeps fewer facts: an expression is called available only when it is available on every path, so a conservative solution marks doubtful expressions as not available.
+- ch 6 [low] Quiz Q5 answer: The answer's reasoning is muddled. A later definition does not stop an older definition by being 'reached from B'; rather, once control passes through B, B's assignment overrides the same variable. Because a later definition can enter B through a back edge in a loop, it can appear in IN[B] and must therefore be removed by kill[B].

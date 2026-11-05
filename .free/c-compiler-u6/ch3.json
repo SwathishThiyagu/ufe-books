@@ -1,0 +1,240 @@
+{
+ "lead": "A basic block is straight-line code. Within it, the same expression may be computed twice, some assignments only copy a value, and some results are never used. A DAG representation of the block is a directed acyclic graph that makes these facts visible. Leaves are variables entering the block; each interior node is one operation, labelled with the statements that define it. Compilers use it to remove repeated computation, propagate copies and drop dead statements before generating target code.",
+ "prereq": "You need <a href=\"#basic-blocks-and-flow-graphs\">6.2 Basic blocks and flow graphs</a> for the basic block, and Unit 4's syntax trees and DAGs for expressions.",
+ "sections": [
+  {
+   "h3": "Building the DAG",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Process the statements of the block in order. Keep a table that maps each name to the node that currently holds its value."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "For a statement x = y op z, find the leaves or nodes for y and z. Create an interior node labelled op with those two children in that order. Give the node the statement number of x = y op z. Record x as a label on the node.",
+      "Before creating the node, look for an existing node with the same operator and the same ordered children. If it exists, add x as another label on that node. Do not create a second node. That merge is one common subexpression removed.",
+      "For a copy x = y, create no node. Add x as a label on the node of y. The value is not computed again.",
+      "For an array assignment a[i] = y, treat the array as changed. Later reads of a must not reuse an earlier node for a, because a[i] and a[j] may name the same cell."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A leaf can carry several variable names if copies put them there. An interior node can carry several statement numbers. Every edge points from an operand to the operation that uses it, so the graph has no cycles."
+    }
+   ]
+  },
+  {
+   "h3": "Merging, copies and array kills",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Merging is strict. Two nodes merge only when the operator is the same and the ordered children are the same. a − b and b − a stay separate. a + b and b + a also stay separate under this rule; an implementation may canonicalise commutative operands, but the safe textbook rule is ordered children."
+    },
+    {
+     "type": "p",
+     "text": "A copy x = y adds x as a label to the node of y. It creates no interior node. If x is later used, it reads the same value. Copy assignments are cheap to remove when the source y is not changed before the use."
+    },
+    {
+     "type": "p",
+     "text": "Deadness is local. A node with no parent and no live label at block exit is dead. A variable redefined before use kills its earlier label."
+    },
+    {
+     "type": "p",
+     "text": "An array assignment a[i] = y changes the array. It kills earlier nodes that read or write a. A later a[j] cannot reuse them, because i and j may be equal at run time. Only a proof that the indices differ allows reuse."
+    }
+   ]
+  },
+  {
+   "h3": "Reading optimisations and limits",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Common subexpressions: a node with labels t1 and t2 on the same plus node was computed once. Later uses read one value."
+    },
+    {
+     "type": "p",
+     "text": "Copies: a label added by x = y marks x as another name for y. If y is unchanged before a use of x, replace that use with y. The copy often becomes dead."
+    },
+    {
+     "type": "p",
+     "text": "Dead code: a node with no parent whose labels are not live at exit can be removed, along with the statements that computed it. Removal is safe only if those statements have no side effects."
+    },
+    {
+     "type": "p",
+     "text": "Reordering: the DAG forgets statement order for independent operations. You may reorder pure arithmetic. Do not reorder calls, stores, array writes or loads that may fault; their order can change behaviour."
+    },
+    {
+     "type": "p",
+     "text": "The DAG is local. It sees one basic block. Facts that cross blocks, such as a value available at the start of a loop, need global analysis (see <a href=\"#global-data-flow-analysis\">6.6</a>)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The plus node carries both t1 and t2, so a + b is computed once. The multiply node carries t3 and d, so d = t3 is a copy, and the minus node builds e from the two shared nodes.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "aria": "A DAG for the block: a single plus node labelled t1 and t2 feeds both the multiply node labelled t3 and d, and the minus node for e.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "a",
+     "x": 0,
+     "y": 0,
+     "note": "leaf",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "b",
+     "x": 1,
+     "y": 0,
+     "note": "leaf",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "c",
+     "x": 2,
+     "y": 0,
+     "note": "leaf",
+     "style": "normal"
+    },
+    {
+     "id": "p",
+     "label": "+",
+     "x": 0,
+     "y": 1,
+     "note": "t1,t2",
+     "style": "accent"
+    },
+    {
+     "id": "m",
+     "label": "*",
+     "x": 1,
+     "y": 1,
+     "note": "t3,d",
+     "style": "live"
+    },
+    {
+     "id": "s",
+     "label": "−",
+     "x": 1,
+     "y": 2,
+     "note": "e",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "p",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "p",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "m",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "m",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "s",
+     "style": "solid"
+    },
+    {
+     "from": "m",
+     "to": "s",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "For the basic block t1 = a + b; t2 = a + b; t3 = t1 * c; d = t3; e = t2 − d, draw the DAG. Then state the total number of nodes, the number of interior nodes, the number of common subexpressions removed and the number of copy assignments.",
+   "steps": [
+    "Leaves: a, b, c. These are three nodes.",
+    "t1 = a + b creates a + node with children a and b, labelled t1.",
+    "t2 = a + b finds the same operator and ordered children. Merge: add t2 to the + node. Common subexpressions removed = 1.",
+    "t3 = t1 * c uses the + node for t1. Create a * node with children + and c, labelled t3.",
+    "d = t3 is a copy. Add d as a label to the * node. No new node. Copy assignments = 1.",
+    "e = t2 − d uses the + node for t2 and the * node for d. Create a − node with children + and *, labelled e.",
+    "Count: 6 total nodes = 3 leaves + 3 interior nodes (+ , * , −). Interior nodes = 3. Common subexpressions removed = 1. Copy assignments = 1."
+   ],
+   "answer": "The DAG has 6 nodes in total, with 3 interior nodes. It removes 1 common subexpression and shows 1 copy assignment.",
+   "check": "stmts = [\n    ('t1','+','a','b'),\n    ('t2','+','a','b'),\n    ('t3','*','t1','c'),\n    ('d','=','t3',''),\n    ('e','-','t2','d'),\n]\nnode_of = {}\nnodes = []\nleaves = []\nkey_map = {}\nmerges = 0\ncopies = 0\n\ndef val(x):\n    if x in node_of:\n        return node_of[x]\n    if x not in leaves:\n        leaves.append(x)\n    return x\n\nfor lhs, op, l, r in stmts:\n    if op == '=':\n        node_of[lhs] = val(l)\n        copies += 1\n        continue\n    a = val(l)\n    b = val(r)\n    key = (op, a, b)\n    if key in key_map:\n        node_of[lhs] = key_map[key]\n        merges += 1\n    else:\n        nid = 'n' + str(len(nodes))\n        nodes.append(key)\n        key_map[key] = nid\n        node_of[lhs] = nid\n\nprint(len(leaves) + len(nodes))\nprint(len(nodes))\nprint(merges)\nprint(copies)",
+   "values": [
+    6,
+    3,
+    1,
+    1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not merge a − b with b − a: subtraction is not commutative, and the ordered children differ.",
+  "Do not forget that an array assignment a[i] = y kills earlier nodes for the array a; a later a[j] may read the same cell.",
+  "A copy x = y adds a label to an existing node; it is not a new computation, so do not count it as an interior node.",
+  "The DAG is within one basic block; it does not prove a value available across blocks or loop iterations.",
+  "Reordering is safe only for operations without side effects; calls, stores and array writes must keep their order."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a leaf in the DAG of a basic block?",
+   "marks": 2,
+   "a": "A variable whose value enters the block from outside; it has no defining statement inside the block."
+  },
+  {
+   "level": "understand",
+   "q": "Why do a − b and b − a get separate nodes?",
+   "marks": 3,
+   "a": "Subtraction is not commutative; the ordered children are different, so the two expressions can have different values."
+  },
+  {
+   "level": "apply",
+   "q": "For the block x = a * b; y = a * b; z = x + y, give the total nodes, interior nodes and merges.",
+   "marks": 4,
+   "a": "Leaves a and b: 2 nodes. One * node shared by x and y: 1 merge. One + node for z. Total 4 nodes, 2 interior nodes, 1 merge."
+  },
+  {
+   "level": "apply",
+   "q": "For the block t1 = a + b; t2 = a + b; t3 = t1 * c; d = t3, give the total nodes and copy assignments.",
+   "marks": 4,
+   "a": "Leaves a, b, c: 3 nodes. One + node for t1 and t2. One * node for t3 and d. Total 5 nodes. Copy assignments: d = t3, so 1."
+  },
+  {
+   "level": "analyze",
+   "q": "A node in a block DAG has no parent and its only label is x, which is not live at block exit. What can you do?",
+   "marks": 5,
+   "a": "The node is dead. Delete the statement that computes it if that statement has no side effects."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a[i] = 0 kill earlier nodes that read a, even if the next statement reads a[j] with i ≠ j?",
+   "marks": 5,
+   "a": "The compiler may not be able to prove i ≠ j. The indices can be equal at run time, so the earlier value may be overwritten."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between a syntax tree and a DAG for the same block.",
+   "marks": 3,
+   "a": "A DAG shares a repeated subexpression as one node; a syntax tree has a separate subtree for each occurrence."
+  }
+ ],
+ "beyond": "Not for the exam. Compilers in practice use local value numbering, which is the same merge idea with a hash table, and SSA form, which gives every assignment a fresh name. LLVM's GVN pass and the sea-of-nodes representation in some JIT compilers extend the DAG idea across blocks. Search for 'local value numbering', 'global value numbering' and 'SSA construction' to go further."
+}

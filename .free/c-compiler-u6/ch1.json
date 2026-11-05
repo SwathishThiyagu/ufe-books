@@ -1,0 +1,207 @@
+{
+ "lead": "A code generator is the compiler pass that turns intermediate code into target instructions. Its input is three-address code from Unit 4. Its output may be assembly, relocatable machine code, or code for a virtual machine. The pass must pick instructions, choose registers, order evaluation, and address memory without wasting moves. A simple code generator does this one instruction at a time using two tables: a register descriptor and an address descriptor. The same ideas appear in student compilers, JIT back ends, and embedded toolchains.",
+ "prereq": "You need three-address code from Unit 4 and variable addresses from activation records in Unit 5; <a href=\"#basic-blocks-and-flow-graphs\">basic blocks</a> come next.",
+ "sections": [
+  {
+   "h3": "Input, output and design issues",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Target code has three common forms: assembly text for an assembler, relocatable machine code for a linker, and bytecode for a virtual machine. Relocatable machine code is object code whose addresses are relative to the start of a block, so a linker can move it. The input is a list of three-address instructions such as <code>t1 = a * b</code>. Each instruction names at most three operands, so the generator can treat it as a small pattern. Some syllabi call this target code generation."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Instruction selection: the target may offer <code>ADD R1, R2</code> or <code>ADD R1, mem</code>; pick the form that fits the addressing mode.",
+      "Register allocation: registers are few; keep frequent names in them and spill when full.",
+      "Evaluation order: reordering can cut loads, but data dependencies must stay.",
+      "Memory addressing: a name may live at a fixed offset from a frame pointer or at a global label.",
+      "Cost: every instruction and memory access has a cost; avoid redundant loads and stores."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "These issues interact. A choice that saves a load may cost a register or force a store."
+    }
+   ]
+  },
+  {
+   "h3": "The simple code generator",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For each instruction <code>x = y op z</code>, the generator calls <code>getreg(x = y op z)</code>. <code>getreg</code> returns a register R for the result. It first looks for an empty register. If none is empty, it picks a register whose current value is not live, or whose next use is farthest away. If that register holds a dirty value, it first emits a store. A dirty register holds a value that differs from the memory copy."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Find a register Ry holding y. If none, use y as a memory operand when the opcode allows it; otherwise emit <code>LD R, y</code>.",
+      "Find a register Rz holding z. If none, use z as a memory operand when allowed; otherwise emit <code>LD R, z</code>.",
+      "Emit <code>OP Ry, Rz</code> (the result overwrites y's register), or <code>OP Ry, z</code> when z can be a memory operand. If getreg returned a register R that holds neither y nor z, first emit <code>MOV R, Ry</code> and then <code>OP R, Rz</code>. In the worked example this is why <code>ADD R0,R1</code> is correct: R0 already holds t1.",
+      "Set the register descriptor of R to {x}; remove x from every other register descriptor; set the address descriptor of x to {R}.",
+      "Mark the memory copy of x as stale until a store writes it."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "For a copy <code>x = y</code>, if y is in a register and y is dead, rename that register to x. Otherwise emit a move or a load. For an unconditional jump, emit <code>BR label</code>; live values at the label must be in memory or in registers agreed by both sides. Calls are left to Unit 5, where activation records fix the addresses."
+    }
+   ]
+  },
+  {
+   "h3": "Descriptors, next-use and control flow",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A register descriptor says which names currently have their value in each register. An address descriptor says where each name can be found: in a register, in memory, or both. After every emitted instruction, update both tables. If R0 holds t1 and <code>ADD R0, R1</code> makes it hold t3, then t1 disappears from R0's descriptor and t3 appears. R1 may become free if t2 is dead."
+    },
+    {
+     "type": "p",
+     "text": "Next-use information says whether a name is read later in the block. It lets getreg free a register without a store when the value is dead. It also chooses the victim with the farthest next use, so the spill is cheap. At a jump or label, the generator stores live values to memory unless both sides agree on a register. The figure follows the descriptor updates for a four-instruction block."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The four three-address instructions t1=a*b; t2=c*d; t3=t1+t2; x=t3 expand to six target instructions; the table shows the descriptors after each one. The final row shows R0 holds x and memory x holds t3; R1 is free.",
+  "spec": {
+   "type": "array",
+   "title": "Descriptors: columns R0, R1, x",
+   "show_index": false,
+   "rows": [
+    {
+     "label": "LD R0,a",
+     "cells": [
+      "a",
+      "—",
+      "—"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "MUL R0,b",
+     "cells": [
+      "t1",
+      "—",
+      "—"
+     ]
+    },
+    {
+     "label": "LD R1,c",
+     "cells": [
+      "t1",
+      "c",
+      "—"
+     ]
+    },
+    {
+     "label": "MUL R1,d",
+     "cells": [
+      "t1",
+      "t2",
+      "—"
+     ]
+    },
+    {
+     "label": "ADD R0,R1",
+     "cells": [
+      "t3",
+      "—",
+      "—"
+     ],
+     "marks": {
+      "0": "live"
+     }
+    },
+    {
+     "label": "ST x,R0",
+     "cells": [
+      "x",
+      "—",
+      "t3"
+     ],
+     "marks": {
+      "2": "next"
+     }
+    }
+   ],
+   "aria": "A table of register and address descriptors after each of six target instructions, showing R0 and R1 contents and where x is stored."
+  }
+ },
+ "examples": [
+  {
+   "question": "Generate target code for the basic block <code>t1 = a * b; t2 = c * d; t3 = t1 + t2; x = t3</code> using a simple code generator with registers R0 and R1. Show the register descriptor and address descriptor after each instruction. State the instruction count, register count and store count.",
+   "steps": [
+    "Start: R0 and R1 are empty; a, b, c, d and x are in memory.",
+    "Instruction 1: <code>t1 = a * b</code>. getreg returns R0. Emit <code>LD R0, a</code>. R0 descriptor = {a}; R1 descriptor = {}.",
+    "Emit <code>MUL R0, b</code>. R0 descriptor = {t1}; a is no longer in R0; R1 descriptor = {}.",
+    "Instruction 2: <code>t2 = c * d</code>. getreg returns R1. Emit <code>LD R1, c</code>. R0 descriptor = {t1}; R1 descriptor = {c}.",
+    "Emit <code>MUL R1, d</code>. R0 descriptor = {t1}; R1 descriptor = {t2}.",
+    "Instruction 3: <code>t3 = t1 + t2</code>. Both operands are in registers. Emit <code>ADD R0, R1</code>. R0 descriptor = {t3}; R1 descriptor = {} because t1 and t2 are dead.",
+    "Instruction 4: <code>x = t3</code>. t3 is dead and R0 holds it, so rename R0 to x: R0 descriptor = {x}; address descriptor of x = {R0}; memory x stays stale; no target instruction is emitted for this copy. At the end of the block emit <code>ST x, R0</code>. Memory x now holds t3; R0 holds x; R1 is free."
+   ],
+   "answer": "The code is LD R0,a; MUL R0,b; LD R1,c; MUL R1,d; ADD R0,R1; ST x,R0: 6 target instructions, 2 registers, and 1 store. At the end R0 holds x and x is also in memory.",
+   "check": "code = [\"LD R0,a\", \"MUL R0,b\", \"LD R1,c\", \"MUL R1,d\", \"ADD R0,R1\", \"ST x,R0\"]\nregs = [\"R0\", \"R1\"]\nprint(len(code))\nprint(len(regs))\nprint(sum(1 for i in code if i.startswith(\"ST\")))\n",
+   "values": [
+    6,
+    2,
+    1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not let getreg return a register that still holds a live value; the old value would be overwritten with no store.",
+  "Update both descriptors after every emitted instruction. A stale address descriptor makes the next getreg think a name is in a register when it is not.",
+  "A register descriptor lists names in a register; an address descriptor lists places for a name. Swapping them is a common exam error.",
+  "After <code>x = t3</code>, memory x is stale until a store. Do not claim x is in memory just because the assignment exists in the source."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name three design issues in code generation.",
+   "marks": 2,
+   "a": "Any three of instruction selection, register allocation, evaluation order, memory addressing and cost."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the simple code generator keep two descriptors?",
+   "marks": 3,
+   "a": "The register descriptor records which names are in each register. The address descriptor records where each name can be found. getreg needs both to avoid loading a value that is already in a register and to avoid overwriting a live value."
+  },
+  {
+   "level": "apply",
+   "q": "Using registers R0 and R1, emit target code for <code>t1 = a * b; x = t1 + c</code> and give the descriptors after each instruction.",
+   "marks": 4,
+   "a": "Code: LD R0,a; MUL R0,b; LD R1,c; ADD R0,R1; ST x,R0. After LD R0,a: R0={a}. After MUL R0,b: R0={t1}. After LD R1,c: R0={t1}, R1={c}. After ADD R0,R1: R0={x}, R1 free. After ST x,R0: x in memory and in R0."
+  },
+  {
+   "level": "analyze",
+   "q": "What goes wrong if getreg returns a register that holds a live value and no store is made?",
+   "marks": 4,
+   "a": "The new result overwrites the old value. Any later use of the old name reads the wrong value. The address descriptor may still claim the old name is in that register, so later decisions are also wrong."
+  },
+  {
+   "level": "understand",
+   "q": "What does next-use information tell getreg?",
+   "marks": 3,
+   "a": "It tells whether a name is read later in the block. A dead value can be overwritten without a store. Among live values, the one with the farthest next use is the cheapest to spill."
+  },
+  {
+   "level": "apply",
+   "q": "For <code>x = y</code>, y is in R1 and y is dead. What do the descriptors become?",
+   "marks": 3,
+   "a": "R1's register descriptor becomes {x}; the address descriptor of x becomes {R1}; y is removed from all descriptors. No load or store is needed if memory x can stay stale until a later store."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must live values be stored at the end of a basic block before a jump?",
+   "marks": 3,
+   "a": "The next block may expect the value in memory or in a different register. A store makes the value visible on both paths unless the generator has an agreement about registers across the edge."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers use SSA form, graph-colouring or linear-scan allocation, and instruction scheduling. JIT back ends choose registers at run time, so allocation must be fast. Embedded toolchains care about code size as much as speed. Search for LLVM code generation, linear-scan register allocation, and peephole optimization to go further."
+}

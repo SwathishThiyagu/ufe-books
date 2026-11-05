@@ -1,0 +1,277 @@
+{
+ "lead": "An optimizer may rewrite a program only if the program still does the same thing. A function-preserving transformation keeps every output, side effect and termination the same while making the code smaller or faster. Common subexpression elimination, constant folding, copy propagation, dead-code elimination and strength reduction are the everyday examples. Loops repay this work best, because a loop body runs many times. This chapter applies the transformations inside loops through loop-invariant code motion and strength reduction, then finishes with peephole optimization, the small-window cleanup over target instructions.",
+ "prereq": "You need: <a href=\"#principal-sources-of-optimization\">6.4</a> for the list of optimization sources, <a href=\"#basic-blocks-and-flow-graphs\">6.2</a> for flow graphs and loops, and Unit 4 for three-address code.",
+ "sections": [
+  {
+   "h3": "Function-preserving transformations",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A function-preserving transformation rewrites a program without changing what an observer can see: the same outputs, the same side effects in the same order, and the same termination. The optimizer may make the code faster or smaller, but it may not change the meaning. Every rule below carries a proof obligation: on every path where the original ran, the new code computes the same values."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Constant folding: 2 * 3 * 4 becomes 24 at compile time.",
+      "Constant propagation: after x = 5, the use in y = x + 1 becomes y = 6.",
+      "Copy propagation: after b = a, the use in c = b + 1 becomes c = a + 1.",
+      "Common subexpression elimination: if b * c is computed twice with no assignment to b or c between, the second computation reuses the first result.",
+      "Dead-code elimination: delete x = 10 when x is never read again, provided the right side cannot fail or call a function.",
+      "Algebraic simplification and strength reduction: x * 1 becomes x, x + 0 becomes x, and x * 4 becomes x << 2 for a non-negative integer x."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Each rule needs a local proof. The DAG of <a href=\"#dag-representation-of-basic-blocks\">6.3</a> gives common subexpression elimination inside one block; copy propagation needs the copy to reach the use with no redefinition on the way. A rewrite is illegal if it drops a side effect, swaps the order of two side effects, or moves an operation that can trap (division by zero, null dereference, array bounds) to a place where it runs when the original did not."
+    }
+   ]
+  },
+  {
+   "h3": "Loop optimization",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A loop body that runs a thousand times repays any saving a thousand times. Loop optimization first finds the loop in the flow graph, then applies the function-preserving rules where they pay most."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Find the loop blocks and the header in the flow graph.",
+      "Mark an expression invariant when every operand is a constant or is defined only outside the loop.",
+      "Create a preheader: a new block on the single edge entering the header.",
+      "Move the invariant expression to the preheader and replace the loop use by the new temporary.",
+      "Check that the new definition dominates all uses, and that the move cannot add a trap on a path where the loop runs zero times."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An induction variable changes by a fixed amount each iteration, such as i = i + 1. If the body uses i * 4, introduce t = 4 * i before the loop and t = t + 4 at the end of the body; the multiply disappears. This is induction-variable strength reduction. Induction-variable elimination then deletes i if it is dead. The iteration count must stay the same, so the bound is scaled too:"
+    },
+    {
+     "type": "formula",
+     "text": "N = (t_last − t_first) ÷ step + 1",
+     "where": "N is the number of iterations; t_first and t_last are the first and last values of the induction variable; step is the constant added each turn."
+    },
+    {
+     "type": "p",
+     "text": "Unrolling copies the body k times and steps the counter by k; it cuts branch overhead and exposes independent work, at the cost of code size. Jamming (fusion) puts two loops with the same trip count into one body, saving loop overhead and improving cache reuse. Jamming is legal only when the two bodies do not write what the other reads. The hoist of x * y is invalid if x or y is assigned inside the loop."
+    }
+   ]
+  },
+  {
+   "h3": "Peephole optimization",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A peephole optimizer looks at a window of two to five target instructions, recognises a pattern, and replaces it with a shorter or faster sequence. It runs after code generation and needs no flow graph, so it is fast and local."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Store then load of the same address: drop the load and keep the register value.",
+      "Jump to a jump: goto L1 where L1 holds goto L2 becomes goto L2, after retargeting every other jump to L1.",
+      "Unreachable code: instructions after an unconditional jump with no label on them are removed.",
+      "Constant folding on target instructions: MOV R1, 2; ADD R1, 3 becomes MOV R1, 5.",
+      "Redundant push and pop of the same register in a pair: delete both."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The window is small, so peephole misses facts that need the whole flow graph; global redundancy is the job of <a href=\"#global-data-flow-analysis\">6.6</a>. It must also respect labels and branches that enter the middle of a window, because such a branch can make an instruction reachable that the window alone thinks is dead."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The invariant t2 = 21 is computed once in the preheader; the counter t1 starts at 0, is tested against 396, and steps by 4, so the body runs 100 times.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Loop optimization",
+   "nodes": [
+    {
+     "id": "pre",
+     "label": "Preheader",
+     "note": "t2 = 21",
+     "style": "accent"
+    },
+    {
+     "id": "init",
+     "label": "t1 = 0",
+     "note": "before loop",
+     "style": "normal"
+    },
+    {
+     "id": "head",
+     "label": "Loop header",
+     "note": "t1 ≤ 396",
+     "style": "normal"
+    },
+    {
+     "id": "body",
+     "label": "Body",
+     "note": "A[t1] = t2",
+     "style": "live"
+    },
+    {
+     "id": "inc",
+     "label": "t1 = t1 + 4",
+     "note": "strength reduced",
+     "style": "normal"
+    },
+    {
+     "id": "exit",
+     "label": "Exit",
+     "note": "after 100 turns",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "pre",
+     "to": "init",
+     "style": "solid"
+    },
+    {
+     "from": "init",
+     "to": "head",
+     "style": "solid"
+    },
+    {
+     "from": "head",
+     "to": "body",
+     "label": "yes",
+     "style": "solid"
+    },
+    {
+     "from": "body",
+     "to": "inc",
+     "style": "solid"
+    },
+    {
+     "from": "inc",
+     "to": "head",
+     "label": "back",
+     "style": "accent"
+    },
+    {
+     "from": "head",
+     "to": "exit",
+     "label": "no",
+     "style": "solid"
+    }
+   ],
+   "aria": "A loop flow graph with the invariant t2 = 21 in a preheader and the induction variable t1 incremented by 4 up to the bound 396."
+  }
+ },
+ "examples": [
+  {
+   "question": "The loop below stores a constant into every fourth element of A. Apply loop-invariant code motion, induction-variable strength reduction and induction-variable elimination. Use x = 3 and y = 7. Give the transformed code, the values t1 takes, the number of iterations, and the sum of the stored values.\nfor i = 0 to 99 do { t1 = 4 * i; t2 = x * y; A[t1] = t2 }",
+   "steps": [
+    "Find invariants: x and y are not assigned in the loop, so t2 = x * y = 3 * 7 = 21 is invariant.",
+    "Create a preheader on the edge into the loop header and move the invariant there: t2 = 21, computed once.",
+    "Strength-reduce t1 = 4 * i. Introduce an induction variable t1 that starts at 4 * 0 = 0 and adds 4 each turn.",
+    "Scale the bound: i runs from 0 to 99, so t1 runs 0, 4, 8, ..., 4 * 99 = 396. The test becomes t1 ≤ 396.",
+    "Eliminate i: after step 3 nothing reads i, so delete i and its increment.",
+    "Count iterations: N = (396 − 0) ÷ 4 + 1 = 100. Each turn stores 21, so the sum is 100 × 21 = 2100.",
+    "Final code: t2 = 21; t1 = 0; while t1 ≤ 396 do { A[t1] = t2; t1 = t1 + 4 }."
+   ],
+   "answer": "The loop runs 100 times, t1 takes 0, 4, ..., 396, the invariant is t2 = 21, and the stored values sum to 2100.",
+   "check": "x = 3\ny = 7\nt2 = x * y\nt1 = 0\nn = 0\ns = 0\nwhile t1 <= 396:\n    s += t2\n    n += 1\n    t1 += 4\nprint(t2)\nprint(n)\nprint(s)\nprint(t1 - 4)\n",
+   "values": [
+    21,
+    100,
+    2100,
+    396
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(void) {\n    int x = 3, y = 7, t2 = x * y, t1 = 0, sum = 0, n = 0;\n    while (t1 <= 396) { sum += t2; n++; t1 += 4; }\n    printf(\"%d %d %d\\n\", t2, n, sum);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "turn",
+     "t1 stored",
+     "sum after"
+    ],
+    "rows": [
+     [
+      "1",
+      "0",
+      "21"
+     ],
+     [
+      "2",
+      "4",
+      "42"
+     ],
+     [
+      "50",
+      "196",
+      "1050"
+     ],
+     [
+      "100",
+      "396",
+      "2100"
+     ]
+    ]
+   },
+   "output": "21 100 2100"
+  }
+ ],
+ "traps": [
+  "Hoisting x * y is wrong when x or y is assigned inside the loop, because the preheader computes a stale value.",
+  "Hoisting a division or an array access is wrong when the loop may run zero times and the operation can trap.",
+  "Strength reduction must scale the bound too: t1 ≤ 396, not t1 ≤ 99, or the loop runs 25 times instead of 100.",
+  "Common subexpression elimination across a call or a pointer write is unsafe, because the call may change the value.",
+  "Dead-code elimination must keep an expression with a side effect, such as a function call or a faulting division."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a function-preserving transformation.",
+   "marks": 2,
+   "a": "A rewrite that leaves every output, side effect, side-effect order and termination unchanged."
+  },
+  {
+   "level": "remember",
+   "q": "What is a preheader and why does loop-invariant code motion need one?",
+   "marks": 2,
+   "a": "A block on the single edge entering the loop header; it runs exactly once, so an invariant can be computed there without changing the loop body's control flow."
+  },
+  {
+   "level": "understand",
+   "q": "Why is copy propagation unsafe if the source variable is reassigned between the copy and the use?",
+   "marks": 3,
+   "a": "The use would read the new value, not the copied value. Propagation is legal only when no assignment to the source reaches the use, for example along every path of the flow graph."
+  },
+  {
+   "level": "apply",
+   "q": "Apply constant folding and propagation: a = 6; b = a * 2; c = b + 4; print c.",
+   "marks": 3,
+   "a": "a = 6, so b = 12 and c = 12 + 4 = 16. The print outputs 16."
+  },
+  {
+   "level": "apply",
+   "q": "Strength-reduce this loop: for i = 0 to 49 do A[8 * i] = 1. Give the new loop and the new bound.",
+   "marks": 4,
+   "a": "t = 0; while t ≤ 392 do { A[t] = 1; t = t + 8 }. The last index is 8 * 49 = 392 and the loop runs 50 times."
+  },
+  {
+   "level": "analyze",
+   "q": "Give one benefit and one cost of unrolling a loop four times.",
+   "marks": 5,
+   "a": "Benefit: one branch and one counter update serve four bodies, and the four bodies can be scheduled together. Cost: code size grows about fourfold, which can hurt instruction-cache behaviour."
+  },
+  {
+   "level": "analyze",
+   "q": "A peephole pass removes goto L1 followed by L1: goto L2. When is this wrong?",
+   "marks": 4,
+   "a": "When another jump targets L1. That jump now lands on the deleted instruction. Retarget every jump to L1 to L2 first, then the rewrite is safe."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers run dozens of these passes in a fixed order; LLVM and GCC expose them as flags such as -O2, and each pass is a module you can list. Loop optimization has grown into polyhedral analysis, which treats a nest of loops as a geometric region and produces tiling and vectorization. Auto-vectorizers turn a strength-reduced induction variable into SIMD lanes. Search 'LLVM loop invariant code motion pass', 'polyhedral compilation' and 'loop tiling' to go further."
+}

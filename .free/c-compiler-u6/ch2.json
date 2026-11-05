@@ -1,0 +1,229 @@
+{
+ "lead": "A basic block is a run of three-address statements with one entry at the top and one exit at the bottom. Inside it, control never branches. Real programs are mostly straight-line runs joined by jumps, so splitting the code at jump points gives a small set of blocks. A flow graph then draws those blocks as nodes and the possible jumps as edges. Compilers use this split to optimize each block locally and to reason about loops and branches across the whole program.",
+ "prereq": "You need three-address code and the jump instructions from see Unit 4, Syntax-Directed Translation and Intermediate Code, and see Unit 3, Bottom-Up Parsing and LR Parsers, for how conditional and unconditional jumps are written.",
+ "sections": [
+  {
+   "h3": "Leaders: where a block must begin",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Control normally moves from one statement to the next. A jump breaks that order. A <b>basic block</b> is a maximal run of consecutive three-address statements where control enters only at the first statement and leaves only after the last. Maximal means you cannot add the next statement without breaking the rule. Inside the block there is no branch, and no jumped-to label sits in the middle."
+    },
+    {
+     "type": "formula",
+     "text": "B = { s<sub>k</sub>, s<sub>k+1</sub>, …, s<sub>m</sub> }",
+     "where": "s<sub>k</sub> is the leader that starts the block, and s<sub>m</sub> is the statement just before the next leader, or the last statement of the program."
+    },
+    {
+     "type": "p",
+     "text": "Every block starts at a <b>leader</b>. Three rules mark the leaders, and nothing else does:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "The first statement of the program is a leader.",
+      "Any statement that is the target of a goto or a conditional jump is a leader.",
+      "Any statement immediately after a jump, conditional or unconditional, is a leader."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The second rule is needed because control can enter a statement from far away. The third rule is needed because a block may contain a branch only as its last statement, so the branch ends the block and the next statement must start a new one. A target can lie above the jump, as with a <code>goto</code> that closes a loop, so leaders are not only forward."
+    }
+   ]
+  },
+  {
+   "h3": "Building blocks and flow-graph edges",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Some syllabi call this step 'partitioning the code into basic blocks'. Sort the leaders by statement number, then cut the listing at those points."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "List the leaders in increasing statement number.",
+      "Block 1 runs from the first leader to the statement just before the second leader. Block 2 runs from the second leader to the statement before the third, and so on. The last block ends at the last statement.",
+      "Draw one node per block. Add a directed edge B → C whenever C can run immediately after B."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The edge rules follow from the last statement of a block:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "If the last statement is <code>goto L</code> and C is the block whose first statement is L, add B → C. There is no fall-through edge.",
+      "If the last statement is <code>if … goto L</code>, add B → C for the target block and also B → C′ for the next block in the listing, which is the fall-through when the test is false.",
+      "If the last statement is not a jump (an assignment, a copy, a call), add the fall-through edge B to the next block in the listing.",
+      "If the last statement is a return, or a jump out of the program, add no edge: the block has no successors."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "B is a <b>predecessor</b> of C when the edge B → C exists; C is a <b>successor</b> of B. The <b>entry block</b> contains the first statement of the program and usually has no predecessors. The <b>exit block</b> has no successors: it ends in a return or a jump out of the program. A block ending in a conditional jump has two successors, and a block reached from two places has two predecessors."
+    }
+   ]
+  },
+  {
+   "h3": "Two levels: block by block, then across the graph",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Optimization works at both levels. Inside a block the compiler can build a DAG, fold constants, and delete repeated subexpressions (see <a href=\"#dag-representation-of-basic-blocks\">6.3</a>). These rewrites are safe because no jump enters or leaves the middle of the block, so the statements always run together."
+    },
+    {
+     "type": "p",
+     "text": "Across blocks the graph shows where facts must be combined. A fact at a block boundary must hold on every edge entering that block, which is why the predecessors matter. Global data-flow analysis starts exactly here (see <a href=\"#global-data-flow-analysis\">6.6</a>); loop optimization uses the same graph to find the loops (see <a href=\"#function-preserving-transformations-and-loop-optimization\">6.5</a>)."
+    },
+    {
+     "type": "p",
+     "text": "A <b>loop</b> appears as a <b>cycle</b>: a path that returns to its starting block. In the worked example the edges B2 → B3 and B3 → B2 make B2 → B3 → B2 a cycle, and the loop test sits in B2. A block with two successors is a branch point; a block with two predecessors is a merge point. Drawing these edges turns a flat listing into a map of the program's control flow."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "B1 falls straight into B2. B2 tests the value and either enters the body B3 or leaves the loop for B4; the jump from B3 back to B2 closes the cycle, so B2 is the loop test.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "B1",
+     "label": "B1",
+     "x": 0,
+     "y": 1,
+     "note": "1: i = 1",
+     "style": "normal"
+    },
+    {
+     "id": "B2",
+     "label": "B2",
+     "x": 2,
+     "y": 2,
+     "note": "2-3: t1, branch",
+     "style": "accent"
+    },
+    {
+     "id": "B3",
+     "label": "B3",
+     "x": 2,
+     "y": 0,
+     "note": "4-6: body",
+     "style": "live"
+    },
+    {
+     "id": "B4",
+     "label": "B4",
+     "x": 4,
+     "y": 2,
+     "note": "7: return",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "B1",
+     "to": "B2",
+     "style": "solid"
+    },
+    {
+     "from": "B2",
+     "to": "B3",
+     "label": "false",
+     "style": "solid"
+    },
+    {
+     "from": "B2",
+     "to": "B4",
+     "label": "t1>100",
+     "style": "solid"
+    },
+    {
+     "from": "B3",
+     "to": "B2",
+     "label": "goto 2",
+     "style": "accent"
+    }
+   ],
+   "aria": "A flow graph with four basic blocks: B1 falls into B2; B2 branches to B3 or B4; B3 jumps back to B2."
+  }
+ },
+ "examples": [
+  {
+   "question": "Partition this three-address code into basic blocks, draw its flow graph, and state how many times the loop body runs: 1 i = 1; 2 t1 = 4 * i; 3 if t1 > 100 goto 7; 4 A[i] = 0; 5 i = i + 1; 6 goto 2; 7 return.",
+   "steps": [
+    "Leaders, by the three rules: statement 1 (first statement); statement 7 (target of the jump at 3); statement 2 (target of the goto at 6); statement 4 (immediately after the conditional jump at 3); statement 7 again (immediately after the goto at 6). The leader set is {1, 2, 4, 7}, so there are four leaders.",
+    "Blocks: B1 = {1}; B2 = {2, 3}; B3 = {4, 5, 6}; B4 = {7}. There are four blocks.",
+    "Edges: B1 ends in an assignment, so it falls through to B2, giving B1 → B2. B2 ends in <code>if t1 > 100 goto 7</code>, giving B2 → B4 on the true branch and B2 → B3 on the false fall-through. B3 ends in <code>goto 2</code>, giving B3 → B2. B4 ends in return, so nothing leaves it. There are four edges.",
+    "Predecessors and successors: pred(B2) = {B1, B3} and succ(B2) = {B3, B4}; pred(B3) = {B2} and succ(B3) = {B2}; pred(B4) = {B2} and succ(B4) = {}. B1 is the entry block and B4 is the exit block.",
+    "Loop: B2 → B3 → B2 is a cycle, so B2 and B3 form the loop.",
+    "Iteration count: the test is t1 = 4 × i > 100, that is i > 25. For i = 1 to 25 the test is false, so B3 runs. At i = 26, t1 = 104 > 100 and control goes to B4. So B3 executes 25 times, and B2 executes 26 times: 25 false exits plus the final true exit."
+   ],
+   "answer": "Leaders are {1, 2, 4, 7}; the blocks are B1 = {1}, B2 = {2, 3}, B3 = {4, 5, 6}, B4 = {7}; the edges are B1 → B2, B2 → B3, B2 → B4, B3 → B2; and the loop body B3 runs 25 times.",
+   "check": "kind = {1:'assign',2:'assign',3:'cond',4:'assign',5:'assign',6:'goto',7:'return'}\ntarget = {3:7, 6:2}\nleaders = {1} | set(target.values()) | {s+1 for s in kind if kind[s] in ('goto','cond')}\nleaders = sorted(leaders)\nblocks = []\nfor idx, s in enumerate(leaders):\n    end = leaders[idx+1]-1 if idx+1 < len(leaders) else 7\n    blocks.append((s,end))\nedges = set()\nfor idx,(s,e) in enumerate(blocks):\n    k = kind[e]\n    if k == 'goto':\n        edges.add((s, target[e]))\n    elif k == 'cond':\n        edges.add((s, target[e]))\n        edges.add((s, leaders[idx+1]))\n    elif k == 'return':\n        pass\n    else:\n        edges.add((s, leaders[idx+1]))\ni = 1\ntests = 0\nbody = 0\nwhile True:\n    tests += 1\n    t1 = 4*i\n    if t1 > 100:\n        break\n    body += 1\n    i += 1\nprint(len(leaders))\nprint(len(blocks))\nprint(len(edges))\nprint(body)\nprint(tests)\n",
+   "values": [
+    4,
+    4,
+    4,
+    25,
+    26
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Marking only the targets of jumps. The statement after a conditional jump is a leader even when no jump targets it, because the branch must end the block.",
+  "Assuming every jump target lies below the jump. A backward <code>goto</code> that closes a loop makes an earlier statement a leader.",
+  "Forgetting that an unconditional <code>goto</code> has exactly one successor (its target) and no fall-through edge.",
+  "Counting statement 3's test as part of the loop body. The test runs one more time than the body; here 26 tests against 25 executions of B3."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a basic block in one sentence.",
+   "marks": 2,
+   "a": "A maximal sequence of consecutive three-address statements in which control enters only at the first statement and leaves only after the last, with no branch except at the end."
+  },
+  {
+   "level": "remember",
+   "q": "State the three rules that mark a leader.",
+   "marks": 2,
+   "a": "The first statement of the program; any statement that is the target of a goto or conditional jump; any statement immediately after a jump."
+  },
+  {
+   "level": "apply",
+   "q": "For the code 1 x=0; 2 if x&lt;10 goto 5; 3 y=1; 4 goto 2; 5 x=x+1; 6 return, list the leaders and the blocks.",
+   "marks": 4,
+   "a": "Leaders: 1, 2, 3, 5. Blocks: {1}, {2}, {3, 4}, {5, 6}. The goto at statement 4 gives the edge {3, 4} → {2}, which closes the cycle {2} → {3, 4} → {2}."
+  },
+  {
+   "level": "apply",
+   "q": "In the worked example's flow graph, give pred(B2) and succ(B2).",
+   "marks": 3,
+   "a": "pred(B2) = {B1, B3} because B1 falls through and B3 jumps back to statement 2. succ(B2) = {B3, B4} because the conditional jump goes to B4 when true and to B3 when false."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a conditional jump produce two successors but an unconditional goto only one?",
+   "marks": 3,
+   "a": "A conditional jump can either take the branch or fall through, so control reaches the target block or the next block. An unconditional goto always goes to its target, so fall-through is impossible."
+  },
+  {
+   "level": "analyze",
+   "q": "A block has two predecessors. What does that tell you about the program's control flow, and why does it matter for optimization?",
+   "marks": 5,
+   "a": "Control reaches the block from two different places, so it is a merge point: an if-join or the top of a loop. A fact placed before the block must hold on both incoming edges, otherwise an optimization that assumes it is true would be wrong on one path."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain in two parts why splitting code into basic blocks helps optimization: inside a block, and across blocks.",
+   "marks": 5,
+   "a": "Inside a block, no jump enters or leaves the middle, so the statements always run in order; local rewrites such as common-subexpression elimination or constant folding are safe. Across blocks, the flow graph lists the possible jumps and merges, so the compiler can see loops and combine facts coming along different edges."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers build a control-flow graph of basic blocks as an early internal form: LLVM's IR is a list of basic blocks joined by branches, and GCC's GIMPLE works the same way. Binary analysis tools rebuild this graph from machine code to find loops and check control-flow integrity. Fuzzers such as coverage-guided ones track which edges of the graph a test input reaches. Search next for 'control-flow graph', 'LLVM basic block', and 'CFG-based fuzzing'."
+}

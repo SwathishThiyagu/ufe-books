@@ -1,0 +1,205 @@
+{
+ "lead": "Global data-flow analysis finds a fact at every basic-block boundary, not just inside one straight-line run. It sets up equations: a meet operator combines facts from paths, and each block has a transfer function that changes the fact. The equations are solved by iteration over the flow graph until values stop changing. Compilers use the result to fold constants, remove repeated expressions, delete dead assignments and place loop invariants. This chapter links the block graph from 6.2 to the optimizations of 6.4 and 6.5.",
+ "prereq": "You need: flow graphs and basic blocks from <a href=\"#basic-blocks-and-flow-graphs\">Chapter 6.2</a>, and set union, intersection and difference.",
+ "sections": [
+  {
+   "h3": "Facts, meet operators and transfer functions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Global data-flow analysis computes a property at every block boundary. A fact is <i>may</i> if it can be true on some path, and <i>must</i> if it is true on every path. A forward analysis moves facts from entry to exits. A backward analysis moves facts from exits to entry."
+    },
+    {
+     "type": "p",
+     "text": "For reaching definitions, a definition d of a variable reaches a point if some path from d to that point does not redefine the variable. A block B has two sets. gen[B] contains definitions inside B that reach the end of B. kill[B] contains every definition in the whole flow graph of a variable that B redefines, including definitions in later blocks."
+    },
+    {
+     "type": "formula",
+     "text": "IN[B] = ∪ OUT[P] over predecessors P; OUT[B] = gen[B] ∪ (IN[B] − kill[B])",
+     "where": "IN[B] is the fact on entry to block B; OUT[B] is the fact on exit; gen[B] and kill[B] are the block's transfer sets; P ranges over predecessor blocks."
+    },
+    {
+     "type": "p",
+     "text": "The meet operator is union because one path is enough. For a must analysis such as available expressions, the meet operator is intersection: IN[B] = ∩ OUT[P]. Available expressions are expressions computed on every path to B and not killed before the end of B."
+    }
+   ]
+  },
+  {
+   "h3": "Solving the equations: iterative and worklist",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The simple solver starts with every IN and OUT set empty for reaching definitions. It walks the blocks in a fixed order, recomputes IN from predecessor OUT sets, then OUT from IN, gen and kill. If any set changes, it makes another pass. It stops when a full pass changes nothing. The sets only grow, and the flow graph has finitely many definitions, so the process ends."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Put every block on a worklist for the worklist solver.",
+      "Remove one block B and recompute IN[B] and OUT[B].",
+      "If OUT[B] changes, add every successor of B to the worklist for a forward analysis.",
+      "Do not add a block already on the list.",
+      "Stop when the worklist is empty."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "This worklist version is the efficient data-flow algorithm some syllabi mention. The same pattern handles other analyses. Live variables is backward and may: IN[B] = use[B] ∪ (OUT[B] − def[B]) and OUT[B] = ∪ IN[S] over successors S. Available expressions is forward and must: IN[B] = ∩ OUT[P], OUT[B] = gen[B] ∪ (IN[B] − kill[B]). Here gen[B] is the expressions computed in B and not killed before the end of B."
+    }
+   ]
+  },
+  {
+   "h3": "From data-flow facts to optimization",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Reaching definitions build def-use chains. A def-use chain links a definition d to every use that d may reach. The reverse, a use-def chain, lists the definitions that may reach one use. These chains are the input to global optimizations."
+    },
+    {
+     "type": "p",
+     "text": "Constant propagation: if a use has exactly one reaching definition and that definition assigns a literal, replace the use by the literal. In the worked example x has two reaching definitions at d4, so x is not constant. Common subexpression elimination: if an expression is available at a point, its earlier value can be reused. Available expressions give the cross-block condition. Live variables show that a definition has no later use, so dead-code elimination removes it."
+    },
+    {
+     "type": "p",
+     "text": "A conservative solution keeps every fact that might be true. It may miss an optimization but never changes the program's result. Optimizers prefer this. The transformations themselves are in <a href=\"#principal-sources-of-optimization\">Chapter 6.4</a> and <a href=\"#function-preserving-transformations-and-loop-optimization\">Chapter 6.5</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "B1 and B2 both send definitions to B3; B3 receives d1, d2 and d3. The union at B3 is why x is not constant there.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "B1",
+     "label": "B1",
+     "x": 0,
+     "y": 1,
+     "note": "OUT {d1,d2}",
+     "style": "accent"
+    },
+    {
+     "id": "B2",
+     "label": "B2",
+     "x": 2,
+     "y": 2,
+     "note": "OUT {d2,d3}",
+     "style": "normal"
+    },
+    {
+     "id": "B3",
+     "label": "B3",
+     "x": 2,
+     "y": 0,
+     "note": "IN {d1,d2,d3}",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "B1",
+     "to": "B2",
+     "style": "solid"
+    },
+    {
+     "from": "B1",
+     "to": "B3",
+     "style": "solid"
+    },
+    {
+     "from": "B2",
+     "to": "B3",
+     "style": "solid"
+    }
+   ],
+   "aria": "A three-block flow graph with reaching-definition sets: B1 and B2 both send definitions into B3."
+  }
+ },
+ "examples": [
+  {
+   "question": "A flow graph has blocks B1, B2, B3. B1 contains d1: x = 1 then d2: y = 2. B2 contains d3: x = 3. B3 contains d4: z = x + y. Edges are B1→B2, B1→B3, B2→B3. Compute gen and kill for each block. Compute IN and OUT reaching-definition sets by iteration. Is x a constant at d4?",
+   "steps": [
+    "Definitions: d1 defines x, d2 defines y, d3 defines x, d4 defines z.",
+    "Kill sets contain every definition of the same variable in the whole graph: kill[B1] = {d3}, kill[B2] = {d1}, kill[B3] = {}.",
+    "Gen sets: gen[B1] = {d1,d2}, gen[B2] = {d3}, gen[B3] = {d4}.",
+    "Start: IN[B1]=IN[B2]=IN[B3]={} and OUT[B1]=OUT[B2]=OUT[B3]={}.",
+    "Pass 1, B1: no predecessors, so IN[B1]={}. OUT[B1]={d1,d2} ∪ ({} − {d3}) = {d1,d2}.",
+    "Pass 1, B2: predecessor B1, so IN[B2]=OUT[B1]={d1,d2}. OUT[B2]={d3} ∪ ({d1,d2} − {d1}) = {d2,d3}.",
+    "Pass 1, B3: predecessors B1 and B2, so IN[B3]=OUT[B1] ∪ OUT[B2]={d1,d2} ∪ {d2,d3}={d1,d2,d3}. OUT[B3]={d4} ∪ ({d1,d2,d3} − {})={d1,d2,d3,d4}.",
+    "Pass 2 repeats the same values, so no set changes. The solution is final.",
+    "At d4, x has two reaching definitions: d1 gives x=1 and d3 gives x=3. Therefore x is not a constant at d4. y has only d2."
+   ],
+   "answer": "IN/OUT are {} / {d1,d2} for B1, {d1,d2} / {d2,d3} for B2, and {d1,d2,d3} / {d1,d2,d3,d4} for B3; their sizes in order IN B1, OUT B1, IN B2, OUT B2, IN B3, OUT B3 are 0, 2, 2, 2, 3, 4, and x is not constant at d4 because d1 and d3 both reach it.",
+   "check": "def main():\n    gen = [{'d1', 'd2'}, {'d3'}, {'d4'}]\n    kill = [{'d3'}, {'d1'}, set()]\n    preds = [[], [0], [0, 1]]\n    n = 3\n    IN = [set() for _ in range(n)]\n    OUT = [set() for _ in range(n)]\n    changed = True\n    while changed:\n        changed = False\n        for b in range(n):\n            new_in = set()\n            for p in preds[b]:\n                new_in |= OUT[p]\n            new_out = gen[b] | (new_in - kill[b])\n            if new_in != IN[b] or new_out != OUT[b]:\n                IN[b] = new_in\n                OUT[b] = new_out\n                changed = True\n    print(len(IN[0]))\n    print(len(OUT[0]))\n    print(len(IN[1]))\n    print(len(OUT[1]))\n    print(len(IN[2]))\n    print(len(OUT[2]))\n\nmain()\n",
+   "values": [
+    0,
+    2,
+    2,
+    2,
+    3,
+    4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Use union for reaching definitions and intersection for available expressions. Swapping them loses facts or invents facts.",
+  "The kill set contains every definition of a variable in the whole flow graph, not just definitions seen before the block.",
+  "May facts use union over paths; must facts use intersection. Reaching definitions is may, available expressions is must, and live variables is backward may.",
+  "Direction matters: reaching definitions and available expressions are forward; live variables is backward. Reversing predecessors and successors gives wrong equations.",
+  "A conservative solution may keep extra facts. It is safe for optimization but can block a transformation; it is not the same as an incorrect solution."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define may analysis and must analysis.",
+   "marks": 2,
+   "a": "A may analysis says a fact is true if some path makes it true. A must analysis says a fact is true only if every path makes it true."
+  },
+  {
+   "level": "understand",
+   "q": "Why does reaching definitions use union at a join point?",
+   "marks": 2,
+   "a": "A definition reaches the join if at least one incoming path carries it. One path is enough, so the predecessor OUT sets are unioned."
+  },
+  {
+   "level": "apply",
+   "q": "For a block B, gen[B] = {d2}, kill[B] = {d1}, and IN[B] = {d1,d3}. Compute OUT[B] for reaching definitions.",
+   "marks": 2,
+   "a": "OUT[B] = gen[B] ∪ (IN[B] − kill[B]) = {d2} ∪ ({d1,d3} − {d1}) = {d2,d3}."
+  },
+  {
+   "level": "apply",
+   "q": "In the worked example, is x constant at d4? Give the reaching definitions of x.",
+   "marks": 3,
+   "a": "No. The reaching definitions of x at d4 are d1: x = 1 and d3: x = 3. Two different values reach the use, so x is not constant."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must kill[B] include definitions from later blocks and other branches?",
+   "marks": 4,
+   "a": "A definition of the same variable anywhere in the graph can be reached from B, so it can stop an older definition from reaching later points. Limiting kill to earlier definitions leaves stale facts in OUT sets."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare reaching definitions and available expressions in direction, meet operator and meaning.",
+   "marks": 4,
+   "a": "Reaching definitions is forward and may, so it uses union. Available expressions is forward and must, so it uses intersection. Reaching definitions tracks definitions that may reach a point; available expressions tracks expressions computed on every path to a point."
+  },
+  {
+   "level": "apply",
+   "q": "For live variables, use[B] = {a}, def[B] = {b}, and OUT[B] = {b,c}. Compute IN[B].",
+   "marks": 3,
+   "a": "IN[B] = use[B] ∪ (OUT[B] − def[B]) = {a} ∪ ({b,c} − {b}) = {a,c}."
+  },
+  {
+   "level": "analyze",
+   "q": "How do def-use chains support constant propagation across blocks?",
+   "marks": 4,
+   "a": "A def-use chain lists the uses reached by each definition. If a use has exactly one reaching definition that assigns a constant, the optimizer replaces the use with that constant. Multiple reaching definitions block the replacement."
+  }
+ ],
+ "beyond": "Not for the exam. Real compilers put these equations into a data-flow framework with lattices and fixed-point iteration, then run many analyses together. SSA form makes def-use chains explicit and speeds up constant propagation and dead-code removal. Interprocedural analysis extends facts across function calls, which this chapter leaves out. Search for \"data-flow analysis lattice\", \"SSA form\" and \"LLVM analysis passes\" to go further."
+}
