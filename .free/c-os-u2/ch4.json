@@ -44,7 +44,7 @@
     {
      "type": "bullets",
      "items": [
-      "Message size is limited (often 8192 bytes).",
+      "Message size is limited by the system constant MSGMAX (at least 8192 bytes on POSIX systems; actual limit may be larger).",
       "Multiple receivers can read messages of specific types.",
       "Queue attributes (max bytes, max messages) are set at creation."
      ]
@@ -71,7 +71,8 @@
     {
      "type": "bullets",
      "items": [
-      "Pipe buffer size is kernel defined; typical default is 4 KB.",
+      "Pipe buffer size is kernel defined; on recent Linux kernels the default capacity is 64 KB (earlier systems used 4 KB).",
+      "Writes of size ≤ PIPE_BUF (at least 4 KB on POSIX) are atomic; they are not interleaved with writes from other processes.",
       "Write blocks when buffer is full; read blocks when buffer is empty.",
       "Blocking semantics implement producer‑consumer flow control."
      ]
@@ -79,7 +80,7 @@
     {
      "type": "code",
      "lang": "c",
-     "code": "#include <stdio.h>\\n#include <unistd.h>\\n#include <string.h>\\n\\nint main() {\\n    int fd[2];\\n    pipe(fd);\\n    pid_t pid = fork();\\n    if (pid == 0) {\\n        // Child reads\\n        close(fd[1]);\\n        char buf[100];\\n        read(fd[0], buf, sizeof(buf));\\n        printf(\"Child read: %s\\n\", buf);\\n    } else {\\n        // Parent writes\\n        close(fd[0]);\\n        const char *msg = \"Hello through pipe\";\\n        write(fd[1], msg, strlen(msg)+1);\\n    }\\n    return 0;\\n}",
+     "code": "#include <stdio.h>\n#include <unistd.h>\n#include <string.h>\n\nint main() {\n    int fd[2];\n    pipe(fd);\n    pid_t pid = fork();\n    if (pid == 0) {\n        // Child reads\n        close(fd[1]);\n        char buf[100];\n        read(fd[0], buf, sizeof(buf));\n        printf(\"Child read: %s\n\", buf);\n    } else {\n        // Parent writes\n        close(fd[0]);\n        const char *msg = \"Hello through pipe\";\n        write(fd[1], msg, strlen(msg)+1);\n    }\n    return 0;\n}",
      "stdin": "",
      "output": "Child read: Hello through pipe"
     },
@@ -153,7 +154,7 @@
    ],
    "code": {
     "lang": "c",
-    "code": "#include <stdio.h>\\nint main(){\\n    int write_time = 4*1; // ms\\n    int block = 2;\\n    int read1 = 4*1;\\n    int unblock = 1;\\n    int write2 = 4*1;\\n    int read2 = 4*1;\\n    int total = write_time + block + read1 + unblock + write2 + read2;\\n    printf(\"Total time = %d ms\\n\", total);\\n    return 0;\\n}",
+    "code": "#include <stdio.h>\nint main(){\n    int write_time = 4*1; // ms\n    int block = 2;\n    int read1 = 4*1;\n    int unblock = 1;\n    int write2 = 4*1;\n    int read2 = 4*1;\n    int total = write_time + block + read1 + unblock + write2 + read2;\n    printf(\"Total time = %d ms\n\", total);\n    return 0;\n}",
     "stdin": "",
     "output": "Total time = 19 ms"
    },
@@ -228,7 +229,7 @@
    "level": "apply",
    "q": "Given a pipe buffer of 4 KB, a producer writes 6 KB in one call. The write system call returns after writing 4 KB. How many bytes remain to be written, and what must the producer do next?",
    "marks": 4,
-   "a": "2 KB remain. The producer must either wait for the consumer to read some data (the call will block) or handle the partial write by retrying the <code>write</code> after the consumer has read."
+   "a": "If the pipe is opened in non‑blocking mode, write returns after writing 4 KB, leaving 2 KB to be written. The producer must either retry the write after the consumer reads some data or handle EAGAIN. In blocking mode the write would block until all 6 KB are transferred, so no partial write occurs."
   },
   {
    "level": "analyze",
@@ -240,7 +241,7 @@
    "level": "analyze",
    "q": "A system uses a named pipe (FIFO) for logging from many processes to a single logger. Identify a potential problem and suggest a mitigation.",
    "marks": 6,
-   "a": "Multiple writers can interleave their writes, causing garbled log lines. Mitigation: open the FIFO in O_WRONLY | O_NONBLOCK mode and protect each write with a file‑lock (e.g., <code>flock</code>) or have each writer prepend a length field and let the logger parse messages atomically."
+   "a": "Multiple writers can interleave their writes, causing garbled log lines. Mitigation: Ensure each writer writes messages of size ≤ PIPE_BUF so each write is atomic, or prepend a length field and have the logger parse messages, or use a separate synchronization mechanism such as a semaphore or a dedicated logging daemon."
   },
   {
    "level": "understand",

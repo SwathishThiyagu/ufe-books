@@ -1,5 +1,5 @@
 {
- "lead": "The operating system must be able to start new programs and stop those that have finished. System calls such as fork, exec, spawn and clone let a running process create another process. The new process receives a unique PID and a link to its parent. When a process ends it calls exit, and the parent can retrieve the exit status with wait. If the parent does not wait, the finished process becomes a zombie, consuming a PID slot. This lifecycle is the basis for all user‑level applications, from a banking app using UPI to a server handling cricket scores.",
+ "lead": "The operating system must be able to start new programs and stop those that have finished. System calls such as <code>fork()</code>, <code>exec()</code> and <code>clone()</code> let a running process create another process. On Windows the system call is <code>CreateProcess()</code>. The POSIX library function <code>spawn()</code> provides similar functionality on Unix. The new process receives a unique PID and a link to its parent. When a process ends it calls <code>exit</code>, and the parent can retrieve the exit status with <code>wait</code>. If the parent does not wait, the finished process becomes a zombie, consuming a PID slot. This lifecycle is the basis for all user‑level applications, from a banking app using UPI to a server handling cricket scores.",
  "prereq": "You need: understanding of process states and PCB from <a href=\"#process-concept-states-and-process-control-block\">Process concept, states and process control block</a>.",
  "sections": [
   {
@@ -21,14 +21,13 @@
      "type": "bullets",
      "items": [
       "<code>execve()</code> replaces the child’s memory image with a new program.",
-      "<code>spawn()</code> (Windows) combines creation and loading in one call.",
+      "<code>CreateProcess()</code> (Windows) creates a new process and loads a program in one call. The POSIX library function <code>spawn()</code> provides similar behaviour on Unix.",
       "<code>clone()</code> (Linux) lets the child share selected resources such as memory or file tables."
      ]
     },
     {
-     "type": "formula",
-     "text": "PID_child = fork() ? 0 : new_PID",
-     "where": "new_PID is the unique identifier allocated by the kernel; the expression evaluates to 0 in the child and to new_PID in the parent."
+     "type": "p",
+     "text": "In the child process <code>fork()</code> returns 0; in the parent process it returns the child’s PID."
     }
    ]
   },
@@ -51,9 +50,9 @@
     {
      "type": "code",
      "lang": "c",
-     "code": "#include <stdio.h>\\n#include <unistd.h>\\n#include <sys/wait.h>\\n\\nint main() {\\n    pid_t pid = fork();\\n    if (pid == 0) {\\n        printf(\"Child PID %d doing work...\\n\", getpid());\\n        exit(42); // return code 42\\n    } else {\\n        int status;\\n        waitpid(pid, &status, 0);\\n        if (WIFEXITED(status)) {\\n            printf(\"Parent received exit code %d from child %d\\n\", WEXITSTATUS(status), pid);\\n        }\\n    }\\n    return 0;\\n}",
+     "code": "#include <stdio.h>\n#include <unistd.h>\n#include <sys/wait.h>\n#include <stdlib.h>\n\nint main() {\n    pid_t pid = fork();\n    if (pid == 0) {\n        printf(\"Child PID %d doing work...\n\", getpid());\n        exit(42); // return code 42\n    } else {\n        int status;\n        waitpid(pid, &status, 0);\n        if (WIFEXITED(status)) {\n            printf(\"Parent received exit code %d from child %d\n\", WEXITSTATUS(status), pid);\n        }\n    }\n    return 0;\n}",
      "stdin": "",
-     "output": "Child PID 12345 doing work...\\nParent received exit code 42 from child 12345"
+     "output": "Child PID 12345 doing work...\nParent received exit code 42 from child 12345"
     },
     {
      "type": "bullets",
@@ -128,16 +127,16 @@
  },
  "examples": [
   {
-   "question": "A program executes <code>fork()</code> twice in a row. The first call creates Child A with PID 2000. Each subsequent <code>fork</code> call creates a child that receives the next consecutive PID. List all PIDs that exist after the second <code>fork</code> and indicate which are parents and which are children.",
+   "question": "A program executes <code>fork()</code> twice in a row. The first call creates Child A with PID 2000. Each subsequent <code>fork</code> call creates a child that receives a unique PID allocated by the kernel (the exact value is not guaranteed to be consecutive). List all PIDs that exist after the second <code>fork</code> and indicate which are parents and which are children.",
    "steps": [
     "First <code>fork</code>: parent (PID 1000) creates Child A (PID 2000). Now two processes exist: 1000 (parent) and 2000 (child).",
     "Second <code>fork</code> is executed by both existing processes.",
-    "Parent (PID 1000) creates Child B with the next PID 2001.",
-    "Child A (PID 2000) creates Child C with the next PID 2002.",
+    "Parent (PID 1000) creates Child B with a new PID (e.g., 2001).",
+    "Child A (PID 2000) creates Child C with another new PID (e.g., 2002).",
     "After the second call there are four processes: 1000 (parent), 2000 (child A), 2001 (child B of parent), 2002 (child C of Child A)."
    ],
    "answer": "The four PIDs are 1000 (original parent), 2000 (first child), 2001 (second child of the parent), and 2002 (second child of the first child).",
-   "check": "pids = [1000, 2000, 2001, 2002]\\nfor pid in pids:\\n    print(pid)",
+   "check": "pids = [1000, 2000, 2001, 2002]\nfor pid in pids:\n    print(pid)",
    "values": [
     1000,
     2000,
@@ -146,7 +145,7 @@
    ],
    "code": {
     "lang": "c",
-    "code": "#include <stdio.h>\\n#include <unistd.h>\\n#include <sys/wait.h>\\n\\nint main() {\\n    pid_t pid1 = fork();\\n    if (pid1 == 0) {\\n        // Child A\\n        pid_t pid2 = fork();\\n        if (pid2 == 0) {\\n            printf(\"Grandchild PID %d, PPID %d\\n\", getpid(), getppid());\\n        } else {\\n            printf(\"Child A PID %d created Grandchild PID %d\\n\", getpid(), pid2);\\n        }\\n    } else {\\n        // Parent\\n        pid_t pid3 = fork();\\n        if (pid3 == 0) {\\n            printf(\"Child B PID %d, PPID %d\\n\", getpid(), getppid());\\n        } else {\\n            printf(\"Parent PID %d created Child A PID %d and Child B PID %d\\n\", getpid(), pid1, pid3);\\n        }\\n    }\\n    // Wait for all children to finish to avoid zombies\\n    while (wait(NULL) > 0) {}\\n    return 0;\\n}",
+    "code": "#include <stdio.h>\n#include <unistd.h>\n#include <sys/wait.h>\n#include <stdlib.h>\n\nint main() {\n    pid_t pid1 = fork();\n    if (pid1 == 0) {\n        // Child A\n        pid_t pid2 = fork();\n        if (pid2 == 0) {\n            printf(\"Grandchild PID %d, PPID %d\n\", getpid(), getppid());\n        } else {\n            printf(\"Child A PID %d created Grandchild PID %d\n\", getpid(), pid2);\n        }\n    } else {\n        // Parent\n        pid_t pid3 = fork();\n        if (pid3 == 0) {\n            printf(\"Child B PID %d, PPID %d\n\", getpid(), getppid());\n        } else {\n            printf(\"Parent PID %d created Child A PID %d and Child B PID %d\n\", getpid(), pid1, pid3);\n        }\n    }\n    // Wait for all children to finish to avoid zombies\n    while (wait(NULL) > 0) {}\n    return 0;\n}",
     "stdin": ""
    },
    "dry_run": {
@@ -173,7 +172,7 @@
      ]
     ]
    },
-   "output": "Parent PID 1000 created Child A PID 2000 and Child B PID 2001\\nChild A PID 2000 created Grandchild PID 2002\\nChild B PID 2001, PPID 1000\\nGrandchild PID 2002, PPID 2000"
+   "output": "Parent PID 1000 created Child A PID 2000 and Child B PID 2001\nChild A PID 2000 created Grandchild PID 2002\nChild B PID 2001, PPID 1000\nGrandchild PID 2002, PPID 2000"
   }
  ],
  "traps": [
@@ -223,7 +222,7 @@
    "level": "apply",
    "q": "Write a short C snippet that creates a child process, makes the child exit with status 7, and the parent prints the received status.",
    "marks": 6,
-   "a": "#include <stdio.h>\\n#include <unistd.h>\\n#include <sys/wait.h>\\n\\nint main(){\\n    pid_t pid = fork();\\n    if(pid==0){\\n        exit(7);\\n    } else {\\n        int st;\\n        waitpid(pid,&st,0);\\n        if(WIFEXITED(st)) printf(\"status %d\\n\", WEXITSTATUS(st));\\n    }\\n    return 0;\\n}"
+   "a": "#include <stdio.h>\\n#include <unistd.h>\\n#include <sys/wait.h>\\n#include <stdlib.h>\\n\\nint main(){\\n    pid_t pid = fork();\\n    if(pid==0){\\n        exit(7);\\n    } else {\\n        int st;\\n        waitpid(pid,&st,0);\\n        if(WIFEXITED(st)) printf(\"status %d\\n\", WEXITSTATUS(st));\\n    }\\n    return 0;\\n}"
   }
  ],
  "beyond": "Not for the exam. In cloud platforms, container runtimes use <code>clone()</code> with fine‑grained namespace sharing to isolate micro‑services. Research on lightweight process creation explores <i>fork‑free</i> models to reduce overhead in high‑frequency trading systems. Modern languages such as Go provide goroutine scheduling on top of OS threads, but still rely on the OS for actual process creation and termination. For deeper study, look into the Linux <code>pid_namespace</code> implementation and the design of the Completely Fair Scheduler."
