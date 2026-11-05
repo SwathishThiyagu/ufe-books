@@ -1,0 +1,254 @@
+{
+ "lead": "A variational autoencoder (VAE) is a generative model: it learns a distribution over data so you can draw new samples. It keeps the encoder–decoder shape of an autoencoder but replaces the single code with a distribution. The encoder q_φ(z|x) outputs a Gaussian over a latent vector z, a short list of hidden numbers; the decoder p_θ(x|z) turns a code back into data. Training maximizes a lower bound on log p(x) called the ELBO. Uses include image sampling, interpolation, molecule design and speech or text front ends.",
+ "prereq": "You need: <a href=\"#autoencoders-and-encoder-decoder-architectures\">6.1 autoencoders</a> for the encoder–decoder shape, <a href=\"#latent-variables-and-maximum-likelihood-learning\">6.2 latent variables and likelihood</a> for p(x) = ∫ p(x|z) p(z) dz, and Unit 2 on backpropagation and gradient descent.",
+ "sections": [
+  {
+   "h3": "Why the code must become a distribution",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A plain autoencoder (6.1) maps input x to one code vector and back to x̂. Nothing forces codes of unseen inputs anywhere useful, so decoding a random code gives noise. Generation needs a distribution over codes, not a lookup table."
+    },
+    {
+     "type": "p",
+     "text": "The VAE fix has two parts. The encoder outputs q_φ(z|x) instead of a point: given x, it says where z is likely. φ is the encoder weights. A fixed prior p(z) = N(0, I) says codes should sit near the origin with unit variance per direction. z has D numbers (D is latent dimension) and I is the identity matrix, so the D dimensions are independent standard normals."
+    },
+    {
+     "type": "p",
+     "text": "The decoder p_θ(x|z) maps a code to a distribution over inputs; θ is the decoder weights. Together they define p_θ(x) = ∫ p_θ(x|z) p(z) dz. This integral over R^D has no closed form, so maximum likelihood (6.2) cannot be applied directly."
+    },
+    {
+     "type": "p",
+     "text": "Instead maximize a lower bound. For any q(z|x):"
+    },
+    {
+     "type": "formula",
+     "text": "log p_θ(x) ≥ E_{z~q_φ(z|x)}[log p_θ(x|z)] − KL(q_φ(z|x) ‖ p(z))",
+     "where": "Left side: log-likelihood of one x. First right term: expected reconstruction log-likelihood, decoding codes sampled from the encoder and scoring x. Second: KL divergence from encoder distribution to prior, in nats; it measures drift from N(0, I). The right side is the ELBO (evidence lower bound). The gap to the left is KL(q_φ(z|x) ‖ p_θ(z|x)), which shrinks as the encoder better approximates the true posterior."
+    }
+   ]
+  },
+  {
+   "h3": "The Gaussian encoder and the closed-form KL",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Make q_φ(z|x) a diagonal Gaussian. The encoder ends in two heads of size D: mean vector μ and log-variance vector. Log form keeps output unconstrained and stops variance from going negative; recover σ² = exp(log σ²). Then q_φ(z|x) = N(μ, diag(σ²))."
+    },
+    {
+     "type": "p",
+     "text": "One sampled z gives an unbiased estimate of E_q[log p_θ(x|z)]. With a Gaussian decoder centred at x̂ with fixed variance c, the term is −‖x − x̂‖²/(2c) plus a constant, so training uses mean squared error. With a Bernoulli decoder over pixels it becomes binary cross-entropy, the same loss as a binary classifier."
+    },
+    {
+     "type": "p",
+     "text": "For a diagonal Gaussian against N(0, I), the KL has a closed form:"
+    },
+    {
+     "type": "formula",
+     "text": "KL(q_φ(z|x) ‖ p(z)) = ½ Σ_{j=1}^{D} (σ_j² + μ_j² − 1 − ln σ_j²)",
+     "where": "μ_j and σ_j² are mean and variance of latent dimension j, for j = 1 to D; ln is natural logarithm, so the answer is in nats. The −1 and −ln σ_j² come from the entropy and normalizing constant of the two Gaussians. σ_j² is variance, not standard deviation."
+    },
+    {
+     "type": "p",
+     "text": "Training minimizes −ELBO summed over the mini-batch. The terms pull against each other: reconstruction wants codes to carry information, KL wants all codes near the prior. That balance keeps the latent space smooth enough to sample new data."
+    }
+   ]
+  },
+  {
+   "h3": "Reparameterization, variants and uses",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Backpropagation needs a deterministic path from parameters to loss. Drawing z ~ N(μ, diag(σ²)) is random; no gradient flows through it. The reparameterization trick moves randomness outside:"
+    },
+    {
+     "type": "formula",
+     "text": "z = μ + σ ⊙ ε,   ε ~ N(0, I)",
+     "where": "σ = √σ² is the standard deviation vector, ⊙ is element-wise multiplication, and ε is noise with no parameters. z is now a smooth function of μ and σ, so ∂z/∂μ = 1 and ∂z/∂σ = ε, and gradients reach the encoder."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Forward the mini-batch through the encoder to get μ and log σ², both length D.",
+      "Compute σ = exp(½ log σ²).",
+      "Draw ε ~ N(0, I), one noise vector per data point.",
+      "Set z = μ + σ ⊙ ε and decode to x̂.",
+      "Loss = reconstruction error + KL; backprop through μ and σ; update φ and θ."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "β-VAE multiplies the KL term by β. β > 1 presses codes harder toward the prior and often disentangles dimensions (one dimension per factor such as smile or pose) at some cost in sharpness; β < 1 favours reconstruction. Conditional VAE (CVAE) feeds label c into both networks, learning q_φ(z|x, c) and p_θ(x|z, c), so you can ask for a digit of class 7."
+    },
+    {
+     "type": "p",
+     "text": "Sampling: draw z ~ N(0, I) and decode. Interpolation: encode two inputs and decode along the straight line between their μ vectors; outputs morph smoothly because the prior fills the gap. Latent traversal: move one coordinate z_j by a fixed step, hold the rest, and watch which attribute changes."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The dashed arrow carries the KL term, computed in closed form from μ and σ²; the worked example's μ = 1, σ² = 4 give KL = 1.307 nats. Gradients reach both arrows because z = μ + σ ⊙ ε.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "VAE training path",
+   "nodes": [
+    {
+     "id": "x",
+     "label": "x",
+     "note": "input",
+     "style": "normal"
+    },
+    {
+     "id": "enc",
+     "label": "Encoder",
+     "note": "q(z|x)",
+     "style": "normal"
+    },
+    {
+     "id": "mus",
+     "label": "μ, σ²",
+     "note": "example: μ=1, σ²=4",
+     "style": "accent"
+    },
+    {
+     "id": "samp",
+     "label": "Sample z",
+     "note": "z = μ + σ⊙ε",
+     "style": "live"
+    },
+    {
+     "id": "dec",
+     "label": "Decoder",
+     "note": "p(x|z)",
+     "style": "normal"
+    },
+    {
+     "id": "xh",
+     "label": "x-hat",
+     "note": "reconstruction",
+     "style": "normal"
+    },
+    {
+     "id": "loss",
+     "label": "ELBO",
+     "note": "minimize −ELBO",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "x",
+     "to": "enc",
+     "style": "solid"
+    },
+    {
+     "from": "enc",
+     "to": "mus",
+     "style": "solid"
+    },
+    {
+     "from": "mus",
+     "to": "samp",
+     "style": "solid"
+    },
+    {
+     "from": "samp",
+     "to": "dec",
+     "style": "solid"
+    },
+    {
+     "from": "dec",
+     "to": "xh",
+     "style": "solid"
+    },
+    {
+     "from": "xh",
+     "to": "loss",
+     "label": "reconstruction",
+     "style": "solid"
+    },
+    {
+     "from": "mus",
+     "to": "loss",
+     "label": "KL = 1.307",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Data flows from the input through the encoder to Gaussian parameters, a reparameterized sample, the decoder and a reconstruction; the ELBO adds reconstruction loss to the KL term."
+  }
+ },
+ "examples": [
+  {
+   "question": "A VAE has one latent dimension (D = 1). For an input x the encoder outputs μ = 1 and σ² = 4, and the prior is p(z) = N(0, 1). Compute KL(q(z|x) ‖ p(z)) in nats and say whether this code is close to the prior.",
+   "steps": [
+    "With D = 1 the KL sum has one term: KL = ½(σ² + μ² − 1 − ln σ²).",
+    "Substitute: μ = 1 so μ² = 1; σ² = 4, so σ = 2. The formula takes variance, so 4 goes in.",
+    "ln σ² = ln 4 = 1.3863.",
+    "Bracket: 4 + 1 − 1 − 1.3863 = 2.6137.",
+    "KL = ½ × 2.6137 = 1.3069 ≈ 1.307 nats.",
+    "A KL of 1.307 nats is well above 0, so the code is not close to the prior: it is too wide (variance 4 against 1) and shifted (mean 1 against 0). Training pushes μ toward 0 and pulls σ² toward 1: here μ = 1 comes down and σ² = 4 comes down toward 1. (If σ² had been below 1, the KL term would push it up.)"
+   ],
+   "answer": "KL(q(z|x) ‖ p(z)) = 1.307 nats, so the code is far from the prior.",
+   "check": "import math\nmu = 1.0\nvar = 4.0\nkl = 0.5 * (var + mu**2 - 1 - math.log(var))\nprint(round(kl, 3))",
+   "values": [
+    1.307
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Variance, not standard deviation. The KL uses σ². Putting σ = 2 in as if variance gives ½(2 + 1 − 1 − ln 2) = 0.65 nats, half the right answer. Encoders output log σ² for this reason: exponentiate once and label the result σ².",
+  "KL direction. The ELBO has KL(q(z|x) ‖ p(z)), not KL(p(z) ‖ q(z|x)). These differ, and only the first has this simple closed form.",
+  "The bound is not the likelihood. Maximizing the ELBO maximizes a lower bound on log p(x); the gap is KL(q(z|x) ‖ p_θ(z|x)) and is zero only if the encoder is exact.",
+  "Gradients do not flow into ε. In z = μ + σ ⊙ ε, ε is noise, not a parameter, so no gradient flows into ε; gradients flow only into μ and σ. σ is not redrawn, it is recomputed by the encoder; what is redrawn each step is ε. Treating sampled z as a plain network output breaks training.",
+  "Calling it a plain autoencoder. A plain autoencoder has no prior and no KL term, so sampling its latent space is unjustified. The KL term is exactly what makes generation possible, and examiners ask for it."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the ELBO for one data point x and name its two terms.",
+   "marks": 2,
+   "a": "log p_θ(x) ≥ E_{q_φ(z|x)}[log p_θ(x|z)] − KL(q_φ(z|x) ‖ p(z)). First term: expected reconstruction log-likelihood. Second: KL from encoder distribution to prior N(0, I)."
+  },
+  {
+   "level": "remember",
+   "q": "What does the encoder network output in a VAE, and why is log variance used?",
+   "marks": 2,
+   "a": "Two vectors of length D: the mean μ and log σ². The log form keeps the output unconstrained, and σ² = exp(log σ²) is always positive."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the reparameterization trick needed in a VAE?",
+   "marks": 3,
+   "a": "Sampling z ~ N(μ, σ²) is random, and backpropagation cannot pass a gradient through it. Rewriting z = μ + σ ⊙ ε with ε ~ N(0, I) makes z deterministic given μ, σ and ε, so gradients reach encoder parameters."
+  },
+  {
+   "level": "apply",
+   "q": "One latent dimension, encoder gives μ = 2 and σ² = 1, prior N(0, 1). Compute KL(q(z|x) ‖ p(z)) in nats.",
+   "marks": 4,
+   "a": "KL = ½(σ² + μ² − 1 − ln σ²) = ½(1 + 4 − 1 − ln 1) = ½(4) = 2 nats."
+  },
+  {
+   "level": "apply",
+   "q": "Two latent dimensions, μ = (1, −1) and σ² = (1, 1), prior N(0, I). Compute the KL in nats.",
+   "marks": 4,
+   "a": "Dimension 1: ½(1 + 1 − 1 − 0) = 0.5. Dimension 2: ½(1 + 1 − 1 − 0) = 0.5. Total = 1 nat."
+  },
+  {
+   "level": "analyze",
+   "q": "What happens if β in a β-VAE is set very large?",
+   "marks": 5,
+   "a": "The KL term dominates. The encoder's q(z|x) collapses toward N(0, I) and the decoder learns to ignore z, giving posterior collapse: reconstructions become blurry or averaged. Reconstruction quality falls (reconstruction error rises). Only moderate β > 1 tends to give more independent, interpretable dimensions; at very large β the code is uninformative and interpretability is lost."
+  },
+  {
+   "level": "analyze",
+   "q": "Two VAEs train on the same greyscale digits, one with a Bernoulli decoder and one with a Gaussian decoder of fixed variance. Which reconstruction loss does each use, and why?",
+   "marks": 5,
+   "a": "Bernoulli: pixels scaled to [0, 1] are treated as probabilities, so loss is binary cross-entropy. Gaussian: the term is −‖x − x̂‖²/(2c) plus a constant, so loss is mean squared error. The choice follows the data range and whether pixels behave like counts or real numbers."
+  }
+ ],
+ "beyond": "Not for the exam. VQ-VAE swaps the Gaussian code for a learned codebook and now powers audio and image tokenizers; hierarchical VAEs such as NVAE generate high-resolution images. The same ELBO trains diffusion models, where the encoder is a fixed noising process, so time on KL and reparameterization pays off twice. Conditional VAEs generate molecules with requested properties. Search terms: posterior collapse, disentanglement, VQ-VAE, ELBO in diffusion models."
+}

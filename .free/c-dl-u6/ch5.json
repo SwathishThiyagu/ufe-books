@@ -1,0 +1,215 @@
+{
+ "lead": "Some generative models need an exact probability for every possible image, not just a realistic-looking sample. An autoregressive model writes the joint density as a product of one-variable conditionals in a fixed order; PixelRNN and PixelCNN apply this order to pixels. A normalizing flow instead maps data through an invertible function and corrects the density with a Jacobian term. Both give exact likelihoods, so they train by maximum likelihood. They appear in image and audio generation, density estimation and anomaly detection.",
+ "prereq": "You need: <a href=\"#latent-variables-and-maximum-likelihood-learning\">6.2</a> for maximum likelihood, and Unit 4 sequence models for the RNN view.",
+ "sections": [
+  {
+   "h3": "Autoregressive factorization",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take a data vector x = (x1, x2, ..., xD) with D entries. In an image each entry is one pixel value; in audio each entry is one sample. The chain rule of probability writes the joint density as a product of conditionals, one per entry, in a fixed order. An autoregressive model chooses that order once and learns every conditional. The order is part of the model: a later entry may depend on all earlier entries, never on later ones."
+    },
+    {
+     "type": "formula",
+     "text": "p(x) = ∏<sub>i=1</sub><sup>D</sup> p(x<sub>i</sub> | x<sub>1:i−1</sub>)",
+     "where": "D is the number of entries; x<sub>i</sub> is entry i; x<sub>1:i−1</sub> = (x<sub>1</sub>, ..., x<sub>i−1</sub>) are the earlier entries in the chosen order."
+    },
+    {
+     "type": "p",
+     "text": "For pixels, a common order is row by row, left to right inside each row. Then x1 is the top-left pixel and xD is the bottom-right pixel. Training uses maximum likelihood: maximize Σ<sub>n</sub> log p(x<sup>(n)</sup>), which becomes Σ<sub>n</sub> Σ<sub>i</sub> log p(x<sub>i</sub><sup>(n)</sup> | x<sub>1:i−1</sub><sup>(n)</sup>). Each conditional is a small classifier: for a binary pixel it outputs p(x<sub>i</sub>=1 | earlier pixels); for an 8-bit pixel it outputs 256 probabilities. Sampling is sequential: draw x1, insert it, draw x2 given x1, and continue. This is exact but slow, because D draws cannot be parallel."
+    }
+   ]
+  },
+  {
+   "h3": "PixelRNN and PixelCNN",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "PixelRNN and PixelCNN are autoregressive models for images. They keep a fixed pixel order and use a neural network to compute each conditional from earlier pixels. PixelRNN uses recurrent layers along the pixel sequence, so a hidden state carries information from earlier pixels (see Unit 4, Recurrent Networks and Sequence Models). PixelCNN uses masked convolutions. A convolution kernel is multiplied by a mask that sets weights for the current pixel and later pixels to zero. The output at a pixel depends only on pixels before it in the fixed order."
+    },
+    {
+     "type": "p",
+     "text": "The mask follows the order. A pixel in the current row can see earlier pixels in that row and all pixels in previous rows. The first pixel of a row sees only previous rows. Build the mask once and keep it fixed. Training feeds a whole image and computes one conditional per pixel in parallel; the loss is the sum of negative log probabilities. Sampling generates pixel 1, inserts it, generates pixel 2, and continues, so it is sequential. Some syllabi call these models fully visible belief nets because every pixel is observed in training. Training and sampling must use the same order; otherwise the product is invalid."
+    }
+   ]
+  },
+  {
+   "h3": "Normalizing flows",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A normalizing flow models x through an invertible function f. Start with a simple base density pZ(z), often a standard normal. Set z = f(x). The change-of-variables formula gives the data density."
+    },
+    {
+     "type": "formula",
+     "text": "log p<sub>X</sub>(x) = log p<sub>Z</sub>(f(x)) + log |det ∂f/∂x|",
+     "where": "p<sub>X</sub>(x) is the data density at x; p<sub>Z</sub> is the base density; f is invertible; det ∂f/∂x is the Jacobian determinant at x."
+    },
+    {
+     "type": "p",
+     "text": "The determinant corrects for local volume change. For sampling, invert: draw z from pZ, then compute x = f<sup>−1</sup>(z). Training maximizes Σ log pX(x) over data, so this is exact likelihood, not a lower bound. A full Jacobian is expensive in high dimensions. Coupling layers make it cheap. Split x into xA and xB. Leave xA unchanged. Transform xB using functions s and t of xA: yA = xA and yB = xB × exp(s(xA)) + t(xA). The Jacobian is triangular, so the log determinant is Σ s(xA). The inverse subtracts t and divides by exp(s). Stack coupling layers and alternate which part is transformed. Unlike a <a href=\"#variational-autoencoders-vaes\">VAE</a>, a flow has no encoder sampling noise and no bound. Only a few universities require full Jacobian derivations; for most exams, know the formula and the coupling determinant."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The figure shows the fixed order: x1=1, then x2=1 given x1, then x3=0 given x1 and x2. Multiplying 0.6, 0.7 and 0.8 gives p(1,1,0)=0.336.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Autoregressive order",
+   "nodes": [
+    {
+     "id": "x1",
+     "label": "x1=1",
+     "note": "first pixel",
+     "style": "normal"
+    },
+    {
+     "id": "x2",
+     "label": "x2=1",
+     "note": "next pixel",
+     "style": "normal"
+    },
+    {
+     "id": "x3",
+     "label": "x3=0",
+     "note": "next pixel",
+     "style": "normal"
+    },
+    {
+     "id": "px",
+     "label": "p(1,1,0)",
+     "note": "0.336",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "x1",
+     "to": "x2",
+     "label": "p(x1)=0.6",
+     "style": "solid"
+    },
+    {
+     "from": "x2",
+     "to": "x3",
+     "label": "p(x2|x1)=0.7",
+     "style": "solid"
+    },
+    {
+     "from": "x3",
+     "to": "px",
+     "label": "p(x3|x1,x2)=0.8",
+     "style": "solid"
+    }
+   ],
+   "aria": "A down chain from x1=1 to x2=1 to x3=0 multiplies conditional probabilities 0.6, 0.7 and 0.8 to produce p(1,1,0)=0.336."
+  }
+ },
+ "examples": [
+  {
+   "question": "For three binary pixels, p(x1=1)=0.6, p(x2=1|x1=1)=0.7, p(x3=0|x1=1,x2=1)=0.8. Compute p(1,1,0).",
+   "steps": [
+    "Write the autoregressive product for this order: p(1,1,0) = p(x1=1) × p(x2=1|x1=1) × p(x3=0|x1=1,x2=1).",
+    "Substitute the first two factors: 0.6 × 0.7 = 0.42.",
+    "Multiply by the third factor: 0.42 × 0.8 = 0.336.",
+    "The result is a probability, so it is dimensionless and lies between 0 and 1."
+   ],
+   "answer": "The probability p(x1=1, x2=1, x3=0) is 0.336.",
+   "check": "p1 = 0.6\np2 = 0.7\np3 = 0.8\nanswer = p1 * p2 * p3\nprint(answer)",
+   "values": [
+    0.336
+   ],
+   "code": {
+    "lang": "python",
+    "code": "p1 = 0.6\np2 = 0.7\np3 = 0.8\nprint(p1 * p2 * p3)",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "variable",
+     "value",
+     "product"
+    ],
+    "rows": [
+     [
+      "p1",
+      "0.6",
+      "0.6"
+     ],
+     [
+      "p2",
+      "0.7",
+      "0.42"
+     ],
+     [
+      "p3",
+      "0.8",
+      "0.336"
+     ]
+    ]
+   },
+   "output": "0.336"
+  }
+ ],
+ "traps": [
+  "A conditional may use only earlier entries. Conditioning on a later pixel breaks the product and makes the density invalid.",
+  "The mask must match the chosen order. Changing the scan order without rebuilding masks and retraining gives wrong conditionals.",
+  "In a flow the Jacobian term is added with a plus sign and an absolute determinant: log pX = log pZ + log|det J|, not minus.",
+  "Autoregressive models give exact likelihood. Do not call their objective a variational lower bound; that belongs to VAEs.",
+  "PixelCNN training is parallel, sampling is sequential. An examiner may ask why training can see the whole image while sampling cannot."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the autoregressive factorization for a D-dimensional vector x in a fixed order.",
+   "marks": 2,
+   "a": "p(x) = ∏<sub>i=1</sub><sup>D</sup> p(x<sub>i</sub> | x<sub>1:i−1</sub>). Each factor is the probability of entry i given all earlier entries."
+  },
+  {
+   "level": "understand",
+   "q": "Why does PixelCNN need a mask in its convolution?",
+   "marks": 3,
+   "a": "Without a mask, a convolution at pixel i could read pixel i or a later pixel. The mask zeroes those weights, so the output depends only on earlier pixels and the conditional p(x<sub>i</sub>|x<sub>1:i−1</sub>) is valid."
+  },
+  {
+   "level": "apply",
+   "q": "A three-entry autoregressive model has p(x1=1)=0.5, p(x2=0|x1=1)=0.4 and p(x3=1|x1=1,x2=0)=0.9. Find p(1,0,1).",
+   "marks": 3,
+   "a": "Multiply: 0.5 × 0.4 × 0.9 = 0.18. The probability is 0.18."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is the log determinant term added in the normalizing-flow likelihood?",
+   "marks": 5,
+   "a": "The invertible map f changes local volume. The determinant measures that volume change. Adding log|det ∂f/∂x| corrects the base density so that integrating pX over x gives 1. A stretch changes volume, and the log determinant offsets it."
+  },
+  {
+   "level": "apply",
+   "q": "For a flow, log pZ(f(x)) = −2.3 and log|det ∂f/∂x| = 0.6. Find log pX(x).",
+   "marks": 2,
+   "a": "Add: −2.3 + 0.6 = −1.7."
+  },
+  {
+   "level": "analyze",
+   "q": "In a coupling layer yA=xA and yB=xB×exp(s(xA))+t(xA), why is the Jacobian determinant cheap?",
+   "marks": 4,
+   "a": "The Jacobian is triangular because yA does not depend on xB. Its determinant is the product of diagonal entries. The xA block contributes 1 and the xB block contributes exp(s(xA)), so log determinant = Σ s(xA). No full D×D determinant is computed."
+  },
+  {
+   "level": "understand",
+   "q": "Why is PixelRNN sampling slower than training on a whole image?",
+   "marks": 3,
+   "a": "Training computes all conditionals in parallel from the known image. Sampling must generate one pixel, insert it, then generate the next, because each new pixel is an input to later conditionals. That is a sequential loop of D steps."
+  },
+  {
+   "level": "remember",
+   "q": "What is a fully visible belief net?",
+   "marks": 2,
+   "a": "An autoregressive model that gives an exact joint density over observed variables, with no latent variables. PixelRNN and PixelCNN are examples."
+  }
+ ],
+ "beyond": "Not for the exam. PixelCNN-style autoregression appears in audio generation and in modern image token models; WaveNet made the same factorization famous for speech. Normalizing flows are used for density estimation, anomaly detection and invertible image transforms; Glow and RealNVP are common names to search. Coupling layers also appear in probabilistic models where exact likelihood matters. Search terms: masked convolution, PixelCNN++, RealNVP, Glow, change of variables."
+}

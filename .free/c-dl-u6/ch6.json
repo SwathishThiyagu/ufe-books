@@ -1,0 +1,196 @@
+{
+ "lead": "Generative models can act as conditional priors for images. A prior supplies plausible missing content; a condition ties that content to the pixels you already have. For image editing you move in latent space or pass an attribute label. For inpainting you pass a mask and visible pixels. For super-resolution you pass a low-resolution image. The same generator then predicts an edited, filled or upscaled image. Phone galleries, e-commerce catalogue clean-up, medical scan enhancement and CCTV restoration use these tasks.",
+ "prereq": "You need autoencoders (<a href=\"#autoencoders-and-encoder-decoder-architectures\">6.1</a>), VAEs (<a href=\"#variational-autoencoders-vaes\">6.3</a>), GANs (<a href=\"#generative-adversarial-networks-architecture-and-training\">6.4</a>) and autoregressive priors (<a href=\"#autoregressive-models-pixelrnn-and-normalizing-flows\">6.5</a>).",
+ "sections": [
+  {
+   "h3": "Image editing by moving in latent space",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An encoder maps image x to a latent vector z; a decoder maps z back to pixels. If the model is trained well, nearby z values give similar images. An attribute direction d is a vector in latent space. Adding it shifts one property. Common choices are smile, hair colour, age or season. A simple estimate takes the mean encoded vector of images with the attribute minus the mean without it, then normalises to unit length. Large step size changes more but risks artifacts."
+    },
+    {
+     "type": "formula",
+     "text": "z′ = z + α d",
+     "where": "z′ is the edited latent code; z is the original latent code; α is the step size in latent units; d is the unit attribute direction."
+    },
+    {
+     "type": "p",
+     "text": "Conditional GANs and VAEs learn the edit directly. The generator sees a condition c, such as “add glasses”, a sketch, or a reference photo, and samples G(z,c). Paired training data has target images. The loss combines reconstruction, adversarial and sometimes identity losses. CycleGAN handles unpaired style change: two generators map domain A to B and back, and a cycle loss ‖F(G(x)) − x‖₁ keeps content. It is used for photo-to-sketch or summer-to-winter looks."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Encode the image to z.",
+      "Pick a direction d or a condition c.",
+      "Decode z + α d or G(z,c).",
+      "Check identity and artifacts; reduce α if needed."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Inpainting: predict the missing region",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Inpainting fills a hole in an image. The input is a visible image x and a binary mask m. m = 1 marks missing pixels. The model predicts the hole from context: p(y | x ⊙ (1 − m), m), where y is the full target image, x is the observed image, m is a binary mask with m = 1 at missing pixels, and ⊙ is the elementwise product. A context encoder is an encoder-decoder trained to reconstruct the whole image but scored mainly on the hole. The mask is passed as an extra channel so the network knows what to ignore. A plain L1 or L2 loss gives a blurry average fill; a GAN or perceptual decoder adds texture."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Make a mask that covers the object or damage.",
+      "Feed the masked image and mask channel to the generator.",
+      "Predict the full image.",
+      "Composite: output = m ⊙ prediction + (1 − m) ⊙ input.",
+      "Train with hole-only pixel loss plus adversarial or perceptual loss.",
+      "Evaluate on held-out holes with PSNR/SSIM and human inspection."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Super-resolution and honest evaluation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Single-image super-resolution maps a low-resolution image to a high-resolution one. A CNN or ResNet predicts missing high-frequency detail; a GAN sharpens texture. Pixel loss alone gives smooth, safe outputs. Perceptual loss compares deep features from a pretrained network and usually looks sharper. SSIM compares local luminance, contrast and structure; it takes values up to 1 (typically between 0 and 1), and equals 1 for identical images. PSNR can rank a blurry result above a sharp one, so report SSIM or a perceptual metric too. Deep image prior is a side note: an untrained network's structure itself favours natural images, so it can denoise or inpaint without training data."
+    },
+    {
+     "type": "formula",
+     "text": "PSNR = 10 log₁₀(MAX² ÷ MSE)",
+     "where": "MAX is the maximum pixel value (255 for 8-bit images); MSE is the mean squared error between the output and the target."
+    },
+    {
+     "type": "p",
+     "text": "The same conditional setup appears in security restoration of CCTV frames. Ethical misuse of restored or edited media belongs to <a href=\"#ethics-in-generative-ai-bias-toxicity-and-deepfakes\">6.7</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A source image is paired with a mask or low-resolution copy; the conditional generator predicts the edited, filled or upscaled output. The condition is the only extra input the generator needs.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Image task pipeline",
+   "nodes": [
+    {
+     "id": "input",
+     "label": "Input image",
+     "note": "source",
+     "style": "normal"
+    },
+    {
+     "id": "cond",
+     "label": "Mask / low-res",
+     "note": "64×64 of 256×256",
+     "style": "accent"
+    },
+    {
+     "id": "gen",
+     "label": "Generator",
+     "note": "conditional model",
+     "style": "live"
+    },
+    {
+     "id": "out",
+     "label": "Output image",
+     "note": "edited or filled",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "input",
+     "to": "cond",
+     "style": "solid"
+    },
+    {
+     "from": "cond",
+     "to": "gen",
+     "style": "solid"
+    },
+    {
+     "from": "gen",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "An input image with a mask or low resolution condition goes through a generator to an output image."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 256×256 8-bit image has a 64×64 masked square. (a) What fraction and percentage of the image is missing? (b) The filled region has MSE = 16 in pixel-level squared error on 8-bit pixels. Compute PSNR. Take MAX = 255.",
+   "steps": [
+    "Total pixels = 256 × 256 = 65,536 pixels.",
+    "Missing pixels = 64 × 64 = 4,096 pixels.",
+    "Missing fraction = 4,096 ÷ 65,536 = 0.0625.",
+    "Missing percentage = 0.0625 × 100 = 6.25%.",
+    "PSNR = 10 log₁₀(255² ÷ 16) = 10 log₁₀(65,025 ÷ 16) = 10 log₁₀(4,064.0625).",
+    "log₁₀(4,064.0625) ≈ 3.609, so PSNR ≈ 36.09 dB."
+   ],
+   "answer": "6.25% of the image is missing, and the PSNR is 36.09 dB.",
+   "check": "import math\nH = 256\nW = 256\nh = 64\nw = 64\nmissing = (h * w) / (H * W)\npct = missing * 100\nmse = 16\npsnr = 10 * math.log10((255 ** 2) / mse)\nprint(missing)\nprint(round(pct, 2))\nprint(round(psnr, 2))",
+   "values": [
+    0.0625,
+    6.25,
+    36.09
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Higher PSNR does not always mean a better-looking image; PSNR rewards smooth blur. Report SSIM or a perceptual metric as well.",
+  "In inpainting, fix the mask polarity: m = 1 means missing, not visible. Composite with m ⊙ prediction + (1 − m) ⊙ input.",
+  "Super-resolution input is low-resolution. Evaluate on held-out low/high-resolution pairs, not on training patches, and build the low-resolution training inputs with the same downscaling (degradation) you will meet at test time.",
+  "CycleGAN's cycle loss preserves content; adversarial loss alone can change identity. A latent edit's step size α is in latent units, not pixels."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the role of the mask in an inpainting model?",
+   "marks": 2,
+   "a": "It marks which pixels are missing so the generator conditions on the visible context and fills only the hole."
+  },
+  {
+   "level": "understand",
+   "q": "Why can PSNR prefer a blurry super-resolution output over a sharp one?",
+   "marks": 3,
+   "a": "PSNR depends on MSE. A smooth blur can have low average error, while sharp texture may move pixels and raise MSE even when it looks better."
+  },
+  {
+   "level": "apply",
+   "q": "A 128×128 image has a 32×32 missing square. What fraction and percentage is missing?",
+   "marks": 3,
+   "a": "Missing pixels = 1,024; total = 16,384. Fraction = 1,024 ÷ 16,384 = 0.0625; percentage = 6.25%."
+  },
+  {
+   "level": "apply",
+   "q": "For 8-bit pixels, MSE = 25. Compute PSNR with MAX = 255.",
+   "marks": 4,
+   "a": "PSNR = 10 log₁₀(255² ÷ 25) = 10 log₁₀(65,025 ÷ 25) = 10 log₁₀(2,601) ≈ 34.15 dB."
+  },
+  {
+   "level": "analyze",
+   "q": "In CycleGAN, what stops the generator from mapping every input to one convincing image in the target domain?",
+   "marks": 4,
+   "a": "The cycle-consistency loss: F(G(x)) must return close to x. The two mappings must be inverses, so content is preserved."
+  },
+  {
+   "level": "understand",
+   "q": "How does a conditional GAN differ from an unconditional GAN for image editing?",
+   "marks": 2,
+   "a": "The conditional generator also receives c, such as an attribute label or reference image, so it can target a requested change."
+  },
+  {
+   "level": "analyze",
+   "q": "A latent edit with large α produces artifacts. What does that suggest about the latent space?",
+   "marks": 5,
+   "a": "The large step leaves the region where training images are dense, so the decoder sees an unlikely code. Use a smaller α or project back toward the data manifold."
+  }
+ ],
+ "beyond": "Not for the exam. Modern photo apps use diffusion models for inpainting and super-resolution, but the task setup and metrics here still apply. Search terms: image-to-image translation, context encoder, perceptual loss, LPIPS, Real-ESRGAN, diffusion inpainting. Research often separates distortion metrics (PSNR, SSIM) from perceptual metrics (LPIPS, FID)."
+}

@@ -1,0 +1,543 @@
+{
+ "lead": "This unit explains how deep networks learn to generate images, audio and other data, and how to judge the result. After it you can read an autoencoder, VAE or GAN architecture, compute its main loss, and choose a model for editing, inpainting or super-resolution. You can also name the social risks of generated media and the basic controls.",
+ "about": "Unit 6 is about models that learn a data distribution, not just a label. Chapter 6.1 starts with autoencoders and encoder-decoder blocks. Chapter 6.2 adds latent variables and maximum likelihood, which gives the language for 6.3 variational autoencoders. Chapter 6.4 turns to adversarial training and GANs. Chapter 6.5 covers autoregressive models, PixelRNN and normalizing flows. Chapter 6.6 applies these models to image editing, inpainting and super-resolution. Chapter 6.7 closes with bias, toxicity, deepfakes and responsible use. The order moves from reconstruction, to density estimation, to generation, to deployment, so each chapter uses the previous one.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "An autoencoder squeezes input through a narrow latent code and learns to reconstruct it.",
+   "depth": "Encoder q(z|x) maps input x to latent z; decoder p(x|z) rebuilds x-hat. Use reconstruction loss: mean squared error for real values, binary cross-entropy for 0/1 pixels. Cover undercomplete and overcomplete autoencoders, tied weights, denoising (add noise, recover clean x), sparse (add a penalty on the code), and contractive autoencoders only a few universities teach in detail. Show encoder-decoder as a general pattern, not only autoencoders. Link to PCA: a linear autoencoder with squared error learns a PCA-like subspace.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Autoencoder bottleneck",
+    "nodes": [
+     {
+      "id": "x",
+      "label": "x",
+      "note": "input",
+      "style": "normal"
+     },
+     {
+      "id": "enc",
+      "label": "Encoder",
+      "note": "q(z|x)",
+      "style": "normal"
+     },
+     {
+      "id": "z",
+      "label": "z",
+      "note": "latent code",
+      "style": "accent"
+     },
+     {
+      "id": "dec",
+      "label": "Decoder",
+      "note": "p(x|z)",
+      "style": "normal"
+     },
+     {
+      "id": "xh",
+      "label": "x-hat",
+      "note": "reconstruction",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "x",
+      "to": "enc",
+      "style": "solid"
+     },
+     {
+      "from": "enc",
+      "to": "z",
+      "style": "solid"
+     },
+     {
+      "from": "z",
+      "to": "dec",
+      "style": "solid"
+     },
+     {
+      "from": "dec",
+      "to": "xh",
+      "style": "solid"
+     }
+    ],
+    "aria": "Input x passes through an encoder to a narrow latent code z and a decoder produces x-hat."
+   },
+   "example": "A 1,000-pixel input uses a 32-unit bottleneck. Encoder weights are 1,000×32 and 32 biases; decoder weights are 32×1,000 and 1,000 biases. Compute total parameters and compression ratio. Answer: 32,000+32+32,000+1,000=65,032 parameters; ratio 1,000/32=31.25:1.",
+   "trap": "A wide bottleneck can copy the input, so low reconstruction loss does not prove a useful code; always report bottleneck size and test on held-out data.",
+   "prereq": "Unit 1 MLP and backprop; Unit 2 optimizers and regularization.",
+   "leave": "VAE training to 6.3, adversarial training to 6.4, applications to 6.6."
+  },
+  {
+   "k": 2,
+   "idea": "A latent variable model explains observed data through hidden causes, and maximum likelihood fits it by maximizing p(x).",
+   "depth": "Define latent z and observed x. Joint p(x,z)=p(z)p(x|z); marginal p(x)=∫p(x,z)dz or Σ_z. Log-likelihood over N points is Σ log p(x_i). The integral is often intractable, so use a Monte Carlo estimate p(x)≈(1/M)Σ p(x|z_m) with z_m~p(z); mention EM as an alternate route. Define local independencies in a Markov network: a node is independent of non-neighbours given its neighbours. RBM is a latent-variable model: visible v, hidden h, energy E(v,h)=-aᵀv-bᵀh-vᵀWh, p(v,h)=exp(-E)/Z. Training by contrastive divergence; only a few universities require the full derivation.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "theta",
+      "label": "θ",
+      "x": 0,
+      "y": 2,
+      "note": "parameters",
+      "style": "normal"
+     },
+     {
+      "id": "z",
+      "label": "z",
+      "x": 0,
+      "y": 0,
+      "note": "latent cause",
+      "style": "accent"
+     },
+     {
+      "id": "x",
+      "label": "x",
+      "x": 2,
+      "y": 1,
+      "note": "observed data",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "z",
+      "to": "x",
+      "label": "p(x|z)",
+      "style": "solid"
+     },
+     {
+      "from": "theta",
+      "to": "x",
+      "label": "θ",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A latent cause z and parameters θ point to observed data x."
+   },
+   "example": "Latent z=1 with probability 0.6, z=2 with 0.4. Emission p(x=1|z=1)=0.9, p(x=1|z=2)=0.2. Find p(x=1) and the log-likelihood of observations [1,1,0], using p(x=0)=1-p(x=1). Answer: p(x=1)=0.6×0.9+0.4×0.2=0.62; p(x=0)=0.38; L=0.62×0.62×0.38=0.146; ln L≈-1.924.",
+   "trap": "Do not maximize the joint p(x,z) for a guessed z and call it maximum likelihood; the likelihood of x needs the sum or integral over z.",
+   "prereq": "Unit 1 probability and loss functions; Chapter 6.1 for encoder-decoder notation.",
+   "leave": "VAE variational bound to 6.3; GAN implicit models to 6.4; full RBM sampling details stay a short example."
+  },
+  {
+   "k": 3,
+   "idea": "A VAE learns a probabilistic encoder and decoder by maximizing a lower bound on data likelihood.",
+   "depth": "Encoder q_φ(z|x) outputs mean μ and variance σ² for a Gaussian; prior p(z)=N(0,I). Decoder p_θ(x|z). ELBO = E_q[log p(x|z)] - KL(q(z|x)||p(z)). The KL for a diagonal Gaussian is ½Σ(σ_j²+μ_j²-1-log σ_j²). Reparameterization: z=μ+σ⊙ε, ε~N(0,I), so gradients pass through sampling. Cover β-VAE and conditional VAE as variants. Applications: sampling, interpolation, latent traversal.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "VAE training path",
+    "nodes": [
+     {
+      "id": "x",
+      "label": "x",
+      "note": "input",
+      "style": "normal"
+     },
+     {
+      "id": "enc",
+      "label": "Encoder",
+      "note": "q(z|x)",
+      "style": "normal"
+     },
+     {
+      "id": "mus",
+      "label": "μ,σ",
+      "note": "Gaussian params",
+      "style": "accent"
+     },
+     {
+      "id": "samp",
+      "label": "Sample z",
+      "note": "reparameterize",
+      "style": "live"
+     },
+     {
+      "id": "dec",
+      "label": "Decoder",
+      "note": "p(x|z)",
+      "style": "normal"
+     },
+     {
+      "id": "xh",
+      "label": "x-hat",
+      "note": "reconstruction",
+      "style": "normal"
+     },
+     {
+      "id": "loss",
+      "label": "ELBO",
+      "note": "training loss",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "x",
+      "to": "enc",
+      "style": "solid"
+     },
+     {
+      "from": "enc",
+      "to": "mus",
+      "style": "solid"
+     },
+     {
+      "from": "mus",
+      "to": "samp",
+      "style": "solid"
+     },
+     {
+      "from": "samp",
+      "to": "dec",
+      "style": "solid"
+     },
+     {
+      "from": "dec",
+      "to": "xh",
+      "style": "solid"
+     },
+     {
+      "from": "xh",
+      "to": "loss",
+      "label": "reconstruction",
+      "style": "solid"
+     },
+     {
+      "from": "mus",
+      "to": "loss",
+      "label": "KL",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Data passes through an encoder to Gaussian parameters, a sampled latent and a decoder; the ELBO combines reconstruction and KL."
+   },
+   "example": "For one latent dimension, q(z|x)=N(μ=1, σ²=4) and prior N(0,1). Compute KL(q||p). Answer: ½(4+1-1-log 4)=½(4-1.386)=1.307.",
+   "trap": "Put variance, not standard deviation, into the KL formula; mixing σ and σ² is the common numerical error.",
+   "prereq": "6.1 encoder-decoder and 6.2 latent variables and likelihood; Unit 2 backprop.",
+   "leave": "GAN training to 6.4; flow-based exact likelihood to 6.5."
+  },
+  {
+   "k": 4,
+   "idea": "A GAN trains a generator and discriminator in a two-player game to produce realistic samples.",
+   "depth": "Generator G(z;θ_g) maps noise z to a fake sample; discriminator D(x;θ_d) outputs a probability that x is real. Minimax value V(D,G)=E_data[log D(x)] + E_z[log(1-D(G(z)))]. Train D to maximize V, G to minimize V or use the non-saturating loss -log D(G(z)). Alternate updates and keep one side fixed per step. Cover mode collapse, instability, conditional GAN, CycleGAN for unpaired translation and Progressive GAN for high resolution. Only a few universities derive the optimal discriminator.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "GAN training loop",
+    "nodes": [
+     {
+      "id": "z",
+      "label": "z",
+      "note": "random noise",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "Generator",
+      "note": "G(z)",
+      "style": "accent"
+     },
+     {
+      "id": "fake",
+      "label": "Fake x",
+      "note": "G(z)",
+      "style": "live"
+     },
+     {
+      "id": "real",
+      "label": "Real x",
+      "note": "data",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Discriminator",
+      "note": "D(x)",
+      "style": "accent"
+     },
+     {
+      "id": "out",
+      "label": "Real / fake",
+      "note": "score",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "z",
+      "to": "g",
+      "style": "solid"
+     },
+     {
+      "from": "g",
+      "to": "fake",
+      "style": "solid"
+     },
+     {
+      "from": "fake",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "real",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "out",
+      "style": "solid"
+     }
+    ],
+    "aria": "Noise goes to a generator that makes fake samples, and a discriminator compares fake and real samples."
+   },
+   "example": "For one real and one fake sample, D(real)=0.8 and D(fake)=0.3. Compute the discriminator maximization objective V and the non-saturating generator loss. Answer: V=ln0.8+ln0.7=-0.223-0.357=-0.580; G loss=-ln0.3=1.204 (lower is better for G).",
+   "trap": "Do not update the generator with the discriminator's real-data term; the generator sees only fake samples, and the sign of its loss is easy to flip.",
+   "prereq": "6.2 likelihood and latent variables; Unit 2 optimization; Unit 3 CNN for image GANs.",
+   "leave": "VAE likelihood bound to 6.3; super-resolution and editing to 6.6; ethics to 6.7."
+  },
+  {
+   "k": 5,
+   "idea": "Model a high-dimensional density exactly by ordering variables or by an invertible transform.",
+   "depth": "Autoregressive factorization p(x)=∏_{i=1}^D p(x_i|x_<i). PixelRNN and PixelCNN use spatial order, row by row, and masked convolutions so a pixel sees only earlier pixels. Training is maximum likelihood, one conditional per pixel. A normalizing flow uses an invertible f with log p_X(x)=log p_Z(f(x))+log|det ∂f/∂x|; coupling layers keep the Jacobian simple. Some syllabi call these fully visible belief nets. Only a few universities require flow Jacobian derivations.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Autoregressive order",
+    "nodes": [
+     {
+      "id": "x1",
+      "label": "x1",
+      "note": "first pixel",
+      "style": "normal"
+     },
+     {
+      "id": "x2",
+      "label": "x2",
+      "note": "next pixel",
+      "style": "normal"
+     },
+     {
+      "id": "x3",
+      "label": "x3",
+      "note": "next pixel",
+      "style": "normal"
+     },
+     {
+      "id": "px",
+      "label": "p(x)",
+      "note": "product of terms",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "x1",
+      "to": "x2",
+      "label": "p(x2|x1)",
+      "style": "solid"
+     },
+     {
+      "from": "x2",
+      "to": "x3",
+      "label": "p(x3|x1,x2)",
+      "style": "solid"
+     },
+     {
+      "from": "x3",
+      "to": "px",
+      "label": "product",
+      "style": "solid"
+     }
+    ],
+    "aria": "Pixels are predicted in a fixed order, and their conditional probabilities multiply into the joint density."
+   },
+   "example": "For three binary pixels, p(x1=1)=0.6, p(x2=1|x1=1)=0.7, p(x3=0|x1=1,x2=1)=0.8. Compute p(1,1,0). Answer: 0.6×0.7×0.8=0.336.",
+   "trap": "Conditioning on a later pixel breaks the autoregressive order and makes the product invalid; masked convolutions must enforce the same order in training and sampling.",
+   "prereq": "6.2 maximum likelihood; Unit 4 sequence models for the RNN view.",
+   "leave": "VAE and GAN sampling to 6.3-6.4; applications to 6.6."
+  },
+  {
+   "k": 6,
+   "idea": "Generative models act as conditional priors to edit, fill and upscale images.",
+   "depth": "Image editing: move in latent space, change attributes, use conditional GAN or VAE; CycleGAN for unpaired style change. Inpainting: condition on visible pixels and a mask, predict the missing region; context encoder and GAN or VAE decoders. Super-resolution: single-image upscaling, perceptual loss, PSNR and SSIM evaluation. Mention 3D object generation and security uses briefly. Keep task setup, one model choice and evaluation. Some syllabi add deep image prior; treat it as a short side note.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Image task pipeline",
+    "nodes": [
+     {
+      "id": "input",
+      "label": "Input image",
+      "note": "source",
+      "style": "normal"
+     },
+     {
+      "id": "cond",
+      "label": "Mask / low-res",
+      "note": "64×64 missing block",
+      "style": "accent"
+     },
+     {
+      "id": "gen",
+      "label": "Generator",
+      "note": "conditional model",
+      "style": "live"
+     },
+     {
+      "id": "out",
+      "label": "Output image",
+      "note": "edited or filled",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "input",
+      "to": "cond",
+      "style": "solid"
+     },
+     {
+      "from": "cond",
+      "to": "gen",
+      "style": "solid"
+     },
+     {
+      "from": "gen",
+      "to": "out",
+      "style": "solid"
+     }
+    ],
+    "aria": "An input image with a mask or low resolution condition goes through a generator to an output image."
+   },
+   "example": "A 256×256 image has a 64×64 masked square. (a) What fraction is missing? (b) If the filled region has MSE=16 on 8-bit pixels, compute PSNR. Answer: 64²/256²=4,096/65,536=0.0625=6.25%; PSNR=10 log10(255²/16)=10 log10(4064.06)=36.09 dB.",
+   "trap": "PSNR rewards smooth blur and can rank a blurry super-resolution above a sharp one; report a perceptual or structural metric as well.",
+   "prereq": "6.1 autoencoders, 6.3 VAE, 6.4 GAN, 6.5 autoregressive priors.",
+   "leave": "Ethics and deepfake misuse to 6.7; full 3D representations to a graphics unit."
+  },
+  {
+   "k": 7,
+   "idea": "Generative AI can scale bias, toxicity and fake media, so evaluation and mitigation are part of the model.",
+   "depth": "Bias: training data skew and objective choices can produce group-dependent errors; measure per-group accuracy, false positive rate and demographic parity difference. Toxicity: prompts can elicit harmful text; use filters, red-teaming and human review. Deepfakes: synthetic faces, voice and video can deceive; cover consent, watermarking, detection and provenance. Privacy: memorization of training data. Explainability and responsible AI: model cards and audits. Some syllabi put this under responsible AI or LLM ethics.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Harm and control path",
+    "nodes": [
+     {
+      "id": "data",
+      "label": "Training data",
+      "note": "skewed samples",
+      "style": "normal"
+     },
+     {
+      "id": "model",
+      "label": "Model",
+      "note": "learned patterns",
+      "style": "normal"
+     },
+     {
+      "id": "media",
+      "label": "Generated media",
+      "note": "images or text",
+      "style": "live"
+     },
+     {
+      "id": "harm",
+      "label": "Harm",
+      "note": "bias or deception",
+      "style": "accent"
+     },
+     {
+      "id": "mit",
+      "label": "Mitigation",
+      "note": "audit and filter",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "data",
+      "to": "model",
+      "style": "solid"
+     },
+     {
+      "from": "model",
+      "to": "media",
+      "style": "solid"
+     },
+     {
+      "from": "media",
+      "to": "harm",
+      "style": "solid"
+     },
+     {
+      "from": "mit",
+      "to": "model",
+      "label": "control",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Training data feeds a model that makes generated media, which can cause harm; mitigation feeds back into the model."
+   },
+   "example": "A deepfake detector tests 1,000 real and 1,000 fake videos. It flags 50 real videos as fake and misses 100 fake videos. Compute false positive rate, false negative rate and precision. Answer: FPR=50/1,000=5%; FNR=100/1,000=10%; flagged=50+900=950, precision=900/950=94.7%.",
+   "trap": "High overall accuracy hides harm when one group is small; always report per-group false positive and false negative rates.",
+   "prereq": "6.4 GANs and 6.6 applications; Unit 5 LLM ethics if text models.",
+   "leave": "Law and platform policy details outside this unit; technical detection architectures to 6.4."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "bottleneck gives latent z"
+  ],
+  [
+   2,
+   3,
+   "marginal likelihood becomes ELBO"
+  ],
+  [
+   3,
+   4,
+   "two generative training routes"
+  ],
+  [
+   1,
+   4,
+   "decoder becomes GAN generator"
+  ],
+  [
+   3,
+   6,
+   "VAE decoder for editing"
+  ],
+  [
+   4,
+   6,
+   "GANs for inpainting and super-resolution"
+  ],
+  [
+   5,
+   6,
+   "autoregressive priors for completion"
+  ],
+  [
+   6,
+   7,
+   "applications create misuse risks"
+  ],
+  [
+   4,
+   7,
+   "realistic media enables deepfakes"
+  ]
+ ]
+}
