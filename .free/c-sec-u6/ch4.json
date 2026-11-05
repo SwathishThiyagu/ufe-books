@@ -1,0 +1,219 @@
+{
+ "lead": "Program security studies flaws inside a running program. A memory-safety bug lets input change memory the programmer did not intend to change. The classic case is a stack buffer overflow in C. A separate class is malicious code: a virus, worm, trojan, logic bomb or backdoor that runs because someone placed it there. Both matter because a firewall can allow port 443 and still pass an attack that exploits a bug in the web server. The bug comes first, then the controls that make exploitation harder.",
+ "prereq": "You need: Unit 1 malware basics and the C memory layout: text, data, heap and stack; for OS enforcement see <a href=\"#operating-system-security-unix-and-windows\">Chapter 6.5</a>.",
+ "sections": [
+  {
+   "h3": "Memory layout and unsafe C calls",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When a C program runs, its address space is divided into regions. Text holds machine instructions. Data holds global and static variables. Heap holds memory from malloc and free. Stack holds function call frames: arguments, local variables, saved frame pointer EBP and return address EIP on 32-bit x86. The stack grows down on most systems, but textbook diagrams often draw low addresses on the left."
+    },
+    {
+     "type": "p",
+     "text": "Many C library functions do not know the size of the destination. gets reads a line into a buffer with no limit. strcpy copies until the source null byte. sprintf formats into a buffer with no limit. strcat appends with no limit. If input is longer than the buffer, the extra bytes go to whatever follows in memory. That is a buffer overflow. A buffer overflow is usually a non-malicious program error, but an attacker turns it into an attack."
+    },
+    {
+     "type": "p",
+     "text": "Safe replacements take a size: fgets(buf, sizeof buf, stdin), strncpy or snprintf. They still need care: strncpy may leave no null terminator, and snprintf returns the length that would have been written, not the length stored. The bug is not the function name; it is missing a bound."
+    }
+   ]
+  },
+  {
+   "h3": "Stack overflow, off-by-one and other memory bugs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A stack overflow writes past a local array and reaches the saved frame pointer and return address. On return, the CPU loads EIP from the overwritten slot and jumps to the attacker's chosen address. If the address points into the same buffer, the attacker can run injected machine code. Modern systems often block that with non-executable memory, so attackers reuse existing code instead. Return-oriented programming (ROP) chains short instruction sequences called gadgets that already exist in libraries. Only a few universities teach ROP and control-flow integrity in detail; the exam idea is that code reuse bypasses the need to inject code."
+    },
+    {
+     "type": "p",
+     "text": "An off-by-one writes one byte too many. With strcpy, the null terminator is that extra byte. A one-byte overflow can change the low byte of the saved EBP, which can shift later references. An integer overflow makes a size calculation wrap: if len is unsigned 16-bit and len + 1 is 65536, it becomes 0, so a check passes and a copy still overflows. A heap overflow corrupts heap metadata or adjacent objects; exploitation is allocator-specific. A format-string bug happens when user input is passed as the format: printf(input). The %n conversion writes the number of bytes printed so far to a pointer taken from the argument list. The fix is printf(\"%s\", input)."
+    }
+   ]
+  },
+  {
+   "h3": "Malicious code classes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Malicious code is code with an unwanted effect. A virus attaches to a host file or boot sector and spreads when the host runs. A worm spreads by itself over a network, often by exploiting a service; it does not need a user to open a file. A trojan looks useful but carries a hidden payload; it does not self-replicate. A logic bomb waits for a condition, such as a date or a missing employee record, then acts. A backdoor is a hidden way in, left by an attacker or sometimes by a vendor for support. Spyware, ransomware and rootkits are further labels; a rootkit hides the attacker's presence."
+    },
+    {
+     "type": "p",
+     "text": "Program security and malicious code meet at the exploit. A worm can use a buffer overflow to enter a host and then install a backdoor. A trojan can be the delivery step for a remote-access tool. Controls differ: memory-safety controls reduce the chance that a worm's exploit succeeds; antivirus and application allow-lists reduce the chance that a trojan runs. Neither control replaces the other."
+    }
+   ]
+  },
+  {
+   "h3": "Controls against program threats",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Compile with warnings and bounds-checked libraries where available. Use fgets, snprintf and explicit length checks. Static analysis reads source or bytecode without running it and flags unsafe calls and missing checks. Dynamic analysis runs the program with test inputs and tools such as fuzzers and sanitizers; AddressSanitizer catches many out-of-bounds accesses during testing. These find bugs but cannot prove absence."
+    },
+    {
+     "type": "p",
+     "text": "Stack canaries place a random value between the buffer and the saved return address. A function checks the canary before returning; a linear overflow that overwrites EIP also changes the canary. NX or DEP marks the stack and heap non-executable, so injected code cannot run. ASLR randomises base addresses of the stack, heap and libraries, so an attacker cannot hard-code a jump target. ASLR is probabilistic and does not fix the bug; a leak of one address can defeat it. Control-flow integrity checks that indirect jumps and returns go to valid targets; it is stronger but needs compiler and hardware support. None of these controls is a substitute for fixing the unsafe copy."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A 32-bit frame with an 8-byte buffer, 4-byte saved EBP and 4-byte return address. The return address at cell 9 is the target of the overflow.",
+  "spec": {
+   "type": "array",
+   "title": "32-bit stack frame",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Low to high",
+     "cells": [
+      "b0",
+      "b1",
+      "b2",
+      "b3",
+      "b4",
+      "b5",
+      "b6",
+      "b7",
+      "EBP",
+      "EIP"
+     ],
+     "marks": {
+      "8": "accent",
+      "9": "live"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 9,
+     "label": "return"
+    }
+   ],
+   "aria": "A stack frame has eight buffer bytes followed by the saved frame pointer EBP and the return address EIP."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 32-bit x86 function declares char buf[8]; and calls strcpy(buf, input). The saved EBP is 4 bytes and the return address is 4 bytes. Input is 16 bytes: bytes 1–8 are 'A' (0x41), bytes 9–12 are 'B' (0x42), bytes 13–16 are a0 84 04 08. (a) Which stack fields are overwritten? (b) What return address is used in little-endian? (c) Why is the null terminator a problem?",
+   "steps": [
+    "Buffer offsets 0–7 hold 8 bytes; saved EBP offsets 8–11 hold 4 bytes; return address offsets 12–15 hold 4 bytes. The input also has 16 bytes, offsets 0–15.",
+    "Bytes 0–7 fill the buffer with 0x41. Bytes 8–11 overwrite saved EBP with 0x42. Bytes 12–15 overwrite the return address with a0 84 04 08.",
+    "Little-endian places the least significant byte first. The bytes a0 84 04 08 form the address 0x080484a0, which is 134513824 in decimal.",
+    "strcpy copies 16 bytes and then writes a null byte 0x00 at offset 16. That extra byte is one byte past the return address and corrupts the next 4-byte word."
+   ],
+   "answer": "The buffer (8 bytes), saved EBP (4 bytes) and return address (4 bytes) are overwritten by the 16-byte input; EIP becomes 0x080484a0 (134513824), and the extra null byte is 1 byte at offset 16.",
+   "check": "b=8\ne=4\nr=4\nn=16\nraw=[0xa0,0x84,0x04,0x08]\naddr=raw[0] | (raw[1]<<8) | (raw[2]<<16) | (raw[3]<<24)\nprint(b)\nprint(e)\nprint(r)\nprint(n)\nprint(addr)\nprint(1)",
+   "values": [
+    8,
+    4,
+    4,
+    16,
+    134513824,
+    1
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\n#include <string.h>\nint main(void){\n unsigned char in[16]={'A','A','A','A','A','A','A','A','B','B','B','B',0xa0,0x84,0x04,0x08};\n unsigned char b[8],e[4],r[4]; int i;\n memcpy(b,in,8); memcpy(e,in+8,4); memcpy(r,in+12,4);\n unsigned int a=r[0]|(r[1]<<8)|(r[2]<<16)|(r[3]<<24);\n printf(\"buf:\"); for(i=0;i<8;i++)printf(\" %02x\",b[i]);\n printf(\"\\nEBP:\"); for(i=0;i<4;i++)printf(\" %02x\",e[i]);\n printf(\"\\nEIP:\"); for(i=0;i<4;i++)printf(\" %02x\",r[i]);\n printf(\"\\naddr=0x%08x\\n\",a);\n printf(\"null index=16\\n\");\n return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Field",
+     "Offsets",
+     "Input bytes",
+     "Effect"
+    ],
+    "rows": [
+     [
+      "buffer",
+      "0–7",
+      "41 41 41 41 41 41 41 41",
+      "filled"
+     ],
+     [
+      "saved EBP",
+      "8–11",
+      "42 42 42 42",
+      "overwritten"
+     ],
+     [
+      "return address",
+      "12–15",
+      "a0 84 04 08",
+      "0x080484a0"
+     ],
+     [
+      "next word",
+      "16",
+      "00",
+      "null terminator"
+     ]
+    ]
+   },
+   "output": "buf: 41 41 41 41 41 41 41 41\nEBP: 42 42 42 42\nEIP: a0 84 04 08\naddr=0x080484a0\nnull index=16"
+  }
+ ],
+ "traps": [
+  "The null terminator from strcpy is one extra byte, so a 16-byte input writes 17 bytes. Students often count only the visible input.",
+  "ASLR is probabilistic and does not repair the missing bound; a crash is still a denial of service.",
+  "NX or DEP stops injected code on the stack, not code reuse such as ROP; do not say it stops all buffer-overflow exploits.",
+  "A virus needs a host and a user action; a worm spreads by itself over the network. A trojan does not replicate."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the four main memory regions of a C process.",
+   "marks": 2,
+   "a": "Text, data, heap and stack."
+  },
+  {
+   "level": "understand",
+   "q": "Why is gets more dangerous than fgets?",
+   "marks": 3,
+   "a": "gets has no size argument and cannot limit how many bytes it writes; fgets takes the buffer size and stops at that limit."
+  },
+  {
+   "level": "apply",
+   "q": "A 32-bit function has char buf[12]; saved EBP is 4 bytes and the return address is 4 bytes. An input of 25 bytes reaches how many bytes past the return address?",
+   "marks": 2,
+   "a": "12 + 4 + 4 = 20 bytes to fill the frame; 25 − 20 = 5 bytes past the return address."
+  },
+  {
+   "level": "apply",
+   "q": "Little-endian bytes 78 56 34 12 form what 32-bit address? Give hex and decimal.",
+   "marks": 2,
+   "a": "0x12345678, which is 305419896 in decimal."
+  },
+  {
+   "level": "analyze",
+   "q": "ASLR and NX are enabled. Why can a stack overflow still be serious?",
+   "marks": 4,
+   "a": "It can still crash the process (denial of service), corrupt data or pointers, and with an address leak an attacker can reuse existing code despite NX and ASLR."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a stack canary fail against an arbitrary write that skips the canary?",
+   "marks": 4,
+   "a": "A canary detects a contiguous overflow that passes through it. An arbitrary write can target the saved return address directly without touching the canary."
+  },
+  {
+   "level": "understand",
+   "q": "Distinguish a worm from a trojan.",
+   "marks": 3,
+   "a": "A worm spreads by itself over a network; a trojan is hidden inside a useful-looking program and does not self-replicate."
+  },
+  {
+   "level": "remember",
+   "q": "What does %n do in printf, and how is it abused?",
+   "marks": 2,
+   "a": "It writes the number of bytes printed so far to a pointer from the argument list; if the format string is attacker-controlled, it can become an arbitrary write."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, memory-safe languages such as Rust and Go remove many overflow bugs, while C and C++ code still ships with fuzzing, sanitizers and exploit mitigations. Hardware shadow stacks and memory tagging are moving control-flow protection into the CPU. Supply-chain attacks often combine a trojan in a build tool with a backdoor in the product. Search for 'AddressSanitizer', 'ROP gadgets', 'shadow stack' and 'memory safety'."
+}

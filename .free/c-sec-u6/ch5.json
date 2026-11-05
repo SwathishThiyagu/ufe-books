@@ -1,0 +1,257 @@
+{
+ "lead": "Operating system security is the set of checks that decide which process may read, write or execute which file or setting. UNIX and Windows both attach an identity to a running process and permissions to an object; the kernel compares them on every access. This matters on servers, laptops, Android phones and Windows desktops. One wrong permission, such as a world-writable system file or a setuid root program, can turn a normal user into an administrator. This chapter covers UNIX modes and Windows ACLs, then hardening and analysis.",
+ "prereq": "You need: memory protections from <a href=\"#program-security-buffer-overflow-and-malicious-code\">6.4</a> and user authentication from Unit 5.",
+ "sections": [
+  {
+   "h3": "UNIX identity and the rwx mode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "UNIX gives each user a numeric user identifier (UID) and at least one group identifier (GID). <code>/etc/passwd</code> maps names to UIDs; <code>/etc/shadow</code> stores password hashes readable only by root. A process has a real UID (who started it) and an effective UID (what the kernel checks). UID 0 is root, the superuser."
+    },
+    {
+     "type": "p",
+     "text": "Each file has an owner, a group and three permission triads: owner, group, other. Each triad has read (r), write (w) and execute (x). The kernel scores a triad as 4 for read, 2 for write and 1 for execute, then adds them. So rwx is 7, r-x is 5, r-- is 4, --- is 0. A mode is three octal digits: 750 means owner rwx, group r-x, other ---. On a directory, x means search (enter) and r means list names."
+    },
+    {
+     "type": "formula",
+     "text": "mode = 4r + 2w + 1x",
+     "where": "r, w, x are 1 if that triad has read, write or execute, else 0; apply this to owner, group and other."
+    },
+    {
+     "type": "p",
+     "text": "Commands: <code>chmod 750 file</code>, <code>chown alice file</code>, <code>chgrp auditors file</code>. New files start from 666 minus <code>umask</code>; with umask 022 a file becomes 644 and a directory 755."
+    }
+   ]
+  },
+  {
+   "h3": "setuid, setgid, sticky bit and PATH attacks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Three extra bits sit above the nine permission bits: setuid (4), setgid (2) and sticky (1). They form a fourth octal digit on the left. Mode 4755 means setuid plus 755; the owner execute slot shows s: <code>rwsr-xr-x</code>."
+    },
+    {
+     "type": "p",
+     "text": "setuid on an executable changes the process's effective UID to the file owner for the run. The real UID stays the same. A setuid root program runs with root power. setgid does this for the effective GID; on a directory it makes new files inherit the directory group. The sticky bit on /tmp lets only the file owner, directory owner or root delete a file."
+    },
+    {
+     "type": "p",
+     "text": "setuid is a privilege-escalation target. A root program that reads a user-named file or calls a shell without dropping privilege can be abused. A PATH attack works like this: root runs a script that calls <code>ls</code> by name; the attacker puts a malicious <code>ls</code> in an early PATH directory. setuid is ignored on filesystems mounted <code>nosuid</code>, on scripts on many systems, and when execute permission is missing."
+    },
+    {
+     "type": "p",
+     "text": "UNIX security analysis: find setuid files with <code>find / -perm -4000</code>, add <code>-o -perm -2000</code> for setgid; check world-writable files and directories; check <code>/etc/shadow</code> permissions; review cron and startup scripts. Root can override mode bits, but not a read-only mount, an LSM policy or a container boundary."
+    }
+   ]
+  },
+  {
+   "h3": "Windows: SIDs, tokens and ACLs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Windows uses a security identifier (SID) for every user and group. At logon the system builds an access token: the user SID, group SIDs and privileges. Every process runs with a token. A process cannot upgrade its own token without a privileged service."
+    },
+    {
+     "type": "p",
+     "text": "Each securable object has a security descriptor: owner SID, a discretionary access control list (DACL) and a system access control list (SACL). A DACL holds access control entries (ACEs). An ACE names a SID, an access mask (read, write, execute) and allow or deny. The SACL holds audit ACEs."
+    },
+    {
+     "type": "p",
+     "text": "On access, the kernel compares the token with the DACL. It walks ACEs; a deny ACE usually wins over an allow ACE for the same right. If no ACE allows the right, the request is denied. The decision can be written to the Security log. This is the same subject-object check as <a href=\"#access-control-models-and-policies\">6.6</a>, with Windows names."
+    },
+    {
+     "type": "p",
+     "text": "Integrity levels add a second gate: low, medium, high, system. A low-integrity browser tab cannot write a medium file even if the DACL allows it. User Account Control (UAC) keeps an administrator at medium until consent, then gives a high-integrity token. Services run as LocalSystem, LocalService or NetworkService; give each the least privilege. Registry keys carry ACLs too, so a weak service key is as dangerous as a weak file."
+    }
+   ]
+  },
+  {
+   "h3": "Hardening, auditing and security kernels",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Hardening reduces what an attacker can use. Run users and services with least privilege. Remove unused services and shares. Set a restrictive umask. Patch the OS and applications on a schedule: one local privilege-escalation bug defeats password policy. Audit logon, privilege use and object access, and send logs off the host. Logs must be time-synchronised or they are hard to correlate. Audit belongs with policy and risk in <a href=\"#security-policies-risk-management-and-audit\">6.7</a>."
+    },
+    {
+     "type": "p",
+     "text": "A security kernel is the small hardware and software part that mediates every access. A reference monitor must be complete (every access checked), isolated (tamperproof) and verifiable (small enough to review). Commercial systems were not built this way. Retrofitting adds hooks: Linux uses Linux Security Modules (LSM) for SELinux and AppArmor; Windows uses integrity levels, UAC and service hardening. Only a few universities teach security kernels and retrofitting in depth; know the three properties and one real example."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "A process token carries the subject's user and group SIDs. The object's DACL supplies allow and deny ACEs; the access check returns allow or deny and can write an audit record.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Operating system access check",
+   "nodes": [
+    {
+     "id": "subj",
+     "label": "Process token",
+     "note": "user and group SIDs",
+     "style": "accent"
+    },
+    {
+     "id": "obj",
+     "label": "Object ACL",
+     "note": "allow and deny",
+     "style": "live"
+    },
+    {
+     "id": "chk",
+     "label": "Access check",
+     "style": "normal"
+    },
+    {
+     "id": "dec",
+     "label": "Allow or deny",
+     "style": "normal"
+    },
+    {
+     "id": "log",
+     "label": "Audit log",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "subj",
+     "to": "chk",
+     "label": "credentials",
+     "style": "solid"
+    },
+    {
+     "from": "obj",
+     "to": "chk",
+     "label": "permissions",
+     "style": "solid"
+    },
+    {
+     "from": "chk",
+     "to": "dec",
+     "label": "decision",
+     "style": "solid"
+    },
+    {
+     "from": "dec",
+     "to": "log",
+     "label": "record",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A process token and an object ACL are compared in an access check, which produces allow or deny and records the result in an audit log."
+  }
+ },
+ "examples": [
+  {
+   "question": "A file is owned by root, group auditors, mode 4755. User alice is not root and not a member of auditors. She runs the program. (a) What are the four octal digits? (b) Can she execute it? (c) What is her effective UID inside the program? (d) Give two reasons setuid may be ignored.",
+   "steps": [
+    "Write mode 4755 as four digits: special = 4, owner = 7, group = 5, other = 5.",
+    "Special digit 4 means setuid. It is not setgid (2) or sticky (1).",
+    "Owner triad 7 is rwx. Group triad 5 is r-x. Other triad 5 is r-x.",
+    "Alice is not owner and not in group, so the other triad applies: r-x. Execute is allowed, so yes she can execute.",
+    "The file owner is root (UID 0) and setuid is set, so the effective UID becomes 0. Her real UID stays alice's UID.",
+    "Setuid may be ignored on a filesystem mounted nosuid, on an interpreted script, or when execute permission is missing."
+   ],
+   "answer": "The digits are 4, 7, 5, 5; alice can execute; her effective UID is 0 (root); setuid can be ignored on a nosuid mount or for a script.",
+   "check": "mode = 0o4755\nspecial = mode // 0o1000\nowner = (mode // 0o100) % 8\ngroup = (mode // 0o10) % 8\nother = mode % 8\neuid = 0\nprint(special)\nprint(owner)\nprint(group)\nprint(other)\nprint(euid)",
+   "values": [
+    4,
+    7,
+    5,
+    5,
+    0
+   ],
+   "dry_run": {
+    "head": [
+     "item",
+     "value"
+    ],
+    "rows": [
+     [
+      "special",
+      "4"
+     ],
+     [
+      "owner",
+      "7"
+     ],
+     [
+      "group",
+      "5"
+     ],
+     [
+      "other",
+      "5"
+     ],
+     [
+      "effective UID",
+      "0"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "setuid changes the effective UID, not the real UID. The real UID still identifies the user who started the process.",
+  "In Windows a deny ACE usually wins over an allow ACE for the same right. Do not assume an allow entry is enough when a deny matches.",
+  "Read the four octal digits correctly: in 4755 the 4 is the setuid bit, not the owner triad. The owner triad is 7.",
+  "Root can override UNIX permission bits, but not every control: a nosuid mount, a read-only filesystem, an LSM policy or a container boundary can still block root.",
+  "setuid on an interpreted script is often ignored. A script marked 4755 does not automatically run as root."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In UNIX, what does mode 640 allow for owner, group and other?",
+   "marks": 2,
+   "a": "Owner rw-, group r--, other ---."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a setuid program keep the real UID but change the effective UID?",
+   "marks": 3,
+   "a": "The effective UID is used for permission checks, so the program gains the file owner's rights. The real UID still records the original user for logging and for dropping privilege later."
+  },
+  {
+   "level": "apply",
+   "q": "A file has mode 2750 and owner root, group dev. User bob is in dev and not root. Can he read, write or execute? What is the effective GID if the file is executed?",
+   "marks": 4,
+   "a": "Mode 2750: setgid (2), owner rwx (7), group r-x (5), other --- (0). Bob matches group dev, so read yes, write no, execute yes. The setgid bit makes the effective GID dev when he executes it."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is a world-writable directory with the sticky bit safer than one without it?",
+   "marks": 3,
+   "a": "Without sticky, any user can delete or rename another user's file in the directory. With sticky, only the file owner, directory owner or root may delete or rename it."
+  },
+  {
+   "level": "apply",
+   "q": "A Windows DACL has an allow ACE for Everyone read and a deny ACE for Alice read. Alice requests read. What happens?",
+   "marks": 2,
+   "a": "The deny ACE usually wins, so Alice is denied read."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does UAC not make an administrator account safe from all malware?",
+   "marks": 4,
+   "a": "The normal token is medium integrity, so malware can run in the user session and persist in user-writable locations. The user may approve elevation, and an unpatched elevation bug can bypass consent."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three properties of a reference monitor.",
+   "marks": 3,
+   "a": "Complete mediation, isolation (tamperproof), and verifiability."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between a DACL and a SACL?",
+   "marks": 3,
+   "a": "A DACL holds allow and deny ACEs that control access. A SACL holds audit ACEs that record access attempts."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems now add Linux capabilities, seccomp filters and mandatory access control such as SELinux or AppArmor on top of mode bits. Windows adds protected process light, Credential Guard and virtualization-based security. Containers and microVMs move the trust boundary outside the guest kernel. Search for capabilities, seccomp, SELinux policy, AppArmor profiles, Windows integrity levels and measured boot."
+}

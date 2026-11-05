@@ -1,0 +1,267 @@
+{
+ "lead": "A firewall follows rules you wrote in advance. An intrusion detection system (IDS) watches traffic or a host and raises an alert when it sees something suspicious. An intrusion prevention system (IPS) sits in the path of the traffic and can also drop the packet. Detection covers what a rule list cannot hold in advance: a new port scan, a strange login pattern, a known attack signature crossing an allowed port. Banks, cloud providers and campus networks run these sensors next to their firewalls, and analysts read the alerts on a console.",
+ "prereq": "You need: <a href=\"#firewalls-types-and-configurations\">6.1 Firewalls</a> for where a sensor sits in the network, and Unit 1 for the attacks and malware that the sensor is trying to detect.",
+ "sections": [
+  {
+   "h3": "Detect passively, prevent inline",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An intrusion detection system is passive. It receives a copy of the traffic, from a switch SPAN port, a network tap, or an agent reading logs on a host, and it never sits in the path. If the IDS fails, traffic keeps flowing. When it sees something suspicious it writes an alert to a console, and maybe sends a syslog message or an email. The attack itself still reaches the target; a person or a script must respond."
+    },
+    {
+     "type": "p",
+     "text": "An intrusion prevention system is inline. Traffic enters one interface and leaves another, so the device can drop a packet, reset a TCP connection, or block a source address for ten minutes. That power has a price. Every packet waits for the check, and one wrong block stops real work, such as a payment at a busy hour. Many products ship both modes and call the whole box an IDPS."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Host-based IDS (HIDS): an agent on one machine. It hashes important files, reads the system log, and watches processes and system calls. It sees traffic after the host decrypts it, but only for that host.",
+      "Network-based IDS (NIDS): a sensor on a link. It watches packets for many hosts at once. Traffic inside TLS stays unreadable without the keys (see Unit 5, SSL/TLS)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Placement follows the firewall logic of <a href=\"#firewalls-types-and-configurations\">6.1</a>. Put a sensor outside the firewall to see attacks arriving from the internet, one in the DMZ beside the public servers, and one at the internal core to catch a laptop that is already infected."
+    }
+   ]
+  },
+  {
+   "h3": "How the engine decides: signature, anomaly, protocol state",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A signature detector keeps a list of rules, each describing a pattern seen in earlier attacks. The engine compares every packet with the rules, and a match produces an alert. It is fast, cheap and explains itself, because the alert names the rule. It cannot catch an attack whose pattern is not in the list, which is the zero-day case."
+    },
+    {
+     "type": "p",
+     "text": "An anomaly detector first learns a baseline of normal behaviour: packets per second on each port, usual login times, CPU use, DNS query sizes. It then scores each observation against that baseline and alerts when the score crosses a threshold. It can catch a new attack, and it also flags every legitimate change: a new application, a festival sale, a software update."
+    },
+    {
+     "type": "p",
+     "text": "A stateful protocol detector parses the protocol instead of matching bytes. It checks that a TCP connection starts with SYN, that an HTTP request line has a method, a path and a version, and that the body length promised in a header matches what arrives. A request that breaks the grammar raises an alert even with no known attack pattern."
+    },
+    {
+     "type": "p",
+     "text": "Rules are written in a small language. Fields differ between products; the shape is the same."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "alert tcp any any -> 10.0.0.0/8 22 (\n  msg:\"repeated SSH logins\";\n  content:\"SSH-\";\n  threshold:5 in 60s;\n  sid:1001;\n)",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "Here alert is the action, tcp is the protocol, any any is the source address and port, 10.0.0.0/8 22 is the destination network and port, msg is the text a human reads, threshold limits how often the rule may fire, and sid is the rule number."
+    }
+   ]
+  },
+  {
+   "h3": "Placement, tuning and the cost of wrong alerts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A NIDS interface runs in promiscuous mode: the network card hands every frame it sees on the segment to the sensor, not only frames addressed to the sensor's own MAC address. On a switched network a plain port sees only broadcast traffic, so the sensor needs a SPAN (mirror) port or a tap. A busy mirror can lose packets while copying them, so the sensor must report how many it dropped."
+    },
+    {
+     "type": "table",
+     "head": [
+      "",
+      "Attack packet",
+      "Normal packet"
+     ],
+     "rows": [
+      [
+       "Alert raised",
+       "true positive (TP)",
+       "false positive (FP)"
+      ],
+      [
+       "No alert",
+       "false negative (FN)",
+       "true negative (TN)"
+      ]
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "detection rate = TP ÷ (TP + FN),  false positive rate = FP ÷ (FP + TN),  precision = TP ÷ (TP + FP)",
+     "where": "TP is attack packets alerted, FN is attack packets missed, FP is normal packets alerted, TN is normal packets not alerted. The first two rates are measured over the two real classes; precision is measured over the alerts. Multiply by 100 for a percentage."
+    },
+    {
+     "type": "p",
+     "text": "The base rate decides how useful an alert is. When attacks are a tiny share of traffic, even a 3% false positive rate produces more false alerts than true ones, so precision falls while the detection rate still looks fine. Analysts tune with suppression rules, thresholds and whitelists, and they review the console every day, because an unread console is the same as no IDS."
+    },
+    {
+     "type": "p",
+     "text": "One unusual sensor watches routing, not payload. It collects BGP announcements from peers and flags an anomaly, such as an autonomous system announcing a prefix it does not own, which is a hijack attempt. Full BGP security is outside this unit; only the detection idea matters here."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Traffic reaches a sensor and the detection engine. In IDS mode the engine raises an alert on the console; in IPS mode it can also send the packet to an inline blocker that drops it.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "IDS versus IPS",
+   "nodes": [
+    {
+     "id": "traffic",
+     "label": "Traffic",
+     "style": "normal"
+    },
+    {
+     "id": "sensor",
+     "label": "Sensor",
+     "style": "accent"
+    },
+    {
+     "id": "engine",
+     "label": "Detection engine",
+     "style": "normal"
+    },
+    {
+     "id": "alert",
+     "label": "Alert console",
+     "note": "IDS mode",
+     "style": "live"
+    },
+    {
+     "id": "ips",
+     "label": "IPS inline",
+     "note": "IPS mode",
+     "style": "next"
+    },
+    {
+     "id": "drop",
+     "label": "Drop packet",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "traffic",
+     "to": "sensor",
+     "label": "copy",
+     "style": "solid"
+    },
+    {
+     "from": "sensor",
+     "to": "engine",
+     "label": "packets",
+     "style": "solid"
+    },
+    {
+     "from": "engine",
+     "to": "alert",
+     "label": "alert",
+     "style": "solid"
+    },
+    {
+     "from": "engine",
+     "to": "ips",
+     "label": "block",
+     "style": "dashed"
+    },
+    {
+     "from": "ips",
+     "to": "drop",
+     "label": "drop",
+     "style": "solid"
+    }
+   ],
+   "aria": "Traffic reaches a sensor and a detection engine; in IDS mode the engine sends an alert to a console, and in IPS mode it can send the packet to an inline blocker that drops it."
+  }
+ },
+ "examples": [
+  {
+   "question": "A signature-based NIDS watches a link for one hour and sees 1000 packets. 20 of them belong to a real attack. The system raises 48 alerts: 18 on attack packets and 30 on normal packets. Compute the detection rate, the false positive rate and the precision, and comment on the precision.",
+   "steps": [
+    "Attack packets = 20. Normal packets = 1000 − 20 = 980.",
+    "True positives TP = 18. False negatives FN = 20 − 18 = 2.",
+    "False positives FP = 30. True negatives TN = 980 − 30 = 950.",
+    "Check the alerts: TP + FP = 18 + 30 = 48, which matches the 48 alerts reported.",
+    "Detection rate = TP ÷ (TP + FN) = 18 ÷ 20 = 0.90, that is 90%.",
+    "False positive rate = FP ÷ (FP + TN) = 30 ÷ 980 = 0.03061, that is 3.06%.",
+    "Precision = TP ÷ (TP + FP) = 18 ÷ 48 = 0.375, that is 37.5%.",
+    "Comment: attack packets are only 2% of the traffic, so 30 false alerts outweigh the 18 true ones. Nearly two alerts in three are wrong, and each one costs an analyst time."
+   ],
+   "answer": "Detection rate 90%, false positive rate 3.06%, precision 37.5%; with attacks at 2% of traffic, most alerts are false.",
+   "check": "total = 1000\nattacks = 20\nnormal = total - attacks\nalerts = 48\ntp = 18\nfp = alerts - tp\nfn = attacks - tp\ntn = normal - fp\nprint(round(tp / (tp + fn) * 100, 2))\nprint(round(fp / (fp + tn) * 100, 2))\nprint(round(tp / (tp + fp) * 100, 2))",
+   "values": [
+    90.0,
+    3.06,
+    37.5
+   ],
+   "output": ""
+  },
+  {
+   "question": "Second example: in one minute a sensor sees 5000 packets, of which 10 are attack packets. It raises an alert on 8 attack packets and on 40 normal packets. Find the detection rate, the false positive rate and the precision.",
+   "steps": [
+    "Normal packets = 5000 − 10 = 4990.",
+    "TP = 8, FN = 10 − 8 = 2, FP = 40, TN = 4990 − 40 = 4950.",
+    "Detection rate = 8 ÷ 10 = 0.80, that is 80%.",
+    "False positive rate = 40 ÷ 4990 = 0.008016, that is 0.80%.",
+    "Precision = 8 ÷ (8 + 40) = 8 ÷ 48 = 0.1667, that is 16.67%."
+   ],
+   "answer": "Detection rate 80%, false positive rate 0.80%, precision 16.67%.",
+   "check": "total = 5000\nattacks = 10\nnormal = total - attacks\ntp = 8\nfp = 40\nfn = attacks - tp\ntn = normal - fp\nprint(round(tp / (tp + fn) * 100, 2))\nprint(round(fp / (fp + tn) * 100, 2))\nprint(round(tp / (tp + fp) * 100, 2))",
+   "values": [
+    80.0,
+    0.8,
+    16.67
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "An IDS copies traffic and only alerts; it cannot drop a packet. Only an inline IPS can block, and that is also why an IPS can break legitimate traffic.",
+  "Detection rate is not accuracy. Use TP ÷ (TP + FN), the share of real attacks caught, not TP ÷ total packets.",
+  "The false positive rate divides by the normal packets (FP + TN), not by all 1000 packets and not by the number of alerts.",
+  "A high detection rate with poor precision can still be useless when attacks are rare. Examiners like the line: 3% of 980 beats 90% of 20.",
+  "Signature detection misses zero-day attacks, anomaly detection catches them but flags legitimate new traffic, and a NIDS cannot read payload inside TLS."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define false positive and false negative for an IDS.",
+   "marks": 2,
+   "a": "A false positive is an alert raised on normal traffic. A false negative is a real attack that raises no alert."
+  },
+  {
+   "level": "remember",
+   "q": "What is promiscuous mode, and which sensor type needs it?",
+   "marks": 2,
+   "a": "The network card delivers every frame seen on the segment to the host, not only frames addressed to it. A network-based IDS needs it; a host-based agent does not."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a signature IDS miss a zero-day attack while an anomaly IDS may catch it?",
+   "marks": 3,
+   "a": "A signature needs a pattern taken from a known attack, and a new attack has no such pattern in the list. An anomaly detector compares behaviour with a learned baseline of normal activity, so unusual behaviour crosses the threshold without any prior pattern."
+  },
+  {
+   "level": "understand",
+   "q": "An IPS is inline. Give one benefit and one risk compared with a passive IDS.",
+   "marks": 3,
+   "a": "Benefit: it can drop the packet or reset the connection, so the attack never reaches the host. Risk: a false positive blocks legitimate traffic, and every packet waits for the check, adding delay and creating a single point of failure."
+  },
+  {
+   "level": "apply",
+   "q": "A sensor sees 5000 packets in a minute, 10 of them attack packets. It alerts on 8 attack packets and 40 normal packets. Find the detection rate, the false positive rate and the precision.",
+   "marks": 4,
+   "a": "Normal packets = 4990. TP = 8, FN = 2, FP = 40, TN = 4950. Detection rate = 8/10 = 80%. False positive rate = 40/4990 = 0.80%. Precision = 8/48 = 16.67%."
+  },
+  {
+   "level": "analyze",
+   "q": "A rule fires 200 times a day and 190 of those alerts are wrong. State the precision and give two tuning steps with the effect of each.",
+   "marks": 5,
+   "a": "Precision = 10/200 = 5%. Step 1: add a threshold, say 5 matches in 60 s, so a single stray packet no longer alerts; false positives fall, but a slow attack may be seen later. Step 2: whitelist the internal scanner's address, since its traffic is normal for this network; those false positives vanish, and the rule stops covering that host."
+  }
+ ],
+ "beyond": "Not for the exam. Production estates now use host sensors that watch system calls with low overhead, and network sensors that export flow records instead of full packets, so encrypted traffic still shows volume and timing. Machine learning models are often added on top of the anomaly detector, and they bring their own attacks (see <a href=\"#ai-in-security-anomaly-detection-adversarial-attacks\">6.9</a>). Look up Zeek, Suricata and Sigma rules to see the real rule formats, and read about RPKI for the routing side."
+}

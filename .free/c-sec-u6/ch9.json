@@ -1,0 +1,611 @@
+{
+ "lead": "AI-based security tools learn patterns from data instead of only matching known signatures. An anomaly detector builds a model of normal behaviour and gives each event a score; a threshold turns that score into an alert. This finds attacks that no signature covers, so it is used in intrusion detection, malware classification and cloud monitoring. The same learning creates a new weakness: an attacker who understands the model can craft input that scores below the threshold, or poison the data used to train it. This chapter covers both the detector and its attacker.",
+ "prereq": "You need: <a href=\"#intrusion-detection-and-prevention-systems\">6.2 IDS</a>, <a href=\"#program-security-buffer-overflow-and-malicious-code\">6.4 malware</a> and <a href=\"#cloud-security-services\">6.8 cloud telemetry</a>.",
+ "sections": [
+  {
+   "h3": "Learning normal, scoring the rest",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A detector turns each event into a <b>feature vector</b>: a fixed list of numbers. For a network flow the features might be bytes per second, packets per second, distinct destination ports and hour of the day. For a login they might be hour, country, device and failed attempts. Good features matter more than the choice of algorithm."
+    },
+    {
+     "type": "p",
+     "text": "In <b>supervised</b> learning every training record carries a label, normal or attack, and the model learns the boundary. In <b>unsupervised</b> learning the model sees mostly normal records and learns their shape; a new record is scored by its distance from that shape. <b>Semi-supervised</b> training uses normal data plus a small labelled attack set, which is the common case in practice."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Collect a baseline over a full weekly cycle, so a Monday peak is not treated as an attack.",
+      "Clean the data and extract the features.",
+      "Split into a training set and a separate validation set.",
+      "Train on the training set only, and never report the training score as performance.",
+      "Pick the threshold on the validation set, deploy, and retrain when behaviour drifts."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "alert if score ≥ t; TPR = TP ÷ (TP + FN); FPR = FP ÷ (FP + TN)",
+     "where": "score is the model output from 0 to 1; t is the threshold; TP and FN count attacks flagged and missed; FP and TN count normal events flagged and passed; TPR is the true positive rate (recall) and FPR the false positive rate."
+    },
+    {
+     "type": "p",
+     "text": "Lowering t catches more attacks and raises false positives. Each false positive costs analyst minutes, and a flood of them causes alert fatigue, so real attacks get ignored. Raising t is quiet but gives an attacker room to score just under the line. The threshold is a decision about how many wrong alerts a team can absorb."
+    },
+    {
+     "type": "p",
+     "text": "Accuracy misleads here. If 1 flow in 1000 is an attack, always answering normal scores 99.9% accuracy and detects nothing. Judge a detector by TPR, FPR and precision."
+    }
+   ]
+  },
+  {
+   "h3": "Where it is used",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Anomaly detection fits wherever routine behaviour is plentiful and labels are scarce."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Intrusion detection</b>: a flow-based model watches for traffic unlike the baseline and runs beside signature rules (<a href=\"#intrusion-detection-and-prevention-systems\">6.2</a>). A host-based model looks at process trees and file access.",
+      "<b>Malware analysis</b>: features come from the file (imports, section entropy, strings) or from a sandbox run (API calls, network destinations) (<a href=\"#program-security-buffer-overflow-and-malicious-code\">6.4</a>).",
+      "<b>Threat intelligence</b>: models cluster reports and rank alerts. Only a few universities teach NLP for this, so keep it brief.",
+      "<b>Cloud and identity</b>: user and entity behaviour analytics score logins by device, time, location and data volume, so a stolen password shows up as odd behaviour (<a href=\"#cloud-security-services\">6.8</a>)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The model complements signatures rather than replacing them. A signature catches a known tool cheaply and exactly. An anomaly model catches variants, at the price of more false alarms. Run both and show the analyst the evidence from each."
+    }
+   ]
+  },
+  {
+   "h3": "Adversarial machine learning",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>Adversarial machine learning</b> studies how an attacker manipulates a model or its inputs. The aim is not to break cryptography; it is to move a score across a threshold the attacker cannot see."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Evasion</b>: the attacker crafts input at test time that the model calls normal. A spam filter is beaten by adding innocent words; the attack score falls from 0.80 to 0.60 and the message passes.",
+      "<b>Perturbation</b>: a small deliberate change to the input. Malware appends unused bytes, renames an import or packs a section. The file looks harmless and its hash changes.",
+      "<b>Poisoning</b>: the attacker edits the training data, for example by feeding tainted samples through a public threat feed, to raise false positives or plant a backdoor.",
+      "<b>Model extraction</b>: the attacker queries a prediction API many times and fits a copy, then searches for evasive inputs offline."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Perturbations often transfer between models, so a copy or a rough substitute is enough. One changed feature can cross the line, which is why the worked example below matters more than it looks."
+    }
+   ]
+  },
+  {
+   "h3": "Defences and human review",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "No defence makes a model safe, but each of these raises the attacker's cost."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Adversarial training</b>: add perturbed attack samples to the training set so the model learns them. It helps, it costs compute, and it does not cover tomorrow's perturbation.",
+      "<b>Robust features</b>: prefer what the attacker cannot easily change, such as section entropy, import table structure or a call sequence, over file names and string constants.",
+      "<b>Human review</b>: a person checks borderline scores and approves any blocking action.",
+      "<b>Layering</b>: keep signatures, allowlists and anomaly scores side by side (<a href=\"#intrusion-detection-and-prevention-systems\">6.2</a>).",
+      "<b>Monitoring</b>: watch the score distribution. A sudden jump in false positives suggests drift or poisoning."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Against model extraction, rate-limit prediction queries, log them, and keep high-value models offline. Budget for misses and rehearse the review step; a detector that nobody trusts is worse than none."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Scores from four normal events and four attack events against a threshold of 0.70. Three attack scores cross the line; the attack at 0.65 stays below it and is missed.",
+  "spec": {
+   "type": "plot",
+   "x": {
+    "label": "time step",
+    "min": 0,
+    "max": 10
+   },
+   "y": {
+    "label": "score",
+    "min": 0,
+    "max": 1
+   },
+   "series": [
+    {
+     "name": "threshold",
+     "expr": "0.7",
+     "style": "accent",
+     "_pts": [
+      [
+       0.0,
+       0.7
+      ],
+      [
+       0.125,
+       0.7
+      ],
+      [
+       0.25,
+       0.7
+      ],
+      [
+       0.375,
+       0.7
+      ],
+      [
+       0.5,
+       0.7
+      ],
+      [
+       0.625,
+       0.7
+      ],
+      [
+       0.75,
+       0.7
+      ],
+      [
+       0.875,
+       0.7
+      ],
+      [
+       1.0,
+       0.7
+      ],
+      [
+       1.125,
+       0.7
+      ],
+      [
+       1.25,
+       0.7
+      ],
+      [
+       1.375,
+       0.7
+      ],
+      [
+       1.5,
+       0.7
+      ],
+      [
+       1.625,
+       0.7
+      ],
+      [
+       1.75,
+       0.7
+      ],
+      [
+       1.875,
+       0.7
+      ],
+      [
+       2.0,
+       0.7
+      ],
+      [
+       2.125,
+       0.7
+      ],
+      [
+       2.25,
+       0.7
+      ],
+      [
+       2.375,
+       0.7
+      ],
+      [
+       2.5,
+       0.7
+      ],
+      [
+       2.625,
+       0.7
+      ],
+      [
+       2.75,
+       0.7
+      ],
+      [
+       2.875,
+       0.7
+      ],
+      [
+       3.0,
+       0.7
+      ],
+      [
+       3.125,
+       0.7
+      ],
+      [
+       3.25,
+       0.7
+      ],
+      [
+       3.375,
+       0.7
+      ],
+      [
+       3.5,
+       0.7
+      ],
+      [
+       3.625,
+       0.7
+      ],
+      [
+       3.75,
+       0.7
+      ],
+      [
+       3.875,
+       0.7
+      ],
+      [
+       4.0,
+       0.7
+      ],
+      [
+       4.125,
+       0.7
+      ],
+      [
+       4.25,
+       0.7
+      ],
+      [
+       4.375,
+       0.7
+      ],
+      [
+       4.5,
+       0.7
+      ],
+      [
+       4.625,
+       0.7
+      ],
+      [
+       4.75,
+       0.7
+      ],
+      [
+       4.875,
+       0.7
+      ],
+      [
+       5.0,
+       0.7
+      ],
+      [
+       5.125,
+       0.7
+      ],
+      [
+       5.25,
+       0.7
+      ],
+      [
+       5.375,
+       0.7
+      ],
+      [
+       5.5,
+       0.7
+      ],
+      [
+       5.625,
+       0.7
+      ],
+      [
+       5.75,
+       0.7
+      ],
+      [
+       5.875,
+       0.7
+      ],
+      [
+       6.0,
+       0.7
+      ],
+      [
+       6.125,
+       0.7
+      ],
+      [
+       6.25,
+       0.7
+      ],
+      [
+       6.375,
+       0.7
+      ],
+      [
+       6.5,
+       0.7
+      ],
+      [
+       6.625,
+       0.7
+      ],
+      [
+       6.75,
+       0.7
+      ],
+      [
+       6.875,
+       0.7
+      ],
+      [
+       7.0,
+       0.7
+      ],
+      [
+       7.125,
+       0.7
+      ],
+      [
+       7.25,
+       0.7
+      ],
+      [
+       7.375,
+       0.7
+      ],
+      [
+       7.5,
+       0.7
+      ],
+      [
+       7.625,
+       0.7
+      ],
+      [
+       7.75,
+       0.7
+      ],
+      [
+       7.875,
+       0.7
+      ],
+      [
+       8.0,
+       0.7
+      ],
+      [
+       8.125,
+       0.7
+      ],
+      [
+       8.25,
+       0.7
+      ],
+      [
+       8.375,
+       0.7
+      ],
+      [
+       8.5,
+       0.7
+      ],
+      [
+       8.625,
+       0.7
+      ],
+      [
+       8.75,
+       0.7
+      ],
+      [
+       8.875,
+       0.7
+      ],
+      [
+       9.0,
+       0.7
+      ],
+      [
+       9.125,
+       0.7
+      ],
+      [
+       9.25,
+       0.7
+      ],
+      [
+       9.375,
+       0.7
+      ],
+      [
+       9.5,
+       0.7
+      ],
+      [
+       9.625,
+       0.7
+      ],
+      [
+       9.75,
+       0.7
+      ],
+      [
+       9.875,
+       0.7
+      ],
+      [
+       10.0,
+       0.7
+      ]
+     ]
+    },
+    {
+     "name": "scores",
+     "points": [
+      [
+       1,
+       0.1
+      ],
+      [
+       2,
+       0.2
+      ],
+      [
+       3,
+       0.35
+      ],
+      [
+       4,
+       0.55
+      ],
+      [
+       6,
+       0.65
+      ],
+      [
+       7,
+       0.8
+      ],
+      [
+       8,
+       0.9
+      ],
+      [
+       9,
+       0.95
+      ]
+     ],
+     "style": "live",
+     "_pts": [
+      [
+       1.0,
+       0.1
+      ],
+      [
+       2.0,
+       0.2
+      ],
+      [
+       3.0,
+       0.35
+      ],
+      [
+       4.0,
+       0.55
+      ],
+      [
+       6.0,
+       0.65
+      ],
+      [
+       7.0,
+       0.8
+      ],
+      [
+       8.0,
+       0.9
+      ],
+      [
+       9.0,
+       0.95
+      ]
+     ]
+    }
+   ],
+   "aria": "A threshold line at score 0.70; normal scores stay below it and three of four attack scores are above it."
+  }
+ },
+ "examples": [
+  {
+   "question": "An anomaly detector gives scores from 0 to 1 with threshold 0.70. Normal scores: 0.10, 0.20, 0.35, 0.55. Attack scores: 0.65, 0.80, 0.90, 0.95. (a) Which scores are flagged? (b) Compute TPR and FPR at 0.70. (c) If the 0.80 attack is perturbed to 0.60, what is the new TPR?",
+   "steps": [
+    "Flag if score ≥ 0.70. Attack scores: 0.65 is below 0.70 and missed; 0.80, 0.90 and 0.95 are flagged. So TP = 3 and FN = 1.",
+    "Normal scores: 0.10, 0.20, 0.35, 0.55 are all below 0.70, so FP = 0 and TN = 4.",
+    "TPR = TP ÷ (TP + FN) = 3 ÷ 4 = 0.75, that is 75% of attacks caught.",
+    "FPR = FP ÷ (FP + TN) = 0 ÷ 4 = 0.00, that is no normal event flagged.",
+    "Perturbed attack set: 0.65, 0.60, 0.90, 0.95. Flagged: 0.90 and 0.95 only, so TP = 2 and FN = 2.",
+    "New TPR = 2 ÷ 4 = 0.50. FPR stays 0 ÷ 4 = 0.00 because no normal score changed."
+   ],
+   "answer": "(a) 0.80, 0.90 and 0.95 are flagged. (b) TPR = 0.75 (75%) and FPR = 0.00 (0%). (c) After the perturbation to 0.60, TPR falls to 0.50 (50%) at the same threshold.",
+   "check": "normal = [0.10, 0.20, 0.35, 0.55]\nattack = [0.65, 0.80, 0.90, 0.95]\nt = 0.70\ntp = sum(1 for s in attack if s >= t)\nfp = sum(1 for s in normal if s >= t)\nprint(tp / len(attack))\nprint(fp / len(normal))\nattack2 = [0.65, 0.60, 0.90, 0.95]\nprint(sum(1 for s in attack2 if s >= t) / len(attack2))",
+   "values": [
+    0.75,
+    0.0,
+    0.5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "High accuracy on imbalanced data proves nothing. Compare against the always-normal baseline and report TPR and FPR.",
+  "An anomaly is not an attack. A new software rollout or a festival sale can look anomalous, so an alert needs a human or a second signal.",
+  "TPR and FPR are not complements. FPR is measured on normal samples; 1 − TPR is the miss rate, which is a different number.",
+  "A threshold test is ≥ or >, so state which. Changing it shifts every metric, so compare two detectors only at the same threshold.",
+  "A perturbed sample can look harmless and have a new hash. 'No known signature' does not mean safe."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define anomaly detection and name the two label settings used to train it.",
+   "marks": 2,
+   "a": "Anomaly detection learns a model of normal behaviour and scores how far a new event lies from it. It is trained supervised (labelled normal and attack) or unsupervised (normal data only, or no labels)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is 99.9% accuracy a poor result for an intrusion detector?",
+   "marks": 3,
+   "a": "Attacks are rare. If 1 flow in 1000 is an attack, always predicting normal gives 99.9% accuracy and detects nothing. Use TPR, FPR and precision, which measure the rare class."
+  },
+  {
+   "level": "apply",
+   "q": "Normal scores 0.20, 0.40, 0.90; attack scores 0.60, 0.75, 0.95; threshold 0.70. Find TPR and FPR.",
+   "marks": 4,
+   "a": "Flagged attacks: 0.75 and 0.95, so TP = 2, FN = 1, TPR = 2 ÷ 3 ≈ 0.667. Flagged normals: 0.90, so FP = 1, TN = 2, FPR = 1 ÷ 3 ≈ 0.333."
+  },
+  {
+   "level": "understand",
+   "q": "Distinguish evasion from poisoning.",
+   "marks": 3,
+   "a": "Evasion changes the input at test time so the already trained model misclassifies it. Poisoning changes the training data so the model itself becomes wrong or backdoored."
+  },
+  {
+   "level": "analyze",
+   "q": "A team raises its alert threshold from 0.70 to 0.90. Who benefits?",
+   "marks": 4,
+   "a": "False positives fall, so analysts get fewer alerts and less fatigue. Attacks scoring between 0.70 and 0.89 now pass, so the attacker gains. Raising a threshold trades missed attacks for quieter operations."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does model extraction help an attacker even when the copied model is not exact?",
+   "marks": 4,
+   "a": "Perturbations transfer between models. A copy gives scores to search against for inputs that also fool the original, and it costs the attacker only API queries."
+  },
+  {
+   "level": "apply",
+   "q": "A malware classifier uses the file name and the presence of a known string. Which feature is fragile, and what is a robust replacement?",
+   "marks": 4,
+   "a": "The file name is fragile, since renaming is free. The known string is also easy to change by packing. Robust replacements are section entropy, import table structure or the API call sequence from a sandbox."
+  },
+  {
+   "level": "remember",
+   "q": "Name three adversarial machine learning attack types other than evasion.",
+   "marks": 2,
+   "a": "Perturbation of inputs, poisoning of training data, and model extraction. Backdoor insertion is a fourth."
+  }
+ ],
+ "beyond": "Not for the exam. In industry this work sits under MLSecOps: versioned training data, model registries, drift dashboards, and red teams that attack the detector before attackers do. Research moves toward certified robustness, which bounds how far an input can be perturbed before its label can change, and toward detectors that explain their scores. LLM-based security assistants add a new surface, prompt injection through log lines and alert text. Useful search terms: adversarial examples, data poisoning, MITRE ATLAS, UEBA, concept drift."
+}
