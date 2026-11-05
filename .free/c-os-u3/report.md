@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-os/c-os-u3.html`
 - Status: ok
-- Model calls so far: 40 (134,980 tokens in, 137,733 out), 5.6 minutes
+- Model calls so far: 44 (151,637 tokens in, 157,815 out), 7.6 minutes
 
 ## Checker
 
 ```
-c-os-u3.html: 8 chapters, 11807 words, 9 figures, 139 KB
+c-os-u3.html: 8 chapters, 11819 words, 9 figures, 142 KB
 OK
 ```
 
@@ -21,7 +21,6 @@ OK
 - chapter 8: give 6 to 8 quiz questions
 - chapter 7: a python program's shown output was replaced by its real output; check the text around it
 - chapter 7: the figure cannot be drawn: tree label "Check request ≤ need?" is too long; shorten it
-- chapter 7: the reviewer found 3 serious problem(s) and the revision did not pass the checks; read the review in the state folder
 
 ## Reviewer notes (after any revision)
 
@@ -51,10 +50,10 @@ OK
 - ch 6 [high] Lead paragraph: The sentence "By breaking the condition, the system cannot enter a circular wait." is inaccurate because breaking any one of the four necessary conditions prevents deadlock, but it does not necessarily prevent a circular wait from forming if a different condition remains satisfied.
 - ch 6 [low] Exam traps, bullet 1: The wording is confusing: it says eliminating mutual exclusion alone guarantees deadlock‑free execution, then adds that other conditions may still form a cycle, which seems contradictory.
 - ch 6 [low] Section 3, preemption description: Memory pages are described as consumable resources, which is inaccurate; pages are sharable and can be swapped, not consumed like CPU time.
-- ch 7 [high] Section 3, worked example: The allocation matrix uses more units than the total resources (A: 0+2+3 = 5 > 3, B: 1+0+0 = 1 ≤ 2). This makes Available negative and forces an artificial correction to (0,1), which is not a valid example.
-- ch 7 [high] Section 3, pretend allocation step: After correcting the allocation, the pretend allocation still subtracts the request (1,0) from Available (0,1), producing a negative Available' = (‑1,1). The Banker's algorithm must first check that the request does not exceed the current Available; a negative Available' is impossible.
-- ch 7 [high] Quiz Q3: The answer states that the request should be denied because the safety test fails. With the given data (Available = (2,1), Allocation = [[1,0],[0,1]], Max = [[2,1],[1,2]], request = (1,1)), the safety test actually succeeds, so the request must be granted.
-- ch 7 [low] Section 2, Banker's safety algorithm: The algorithm description omits the required check that the request does not exceed the currently Available resources.
-- ch 7 [low] Section 3, worked example narrative: The sentence "Since negative availability is impossible, the initial state is already unsafe; however, for the purpose of the algorithm we treat Available as (0,1) after correcting the input error" is confusing and hides the real mistake in the data.
+- ch 7 [high] Section 3 (Worked example): The allocation matrix (P0:0,1; P1:2,0; P2:3,0) uses 5 units of resource A while only 3 units exist, giving a negative Available vector (‑2,1). This makes the example inconsistent and unrealistic.
+- ch 7 [high] Quiz Q3: The answer states that the safety test fails and the request must be denied, but the correct safety test succeeds, so the request should be granted.
+- ch 7 [low] Section 2 (Banker's safety algorithm): The step description says "Check request ≤ Need; if not, raise error." This wording suggests an error rather than a normal denial.
+- ch 7 [low] Python code comment: Comment reads "# prints True if safe" which may be misread as the code always prints True.
+- ch 7 [low] Exam traps bullet "Treating a safe state as automatically deadlock‑free without verifying that all processes can actually finish.": The statement is redundant because the definition of a safe state already guarantees a sequence for all processes to finish.
 - ch 8 [high] Worked example 1, step 9 (Recovery): The recovery step says aborting process P4 releases its request (1,1,1) and makes Available = (1,1,1). Aborting a process releases only the resources it currently holds, not the resources it is requesting. P4 holds no printers, so terminating it does not free any printer and the deadlock remains.
 - ch 8 [low] Section 2 (Detection for multiple‑instance resources): The description introduces the Work vector but does not define the Finish vector, which is used in the algorithm steps.
