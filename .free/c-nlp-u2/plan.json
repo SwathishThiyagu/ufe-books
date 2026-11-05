@@ -1,0 +1,685 @@
+{
+ "lead": "This unit turns a bag of words into a sequence. You learn how an n-gram language model gives a sentence a probability, how to smooth it and score it, and then how to attach a label to every word using HMMs, MEMMs and CRFs. After it you can build a tagger, a named entity recogniser and a small relation extractor, and you can say exactly what each one gets wrong.",
+ "about": "Unit 2 moves from single words to whole sequences. Chapter 2.1 builds the n-gram language model and shows how a sentence gets a probability. Chapter 2.2 repairs its zero counts with smoothing, interpolation and backoff, and 2.3 measures the result with perplexity. Chapters 2.4 to 2.7 turn to labelling: part-of-speech tagging first by rules and statistics, then the hidden Markov model with Viterbi decoding, then the two discriminative upgrades, maximum entropy Markov models and conditional random fields. Chapters 2.8 and 2.9 apply those labelers to real tasks, named entity recognition and information and relation extraction. Unit 1 supplies the tokenizer and the probability; this unit supplies the sequence.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A sentence's probability is the product of each word's probability given the n−1 words before it, and those conditional counts are read straight off a corpus.",
+   "depth": "Define a word n-gram and the order n: unigram (n=1), bigram (n=2), trigram (n=3). Derive the chain rule P(w1…wm) = Π P(wi | w1…wi−1), then apply the Markov assumption to cut the history to n−1 words. Show the maximum likelihood estimate P(wi | wi−n+1…wi−1) = c(wi−n+1…wi) / c(wi−n+1…wi−1) and define every symbol. Add the start symbol ⟨s⟩ and end symbol ⟨/s⟩ and explain why the end symbol is needed. Build a bigram count matrix and a conditional probability table from a small corpus. State the sparsity problem (most cells are zero) in one paragraph only. Some syllabi call this topic 'unsmoothed n-grams'; a bigram model is a first-order Markov chain, and 'Markov chain' is the name used in some syllabi.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "s",
+      "label": "⟨s⟩",
+      "x": 0,
+      "y": 1,
+      "note": "start",
+      "style": "muted"
+     },
+     {
+      "id": "the",
+      "label": "the",
+      "x": 1,
+      "y": 1,
+      "style": "accent"
+     },
+     {
+      "id": "cat",
+      "label": "cat",
+      "x": 2,
+      "y": 1
+     },
+     {
+      "id": "sat",
+      "label": "sat",
+      "x": 3,
+      "y": 1
+     },
+     {
+      "id": "e",
+      "label": "⟨/s⟩",
+      "x": 4,
+      "y": 1,
+      "note": "end",
+      "style": "muted"
+     },
+     {
+      "id": "on",
+      "label": "on",
+      "x": 3,
+      "y": 0
+     },
+     {
+      "id": "mat",
+      "label": "mat",
+      "x": 1,
+      "y": 0
+     }
+    ],
+    "edges": [
+     {
+      "from": "s",
+      "to": "the",
+      "label": "1"
+     },
+     {
+      "from": "the",
+      "to": "cat",
+      "label": "2",
+      "style": "accent"
+     },
+     {
+      "from": "cat",
+      "to": "sat",
+      "label": "2",
+      "style": "accent"
+     },
+     {
+      "from": "sat",
+      "to": "e",
+      "label": "1"
+     },
+     {
+      "from": "sat",
+      "to": "on",
+      "label": "1"
+     },
+     {
+      "from": "on",
+      "to": "the",
+      "label": "1"
+     },
+     {
+      "from": "the",
+      "to": "mat",
+      "label": "1"
+     },
+     {
+      "from": "mat",
+      "to": "the",
+      "label": "1"
+     }
+    ]
+   },
+   "example": "Corpus: 'the cat sat on the mat the cat sat' (9 words). Add ⟨s⟩ at the front and ⟨/s⟩ at the end and count bigrams: ⟨s⟩ the = 1, the cat = 2, cat sat = 2, sat on = 1, on the = 1, the mat = 1, mat the = 1, sat ⟨/s⟩ = 1. That is 10 bigrams. Find P(sat | cat) and P(on | cat). Answer: c(cat) = 2, so P(sat | cat) = 2/2 = 1.00 and P(on | cat) = 0/2 = 0. The zero is exactly what smoothing in 2.2 repairs.",
+   "trap": "Forgetting to add ⟨s⟩ and ⟨/s⟩, which changes the token count and the denominator. Also reading a cell as P(context | word) when the table stores P(word | context).",
+   "prereq": "Unit 1: tokenization and normalisation, so that 'words' are already defined, plus basic conditional probability.",
+   "leave": "Smoothing to 2.2. Perplexity to 2.3. Recurrent and neural language models to Unit 6."
+  },
+  {
+   "k": 2,
+   "idea": "Unseen n-grams get probability zero, so smoothing moves a little mass from seen events to unseen ones, and interpolation or backoff mixes models of different orders.",
+   "depth": "Show why zero probabilities are fatal for a product of terms and for perplexity. Cover add-one (Laplace) smoothing with the estimator (c + 1)/(N + V), defining c, N and V, and add-k with (c + k)/(N + kV). Give one line of intuition for discounting (Good-Turing: give unseen events the mass of the singletons) without the full derivation. Cover linear interpolation P = λ1 P_trigram + λ2 P_bigram + λ3 P_unigram with λ1 + λ2 + λ3 = 1 and say that the λ are set on held-out data. Cover Katz backoff: use the shorter context when the longer count is zero, with a discount factor. Compare the two in a short table.",
+   "figure": {
+    "type": "array",
+    "title": "Unigram counts and estimates, N = 10, V = 6",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Count",
+      "cells": [
+       "4",
+       "2",
+       "2",
+       "1",
+       "1",
+       "0"
+      ]
+     },
+     {
+      "label": "MLE",
+      "cells": [
+       "0.4",
+       "0.2",
+       "0.2",
+       "0.1",
+       "0.1",
+       "0"
+      ]
+     },
+     {
+      "label": "Add-1",
+      "cells": [
+       "0.31",
+       "0.19",
+       "0.19",
+       "0.13",
+       "0.13",
+       "0.06"
+      ],
+      "marks": {
+       "5": "live"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 0,
+      "cell": 5,
+      "label": "unseen"
+     }
+    ]
+   },
+   "example": "Unigram counts over N = 10 words: the 4, cat 2, sat 2, on 1, mat 1, dog 0. The vocabulary has V = 6 words, because dog is a known word that never appeared. Find the maximum likelihood and add-one estimates, then the interpolated bigram P(dog | the) with λ_bigram = 0.7 and λ_unigram = 0.3. Answer: MLE(the) = 4/10 = 0.40, add-one(the) = (4+1)/(10+6) = 0.31. MLE(dog) = 0 and add-one(dog) = (0+1)/16 = 0.06. The bigram count c(the dog) = 0, so P(dog | the) = 0.7 × 0 + 0.3 × 0.06 = 0.018.",
+   "trap": "Using N as the denominator in add-one instead of N + V, which makes the probabilities sum to more than 1. And choosing λ values that do not sum to 1.",
+   "prereq": "2.1, especially the count matrix and the maximum likelihood estimate.",
+   "leave": "How good the smoothed model is, that is perplexity, goes to 2.3. Word embeddings as an alternative to counting go to Unit 5."
+  },
+  {
+   "k": 3,
+   "idea": "Perplexity is the inverse geometric mean probability per word, so a model that gives test words higher probability has lower and better perplexity.",
+   "depth": "Give the definition PP(W) = P(w1…wm)^(−1/m) and the equivalent forms PP = 2^H and PP = exp(−(1/m) Σ ln P(wi | history)), defining m as the number of predicted tokens including ⟨/s⟩. Explain the intuition as a branching factor: a model with perplexity 4 is as unsure as one choosing among 4 equally likely words each step. Cover train/dev/test splits, why test text must be unseen, and out-of-vocabulary words (map them to a single ⟨unk⟩ token, then say perplexity can only be compared across models that use the same vocabulary). State the monotone relation between perplexity and cross-entropy. Compare bigram against unigram against trigram on the same test set.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "n-gram order n",
+     "min": 1,
+     "max": 5
+    },
+    "y": {
+     "label": "perplexity",
+     "min": 0,
+     "max": 140
+    },
+    "series": [
+     {
+      "name": "train",
+      "points": [
+       [
+        1,
+        120
+       ],
+       [
+        2,
+        60
+       ],
+       [
+        3,
+        40
+       ],
+       [
+        4,
+        30
+       ],
+       [
+        5,
+        25
+       ]
+      ],
+      "style": "accent"
+     },
+     {
+      "name": "test",
+      "points": [
+       [
+        1,
+        130
+       ],
+       [
+        2,
+        70
+       ],
+       [
+        3,
+        55
+       ],
+       [
+        4,
+        60
+       ],
+       [
+        5,
+        75
+       ]
+      ],
+      "style": "live"
+     }
+    ]
+   },
+   "example": "A smoothed bigram model gives P(the | ⟨s⟩) = 0.5, P(cat | the) = 0.4 and P(⟨/s⟩ | cat) = 0.5. Find the perplexity on the test sentence 'the cat'. Answer: m = 3 predicted tokens (the, cat, ⟨/s⟩). Product = 0.5 × 0.4 × 0.5 = 0.1. PP = 0.1^(−1/3) = 2.15. A uniform model over the same 4-word vocabulary gives 0.25 each, product 0.25³ = 0.0156, PP = 4.00. So 2.15 beats 4.00.",
+   "trap": "Dividing by the number of words in the sentence while the product also contains the ⟨/s⟩ term, so m is off by one. And comparing perplexities of two models whose vocabularies differ, which is meaningless.",
+   "prereq": "2.1 and 2.2. Without smoothing the product is zero and the perplexity is infinite.",
+   "leave": "Cross-entropy as a loss function in neural models goes to Unit 6."
+  },
+  {
+   "k": 4,
+   "idea": "Part-of-speech tagging gives every token its grammatical class, and rule-based, stochastic and transformation-based taggers differ only in where the tagging knowledge comes from.",
+   "depth": "Define part of speech, open classes (noun, verb, adjective, adverb) and closed classes (determiner, preposition, pronoun, conjunction). Show a tagset such as the Penn Treebank set of about 36 tags, and mention that Indian-language tagsets add case and gender features. Give an ambiguity example ('book' as noun or verb, 'that' as determiner, pronoun or complementiser) and say the average English word has more than one possible tag. Rule-based tagging: two stages, a lexicon that lists candidate tags, then hand-written context rules that remove candidates (the ENGTWOL style). Stochastic tagging: pick the tag with the highest P(tag | word), and the most-frequent-tag baseline. Transformation-based (Brill) tagging: start from the baseline, find errors, propose rewrite rules from templates such as 'change tag X to Y when the previous tag is Z', keep the rule that fixes most errors, repeat, and apply the ordered rule list at test time. List the issues: unknown words, ambiguity, tagset size and granularity, annotation cost and inter-annotator agreement.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Transformation-based tagging loop",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Tagged corpus",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Baseline tags",
+      "note": "most frequent tag",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Find errors",
+      "style": "live"
+     },
+     {
+      "id": "d",
+      "label": "Propose rule",
+      "note": "from templates",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Apply best rule",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b"
+     },
+     {
+      "from": "b",
+      "to": "c"
+     },
+     {
+      "from": "c",
+      "to": "d"
+     },
+     {
+      "from": "d",
+      "to": "e"
+     },
+     {
+      "from": "e",
+      "to": "c",
+      "label": "re-score",
+      "style": "dashed"
+     }
+    ]
+   },
+   "example": "Tag 'They want to fly'. (a) Rule-based tagger: the lexicon gives fly as NN or VB, and the context rule 'after the infinitive marker TO, a verb is VB' forces fly/VB. (b) Stochastic baseline: They/PRP want/VBP to/TO fly/NN, because NN is the most frequent tag for fly. (c) Brill loop: the error is fly/NN after TO, the template 'change NN to VB when the previous tag is TO' scores best and is kept, giving They/PRP want/VBP to/TO fly/VB. Report the rule and its trigger context.",
+   "trap": "Transformation rules are ordered and applied one after another; a later rule may undo an earlier one. A tagger is not a classifier that re-decides each word from scratch.",
+   "prereq": "Unit 1: word classes, morphology and tokenization. Some probability from 2.1 helps for the stochastic case.",
+   "leave": "The HMM mathematics goes to 2.5. Discriminative taggers go to 2.6 and 2.7. Parsing, which consumes the tags, goes to Unit 3."
+  },
+  {
+   "k": 5,
+   "idea": "A hidden Markov model treats tags as hidden states and words as observations, and Viterbi finds the single most probable tag path through the trellis.",
+   "depth": "Define the HMM triple: start probabilities π, transition matrix A with a(i,j) = P(tag j | tag i), emission matrix B with b(j,o) = P(word o | tag j). State the two independence assumptions and write the joint probability P(T, W) = Π a(ti−1, ti) b(ti, wi). Name the three classic problems: likelihood of the observations (forward algorithm), best state sequence (Viterbi), parameter learning (Baum-Welch / EM). Give the Viterbi recursion δt(j) = max_i [δt−1(i) a(i,j)] b(j, ot) with ψt(j) recording the argmax, define δ and ψ, and note the cost O(T · S²) for T tokens and S states. Show the backtrace. Keep the forward algorithm to a formula and one line of purpose.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "n1",
+      "label": "N",
+      "x": 0,
+      "y": 1,
+      "note": "δ=0.30",
+      "style": "accent"
+     },
+     {
+      "id": "v1",
+      "label": "V",
+      "x": 0,
+      "y": 0,
+      "note": "δ=0.08"
+     },
+     {
+      "id": "n2",
+      "label": "N",
+      "x": 1,
+      "y": 1,
+      "note": "δ=0.012"
+     },
+     {
+      "id": "v2",
+      "label": "V",
+      "x": 1,
+      "y": 0,
+      "note": "δ=0.108",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "n1",
+      "to": "n2",
+      "label": "0.12",
+      "style": "dashed"
+     },
+     {
+      "from": "n1",
+      "to": "v2",
+      "label": "0.18"
+     },
+     {
+      "from": "v1",
+      "to": "n2",
+      "label": "0.056"
+     },
+     {
+      "from": "v1",
+      "to": "v2",
+      "label": "0.024"
+     }
+    ]
+   },
+   "example": "States S = {N, V}. Start: π(N) = 0.6, π(V) = 0.4. Transitions: a(N,N) = 0.4, a(N,V) = 0.6, a(V,N) = 0.7, a(V,V) = 0.3. Emissions: b(N, fish) = 0.5, b(V, fish) = 0.2, b(N, sleep) = 0.1, b(V, sleep) = 0.6. Observation: fish sleep. Run Viterbi. Answer: t = 1 gives δ1(N) = 0.6 × 0.5 = 0.30 and δ1(V) = 0.4 × 0.2 = 0.08. t = 2 with word 'sleep': from N, 0.30 × 0.4 = 0.12; from V, 0.08 × 0.7 = 0.056, so δ2(N) = 0.12 × 0.1 = 0.012 with backpointer N. From N, 0.30 × 0.6 = 0.18; from V, 0.08 × 0.3 = 0.024, so δ2(V) = 0.18 × 0.6 = 0.108 with backpointer N. δ2(V) = 0.108 is the maximum, so the best path is N then V: fish/N sleep/V.",
+   "trap": "δt(j) is the probability of the best single path ending in state j, not the sum of all path probabilities; summing is the forward algorithm. Also forgetting the backpointers, which leaves the score but no tag sequence.",
+   "prereq": "2.1 for the Markov assumption and 2.4 for what a tag is.",
+   "leave": "Speech recognition with HMMs goes to Unit 7. The forward-backward derivation in full goes to a later course; here keep the recursion."
+  },
+  {
+   "k": 6,
+   "idea": "A maximum entropy Markov model replaces the HMM's emission table with a log-linear classifier over many overlapping features, normalised at each position.",
+   "depth": "Only a few universities teach this. Start from the HMM weakness: emissions use one word only and cannot use spelling, suffix, capitalisation or the next word together. Define a feature function f(i, ti−1, ti, x) returning 0 or 1, and a weight λ for each. Give the score Σ λj fj and the local probability P(ti | ti−1, xi) = exp(score) / Σ_t' exp(score(t')), normalised over the tags at position i only. Show that Viterbi still decodes, because the model is still a chain. Explain the label bias problem in one paragraph: per-state normalisation means a state that offers few outgoing choices is barely penalised. Call it a maximum entropy Markov model (MEMM), also named a conditional Markov model. A small comparison table against the HMM (generative vs discriminative, features, normalisation).",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "MEMM at one position",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Token i",
+      "note": "word and previous tag",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Feature vector",
+      "note": "suffix, shape, neighbours",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "MaxEnt classifier",
+      "note": "one per position",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Local probabilities",
+      "note": "sum to 1 here",
+      "style": "next"
+     },
+     {
+      "id": "e",
+      "label": "Viterbi decode",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b"
+     },
+     {
+      "from": "b",
+      "to": "c"
+     },
+     {
+      "from": "c",
+      "to": "d"
+     },
+     {
+      "from": "d",
+      "to": "e"
+     }
+    ]
+   },
+   "example": "Token 'flies' comes after tag N. Two features fire for tag V: word = flies with weight 1.5, and previous tag = N with weight 0.2, so score(V) = 1.7. For tag N: word = flies with weight 0.8, and previous tag = N with weight 0.5, so score(N) = 1.3. Find the two local probabilities. Answer: exp(1.3) = 3.669, exp(1.7) = 5.474, local sum = 9.143. P(N | N, flies) = 3.669/9.143 = 0.40 and P(V | N, flies) = 5.474/9.143 = 0.60.",
+   "trap": "The normaliser is per position, over tags only. Students divide by the sum over all positions and histories, which is the CRF of 2.7, not a MEMM.",
+   "prereq": "2.5 for the HMM chain and Viterbi, plus the logistic regression and maximum entropy classifier from Unit 5.",
+   "leave": "The full training derivation (L-BFGS, gradient of the log-likelihood) is optional here; state the objective only. The CRF fix goes to 2.7."
+  },
+  {
+   "k": 7,
+   "idea": "A conditional random field scores the whole label sequence with one log-linear function and normalises once over all sequences, so no position is scored in isolation.",
+   "depth": "Only a few universities teach this. Define a linear-chain CRF as an undirected graphical model over the labels y given the observations x. Write the conditional distribution P(y | x) = (1/Z(x)) exp( Σi Σj λj fj(yi−1, yi, x, i) ), and define each symbol clearly: feature function f, weight λ, and the partition function Z(x) = Σ over all label sequences of the same exponential. Say that Z is computed with a forward algorithm and that the argmax label sequence comes from Viterbi with the same weights. Mention training by maximising the conditional log-likelihood, which needs the expected feature counts under the model. Give the three-way comparison table: HMM generative and joint, MEMM discriminative but locally normalised, CRF discriminative and globally normalised. Name the price: slower training, and Z over all sequences.",
+   "figure": {
+    "type": "graph",
+    "directed": false,
+    "nodes": [
+     {
+      "id": "y1",
+      "label": "y₁",
+      "x": 0,
+      "y": 1,
+      "style": "accent"
+     },
+     {
+      "id": "y2",
+      "label": "y₂",
+      "x": 1,
+      "y": 1,
+      "style": "accent"
+     },
+     {
+      "id": "y3",
+      "label": "y₃",
+      "x": 2,
+      "y": 1,
+      "style": "accent"
+     },
+     {
+      "id": "x1",
+      "label": "x₁",
+      "x": 0,
+      "y": 0,
+      "style": "muted"
+     },
+     {
+      "id": "x2",
+      "label": "x₂",
+      "x": 1,
+      "y": 0,
+      "style": "muted"
+     },
+     {
+      "id": "x3",
+      "label": "x₃",
+      "x": 2,
+      "y": 0,
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "y1",
+      "to": "y2",
+      "label": "f"
+     },
+     {
+      "from": "y2",
+      "to": "y3",
+      "label": "f"
+     },
+     {
+      "from": "x1",
+      "to": "y1",
+      "label": "f"
+     },
+     {
+      "from": "x2",
+      "to": "y2",
+      "label": "f"
+     },
+     {
+      "from": "x3",
+      "to": "y3",
+      "label": "f"
+     }
+    ]
+   },
+   "example": "Three tokens, two tags each, so 8 label sequences. For the current weights, exp(score(N,V,N)) = 12.18 and exp(score(N,N,N)) = 6.05; the other six sequences sum to 11.77. Find Z and P(N,V,N | x). Answer: Z = 12.18 + 6.05 + 11.77 = 30.00, so P(N,V,N | x) = 12.18/30.00 = 0.406. The same weight vector also gives the pairwise features used inside the sum, so no step is normalised on its own.",
+   "trap": "Z is a sum over all 2³ label sequences and must be recomputed for every input sentence; it is not the product of the per-position normalisers from 2.6.",
+   "prereq": "2.6 for the log-linear scoring and the label bias motivation, plus 2.5 for Viterbi decoding.",
+   "leave": "Training algorithms in detail and software libraries are out of scope here. Application to entities is 2.8."
+  },
+  {
+   "k": 8,
+   "idea": "Named entity recognition finds and classifies the spans that name people, places, organisations, dates and similar categories, usually as a sequence labelling task.",
+   "depth": "Define the entity types commonly used: person, location, organisation, miscellaneous, plus numeric types such as date, time, money and percentage. Explain BIO encoding (B-begin, I-inside, O-outside) and mention BIOES and the boundary problem when two entities touch. Cover three approaches at a survey level: gazetteer and hand-written rules, feature-based classifiers with features such as word shape, capitalisation, suffix, and previous tag, and a CRF labeler from 2.7. Cover evaluation at the entity level: precision = correct predicted entities / predicted entities, recall = correct / gold entities, F1 = 2PR/(P+R). Mention nested entities, cross-sentence entities and Indian-language issues such as transliteration and missing capitalisation cues. Keep the depth at one worked tagging plus one scoring, not a full feature table.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "NER pipeline",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Text"
+     },
+     {
+      "id": "b",
+      "label": "POS tags"
+     },
+     {
+      "id": "c",
+      "label": "Gazetteer + rules",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "BIO labels",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "Entities"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b"
+     },
+     {
+      "from": "b",
+      "to": "c"
+     },
+     {
+      "from": "c",
+      "to": "d"
+     },
+     {
+      "from": "d",
+      "to": "e"
+     }
+    ]
+   },
+   "example": "Tag 'Mr Rao of TCS met the team in Pune' with BIO labels, then score a system. Gold entities: Rao (PER), TCS (ORG), Pune (LOC); 'the team' is not an entity. The system predicts Rao (PER), TCS (ORG) and the span 'team in Pune' (LOC). Answer: Mr/B-PER Rao/I-PER of/O TCS/B-ORG met/O the/O team/O in/O Pune/B-LOC. The system got 2 of its 3 predictions right and found 2 of the 3 gold entities, so P = 2/3 = 0.67, R = 2/3 = 0.67 and F1 = 0.67.",
+   "trap": "Grading token by token. Tagging every word O gives about 90% token accuracy and F1 = 0. One wrong boundary word also destroys a whole entity under exact-span matching.",
+   "prereq": "2.4 for the tagset, and 2.5 to 2.7 for the sequence models that do the labelling.",
+   "leave": "Coreference and entity linking to Unit 4. Question answering over the extracted entities to Unit 6."
+  },
+  {
+   "k": 9,
+   "idea": "Information extraction fills structured slots from free text, and relation extraction links two named entities into a triple of subject, relation and object.",
+   "depth": "Define the IE family: entity extraction (2.8), relation extraction, and template or slot filling. Define the output triple (subject, relation, object) and show how triples become a knowledge base. Cover three methods briefly: hand-written patterns over words or POS tags, bootstrapping from a few seed tuples (also called seed-based or semi-supervised learning), and supervised relation classification over features, with distant supervision mentioned in one line. (One line on training data built by aligning a knowledge base with text.) Cover evaluation with precision, recall and F1 on held-out text, and note that relation extraction assumes the entities are already correct, so errors add up. Note in one line that this completes the subject's sequence: labels to spans to relations.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "rao",
+      "label": "Rao",
+      "x": 0,
+      "y": 1,
+      "note": "PER"
+     },
+     {
+      "id": "tcs",
+      "label": "TCS",
+      "x": 1,
+      "y": 1,
+      "note": "ORG",
+      "style": "accent"
+     },
+     {
+      "id": "pune",
+      "label": "Pune",
+      "x": 2,
+      "y": 1,
+      "note": "LOC",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "rao",
+      "to": "tcs",
+      "label": "works_for",
+      "style": "accent"
+     },
+     {
+      "from": "tcs",
+      "to": "pune",
+      "label": "based_in"
+     },
+     {
+      "from": "rao",
+      "to": "pune",
+      "label": "lives_in",
+      "style": "dashed"
+     }
+    ]
+   },
+   "example": "Sentence: 'Rao joined TCS in Pune last Monday'. Extract entities and relations, then score a pattern. Answer: entities Rao (PER), TCS (ORG), Pune (LOC), Monday (DATE). Triples: (Rao, works_for, TCS), (TCS, based_in, Pune), (Rao, joined_on, Monday). The pattern 'PER joined ORG in LOC' fires on 3 held-out sentences and gives a correct triple on 2 of them, so precision = 2/3 = 0.67. The test set holds 5 true relations, so recall = 2/5 = 0.40 and F1 = 2 × 0.67 × 0.40 / (0.67 + 0.40) = 0.50.",
+   "trap": "Measuring pattern precision on the sentences used to write the pattern. Report it on held-out text, and count a triple as correct only when subject, relation and object all match.",
+   "prereq": "2.8, since relations are defined between named entities.",
+   "leave": "Dependency parsing, which gives the subject-verb-object skeleton, goes to Unit 3. Semantic roles go to Unit 4. Open-domain question answering goes to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "zero counts from the bigram table need smoothing"
+  ],
+  [
+   2,
+   3,
+   "smoothed models are compared with perplexity"
+  ],
+  [
+   3,
+   5,
+   "perplexity scores the HMM language model"
+  ],
+  [
+   4,
+   5,
+   "the HMM is the stochastic tagger"
+  ],
+  [
+   5,
+   6,
+   "MEMM swaps the HMM emission table for a classifier"
+  ],
+  [
+   6,
+   7,
+   "CRF removes the MEMM label bias"
+  ],
+  [
+   7,
+   8,
+   "sequence labelling becomes entity recognition"
+  ],
+  [
+   8,
+   9,
+   "entities become the arguments of relations"
+  ]
+ ]
+}

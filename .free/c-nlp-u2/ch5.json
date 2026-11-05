@@ -1,0 +1,187 @@
+{
+ "lead": "An HMM tags a sentence by treating tags as hidden states and words as observed output. You cannot see the tag path, only the words, so the model assigns probabilities to state paths and Viterbi picks the single most probable one. POS tagging, named-entity chunking and sequence labelling use this idea. The model is small: start probabilities, transition probabilities and emission probabilities. Viterbi fills a table of best scores and backpointers. It returns a tag for every word, not just a score.",
+ "prereq": "You need <a href=\"#n-gram-language-models\">2.1</a> for the Markov assumption and <a href=\"#part-of-speech-tagging-rule-based-stochastic-transformation-base\">2.4</a> for what a tag is.",
+ "sections": [
+  {
+   "h3": "The HMM triple and two independence assumptions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An HMM is a model λ=(π,A,B). Let S be the number of tags. Let T be the number of tokens. Let q<sub>t</sub> be the tag at position t and w<sub>t</sub> the word. The three parts are π(j)=P(q<sub>1</sub>=j), the start probability; a(i,j)=P(q<sub>t</sub>=j|q<sub>t−1</sub>=i), the transition probability; b(j,o)=P(w<sub>t</sub>=o|q<sub>t</sub>=j), the emission probability. Row sums are 1: Σ<sub>j</sub>a(i,j)=1 and Σ<sub>o</sub>b(i,o)=1. Two independence assumptions make this small. The Markov assumption says the current tag depends only on the previous tag: P(q<sub>t</sub>|q<sub>1</sub>…q<sub>t−1</sub>)=a(q<sub>t−1</sub>,q<sub>t</sub>). The emission assumption says the current word depends only on its own tag: P(w<sub>t</sub>|q<sub>1</sub>…q<sub>T</sub>,w<sub>1</sub>…w<sub>t−1</sub>)=b(q<sub>t</sub>,w<sub>t</sub>). With a dummy start state q<sub>0</sub>, where a(q<sub>0</sub>,q<sub>1</sub>)=π(q<sub>1</sub>), the joint probability is P(Q,W)=∏<sub>t=1</sub><sup>T</sup>a(q<sub>t−1</sub>,q<sub>t</sub>)b(q<sub>t</sub>,w<sub>t</sub>). Here Q is the tag sequence and W is the word sequence."
+    },
+    {
+     "type": "formula",
+     "text": "P(Q,W)=∏<sub>t=1</sub><sup>T</sup> a(q<sub>t−1</sub>,q<sub>t</sub>) b(q<sub>t</sub>,w<sub>t</sub>)",
+     "where": "Q is the full tag sequence q1…qT; W is the full word sequence w1…wT; q0 is a dummy start state; a(q0,q1)=π(q1); a(i,j) is the transition probability; b(j,o) is the emission probability; T is the number of tokens."
+    }
+   ]
+  },
+  {
+   "h3": "Three classic problems and the forward sum",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Three classic problems are asked of an HMM. First, the likelihood P(W|λ): the total probability of the words under all tag paths. The forward algorithm sums: α<sub>t</sub>(j)=b(j,w<sub>t</sub>)Σ<sub>i</sub>α<sub>t−1</sub>(i)a(i,j), with α<sub>1</sub>(j)=π(j)b(j,w<sub>1</sub>) and P(W|λ)=Σ<sub>j</sub>α<sub>T</sub>(j). Here α<sub>t</sub>(j) is the summed probability of all paths ending in tag j after t words; i runs over tags. Second, the best state sequence: which single tag path is most probable? Viterbi takes maxima instead of sums. Third, parameter learning: count transitions and emissions from tagged text, or use Baum-Welch (EM) on raw text. Keep the answers separate: forward gives a likelihood, Viterbi gives one path, Baum-Welch gives parameters."
+    },
+    {
+     "type": "formula",
+     "text": "α<sub>t</sub>(j)=b(j,w<sub>t</sub>) Σ<sub>i</sub> α<sub>t−1</sub>(i) a(i,j)",
+     "where": "αt(j) is the summed probability of all tag paths ending in tag j after t words; b(j,wt) is the emission of word wt from tag j; a(i,j) is the transition from tag i to tag j; the sum is over all previous tags i; base case α1(j)=π(j)b(j,w1); P(W|λ)=Σj αT(j)."
+    }
+   ]
+  },
+  {
+   "h3": "Viterbi: best path, not sum",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Viterbi fills a trellis with one node for each tag at each word position. δ<sub>t</sub>(j) is the probability of the single best tag path ending in tag j after t words. ψ<sub>t</sub>(j) is the previous tag on that path; it is the backpointer. For t=1, δ<sub>1</sub>(j)=π(j)b(j,w<sub>1</sub>) and ψ<sub>1</sub>(j)=start. For t=2…T, δ<sub>t</sub>(j)=max<sub>i</sub>[δ<sub>t−1</sub>(i)a(i,j)]b(j,w<sub>t</sub>) and ψ<sub>t</sub>(j)=argmax<sub>i</sub>[δ<sub>t−1</sub>(i)a(i,j)]. The max is over previous tag i; δ<sub>t−1</sub>(i) already stores the best path to i. After the last word, pick q<sub>T</sub>=argmax<sub>j</sub>δ<sub>T</sub>(j). Backtrace: for t=T…2, set q<sub>t−1</sub>=ψ<sub>t</sub>(q<sub>t</sub>). Reverse the list to get q<sub>1</sub>…q<sub>T</sub>. Cost is O(T·S²) time for T tokens and S tags: each target tag compares S previous tags. Memory is O(T·S) with all backpointers, or O(S) scores if only the previous row is kept. The figure shows the two-word example: the winning end node has δ<sub>2</sub>(V)=0.108, with backpointer N."
+    },
+    {
+     "type": "formula",
+     "text": "δ<sub>t</sub>(j)=max<sub>i</sub> [δ<sub>t−1</sub>(i) a(i,j)] b(j,w<sub>t</sub>)",
+     "where": "δt(j) is the probability of the single best tag path ending in tag j after t words; i runs over previous tags; a(i,j) is the transition probability; b(j,wt) is the emission probability of the current word wt from tag j; ψt(j) records the argmax i as the backpointer."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Trellis for the two-word observation fish sleep. The orange node is the best end state; the dashed edge is not on the winning backtrace.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "aria": "A directed graph shows four Viterbi scores for tags N and V at two time steps, with transition scores on the edges and the best final node highlighted.",
+   "nodes": [
+    {
+     "id": "n1",
+     "label": "N",
+     "x": 0,
+     "y": 1,
+     "note": "δ=0.30",
+     "style": "accent"
+    },
+    {
+     "id": "v1",
+     "label": "V",
+     "x": 0,
+     "y": 0,
+     "note": "δ=0.08"
+    },
+    {
+     "id": "n2",
+     "label": "N",
+     "x": 1,
+     "y": 1,
+     "note": "δ=0.012"
+    },
+    {
+     "id": "v2",
+     "label": "V",
+     "x": 1,
+     "y": 0,
+     "note": "δ=0.108",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "n1",
+     "to": "n2",
+     "label": "0.12",
+     "style": "dashed"
+    },
+    {
+     "from": "n1",
+     "to": "v2",
+     "label": "0.18",
+     "style": "solid"
+    },
+    {
+     "from": "v1",
+     "to": "n2",
+     "label": "0.056",
+     "style": "solid"
+    },
+    {
+     "from": "v1",
+     "to": "v2",
+     "label": "0.024",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Consider an HMM with tags S={N,V}. Start probabilities: π(N)=0.6, π(V)=0.4. Transitions: a(N,N)=0.4, a(N,V)=0.6, a(V,N)=0.7, a(V,V)=0.3. Emissions: b(N,fish)=0.5, b(V,fish)=0.2, b(N,sleep)=0.1, b(V,sleep)=0.6. The observed words are fish sleep. Run Viterbi and give the best tag path with its joint probability.",
+   "steps": [
+    "Write the model. Tags S={N,V}. π(N)=0.6, π(V)=0.4. a(N,N)=0.4, a(N,V)=0.6, a(V,N)=0.7, a(V,V)=0.3. b(N,fish)=0.5, b(V,fish)=0.2, b(N,sleep)=0.1, b(V,sleep)=0.6. Words: w1=fish, w2=sleep.",
+    "Time t=1, word fish. δ1(N)=π(N)b(N,fish)=0.6×0.5=0.30. δ1(V)=π(V)b(V,fish)=0.4×0.2=0.08. Both backpointers are start.",
+    "Time t=2, target N, word sleep. From N: δ1(N)a(N,N)=0.30×0.4=0.12. From V: δ1(V)a(V,N)=0.08×0.7=0.056. Maximum is 0.12 from N. Multiply by b(N,sleep)=0.1: δ2(N)=0.12×0.1=0.012. ψ2(N)=N.",
+    "Time t=2, target V, word sleep. From N: 0.30×a(N,V)=0.30×0.6=0.18. From V: 0.08×a(V,V)=0.08×0.3=0.024. Maximum is 0.18 from N. Multiply by b(V,sleep)=0.6: δ2(V)=0.18×0.6=0.108. ψ2(V)=N.",
+    "Final choice. δ2(N)=0.012, δ2(V)=0.108. Maximum is 0.108 at V. Backtrace: q2=V; ψ2(V)=N so q1=N. Path N,V."
+   ],
+   "answer": "The best tag path is N then V, so fish/N sleep/V, with joint probability P(Q,W)=0.108.",
+   "check": "pi = {'N': 0.6, 'V': 0.4}\nA = {('N','N'): 0.4, ('N','V'): 0.6, ('V','N'): 0.7, ('V','V'): 0.3}\nB = {('N','fish'): 0.5, ('V','fish'): 0.2, ('N','sleep'): 0.1, ('V','sleep'): 0.6}\nwords = ['fish', 'sleep']\ndelta1 = {j: pi[j] * B[(j, words[0])] for j in 'NV'}\nprint(round(delta1['N'], 4))\nprint(round(delta1['V'], 4))\ndelta2 = {}\nfor j in 'NV':\n    best = max(delta1[i] * A[(i, j)] for i in 'NV')\n    delta2[j] = best * B[(j, words[1])]\nprint(round(delta2['N'], 4))\nprint(round(delta2['V'], 4))",
+   "values": [
+    0.3,
+    0.08,
+    0.012,
+    0.108
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "δt(j) is the probability of the best single path ending in tag j, not the sum of all paths ending there. Summing over paths is the forward algorithm.",
+  "Forgetting ψ leaves only a score. Viterbi needs backpointers to recover the actual tag sequence.",
+  "π is used only at the first word. Do not multiply π again at later positions.",
+  "The score 0.108 is the joint probability P(Q,W), not the conditional P(Q|W). The argmax is the same, but the conditional value needs division by P(W)."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In Viterbi, what does δt(j) store?",
+   "marks": 2,
+   "a": "The probability of the single best tag path ending in tag j after t words."
+  },
+  {
+   "level": "remember",
+   "q": "State the two independence assumptions of an HMM.",
+   "marks": 3,
+   "a": "The current tag depends only on the previous tag. The current word depends only on its own tag."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Viterbi use max where the forward algorithm uses sum?",
+   "marks": 3,
+   "a": "Viterbi needs one best tag path, so each node keeps the highest-scoring predecessor. Forward needs the total observation likelihood, so each node sums over all predecessors."
+  },
+  {
+   "level": "apply",
+   "q": "Using π(N)=0.6, π(V)=0.4, b(N,fish)=0.5, b(V,fish)=0.2, compute δ1(N) and δ1(V).",
+   "marks": 2,
+   "a": "δ1(N)=0.6×0.5=0.30. δ1(V)=0.4×0.2=0.08."
+  },
+  {
+   "level": "apply",
+   "q": "From δ1(N)=0.30, a(N,V)=0.6 and b(V,sleep)=0.6, compute the candidate score for ending in V at t=2 that comes from N.",
+   "marks": 3,
+   "a": "0.30×0.6×0.6=0.108."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare forward and Viterbi: what is stored at each trellis node, and what final answer does each give?",
+   "marks": 4,
+   "a": "Forward stores α, the sum over all paths to the node, and gives P(W|λ). Viterbi stores δ, the best single path to the node, plus ψ, and gives the best tag sequence."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is the Viterbi cost O(T·S²) and not O(T·S)?",
+   "marks": 3,
+   "a": "For each of T positions and each of S target tags, the recursion compares S previous tags. That gives T×S×S operations."
+  }
+ ],
+ "beyond": "Not for the exam. The same Viterbi recursion decodes convolutional codes in digital communication and finds likely state paths in DNA sequence models. Baum-Welch remains a standard way to train sequence models from unlabelled data when labels are costly. Modern taggers often use CRFs or neural sequence models, but the HMM trellis is still the cleanest place to learn max-plus dynamic programming. Search next for the Viterbi decoder, forward-backward, and profile HMMs."
+}

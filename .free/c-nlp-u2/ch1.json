@@ -1,0 +1,268 @@
+{
+ "lead": "An n-gram language model gives a probability to a word sequence. It reads that probability from counts in a corpus: the chance of each word depends only on the n−1 words before it. A bigram model looks one word back; a trigram looks two back. The model powers spell correction, speech recognition, predictive keyboards and machine translation scoring, where a system must choose between word sequences that all look possible.",
+ "prereq": "You need Unit 1 on tokenization and normalisation, so that words are already defined, plus basic conditional probability.",
+ "sections": [
+  {
+   "h3": "From a sentence to a product of small probabilities",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A word n-gram is a block of n consecutive tokens. The order n is the block length: a unigram has n=1, a bigram n=2, a trigram n=3. A language model assigns a probability to a whole sentence, not to one word alone."
+    },
+    {
+     "type": "formula",
+     "text": "P(w₁ … w_m) = Π_{i=1}^{m} P(w_i | w₁ … w_{i−1})",
+     "where": "P(w₁ … w_m) is the probability of the sentence; w_i is the i-th word; m is the number of words; P(w_i | w₁ … w_{i−1}) is the chance of word i after all earlier words."
+    },
+    {
+     "type": "p",
+     "text": "The full history w₁ … w_{i−1} is too long to count. The Markov assumption keeps only the last n−1 words. A bigram uses one word of history: P(w_i | w₁ … w_{i−1}) ≈ P(w_i | w_{i−1}). A trigram uses two: P(w_i | w_{i−2} w_{i−1})."
+    },
+    {
+     "type": "p",
+     "text": "This cut is the whole trick. With boundaries added, the sentence “the cat sat” is scored as P(the | ⟨s⟩) × P(cat | the) × P(sat | cat) × P(⟨/s⟩ | sat); the middle factors show the Markov cut, and each context is short enough to count. A bigram model is a first-order Markov chain: the next word depends on the present word only."
+    }
+   ]
+  },
+  {
+   "h3": "Maximum likelihood counts and boundary symbols",
+   "blocks": [
+    {
+     "type": "formula",
+     "text": "P(w_i | w_{i−n+1} … w_{i−1}) = c(w_{i−n+1} … w_i) ÷ c(w_{i−n+1} … w_{i−1})",
+     "where": "c(x) is the number of times the token sequence x appears in the corpus; the numerator counts the full n-gram, and the denominator counts its (n−1)-word history. For a bigram: P(w_i | w_{i−1}) = c(w_{i−1} w_i) ÷ c(w_{i−1})."
+    },
+    {
+     "type": "p",
+     "text": "The denominator is c(context), not c(w_i). For P(sat | cat), divide c(cat sat) by c(cat)."
+    },
+    {
+     "type": "p",
+     "text": "Add ⟨s⟩ before the first word and ⟨/s⟩ after the last word. Both are tokens and take part in counts. ⟨s⟩ makes P(first word | ⟨s⟩) defined. ⟨/s⟩ gives the sentence a stopping probability, so P(⟨/s⟩ | last word) is in the product; without it, a model cannot compare sentences of different lengths fairly."
+    },
+    {
+     "type": "p",
+     "text": "For the sample corpus, the bigram count matrix has a row for each context and a column for each next word. The table lists non-zero cells and the row probability P(next | context)."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Context",
+      "c(context)",
+      "Next word: count → P"
+     ],
+     "rows": [
+      [
+       "⟨s⟩",
+       "1",
+       "the: 1 → 1.00"
+      ],
+      [
+       "the",
+       "3",
+       "cat: 2 → 0.67; mat: 1 → 0.33"
+      ],
+      [
+       "cat",
+       "2",
+       "sat: 2 → 1.00"
+      ],
+      [
+       "sat",
+       "2",
+       "on: 1 → 0.50; ⟨/s⟩: 1 → 0.50"
+      ],
+      [
+       "on",
+       "1",
+       "the: 1 → 1.00"
+      ],
+      [
+       "mat",
+       "1",
+       "the: 1 → 1.00"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Most cells in a real count matrix are zero. A finite corpus cannot contain every possible bigram, so an unsmoothed model gives unseen bigrams P=0. One zero makes the whole sentence probability zero. <a href=\"#smoothing-interpolation-and-backoff\">Smoothing</a> moves probability mass to unseen events. Some syllabi call this topic “unsmoothed n-grams”."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The graph turns the sample corpus into bigram counts: each arrow x → y carries c(x y). Notice that the → cat and cat → sat each carry count 2, while cat → on has no arrow, so its count is 0.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "aria": "A directed graph of bigram counts for the sample corpus, with start and end symbols and arrows labelled by counts.",
+   "nodes": [
+    {
+     "id": "s",
+     "label": "⟨s⟩",
+     "x": 0,
+     "y": 1,
+     "note": "start",
+     "style": "muted"
+    },
+    {
+     "id": "the",
+     "label": "the",
+     "x": 1,
+     "y": 1,
+     "style": "accent"
+    },
+    {
+     "id": "cat",
+     "label": "cat",
+     "x": 2,
+     "y": 1
+    },
+    {
+     "id": "sat",
+     "label": "sat",
+     "x": 3,
+     "y": 1
+    },
+    {
+     "id": "e",
+     "label": "⟨/s⟩",
+     "x": 4,
+     "y": 1,
+     "note": "end",
+     "style": "muted"
+    },
+    {
+     "id": "on",
+     "label": "on",
+     "x": 3,
+     "y": 0
+    },
+    {
+     "id": "mat",
+     "label": "mat",
+     "x": 1,
+     "y": 0
+    }
+   ],
+   "edges": [
+    {
+     "from": "s",
+     "to": "the",
+     "label": "1"
+    },
+    {
+     "from": "the",
+     "to": "cat",
+     "label": "2",
+     "style": "accent"
+    },
+    {
+     "from": "cat",
+     "to": "sat",
+     "label": "2",
+     "style": "accent"
+    },
+    {
+     "from": "sat",
+     "to": "e",
+     "label": "1"
+    },
+    {
+     "from": "sat",
+     "to": "on",
+     "label": "1"
+    },
+    {
+     "from": "on",
+     "to": "the",
+     "label": "1"
+    },
+    {
+     "from": "the",
+     "to": "mat",
+     "label": "1"
+    },
+    {
+     "from": "mat",
+     "to": "the",
+     "label": "1"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Corpus: “the cat sat on the mat the cat sat” (9 words). Add ⟨s⟩ at the front and ⟨/s⟩ at the end. Using an unsmoothed bigram model, find P(sat | cat) and P(on | cat). Show the bigram counts.",
+   "steps": [
+    "Tokenise and add boundaries: ⟨s⟩ the cat sat on the mat the cat sat ⟨/s⟩. This is 11 tokens.",
+    "List the 10 bigrams: ⟨s⟩ the, the cat, cat sat, sat on, on the, the mat, mat the, the cat, cat sat, sat ⟨/s⟩.",
+    "Count: ⟨s⟩ the = 1, the cat = 2, cat sat = 2, sat on = 1, on the = 1, the mat = 1, mat the = 1, sat ⟨/s⟩ = 1. Total bigrams = 10.",
+    "The context cat occurs 2 times, so c(cat) = 2.",
+    "P(sat | cat) = c(cat sat) ÷ c(cat) = 2 ÷ 2 = 1.00.",
+    "P(on | cat) = c(cat on) ÷ c(cat) = 0 ÷ 2 = 0.00."
+   ],
+   "answer": "P(sat | cat) = 1.00 and P(on | cat) = 0.00; the zero is exactly what smoothing in 2.2 repairs.",
+   "check": "from collections import Counter\ncorpus = \"the cat sat on the mat the cat sat\".split()\ntokens = [\"<s>\"] + corpus + [\"</s>\"]\nbigrams = Counter(zip(tokens, tokens[1:]))\nunigrams = Counter(tokens)\np_sat_given_cat = bigrams[(\"cat\", \"sat\")] / unigrams[\"cat\"]\np_on_given_cat = bigrams[(\"cat\", \"on\")] / unigrams[\"cat\"]\nprint(p_sat_given_cat)\nprint(p_on_given_cat)",
+   "values": [
+    1.0,
+    0.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Forgetting ⟨s⟩ and ⟨/s⟩ changes the token count, the bigram count and the denominator for the last word.",
+  "Reading a cell as P(context | word) when the table stores P(word | context); a row fixes the context.",
+  "Using c(word) in the denominator instead of c(context). For P(sat | cat), divide by c(cat), not c(sat).",
+  "Treating a zero count as proof that a word string is impossible; it means unseen in this corpus, which smoothing repairs.",
+  "Examiner favourite: ask for P(on | cat) after giving P(sat | cat); the answer is 0, not 1/2."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a bigram and state its order.",
+   "marks": 2,
+   "a": "A bigram is a block of two consecutive tokens, so its order is n=2."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the end symbol ⟨/s⟩ needed in an n-gram language model?",
+   "marks": 3,
+   "a": "It gives the sentence a stopping probability, so P(⟨/s⟩ | last word) is included. Without it, the model cannot fairly compare sentences of different lengths and probability mass can leak to longer strings."
+  },
+  {
+   "level": "apply",
+   "q": "Corpus: “a b a”. Add ⟨s⟩ and ⟨/s⟩. Compute P(b | a).",
+   "marks": 3,
+   "a": "Token sequence: ⟨s⟩ a b a ⟨/s⟩. Bigrams: ⟨s⟩ a, a b, b a, a ⟨/s⟩. c(a b)=1 and c(a)=2, so P(b | a)=1/2=0.50."
+  },
+  {
+   "level": "analyze",
+   "q": "A student reads a bigram table as P(context | word). Give a counterexample from the sample corpus using cat and the.",
+   "marks": 4,
+   "a": "The table gives P(cat | the)=c(the cat)/c(the)=2/3≈0.67. The reverse is P(the | cat)=c(the cat)/c(cat)=2/2=1.00. They are not equal, so the direction matters."
+  },
+  {
+   "level": "apply",
+   "q": "For the sample corpus, compute P(cat | the) and P(mat | the).",
+   "marks": 3,
+   "a": "c(the)=3, c(the cat)=2, c(the mat)=1. P(cat | the)=2/3≈0.67 and P(mat | the)=1/3≈0.33."
+  },
+  {
+   "level": "understand",
+   "q": "What does first-order Markov mean for a bigram model?",
+   "marks": 3,
+   "a": "The next word depends only on the one present word, not on the full earlier history: P(w_i | w₁ … w_{i−1}) is replaced by P(w_i | w_{i−1})."
+  },
+  {
+   "level": "analyze",
+   "q": "If you add ⟨s⟩ but forget ⟨/s⟩, which bigram disappears and how does the total bigram count change?",
+   "marks": 5,
+   "a": "The final bigram sat ⟨/s⟩ disappears. The token count becomes 10 instead of 11, so the bigram count becomes 9 instead of 10. c(sat) drops from 2 to 1, so P(on | sat) is renormalised from 0.50 to 1.00, and the model has no stopping probability at all: nothing ever ends a sentence, so probabilities over strings of all lengths no longer form a proper distribution."
+  }
+ ],
+ "beyond": "Not for the exam. N-gram counts still sit inside predictive keyboards, spelling correctors and search query filters. Modern systems use neural language models (see Unit 6, Neural NLP, Transformers and Applications), but they are trained and evaluated on the same next-word probability idea. Useful search terms: Kneser-Ney smoothing, Stupid Backoff, KenLM, n-gram pruning."
+}

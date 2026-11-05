@@ -1,0 +1,214 @@
+{
+ "lead": "Named entity recognition (NER) finds the runs of words in a text that name a person, a place, an organisation, a date, an amount and similar things, and labels each run with its category. It exists because most later work — search, question answering, news indexing, form filling — needs the actors in a sentence, not only its grammar. A bank's KYC team, a newsroom sorting stories by company, and a chatbot reading 'pay ₹500 to Ravi on Friday' all sit on top of NER. It is usually solved as sequence labelling: one tag per token.",
+ "prereq": "You need: <a href=\"#part-of-speech-tagging-rule-based-stochastic-transformation-base\">2.4</a> for the idea of a tagset, and <a href=\"#conditional-random-fields\">2.7</a> (with <a href=\"#hidden-markov-models-and-the-viterbi-algorithm\">2.5</a>) for the sequence models that do the labelling.",
+ "sections": [
+  {
+   "h3": "The entity types",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A named entity is a contiguous run of tokens that names one specific thing. NER does two jobs at once: it finds where each run starts and ends, and it puts the run into a category. Both jobs are hard. 'Apple' is a fruit in one sentence and a company in the next."
+    },
+    {
+     "type": "p",
+     "text": "Four types cover most news and office text. PERSON (PER) names a person, for example 'Sundar Pichai'. LOCATION (LOC) names a place, natural or political, for example 'Godavari' or 'Pune'. ORGANISATION (ORG) names a company, team, agency or institution, for example 'IRCTC' or 'State Bank of India'. MISCELLANEOUS (MISC) is the leftover bin for named things that are none of these — events, laws, awards, nationalities, such as 'Kumbh Mela' or 'Bharat Ratna'."
+    },
+    {
+     "type": "p",
+     "text": "A second family holds numeric and temporal expressions, where the value matters more than the name: DATE ('12 March 2024'), TIME ('4:30 pm'), MONEY ('₹2,500'), PERCENT ('18%'). A form-filling system wants these with a normalised value, so the tagger often writes 12/03/2024 next to the span."
+    },
+    {
+     "type": "p",
+     "text": "The tagset is a design choice, not a law. Standard shared-task tagsets use PER, LOC, ORG and MISC; a bank may add ACCOUNT and IFSC_CODE. Changing the tagset changes the scores, so always report which one you used."
+    }
+   ]
+  },
+  {
+   "h3": "BIO encoding",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A sequence labeller gives one tag per token, so the tag itself must carry both the type and the boundary. BIO does this with a prefix. B-X means 'this token begins an entity of type X'. I-X means 'this token continues an entity of type X'. O means 'outside every entity'."
+    },
+    {
+     "type": "p",
+     "text": "The B prefix is not decoration. Two entities of the same type can sit side by side: 'Rao, Iyer and Bose' are three people. With only I-PER the three names merge into one span. B-PER restarts the span, so the boundary survives."
+    },
+    {
+     "type": "p",
+     "text": "Some taggers use BIOES, also written BILOU. E-X ends an entity and S-X is a single-token entity. The end markers state the right boundary outright, so the model need not infer it from the next token being O. Sequences must obey the scheme: I-X may not follow O or B-Y when Y is not X. A CRF can be given a very large penalty for those transitions, so its decoder can never emit an illegal sequence."
+    },
+    {
+     "type": "p",
+     "text": "The boundary problem appears whenever entities touch or one is a piece of another, as in 'Wipro Limited Chennai'. Exact-span scoring then punishes a run that is split differently from the gold data."
+    }
+   ]
+  },
+  {
+   "h3": "Three ways to build a tagger",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Gazetteer and rules. Keep lists of known persons, cities and companies. Add patterns: a capitalised word after 'Mr' is PER; a listed city after 'in' is LOC; a capitalised word ending in 'Ltd' or 'Pvt' is ORG. This is fast and precise on known names, and it never generalises to a name that was added yesterday."
+    },
+    {
+     "type": "p",
+     "text": "Features plus a classifier. Turn each token into a feature vector and predict its tag. Useful features: the word itself; its lowercase form; word shape (Xxx for 'Pune', XX for 'TCS', dd for a number); capitalisation flags; a prefix and suffix of three or four letters (-pur, -abad, -son, Ltd); the previous and next word; membership of a gazetteer; and the previous tag. The previous tag is what makes this sequence labelling — the classifier sees the decisions already made."
+    },
+    {
+     "type": "p",
+     "text": "The CRF of <a href=\"#conditional-random-fields\">2.7</a> is the standard non-neural model here: it accepts overlapping features and scores the whole tag sequence, so neighbour tags enter each decision properly. A maximum entropy Markov model (<a href=\"#maximum-entropy-markov-models\">2.6</a>) also works and is cheaper to train. A plain HMM (<a href=\"#hidden-markov-models-and-the-viterbi-algorithm\">2.5</a>) sees only the current word through its emission table, so it cannot use the suffix of the next word or the previous two tags."
+    }
+   ]
+  },
+  {
+   "h3": "Scoring at entity level",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Token accuracy is the wrong metric. A tagger that prints O everywhere scores about 90% on newswire, because most tokens lie outside entities, and it finds nothing at all."
+    },
+    {
+     "type": "p",
+     "text": "Score whole entities with exact-span matching: a predicted entity is correct only if its start, end and type all match a gold entity. Let C be the number of such matches, N the number of predicted entities and G the number of gold entities."
+    },
+    {
+     "type": "formula",
+     "text": "P = C ÷ N,  R = C ÷ G,  F1 = 2PR ÷ (P + R)",
+     "where": "P is precision, R is recall, C is the count of exactly matching entities, N is the number of entities the system predicted, G is the number of entities in the gold annotation; F1 is their harmonic mean, all three between 0 and 1."
+    },
+    {
+     "type": "p",
+     "text": "One wrong boundary word costs twice: the gold entity is missed, which lowers recall, and a wrong span is invented, which lowers precision."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Text is POS-tagged, names are matched against gazetteers and rules, the output is a BIO label sequence, and decoding joins the B and I tags into complete entities. The label stage is where the boundary information lives.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "NER pipeline",
+   "aria": "A left-to-right pipeline from text to POS tags to gazetteer and rule matching to BIO labels to final entities.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Text"
+    },
+    {
+     "id": "b",
+     "label": "POS tags"
+    },
+    {
+     "id": "c",
+     "label": "Gazetteer + rules",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "BIO labels",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "Entities"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b"
+    },
+    {
+     "from": "b",
+     "to": "c"
+    },
+    {
+     "from": "c",
+     "to": "d"
+    },
+    {
+     "from": "d",
+     "to": "e"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Tag the sentence 'Mr Rao of TCS met the team in Pune' with BIO labels over the types PER, ORG and LOC. A system then predicts the entities Rao (PER), TCS (ORG) and the span 'team in Pune' (LOC). The gold entities are Rao (PER), TCS (ORG) and Pune (LOC); 'the team' is not an entity. Compute precision, recall and F1 under exact-span matching.",
+   "steps": [
+    "Tokenise: Mr, Rao, of, TCS, met, the, team, in, Pune — 9 tokens.",
+    "Tag each token. The title 'Mr' is outside the span, so it is O. 'Rao' begins a person. 'TCS' begins an organisation. 'Pune' is a one-token location, which gets B-LOC (BIOES would write S-LOC). Full line: Mr/O Rao/B-PER of/O TCS/B-ORG met/O the/O team/O in/O Pune/B-LOC.",
+    "Read off the gold spans: gold G = {(Rao, PER), (TCS, ORG), (Pune, LOC)}, so G = 3 entities.",
+    "Read off the system spans: predicted N = {(Rao, PER), (TCS, ORG), (team in Pune, LOC)}, so N = 3 entities.",
+    "Match exactly: (Rao, PER) and (TCS, ORG) match, giving C = 2. 'team in Pune' misses the gold boundary and type target, so it is a false positive, and Pune is a false negative.",
+    "Precision P = C ÷ N = 2 ÷ 3 = 0.667 ≈ 0.67.",
+    "Recall R = C ÷ G = 2 ÷ 3 = 0.667 ≈ 0.67.",
+    "F1 = 2PR ÷ (P + R) = 2 × 0.667 × 0.667 ÷ (0.667 + 0.667) = 0.889 ÷ 1.333 = 0.667 ≈ 0.67."
+   ],
+   "answer": "Precision = 0.67, recall = 0.67 and F1 = 0.67; the wrong boundary on 'team in Pune' produces one false positive and one false negative at the same time.",
+   "check": "gold = [('Rao','PER'), ('TCS','ORG'), ('Pune','LOC')]\npred = [('Rao','PER'), ('TCS','ORG'), ('team in Pune','LOC')]\nC = len(set(gold) & set(pred))\nN = len(pred)\nG = len(gold)\nP = C / N\nR = C / G\nF1 = 2 * P * R / (P + R)\nprint(f\"{P:.2f}\")\nprint(f\"{R:.2f}\")\nprint(f\"{F1:.2f}\")",
+   "values": [
+    0.67,
+    0.67,
+    0.67
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Grading token by token: an all-O tagger gets about 90% token accuracy and F1 = 0. Reporting accuracy alone for NER is the classic mistake.",
+  "One boundary word wrong destroys a whole entity under exact-span matching, and it counts twice — one false positive and one false negative.",
+  "Writing I-PER on the first token of an entity is an illegal sequence; gold data never has I-X straight after O.",
+  "Partial overlap is not a match: 'Bank of India' against gold 'Reserve Bank of India' scores zero for that entity, not half.",
+  "Capitalisation features fail outside English and outside edited text — Hindi or Tamil has no case, and chat text is lowercase throughout."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define named entity recognition in one sentence.",
+   "marks": 2,
+   "a": "It finds spans of text that name entities and assigns each span a type such as person, location or organisation."
+  },
+  {
+   "level": "remember",
+   "q": "What do B, I and O stand for in BIO tagging?",
+   "marks": 2,
+   "a": "B is begin, I is inside (continue), O is outside every entity."
+  },
+  {
+   "level": "understand",
+   "q": "Why is B needed when I already carries the entity type?",
+   "marks": 3,
+   "a": "Two entities of the same type can touch, as in 'Rao, Iyer and Bose'. With only I-PER the three names merge into one span; B-PER restarts it."
+  },
+  {
+   "level": "apply",
+   "q": "Tag 'Ms Iyer flew from Delhi to Wipro office in Bengaluru' with BIO labels over PER, LOC and ORG.",
+   "marks": 4,
+   "a": "Ms/B-PER Iyer/I-PER flew/O from/O Delhi/B-LOC to/O Wipro/B-ORG office/O in/O Bengaluru/B-LOC. The title 'Ms' begins the person span here because it is inside the gold span."
+  },
+  {
+   "level": "apply",
+   "q": "Gold holds 5 entities. A system predicts 6 entities, of which 4 match gold exactly. Give P, R and F1.",
+   "marks": 4,
+   "a": "P = 4 ÷ 6 = 0.67. R = 4 ÷ 5 = 0.80. F1 = 2 × 0.67 × 0.80 ÷ 1.47 = 1.072 ÷ 1.47 = 0.73."
+  },
+  {
+   "level": "analyze",
+   "q": "A system tags every token O and reports 91% token accuracy. What is its entity F1, and what does the number show?",
+   "marks": 5,
+   "a": "It predicts no entities, so correct matches C = 0, precision is 0 (no predictions), recall is 0, F1 = 0. The 91% only says most tokens are outside entities; the metric measures tags, not entities, so it cannot see the failure."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the previous tag help a feature-based NER classifier more than the next word alone?",
+   "marks": 4,
+   "a": "The previous tag records whether an entity is already open, so the model can keep a name going or close it. The next word gives one-sided evidence only; it cannot say whether a span has started."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, NER is now mostly a token-classification head on a pretrained transformer: fine-tune a BERT-style encoder on a few thousand annotated sentences and it beats feature-based CRFs on most domains. Indic-language NER remains an open problem, because there is no capitalisation cue, names transliterate several ways, and annotated data is thin outside news. Data-hungry teams generate weak labels from gazetteers and then clean them, or transfer a multilingual model. Downstream, the extracted entities feed relation extraction and entity linking, which attaches each mention to a knowledge-base identifier. Search terms: CoNLL-2003, BIO tagging, token classification, multilingual NER, distant supervision."
+}

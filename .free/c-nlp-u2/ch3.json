@@ -1,0 +1,278 @@
+{
+ "lead": "A language model returns a probability for a whole sentence. That number is tiny and it shrinks as the sentence grows, so it cannot be compared across test sets. Perplexity removes both problems: it turns the sentence probability into an average surprise per predicted word, so it has no units and lower is better. Speech recognisers, machine translation systems and spelling correctors all choose between candidate language models by comparing perplexity on text the models have never seen.",
+ "prereq": "You need: <a href=\"#n-gram-language-models\">2.1</a> for the chain rule that turns a sentence probability into a product of conditional probabilities, and <a href=\"#smoothing-interpolation-and-backoff\">2.2</a> for smoothing, because a single unseen n-gram gives probability zero and makes perplexity infinite.",
+ "sections": [
+  {
+   "h3": "Definition and the branching-factor reading",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take a test text W made of m predicted tokens. The first token is predicted after the sentence-start marker ⟨s⟩, and the last token is the sentence-end marker ⟨/s⟩. So m equals the number of ordinary words plus one. The model gives the whole sequence a probability, and perplexity is that probability raised to the power −1/m."
+    },
+    {
+     "type": "formula",
+     "text": "PP(W) = P(W)^(−1/m)",
+     "where": "PP(W) is the perplexity of the test text W, a positive number with no units; P(W) is the probability the model gives the whole token sequence; m is the number of predicted tokens, which counts ⟨/s⟩ and does not count ⟨s⟩."
+    },
+    {
+     "type": "formula",
+     "text": "PP(W) = exp( −(1/m) Σ ln P(wᵢ | w₁…wᵢ₋₁) )",
+     "where": "exp is the exponential function eˣ; ln is the natural logarithm; the sum runs over i = 1 to m; P(wᵢ | w₁…wᵢ₋₁) is the model's probability for the i-th predicted token given every token before it."
+    },
+    {
+     "type": "p",
+     "text": "The second form is the working one. Multiplying many small probabilities underflows to zero on a computer, so implementations add logs, negate and divide. The quantity H = −(1/m) Σ log₂ P(wᵢ | history) is the cross-entropy in bits per token, and PP = 2^H. Perplexity and cross-entropy always move together: the model with lower cross-entropy also has lower perplexity."
+    },
+    {
+     "type": "p",
+     "text": "The branching-factor reading makes the number meaningful. Suppose a model is completely unsure among k equally likely continuations at every step. Each conditional probability is then 1/k, the product is k^(−m), and PP = k. A model with perplexity 20 behaves, on average, like a reader choosing uniformly among 20 possible next words. Lower is better."
+    }
+   ]
+  },
+  {
+   "h3": "Splits, unseen words and fair comparisons",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "Training text: estimate the n-gram counts here.",
+      "Dev text, also called validation: choose the order n, the smoothing method and its constants here.",
+      "Test text: score once, at the very end, and report here. Never tune on it.",
+      "Test text must be unseen. A model that has memorised the sentences will look far better than it is.",
+      "Replace every test word missing from the training vocabulary by one token ⟨unk⟩. Add ⟨unk⟩ to the vocabulary and give it a real count, usually by mapping rare training words to it too.",
+      "Compare perplexities only when both models use the same vocabulary and the same tokenisation."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The last rule is easy to forget. A model with a 50,000-word vocabulary faces a different set of choices at every step from one with a 5,000-word vocabulary, so the two perplexities are not on the same scale and cannot be ranked. Moving from whole words to subword units changes m as well, because one word becomes several tokens. Write the vocabulary size and the token definition next to every perplexity figure you report."
+    },
+    {
+     "type": "p",
+     "text": "The ranking survives any increasing monotone transform. Since PP = 2^H, comparing perplexities is exactly comparing average log-loss. One bit per token less halves the perplexity, so a gap of 2 or 3 points means little while a factor of two means a lot."
+    }
+   ]
+  },
+  {
+   "h3": "Comparing orders on one test set",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Fix the test set, the vocabulary and the smoother, and change only the order n. The figure shows the usual picture. The unigram model ignores context and is worst on test at 130. The bigram improves to 70. The trigram is best at 55. Orders 4 and 5 get worse, 60 and then 75, because most 4-grams and 5-grams in the test text never appeared in training, so the smoothed estimates are noisy."
+    },
+    {
+     "type": "p",
+     "text": "Training perplexity tells a different story: 120, 60, 40, 30, 25, falling at every step. Higher orders memorise the training text. The widening gap between a falling training curve and a rising test curve is overfitting, and it is why n is picked on dev data. Choose the n with the lowest dev perplexity and report that model's test perplexity once."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "Test perplexity is lowest at the trigram, 55, and rises again at orders 4 and 5, while training perplexity keeps falling to 25; the widening gap is overfitting.",
+  "spec": {
+   "type": "plot",
+   "aria": "Line plot of training and test perplexity against n-gram order from 1 to 5; test perplexity falls from 130 to a minimum of 55 at n = 3 and then rises to 75 at n = 5, while training perplexity falls steadily from 120 to 25.",
+   "x": {
+    "label": "n-gram order n",
+    "min": 1,
+    "max": 5
+   },
+   "y": {
+    "label": "perplexity",
+    "min": 0,
+    "max": 140
+   },
+   "series": [
+    {
+     "name": "train",
+     "points": [
+      [
+       1,
+       120
+      ],
+      [
+       2,
+       60
+      ],
+      [
+       3,
+       40
+      ],
+      [
+       4,
+       30
+      ],
+      [
+       5,
+       25
+      ]
+     ],
+     "style": "accent",
+     "_pts": [
+      [
+       1.0,
+       120.0
+      ],
+      [
+       2.0,
+       60.0
+      ],
+      [
+       3.0,
+       40.0
+      ],
+      [
+       4.0,
+       30.0
+      ],
+      [
+       5.0,
+       25.0
+      ]
+     ]
+    },
+    {
+     "name": "test",
+     "points": [
+      [
+       1,
+       130
+      ],
+      [
+       2,
+       70
+      ],
+      [
+       3,
+       55
+      ],
+      [
+       4,
+       60
+      ],
+      [
+       5,
+       75
+      ]
+     ],
+     "style": "live",
+     "_pts": [
+      [
+       1.0,
+       130.0
+      ],
+      [
+       2.0,
+       70.0
+      ],
+      [
+       3.0,
+       55.0
+      ],
+      [
+       4.0,
+       60.0
+      ],
+      [
+       5.0,
+       75.0
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A smoothed bigram model gives P(the | ⟨s⟩) = 0.5, P(cat | the) = 0.4 and P(⟨/s⟩ | cat) = 0.5. Find the perplexity of the test sentence \"the cat\". The vocabulary is {the, cat, dog, ⟨/s⟩}. Compare with a uniform model over the same vocabulary.",
+   "steps": [
+    "Write the sentence with its markers: ⟨s⟩ the cat ⟨/s⟩. The model predicts three tokens: the, cat and ⟨/s⟩. So m = 3. The marker ⟨s⟩ is conditioning context, not a prediction.",
+    "Multiply the conditional probabilities: 0.5 × 0.4 × 0.5 = 0.1.",
+    "Apply the definition: PP = 0.1^(−1/3). Take logs: ln PP = −(1/3) ln 0.1 = −(1/3)(−2.302585) = +0.767528. Exponentiate: PP = e^0.767528 = 2.1544.",
+    "Uniform baseline over 4 words: each token has probability 1/4 = 0.25. Product = 0.25³ = 0.015625. PP = 0.015625^(−1/3) = 4.00.",
+    "Compare: 2.15 is smaller than 4.00, so the bigram model is less surprised by this sentence than the uniform model."
+   ],
+   "answer": "The bigram model's perplexity is 2.15 and the uniform model's is 4.00, so the bigram is better.",
+   "check": "import math\np = [0.5, 0.4, 0.5]\nm = 3\nprod = 1.0\nfor x in p:\n    prod *= x\npp = prod ** (-1.0 / m)\npu = 0.25 ** m\nppu = pu ** (-1.0 / m)\nprint(round(prod, 2))\nprint(round(pp, 2))\nprint(round(ppu, 2))\n",
+   "values": [
+    0.1,
+    2.15,
+    4.0
+   ],
+   "output": "0.1\n2.15\n4.0"
+  },
+  {
+   "question": "A smoothed trigram gives P(the | ⟨s⟩ ⟨s⟩) = 0.1, P(dog | ⟨s⟩ the) = 0.2 and P(⟨/s⟩ | the dog) = 0.5 for the test sentence \"the dog\". Find its perplexity.",
+   "steps": [
+    "Write the sentence with two start markers: ⟨s⟩ ⟨s⟩ the dog ⟨/s⟩. The model predicts three tokens: the, dog and ⟨/s⟩, so m = 3. Each prediction is conditioned on the two tokens before it.",
+    "Product = 0.1 × 0.2 × 0.5 = 0.01.",
+    "PP = 0.01^(−1/3) = 1 / 0.215443 = 4.6416."
+   ],
+   "answer": "The perplexity is 4.64.",
+   "check": "prod = 0.1 * 0.2 * 0.5\nprint(round(prod ** (-1.0 / 3), 2))\n",
+   "values": [
+    4.64
+   ],
+   "output": "4.64"
+  }
+ ],
+ "traps": [
+  "Off-by-one in m. m counts predicted tokens: every ordinary word plus ⟨/s⟩. The ⟨s⟩ marker is context, not a prediction. Counting ⟨s⟩ or dropping ⟨/s⟩ shifts the root and gives a wrong answer.",
+  "Comparing perplexities of models with different vocabularies or tokenisations. A larger vocabulary gives the model more choices at each step, and a subword model predicts more, shorter tokens, so the numbers are on different scales.",
+  "Thinking a larger perplexity is better. Lower perplexity means the model gives the test text higher probability.",
+  "Tuning the order n, the smoothing constant or the vocabulary on the test set. All of that belongs on dev data; test is scored once.",
+  "Quoting a finite perplexity from an unsmoothed model. One zero probability makes the product zero and the perplexity infinite."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the formula for the perplexity of a test text and say exactly what m counts.",
+   "marks": 2,
+   "a": "PP(W) = P(W)^(−1/m), where m is the number of predicted tokens, counting ⟨/s⟩ and not counting ⟨s⟩."
+  },
+  {
+   "level": "understand",
+   "q": "What is the relation between perplexity and cross-entropy in bits per token?",
+   "marks": 2,
+   "a": "PP = 2^H, where H is the cross-entropy in bits per token. Lower cross-entropy means lower perplexity, and one bit less halves the perplexity."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a model that gives probability 1/4 to every word of a 4-word vocabulary have perplexity exactly 4?",
+   "marks": 3,
+   "a": "Each conditional probability is 1/4, so the product over m tokens is 4^(−m). Then PP = (4^(−m))^(−1/m) = 4, for any m. It is a fair four-sided choice at every step."
+  },
+  {
+   "level": "apply",
+   "q": "A model assigns P(the | ⟨s⟩) = 0.1, P(dog | the) = 0.2 and P(⟨/s⟩ | dog) = 0.5 to the sentence \"the dog\". Compute its perplexity.",
+   "marks": 4,
+   "a": "m = 3 predicted tokens. Product = 0.1 × 0.2 × 0.5 = 0.01. PP = 0.01^(−1/3) = 4.64."
+  },
+  {
+   "level": "apply",
+   "q": "Model A has test perplexity 80 and model B has 60, on the same vocabulary and tokenisation. Which is better, and by how many bits per token?",
+   "marks": 5,
+   "a": "B is better. Difference = log₂ 80 − log₂ 60 = 6.3219 − 5.9069 = 0.415 bits per token, because H = log₂ PP."
+  },
+  {
+   "level": "analyze",
+   "q": "Test perplexity falls from n = 1 to n = 3 and then rises. Explain both movements.",
+   "marks": 4,
+   "a": "The fall comes from real context: more conditioning words predict the next word better, so test probabilities rise. The rise comes from sparsity: most 4-grams and 5-grams in the test text were never seen, so their probabilities come from smoothing or backoff and are noisy and lower."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is it meaningless to compare the perplexity of a word-level bigram with that of a character-level model?",
+   "marks": 5,
+   "a": "They predict different units. m counts words in one and characters in the other, and the choice sets differ, so each perplexity is an average over that model's own prediction units. The two numbers sit on different scales and no ordering between them is meaningful."
+  },
+  {
+   "level": "understand",
+   "q": "Where do you choose the order n and the smoothing constant, and where do you report the final perplexity?",
+   "marks": 2,
+   "a": "Choose them on dev (validation) data, then report the final perplexity once on the unseen test set."
+  }
+ ],
+ "beyond": "Not for the exam. In industry perplexity is the first screening number for a language model: a new smoothing scheme or a neural model is checked on dev perplexity before any expensive downstream test. Modern neural models are usually scored in bits per character or bits per byte, because subword tokenisers make per-word numbers incomparable. Large language models also report perplexity on held-out text, but a lower perplexity does not guarantee better translation, recognition or answers, so those are measured separately. Search for \"bits per character\", \"subword tokenization\" and \"language model evaluation downstream\" to go further."
+}
