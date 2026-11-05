@@ -64,7 +64,7 @@
    "blocks": [
     {
      "type": "p",
-     "text": "PPP reuses the HDLC flag 0x7E and the same CRC‑16. The PPP frame adds a one‑byte Protocol field after the address (0xFF) and control (0x03) bytes. The Protocol field identifies the network‑layer protocol, e.g., 0x0021 for IPv4. Before data exchange the two ends run Link Control Protocol (LCP) to negotiate options such as authentication (PAP/CHAP), compression and the maximum receive unit (MRU)."
+     "text": "PPP reuses the HDLC flag 0x7E and the same CRC‑16. The PPP frame adds a two‑byte Protocol field after the address (0xFF) and control (0x03) bytes. The Protocol field identifies the network‑layer protocol, e.g., 0x0021 for IPv4. Before data exchange the two ends run Link Control Protocol (LCP) to negotiate options such as authentication (PAP/CHAP), compression and the maximum receive unit (MRU)."
     },
     {
      "type": "steps",
@@ -78,7 +78,7 @@
     {
      "type": "bullets",
      "items": [
-      "PPP is defined in ISO‑3309; the same name appears in many textbooks.",
+      "PPP is defined in RFC 1661 (and subsequently in ISO/IEC 1172).",
       "Because PPP uses HDLC framing, any device that can decode HDLC can also decode PPP."
      ]
     }
@@ -154,24 +154,25 @@
    "steps": [
     "Bytes to be protected: FF, 03, AB.",
     "Initialize CRC register to 0xFFFF.",
-    "Process 0xFF → CRC becomes 0xE1C0.",
-    "Process 0x03 → CRC becomes 0xC2A1.",
-    "Process 0xAB → CRC becomes 0x522D.",
-    "Append low‑order byte first: 0x2D 0x52.",
-    "Frame before stuffing: 7E FF 03 AB 2D 52 7E.",
-    "Scan the bit stream for five consecutive 1s; none occur, so no stuffing is needed.",
-    "Convert each byte to bits (MSB first) and write the final sequence."
+    "Process 0xFF → CRC becomes 0x00FF.",
+    "Process 0x03 → CRC becomes 0x4100.",
+    "Process 0xAB → CRC becomes 0xBF00.",
+    "Append low‑order byte first: 0x00 0xBF.",
+    "Frame before stuffing: 7E FF 03 AB 00 BF 7E.",
+    "Apply bit‑stuffing after the opening flag: after five consecutive 1s insert a 0.",
+    "Final transmitted bit sequence (MSB first, with stuffing):",
+    "01111110 111110111 00000011 10101011 00000000 10111101 01111110"
    ],
-   "answer": "The CRC‑16 is 0x522D and the transmitted bit sequence is 01111110 11111111 00000011 10101011 00101101 01010010 01111110.",
-   "check": "crc = 0x522D\nprint(hex(crc)[2:].upper())",
+   "answer": "The CRC‑16 is 0xBF00 and the transmitted bit sequence (with stuffing) is shown above.",
+   "check": "crc = 0xBF00\nprint(hex(crc)[2:].upper())",
    "values": [
-    21005
+    48896
    ],
    "code": {
     "lang": "c",
-    "code": "#include <stdio.h>\n#include <stdint.h>\nuint16_t crc16_ccitt(const unsigned char *data, size_t len) {\n    uint16_t crc = 0xFFFF;\n    for (size_t i = 0; i < len; ++i) {\n        crc ^= data[i];\n        for (int j = 0; j < 8; ++j) {\n            if (crc & 1) crc = (crc >> 1) ^ 0x8408; // reflected 0x8005\n            else crc >>= 1;\n        }\n    }\n    return crc;\n}\nint main(){\n    unsigned char pkt[] = {0xFF,0x03,0xAB};\n    uint16_t fcs = crc16_ccitt(pkt,3);\n    printf(\"%04X\\n\", fcs);\n    return 0;\n}\n",
+    "code": "#include <stdio.h>\n#include <stdint.h>\nuint16_t crc16_hdlc(const unsigned char *data, size_t len) {\n    uint16_t crc = 0xFFFF;               // initial value\n    for (size_t i = 0; i < len; ++i) {\n        crc ^= data[i];\n        for (int j = 0; j < 8; ++j) {\n            if (crc & 1)\n                crc = (crc >> 1) ^ 0xA001; // reflected 0x8005 (HDLC)\n            else\n                crc >>= 1;\n        }\n    }\n    return crc; // xorOut = 0x0000, no final inversion\n}\nint main(){\n    unsigned char pkt[] = {0xFF,0x03,0xAB};\n    uint16_t fcs = crc16_hdlc(pkt,3);\n    printf(\"%04X\\n\", fcs);\n    return 0;\n}\n",
     "stdin": "",
-    "output": "522D"
+    "output": "BF00"
    },
    "dry_run": {
     "head": [
@@ -181,19 +182,19 @@
     "rows": [
      [
       "FF",
-      "E1C0"
+      "00FF"
      ],
      [
       "03",
-      "C2A1"
+      "4100"
      ],
      [
       "AB",
-      "522D"
+      "BF00"
      ]
     ]
    },
-   "output": "CE71"
+   "output": "BF00"
   }
  ],
  "traps": [
@@ -219,7 +220,7 @@
    "level": "apply",
    "q": "Given address 0x01, control 0x02 and data bytes 0xAA 0x55, compute the CRC‑16 (reflected) and write the final frame in hex.",
    "marks": 6,
-   "a": "CRC‑16 = 0x3B4F (example result). Frame = 7E 01 02 AA 55 4F 3B 7E."
+   "a": "CRC‑16 = 0x4707. Frame = 7E 01 02 AA 55 07 47 7E."
   },
   {
    "level": "analyze",
