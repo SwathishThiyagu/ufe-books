@@ -1,0 +1,260 @@
+{
+ "lead": "Configuration management keeps every server in a known state that is written as code. An Ansible playbook is a YAML file that declares packages, file contents and services for a group of hosts. It connects over SSH without an agent, compares the current state with the declared state, and changes only what differs. A delivery pipeline uses it to prepare test environments and to configure servers after release. The same file can run many times because it is idempotent: a second run with no drift reports no changes.",
+ "prereq": "You need: deployment stage and environments from <a href=\"#continuous-integration-and-continuous-delivery\">5.6</a>, and artifacts that get deployed from <a href=\"#build-and-test-automation-pipelines\">5.7</a>.",
+ "sections": [
+  {
+   "h3": "State written down, not a script",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An imperative script lists commands: create user, copy file, restart service. Run it twice and some commands repeat: an appended line appears twice, a service restarts again. A declarative playbook lists the end state: package <code>nginx</code> present, file content equals template output, service running and enabled at boot. The module for each task checks the host and acts only when the host differs."
+    },
+    {
+     "type": "formula",
+     "text": "f(f(s)) = f(s)",
+     "where": "f is one full playbook run and s is the state of a managed host; applying the run twice gives the same host state as applying it once."
+    },
+    {
+     "type": "p",
+     "text": "The property that makes this safe is idempotency. Apply the playbook once or ten times and the machine ends in one state. A template that writes the whole file is idempotent; a shell command that appends a line is not."
+    },
+    {
+     "type": "p",
+     "text": "Configuration drift is the gap between declared and actual state. A manual edit, a partial upgrade or a crashed process creates drift. A playbook run reports which tasks changed and which were already correct. Check mode performs the same checks and predicts changes without writing them, so a release manager can inspect a server before a real run."
+    }
+   ]
+  },
+  {
+   "h3": "Inventory, tasks and handlers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Ansible runs from a control node. The inventory file lists managed hosts and groups them by role, for example a group <code>web</code> with 12 addresses. YAML is a plain-text format that uses indentation for structure. A module is a built-in unit of work: <code>apt</code> or <code>dnf</code> installs a package, <code>template</code> renders a file, <code>service</code> controls a daemon. A task pairs a module with arguments and a name. A play maps a group of hosts to an ordered list of tasks. A playbook is one YAML file holding one or more plays."
+    },
+    {
+     "type": "p",
+     "text": "Variables hold values that differ by host or environment. Gathered facts are variables Ansible reads from the host, such as <code>ansible_processor_vcpus</code>, the number of virtual CPUs. A Jinja2 template mixes fixed text with expressions like <code>{{ 2 * ansible_processor_vcpus }}</code>. A handler is a task that runs only when another task notifies it. The usual pattern writes a config file and notifies a reload handler, so a service reloads only when the file changes."
+    },
+    {
+     "type": "p",
+     "text": "Roles group tasks, templates, variables and handlers into a reusable directory. Tags allow a partial run, for example only <code>config</code> tasks. Vault encrypts secret values so passwords are not plain text in the repository. Check mode is the dry run."
+    }
+   ]
+  },
+  {
+   "h3": "In the pipeline",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A pipeline job checks out the playbook and reads the inventory for the target environment. It first runs a syntax check, then check mode, then the real run. For a test environment it provisions hosts, installs the runtime, writes configuration and starts the service. For a release it deploys the artifact from the pipeline, writes environment configuration and enables the service."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Read the inventory for the target environment and run a syntax check.",
+      "Run in check mode and review predicted changes.",
+      "Apply the playbook for real; failed hosts stay in the recap.",
+      "Deploy the versioned artifact from the pipeline before the release configuration run.",
+      "Rerun after a fix; matching hosts report no changes."
+     ]
+    },
+    {
+     "type": "table",
+     "head": [
+      "Task",
+      "Declared end state",
+      "Second run"
+     ],
+     "rows": [
+      [
+       "Install nginx",
+       "package present",
+       "ok, 0 changes"
+      ],
+      [
+       "Template nginx.conf",
+       "file equals template",
+       "ok, 0 changes"
+      ],
+      [
+       "Service",
+       "running and enabled",
+       "ok, 0 changes"
+      ],
+      [
+       "Reload handler",
+       "notified only on template change",
+       "not run"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The playbook runs against inventory group web: 12 hosts get nginx installed, nginx.conf templated, and the service started. The reload handler fires only when the template output changes, and a second run reports 0 changes.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Playbook run",
+   "aria": "A playbook running against twelve hosts: install, template, start service, a reload handler on change, and a second run that reports no changes.",
+   "nodes": [
+    {
+     "id": "pb",
+     "label": "Playbook web.yml",
+     "note": "one file",
+     "style": "accent"
+    },
+    {
+     "id": "inv",
+     "label": "Inventory group web",
+     "note": "12 hosts",
+     "style": "normal"
+    },
+    {
+     "id": "inst",
+     "label": "Install nginx",
+     "style": "normal"
+    },
+    {
+     "id": "tpl",
+     "label": "Template nginx.conf",
+     "note": "2 × vCPU workers",
+     "style": "normal"
+    },
+    {
+     "id": "svc",
+     "label": "Service started",
+     "note": "enabled at boot",
+     "style": "normal"
+    },
+    {
+     "id": "h",
+     "label": "Handler: reload",
+     "note": "only on change",
+     "style": "live"
+    },
+    {
+     "id": "recap",
+     "label": "Rerun: changed = 0",
+     "note": "idempotent",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "pb",
+     "to": "inv",
+     "style": "solid"
+    },
+    {
+     "from": "inv",
+     "to": "inst",
+     "style": "solid"
+    },
+    {
+     "from": "inst",
+     "to": "tpl",
+     "style": "solid"
+    },
+    {
+     "from": "tpl",
+     "to": "svc",
+     "style": "solid"
+    },
+    {
+     "from": "tpl",
+     "to": "h",
+     "label": "on change",
+     "style": "dashed"
+    },
+    {
+     "from": "svc",
+     "to": "recap",
+     "style": "solid"
+    },
+    {
+     "from": "h",
+     "to": "recap",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A team must configure 12 web servers with one playbook. On a fresh host the play makes 3 changes: install nginx, write nginx.conf from a template, and start and enable the service. A handler reloads nginx only when the template output changes. (a) Find the total changes on the first full run. (b) Find the changes on a second run when no file changed. (c) Host 9 is unreachable on the first run: state the recap counts. (d) After the network is fixed, how many hosts does the rerun change, and how many changes are made on host 9?",
+   "steps": [
+    "A fresh host needs 3 changes. For 12 hosts: 12 × 3 = 36 changes.",
+    "Second run with unchanged files: every task finds the declared state, so each host makes 0 changes. Total is 12 × 0 = 0. The handler is not notified.",
+    "Host 9 cannot be reached. Reachable hosts are 12 − 1 = 11. The recap shows 11 ok and 1 failed.",
+    "After the fix, hosts 1–8 and 10–12 already match the declared state, so they make 0 changes. Only host 9 has the 3 missing changes. Changed hosts in the rerun = 1; changes on host 9 = 3."
+   ],
+   "answer": "First run: 36 changes; second run: 0 changes; with host 9 down: 11 ok and 1 failed; after the fix the rerun changes only host 9, with 3 changes on that host.",
+   "check": "hosts = 12\nchanges_per_host = 3\ntotal_changes = hosts * changes_per_host\nsecond_run_changes = 0\nok_hosts = hosts - 1\nfailed_hosts = 1\nrerun_changes_host9 = 3\nprint(hosts)\nprint(changes_per_host)\nprint(total_changes)\nprint(second_run_changes)\nprint(ok_hosts)\nprint(failed_hosts)\nprint(rerun_changes_host9)",
+   "values": [
+    12,
+    3,
+    36,
+    0,
+    11,
+    1,
+    3
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A YAML file full of <code>shell</code> tasks that append lines or restart services every run is not idempotent; the second run must report 0 changes.",
+  "Plain-text passwords in group variables are a leak; use vault, not a private Git branch.",
+  "Do not confuse <code>state: present</code> with <code>state: latest</code>; the first means installed, the second may upgrade and change the version.",
+  "A handler runs only when notified by a changed task; a task that reports ok does not reload the service.",
+  "Check mode predicts changes but does not prove the real run succeeds; permissions and package locks can still fail."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is idempotency in a playbook?",
+   "marks": 2,
+   "a": "A playbook is idempotent when applying it once or many times leaves the host in the same declared state. A second run with no drift reports 0 changes."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a template task more idempotent than a shell command that appends a line to a file?",
+   "marks": 3,
+   "a": "The template writes the whole file to match one declared content, so a rerun produces the same file. The append command adds the line again on every run, so the file grows and the state changes."
+  },
+  {
+   "level": "apply",
+   "q": "Inventory group web has 8 hosts. A first run makes 4 changes per host and a second run makes 0. Find the first-run total changes. If 2 hosts are unreachable, state the ok and failed counts.",
+   "marks": 4,
+   "a": "First-run total = 8 × 4 = 32 changes. Reachable hosts = 8 − 2 = 6 ok; failed hosts = 2."
+  },
+  {
+   "level": "analyze",
+   "q": "A playbook restarts nginx on every run even when nginx.conf is unchanged. What is wrong, and how does a handler fix it?",
+   "marks": 4,
+   "a": "The restart task is unconditional, so it is not idempotent and causes needless downtime. Move the restart into a handler and notify it from the template task; the handler runs only when the template output changes."
+  },
+  {
+   "level": "remember",
+   "q": "How does Ansible connect to managed hosts, and what file lists those hosts?",
+   "marks": 2,
+   "a": "Ansible connects over SSH without installing an agent on the managed host. The inventory file lists hosts and groups them by role."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can <code>shell: echo server_name >> app.conf</code> fail the idempotency test on a rerun?",
+   "marks": 3,
+   "a": "The shell task always runs and appends another line, so the file differs after each run. It does not check the current content, and it reports a change every time."
+  },
+  {
+   "level": "apply",
+   "q": "A template sets worker_processes = 2 × vCPU. The host fact gives 4 vCPU. What value is written?",
+   "marks": 2,
+   "a": "worker_processes = 2 × 4 = 8."
+  }
+ ],
+ "beyond": "Not for the exam. Real estates use dynamic inventories from cloud APIs, so hosts appear and disappear. Policy-as-code checks playbook changes before merge. Some teams replace parts of configuration management with immutable images and containers, but the declarative idea remains. Search next for Ansible collections, dynamic inventory, and infrastructure as code."
+}
