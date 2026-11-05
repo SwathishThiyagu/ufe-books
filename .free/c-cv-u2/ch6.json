@@ -1,0 +1,242 @@
+{
+ "lead": "A Fourier transform rewrites an image as a sum of sine waves of different frequencies, each with a strength and a shift. Slow, smooth shading is low frequency; edges, texture and noise are high frequency. Doing this with arithmetic instead of glass is what the discrete Fourier transform, or DFT, gives you. Once the image is in that form, convolution becomes a plain multiply, so filtering, denoising and compression all get cheaper. It is the tool behind fast convolution, JPEG's parent transforms and every spectrum you have seen drawn beside an image in a textbook.",
+ "prereq": "You need: the image as a sampled discrete function f(x,y) from Unit 1 (sampling and quantisation), and convolution as weighted neighbour summing from <a href=\"#spatial-filtering-basics-correlation-and-convolution\">2.3</a>.",
+ "sections": [
+  {
+   "h3": "From the continuous transform to samples",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Any signal can be built by adding sine waves: pick a frequency, give it an amplitude and a shift, add it to the pile, repeat. The Fourier transform answers the reverse question. Given the finished signal f(x), how much of each frequency is inside it?"
+    },
+    {
+     "type": "formula",
+     "text": "F(μ) = ∫ f(x)·e^(−j2πμx) dx",
+     "where": "F(μ) is the complex spectrum at frequency μ, in cycles per unit length; x is distance; j = √−1; e^(−jθ) = cos θ − j sin θ, so the kernel is a wave of unit magnitude that completes one turn every 1/μ units of x."
+    },
+    {
+     "type": "p",
+     "text": "The inverse puts the pieces back together."
+    },
+    {
+     "type": "formula",
+     "text": "f(x) = ∫ F(μ)·e^(j2πμx) dμ",
+     "where": "only the sign of the exponent changes. |F(μ)| is the magnitude, how strong that frequency is; ∠F(μ) is the phase, where in x that wave is placed."
+    },
+    {
+     "type": "p",
+     "text": "An image is such a signal over two axes. Smooth shading is mostly low frequency; edges, texture and noise are high frequency. That is why the transform earns a chapter: it splits the picture into bands that can be treated separately. Two photographs can look equally bright on average and differ completely in where their energy sits along the frequency axis."
+    },
+    {
+     "type": "p",
+     "text": "A computer cannot integrate. The image is already sampled at x = 0, 1, …, N−1, and sampling in space makes the frequency axis discrete too. The integral collapses to a finite sum, and that sum is the DFT."
+    }
+   ]
+  },
+  {
+   "h3": "The 1-D DFT and its inverse",
+   "blocks": [
+    {
+     "type": "formula",
+     "text": "X(k) = Σ (n = 0 to N−1) x(n)·e^(−j2πkn/N),  k = 0, 1, …, N−1",
+     "where": "X(k) is the complex coefficient of frequency bin k; n is the sample index; N is the number of samples; bin k sits at k/N cycles per sample. Each X(k) is the signal correlated with one wave."
+    },
+    {
+     "type": "formula",
+     "text": "x(n) = (1/N) Σ (k = 0 to N−1) X(k)·e^(j2πkn/N)",
+     "where": "the 1/N restores the scale; without it the round trip returns N·x(n) instead of x(n)."
+    },
+    {
+     "type": "p",
+     "text": "Two facts drop straight out of the exponent. First, the spectrum repeats: X(k + N) = X(k), because e^(−j2πn) = 1 for every integer n. Second, if x(n) is real — every image is — then X(N − k) = X*(k), the complex conjugate. Half the spectrum is therefore redundant, and the negative frequencies are stored at the top of the array: k = N−1, N−2, and so on down."
+    }
+   ]
+  },
+  {
+   "h3": "Two dimensions, and the row–column trick",
+   "blocks": [
+    {
+     "type": "formula",
+     "text": "F(u,v) = Σ (m = 0 to M−1) Σ (n = 0 to N−1) f(m,n)·e^(−j2π(um/M + vn/N))",
+     "where": "f is the M×N image, m is the row index and n the column index, u is the vertical frequency index (0…M−1), v the horizontal one (0…N−1), and F(u,v) is complex. The inverse carries 1/(MN) and a +j exponent."
+    },
+    {
+     "type": "p",
+     "text": "Taken literally this is ruinous: MN outputs, each an MN-term sum, so (MN)² products. The exponent rescues it, because it splits:"
+    },
+    {
+     "type": "formula",
+     "text": "e^(−j2π(um/M + vn/N)) = e^(−j2πum/M) · e^(−j2πvn/N)",
+     "where": "the kernel is a product of one term in m alone and one in n alone. This is separability: the 2-D DFT is a 1-D DFT along every row, then a 1-D DFT along every column of that result. The two orders commute."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Run a 1-D DFT of length N on each of the M rows.",
+      "Run a 1-D DFT of length M on each of the N columns of the result.",
+      "Store the complex output as F(u,v). Cost is MN(M+N) products, not (MN)²."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Properties, phase, and the FFT",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "Linearity: a·f + b·g ↔ a·F + b·G.",
+      "Shift theorem: f(m − m₀, n − n₀) ↔ F(u,v)·e^(−j2π(um₀/M + vn₀/N)). The magnitude is untouched; only the phase changes, linearly in u and v.",
+      "Convolution theorem: f * h ↔ F·H. One multiply per pixel in frequency replaces a sliding-window sum in space (<a href=\"#filtering-in-the-frequency-domain\">2.7</a>).",
+      "DC term: F(0,0) = ΣΣ f(m,n) = MN × mean intensity. A 64×64 image of mean 100 has F(0,0) = 64×64×100 = 409600.",
+      "Periodicity: F(u + M, v) = F(u, v + N) = F(u, v)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Magnitude says how much of each frequency is present; phase says where it is. Put the phase of image B into the magnitude of image A and the result looks like B, because the position of every edge lives in the phase. The phase spectrum, usually printed as grey noise, is not junk."
+    },
+    {
+     "type": "p",
+     "text": "The fast Fourier transform computes the same X(k). For N a power of 2 it splits the sum into even and odd samples and recurses, costing (N/2)·log₂N complex multiplications against N² for the direct sum. At N = 1024 that is 5,120 against 1,048,576, roughly 200 times fewer — the reason a real image transforms in milliseconds."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Magnitudes of the four DFT bins for x = [1, 1, 0, 0]. Notice the mirror symmetry about the middle: bin 3 is the conjugate of bin 1, and bin 2 is exactly zero.",
+  "spec": {
+   "type": "plot",
+   "aria": "Four bars of magnitude for a 4-point transform: 2 at k=0, 1.414 at k=1, 0 at k=2 and 1.414 at k=3, showing symmetry about the middle.",
+   "x": {
+    "label": "k",
+    "min": 0,
+    "max": 3
+   },
+   "y": {
+    "label": "|X(k)|",
+    "min": 0,
+    "max": 2.5
+   },
+   "series": [
+    {
+     "name": "|X(k)|",
+     "points": [
+      [
+       0,
+       2
+      ],
+      [
+       1,
+       1.414
+      ],
+      [
+       2,
+       0
+      ],
+      [
+       3,
+       1.414
+      ]
+     ],
+     "style": "accent",
+     "_pts": [
+      [
+       0.0,
+       2.0
+      ],
+      [
+       1.0,
+       1.414
+      ],
+      [
+       2.0,
+       0.0
+      ],
+      [
+       3.0,
+       1.414
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Find the 4-point DFT of x = [1, 1, 0, 0], state its magnitude spectrum, and compare the cost of the direct DFT and the FFT for N = 1024.",
+   "steps": [
+    "Only n = 0 and n = 1 are nonzero, so X(k) = 1·e^(−j2πk·0/4) + 1·e^(−j2πk·1/4) = 1 + e^(−jπk/2).",
+    "k = 0: e^0 = 1, so X(0) = 1 + 1 = 2. Check: MN × mean = 4 × 0.5 = 2.",
+    "k = 1: e^(−jπ/2) = −j, so X(1) = 1 − j; |X(1)| = √2 = 1.414, phase −45°.",
+    "k = 2: e^(−jπ) = −1, so X(2) = 1 − 1 = 0.",
+    "k = 3: e^(−j3π/2) = +j, so X(3) = 1 + j; magnitude 1.414, phase +45°, the conjugate of X(1) as symmetry demands.",
+    "Cost at N = 1024: direct DFT needs N² = 1024² = 1,048,576 complex multiplications; FFT needs (N/2)·log₂N = 512 × 10 = 5,120."
+   ],
+   "answer": "|X| = 2, 1.414, 0, 1.414; for N = 1024 the direct DFT needs 1,048,576 complex multiplications against 5,120 for the FFT.",
+   "check": "import cmath, math\nx = [1, 1, 0, 0]\nN = len(x)\nX = [sum(x[n] * cmath.exp(-2j * math.pi * k * n / N) for n in range(N)) for k in range(N)]\nfor k in range(N):\n    print(round(abs(X[k]), 3))\nN = 1024\nprint(N * N)\nprint((N // 2) * int(math.log2(N)))\n",
+   "values": [
+    2.0,
+    1.414,
+    0.0,
+    1.414,
+    1048576,
+    5120
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The index runs 0 to N−1, so negative frequencies sit at the top of the array and the spectrum repeats. Move the DC term to the centre before display.",
+  "Dropping the 1/N in the 1-D inverse or the 1/(MN) in the 2-D inverse; the round trip then returns a scaled copy.",
+  "Reading bin k as a frequency in Hz. Bin k is k/N cycles per sample, or k/(N·Δx) cycles per unit length when samples are Δx apart.",
+  "Claiming the magnitude spectrum alone reconstructs the image. Phase is needed; magnitude and phase together are the image.",
+  "Using the DFT as if it gave linear convolution. It multiplies circularly, so pad with zeros before multiplying spectra."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the 1-D DFT of N samples and state what F(0,0) equals for an M×N image.",
+   "marks": 2,
+   "a": "X(k) = Σ x(n)·e^(−j2πkn/N) for k = 0…N−1. F(0,0) = ΣΣ f(m,n) = MN × mean intensity."
+  },
+  {
+   "level": "understand",
+   "q": "Why is X(N − k) the conjugate of X(k) when the signal is real?",
+   "marks": 3,
+   "a": "Because e^(−j2π(N−k)n/N) = e^(j2πkn/N); the sign of every imaginary term flips, so X(N − k) = X*(k). Only half the spectrum is independent."
+  },
+  {
+   "level": "understand",
+   "q": "State the convolution theorem and one practical use of it.",
+   "marks": 3,
+   "a": "Spatial convolution f * h corresponds to F(u,v)·H(u,v). Filtering becomes one multiply per pixel, which beats a large spatial mask."
+  },
+  {
+   "level": "apply",
+   "q": "Find the 4-point DFT of x = [1, 1, 1, 1] and give its magnitude spectrum.",
+   "marks": 4,
+   "a": "X(k) = Σ e^(−j2πkn/4) = 4 for k = 0 and 0 + j0 for k = 1, 2, 3. |X| = 4, 0, 0, 0: constant signal, DC only."
+  },
+  {
+   "level": "apply",
+   "q": "A 256-point DFT is done directly and by FFT. Compare complex multiplications.",
+   "marks": 4,
+   "a": "Direct: 256² = 65,536. FFT: (256/2)·log₂256 = 128 × 8 = 1,024. About 64 times fewer."
+  },
+  {
+   "level": "analyze",
+   "q": "An image is rebuilt from the magnitude of A and the phase of B. Which does it resemble, and why?",
+   "marks": 5,
+   "a": "It resembles B. Phase records where each frequency component sits, so edges stay in their places; magnitude only sets how strong each band is."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does translating an image leave |F(u,v)| unchanged?",
+   "marks": 4,
+   "a": "The shift multiplies F by e^(−j2π(um₀/M + vn₀/N)), which has magnitude 1 for every u and v. Only the phase is altered."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems rarely call the DFT yourself: FFTW, cuFFT and vendor libraries do it, and the engineering lies in choosing sizes and layouts that keep the transform cache-friendly. A converging lens performs an optical Fourier transform for free, which is why the subject appears in optics and in computational imaging. Modern networks sometimes work on spectra directly, for example to blur an image cheaply or to detect periodic noise. Search next for fftshift, circular versus linear convolution, and the windowing used when a signal is cut short."
+}

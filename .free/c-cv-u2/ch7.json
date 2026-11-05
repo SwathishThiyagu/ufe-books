@@ -1,0 +1,249 @@
+{
+ "lead": "Filtering in the frequency domain means changing an image by multiplying its DFT by a mask H(u,v). The mask keeps some frequencies and kills others. A low-pass mask keeps the centre, so noise and fine detail go and the picture blurs. A high-pass mask does the reverse, and edges survive. This is used for denoising, for removing periodic scan lines from a scanned page, and for flattening uneven lighting in a photograph. This chapter gives the pipeline, the three standard low-pass shapes and their high-pass partners.",
+ "prereq": "You need: <a href=\"#fourier-transform-and-the-discrete-fourier-transform\">Chapter 2.6</a> — the DFT pair, separability and the convolution theorem.",
+ "sections": [
+  {
+   "h3": "The filter is one multiplication",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In space, a filter is a convolution with a mask (see <a href=\"#spatial-filtering-basics-correlation-and-convolution\">2.3</a>). In frequency, the same filter is a single multiplication, because convolution in space equals multiplication in frequency. That is the convolution theorem from <a href=\"#fourier-transform-and-the-discrete-fourier-transform\">Chapter 2.6</a>."
+    },
+    {
+     "type": "formula",
+     "text": "g(x,y) = Re{ IDFT[ H(u,v) · F(u,v) ] }",
+     "where": "f(x,y) is the input image; F(u,v) is its DFT; H(u,v) is the transfer function, a mask of the same size; the dot is a pixel-by-pixel multiply at every (u,v); IDFT is the inverse discrete Fourier transform; Re takes the real part; g(x,y) is the filtered image."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Centre the spectrum: multiply f(x,y) by (−1)^(x+y) before the DFT, or shift the spectrum after it.",
+      "Compute F(u,v) with the 2-D FFT.",
+      "Build H(u,v) of the same size, usually from the distance D(u,v).",
+      "Multiply: G(u,v) = H(u,v) · F(u,v) at every point.",
+      "Inverse FFT to return to space.",
+      "Take the real part and clip to 0–255."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The FFT is what makes this practical. For an N×N image the direct DFT costs about N⁴ operations and the 2-D FFT about N² log₂ N. At N = 1024 that is roughly 10⁵ times fewer operations, so a full-image frequency filter runs in a fraction of a second on a laptop. Once F is in memory, applying H is only N² complex multiplies — cheaper than one pass of a 3×3 spatial mask."
+    }
+   ]
+  },
+  {
+   "h3": "Distance D(u,v) and the ideal low-pass",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The raw DFT puts zero frequency at pixel (0,0). A radial filter wants it in the middle, so the spectrum is centred first. Distance from the centre is D(u,v) = √(u² + v²), where u and v are counted from the centre pixel of the M×N spectrum. D is measured in spectrum pixels, not in hertz."
+    },
+    {
+     "type": "p",
+     "text": "A filter written as H(D) depends only on distance, so it is circularly symmetric: it treats horizontal and vertical detail alike. The radius D₀ is the cutoff."
+    },
+    {
+     "type": "formula",
+     "text": "H_ideal(D) = 1 for D ≤ D₀, and 0 for D > D₀",
+     "where": "D₀ is the cutoff radius in spectrum pixels; every frequency inside the circle of radius D₀ passes unchanged, everything outside is set to zero."
+    },
+    {
+     "type": "p",
+     "text": "The ideal filter is the sharpest possible cut, and that is its problem. A step in H has a sinc-shaped inverse transform, so the output shows ripples around every edge. This is ringing, and it gets worse as D₀ shrinks. Sharpening the cutoff sharpens the ripples too."
+    }
+   ]
+  },
+  {
+   "h3": "Butterworth and Gaussian low-pass",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Butterworth filter softens the step."
+    },
+    {
+     "type": "formula",
+     "text": "H(D) = 1 / (1 + (D/D₀)^(2n))",
+     "where": "n is the order, a positive number that sets how sharp the knee is; D₀ is the cutoff radius; D is the distance from the centre. At D = D₀ the ratio is 1, so H = 1/2 for every order — a fixed half-power point."
+    },
+    {
+     "type": "p",
+     "text": "Small n gives a gentle roll-off and almost no ringing. As n grows, the curve approaches the ideal step and ringing comes back. Order 2 is a common compromise."
+    },
+    {
+     "type": "p",
+     "text": "The Gaussian filter has no order at all."
+    },
+    {
+     "type": "formula",
+     "text": "H(D) = e^(−D² / (2D₀²))",
+     "where": "D₀ sets the width of the passband (not a hard cutoff); D is the distance from the centre; e ≈ 2.718. At D = D₀, H = e^(−0.5) = 0.607, and at D = 2D₀, H = e^(−2) = 0.135."
+    },
+    {
+     "type": "p",
+     "text": "The inverse transform of a Gaussian is another Gaussian, which has no side lobes. So the equivalent spatial mask is smooth, and a Gaussian low-pass never rings. That is why it is the default choice for smoothing in the frequency domain."
+    }
+   ]
+  },
+  {
+   "h3": "High-pass, notch and homomorphic filtering",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every low-pass has a high-pass partner: H_hp(u,v) = 1 − H_lp(u,v). Whatever the low-pass removed, the high-pass keeps. A Gaussian high-pass is 1 − e^(−D²/2D₀²): zero at the centre, tending to 1 far out. This is the frequency-domain form of the sharpening in <a href=\"#sharpening-filters-derivatives-laplacian-and-unsharp-masking\">2.5</a> — edges and texture survive, flat regions go grey."
+    },
+    {
+     "type": "p",
+     "text": "Selective filters kill narrow bands instead of whole regions. A band-reject mask sets H = 0 on a ring of radii; a notch sets H = 0 in small spots. The usual target is periodic noise — scan lines, a striped shirt, mains hum — which shows up as bright spikes away from the centre. Because the DFT of a real image is conjugate symmetric, F(u,v) = F*(M−u, N−v), a notch at (u₀,v₀) must be repeated at (M−u₀, N−v₀)."
+    },
+    {
+     "type": "p",
+     "text": "For uneven lighting, take logs first: log f = log i + log r, where i is the illumination (slowly varying, low frequency) and r is the reflectance (the object's detail, high frequency). Low-pass the log to estimate i, subtract it, then exponentiate. This is homomorphic filtering; it removes a shadow gradient without destroying contrast. Unit 3 takes periodic-noise removal further."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The image is transformed, multiplied by the mask H and transformed back; the single multiply box is the whole filter.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Frequency-domain filtering",
+   "aria": "Five boxes in a row: the input image, its DFT giving F, multiplication by H, the inverse DFT, and the filtered output image.",
+   "nodes": [
+    {
+     "id": "f",
+     "label": "f(x,y)"
+    },
+    {
+     "id": "dft",
+     "label": "DFT",
+     "note": "F(u,v)"
+    },
+    {
+     "id": "mul",
+     "label": "Multiply H",
+     "note": "H·F",
+     "style": "accent"
+    },
+    {
+     "id": "idft",
+     "label": "Inverse DFT"
+    },
+    {
+     "id": "g",
+     "label": "g(x,y)"
+    }
+   ],
+   "edges": [
+    {
+     "from": "f",
+     "to": "dft"
+    },
+    {
+     "from": "dft",
+     "to": "mul"
+    },
+    {
+     "from": "mul",
+     "to": "idft"
+    },
+    {
+     "from": "idft",
+     "to": "g"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A 256×256 grayscale image is filtered in the frequency domain with a centred spectrum. The cutoff is D₀ = 50 spectrum pixels. Find the transfer function H at the two radii D = 50 and D = 100 for (a) an ideal low-pass filter, (b) a Butterworth low-pass of order n = 2, (c) a Gaussian low-pass with the same D₀. State which one rings.",
+   "steps": [
+    "Ideal filter: H = 1 when D ≤ D₀ and 0 otherwise. At D = 50 the point lies exactly on the boundary, so take the inside value, H = 1. At D = 100 > 50, H = 0.",
+    "Butterworth, exponent 2n = 4. At D = 50: (50/50)⁴ = 1, so H = 1/(1+1) = 0.5. This is the half-power point, true for any order.",
+    "Butterworth at D = 100: (100/50)⁴ = 2⁴ = 16, so H = 1/(1+16) = 1/17 = 0.0588.",
+    "Gaussian. Exponent is −D²/(2D₀²) = −2500/5000 = −0.5 at D = 50, so H = e^(−0.5) = 0.607.",
+    "Gaussian at D = 100: −10000/5000 = −2, so H = e^(−2) = 0.135. The Gaussian roll-off is gentler than Butterworth order 2 at the same D₀.",
+    "Ringing comes from a sharp step in H. Only the ideal filter has one, so only (a) rings; the Gaussian never does."
+   ],
+   "answer": "At D = 50 the three filters give H = 1, 0.5 and 0.607; at D = 100 they give H = 0, 0.0588 and 0.135, and only the ideal filter rings.",
+   "check": "import math\nD0 = 50.0\ndef ideal(D):\n    return 1.0 if D <= D0 else 0.0\ndef butter(D, n=2):\n    return 1.0 / (1.0 + (D/D0)**(2*n))\ndef gauss(D):\n    return math.exp(-D*D/(2.0*D0*D0))\nprint(ideal(50.0))\nprint(ideal(100.0))\nprint(butter(50.0))\nprint(round(butter(100.0), 4))\nprint(round(gauss(50.0), 3))\nprint(round(gauss(100.0), 3))\n",
+   "values": [
+    1.0,
+    0.0,
+    0.5,
+    0.0588,
+    0.607,
+    0.135
+   ],
+   "output": ""
+  },
+  {
+   "question": "A Butterworth low-pass has D₀ = 100 pixels and order n = 3. Compute H at D = 100 and at D = 200.",
+   "steps": [
+    "Exponent 2n = 6, so H = 1/(1 + (D/100)⁶).",
+    "At D = 100: (1)⁶ = 1, H = 1/(1+1) = 0.5.",
+    "At D = 200: (2)⁶ = 64, H = 1/(1+64) = 1/65 = 0.0154."
+   ],
+   "answer": "H = 0.5 at D = 100 and H = 0.0154 at D = 200.",
+   "check": "def butter(D, D0=100.0, n=3):\n    return 1.0/(1.0 + (D/D0)**(2*n))\nprint(butter(100.0))\nprint(round(butter(200.0), 4))\n",
+   "values": [
+    0.5,
+    0.0154
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Forgetting the real part after the inverse DFT. The spectrum of a real image is conjugate symmetric, so the result is real in theory, but floating point leaves a tiny imaginary residue; passing a complex array to an 8-bit display gives a wrong image.",
+  "Forgetting to centre the spectrum. With the origin at the corner, D = √(u²+v²) places the passband at a corner instead of the middle, so the wrong frequencies are kept.",
+  "Swapping D₀ and n. D₀ is a radius in spectrum pixels and controls the size of the passband; n is the Butterworth order and controls the sharpness of the knee.",
+  "Assuming the ideal filter is the best one. It is the sharpest cut and the worst ringer; the expected answer is usually that the Gaussian has no ringing because its inverse transform has no side lobes.",
+  "Placing a single notch. A notch at (u₀,v₀) must be duplicated at (M−u₀, N−v₀), otherwise the output is not real."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does multiplying F(u,v) by H(u,v) correspond to in the spatial domain?",
+   "marks": 2,
+   "a": "A convolution of the image with the inverse transform of H, that is, a linear filter. Multiplication in frequency equals convolution in space."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a Gaussian low-pass filter not produce ringing?",
+   "marks": 2,
+   "a": "Its inverse transform is another Gaussian, which has no side lobes. Ringing comes from a sharp step in H, whose inverse transform is a sinc with large side lobes."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the spectrum be centred before a radial mask is applied?",
+   "marks": 2,
+   "a": "The raw DFT puts zero frequency at pixel (0,0). A mask built from D = √(u²+v²) assumes the origin is at the centre, so without centring the mask lands in the wrong place."
+  },
+  {
+   "level": "apply",
+   "q": "A Butterworth low-pass has D₀ = 100 pixels and order n = 3. Find H at D = 100 and D = 200.",
+   "marks": 4,
+   "a": "H = 1/(1+(D/100)⁶). At D = 100: 1/(1+1) = 0.5. At D = 200: 2⁶ = 64, H = 1/65 = 0.0154."
+  },
+  {
+   "level": "apply",
+   "q": "A Gaussian high-pass has D₀ = 40 pixels. Find H at D = 40 pixels.",
+   "marks": 3,
+   "a": "H_hp = 1 − e^(−D²/2D₀²). At D = D₀ the exponent is −0.5, so H = 1 − 0.607 = 0.393."
+  },
+  {
+   "level": "analyze",
+   "q": "A scanned page shows faint diagonal stripes. Which frequency-domain step removes them, and why?",
+   "marks": 3,
+   "a": "Notch (or band-reject) filtering. Periodic stripes put a pair of bright spikes at fixed positions away from the centre; zero those spikes and their conjugate points and the rest of the image is untouched."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a smaller D₀ in an ideal low-pass give stronger ringing?",
+   "marks": 4,
+   "a": "A smaller D₀ means a narrower passband, that is, a sharper step in H. The sinc side lobes of the inverse transform spread wider in space, so the ripples around each edge grow."
+  }
+ ],
+ "beyond": "Not for the exam. The same multiply-by-a-mask pipeline runs in modern computational photography: deconvolution on phone cameras, ring-artefact removal in CT reconstruction, and FFT-based convolution inside neural networks once kernels get large. An optical system is described by its modulation transfer function, which is exactly an H(u,v) measured with a test chart. Read a 2-D log-magnitude spectrum fluently and most periodic-noise problems become visible at a glance. Search for Butterworth versus Gaussian low-pass ringing, and for homomorphic filtering of illumination and reflectance, to go further."
+}

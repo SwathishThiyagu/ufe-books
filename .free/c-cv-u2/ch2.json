@@ -1,0 +1,205 @@
+{
+ "lead": "A histogram counts how many pixels take each grey level. Histogram equalisation uses that count to build a curve that spreads busy levels apart and squeezes empty ones together, so the output fills the whole 0 to L−1 range. It is a standard first move for washed-out or dark images in phone camera previews, medical X-ray display and document scanning. Specification goes further: you supply the histogram you want, and the method finds a curve that produces it.",
+ "prereq": "You need: <a href=\"#basic-intensity-transformations-negative-log-power-law\">Chapter 2.1</a>, where a point operation s = T(r) uses only the pixel's own value, and the 0 to L−1 output range.",
+ "sections": [
+  {
+   "h3": "Histogram, normalised counts and the equalisation curve",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For an image with M rows and N columns, the histogram counts pixels at each grey level. Write h(r_k) = n_k, where r_k is the k-th grey level, k = 0, 1, …, L−1, L is the number of levels (256 for 8-bit), and n_k is how many pixels have value r_k. The counts add to MN. Divide by MN to get the normalised histogram p(r_k) = n_k/(MN). It is a probability: p(r_k) is the chance that a pixel picked at random has level r_k, and the p(r_k) sum to 1."
+    },
+    {
+     "type": "p",
+     "text": "Equalisation uses the running total of p. In the continuous case, treat r as a real number from 0 to L−1 with density p_r(r). Define s = T(r) = (L−1) ∫₀^r p_r(w) dw. Here s is the output level and w is a dummy variable for integration. The slope is ds/dr = (L−1)p_r(r). For a monotonic T, the output density is p_s(s) = p_r(r) / (ds/dr) = 1/(L−1). So s is uniform on 0 to L−1: every output band of equal width gets the same share of pixels. That is the goal. T is a cumulative distribution, so it never decreases; the order of grey levels is preserved, dark stays darker than bright."
+    },
+    {
+     "type": "formula",
+     "text": "s = T(r) = (L−1) ∫₀^r p_r(w) dw",
+     "where": "s is the output level from 0 to L−1; r is the input level; L is the number of grey levels (256 for 8-bit); p_r(w) is the input probability density; w is the dummy variable of integration."
+    }
+   ]
+  },
+  {
+   "h3": "Discrete equalisation: scale, round, merge",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In a digital image the integral becomes a sum. The discrete equalisation is s_k = T(r_k) = (L−1) Σ_{j=0}^{k} p(r_j) = ((L−1)/MN) Σ_{j=0}^{k} n_j. The sum is the cumulative count up to level r_k. Multiply it by (L−1)/MN, then round to the nearest integer. The rounding is essential: s_k must be a valid grey level."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Count n_k for every input level r_k.",
+      "Form the cumulative count c_k = n_0 + n_1 + … + n_k.",
+      "Compute s_k = round((L−1)c_k/(MN)).",
+      "Build the lookup table r_k → s_k.",
+      "Replace every pixel value r_k by s_k."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two things surprise students. First, the output histogram is not flat. Rounding sends several input levels to the same output level, so the output has spikes. In the figure, levels 3 and 4 both become 6, and levels 5, 6, 7 all become 7: five input levels merge into two output levels. Second, the curve acts on pixel values, not on the histogram bins. You do not equalise the counts; you equalise the image. Equalisation can over-brighten a mostly dark image, because the crowded dark levels get spread over most of the output range. The sparse bright levels are squeezed into the top of the range. That is why the method is often applied locally or with a clip limit."
+    },
+    {
+     "type": "formula",
+     "text": "s_k = round( ((L−1)/MN) Σ_{j=0}^{k} n_j )",
+     "where": "s_k is the output level for input level r_k; n_j is the count at level r_j; M×N is the total number of pixels; L is the number of levels; round(·) rounds to the nearest integer."
+    }
+   ]
+  },
+  {
+   "h3": "Specification (matching) and local equalisation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Equalisation always aims at a flat output. Specification lets you aim at a chosen histogram p_z(z). Some syllabi call it histogram matching. Procedure: equalise the input to s = T(r) = (L−1)Σ p_r. Equalise the desired histogram to a flat scale G(z) = (L−1)Σ p_z. Both s and G(z) lie on the same 0 to L−1 axis. Invert G to get z = G⁻¹(s), and the mapping is r → s → z. In discrete form, compute s_k for every input level, compute G(z_q) for every desired level z_q, and for each s_k pick the z_q whose G(z_q) is closest. That lookup table is applied to the pixels. Use it when two images must share a tone scale, such as a satellite tile matched to a reference scene."
+    },
+    {
+     "type": "p",
+     "text": "Global equalisation uses one curve for the whole image. Local equalisation divides the image into blocks, often an 8×8 grid of tiles, equalises each block, and blends across block borders. CLAHE, contrast-limited adaptive histogram equalisation, adds a clip limit: counts above the limit are clipped and redistributed before the cumulative sum. The clip stops flat regions from being amplified into noise. Most imaging libraries ship a histogram-equalisation function and a CLAHE class, for example equalizeHist and createCLAHE in OpenCV. Apply the method to the intensity channel of an HSI image, not to R, G and B separately, or colours shift. Local block operations are a step towards the spatial filtering of <a href=\"#spatial-filtering-basics-correlation-and-convolution\">Chapter 2.3</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The counts n_k, their running total cdf, and the rounded output s_k for a 3-bit image of 4096 pixels. Notice that five input levels collapse into the top two output levels.",
+  "spec": {
+   "type": "array",
+   "title": "Equalising a 3-bit image (4096 pixels)",
+   "aria": "Three rows of eight values: raw counts, running cumulative counts up to 4096, and the rounded output levels 1, 3, 5, 6, 6, 7, 7, 7.",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "n_k",
+     "cells": [
+      "790",
+      "1023",
+      "850",
+      "656",
+      "329",
+      "245",
+      "122",
+      "81"
+     ]
+    },
+    {
+     "label": "cdf",
+     "cells": [
+      "790",
+      "1813",
+      "2663",
+      "3319",
+      "3648",
+      "3893",
+      "4015",
+      "4096"
+     ]
+    },
+    {
+     "label": "s_k",
+     "cells": [
+      "1",
+      "3",
+      "5",
+      "6",
+      "6",
+      "7",
+      "7",
+      "7"
+     ],
+     "marks": {
+      "0": "accent",
+      "3": "live"
+     }
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A 3-bit image (L = 8, levels 0 to 7) has 64×64 = 4096 pixels. The counts at levels 0 to 7 are 790, 1023, 850, 656, 329, 245, 122, 81. Perform histogram equalisation. Give the mapping and say how many input levels merge into the top two output levels.",
+   "steps": [
+    "Cumulative counts: 790, 790+1023=1813, +850=2663, +656=3319, +329=3648, +245=3893, +122=4015, +81=4096.",
+    "Scale factor is (L−1)/MN = 7/4096 = 0.00170898 per pixel.",
+    "Level 0: 7×790/4096 = 1.3496, rounds to 1.",
+    "Level 1: 7×1813/4096 = 3.0984, rounds to 3.",
+    "Level 2: 7×2663/4096 = 4.5510, rounds to 5.",
+    "Level 3: 7×3319/4096 = 5.6721, rounds to 6.",
+    "Level 4: 7×3648/4096 = 6.2344, rounds to 6.",
+    "Level 5: 7×3893/4096 = 6.6521, rounds to 7.",
+    "Level 6: 7×4015/4096 = 6.8616, rounds to 7.",
+    "Level 7: 7×4096/4096 = 7.0000, rounds to 7.",
+    "The mapping is 0→1, 1→3, 2→5, 3→6, 4→6, 5→7, 6→7, 7→7.",
+    "Input levels 3 and 4 become 6; input levels 5, 6 and 7 become 7. So five input levels merge into the top two output levels."
+   ],
+   "answer": "The mapping is 0→1, 1→3, 2→5, 3→6, 4→6, 5→7, 6→7, 7→7; five input levels (3, 4, 5, 6, 7) collapse into output levels 6 and 7.",
+   "check": "counts = [790, 1023, 850, 656, 329, 245, 122, 81]\nL = 8\nMN = 4096\nc = 0\nmapping = []\nfor n in counts:\n    c += n\n    mapping.append(round((L - 1) * c / MN))\nfor v in mapping:\n    print(v)",
+   "values": [
+    1,
+    3,
+    5,
+    6,
+    6,
+    7,
+    7,
+    7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Scaling by 1/MN instead of (L−1)/MN leaves the output in 0 to 1, not 0 to L−1.",
+  "Applying the transform to the histogram counts instead of to the pixels gives a flattened histogram but the wrong image.",
+  "Claiming equalisation gives a perfectly flat histogram in the discrete case. Rounding merges levels, so spikes remain.",
+  "Forgetting to round, or using a non-monotonic curve. T must never decrease, or grey order reverses.",
+  "Equalising R, G and B channels separately in colour shifts hues; use the intensity channel (HSI) or a colour-preserving method."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define the normalised histogram p(r_k) for an M×N image with L levels.",
+   "marks": 2,
+   "a": "p(r_k) = n_k/(MN), where n_k is the number of pixels with level r_k, M×N is the total number of pixels, and k = 0, 1, …, L−1. The values p(r_k) sum to 1."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the continuous equalisation s = (L−1)∫₀^r p_r(w) dw produce a uniform output density?",
+   "marks": 3,
+   "a": "The slope is ds/dr = (L−1)p_r(r). For a monotonic curve, p_s(s) = p_r(r)/(ds/dr) = 1/(L−1), which is constant on 0 to L−1. So every output band of equal width has the same probability."
+  },
+  {
+   "level": "apply",
+   "q": "A 2-bit image (L = 4) of 16 pixels has counts n_0 = 4, n_1 = 4, n_2 = 4, n_3 = 4. Find the equalised mapping using s_k = round(3c_k/16).",
+   "marks": 4,
+   "a": "Cumulative counts are 4, 8, 12, 16. Scaled values: 3×4/16 = 0.75 → 1; 3×8/16 = 1.5 → 2; 3×12/16 = 2.25 → 2; 3×16/16 = 3.0 → 3. Mapping: 0→1, 1→2, 2→2, 3→3."
+  },
+  {
+   "level": "analyze",
+   "q": "An image has 90% of its pixels at levels 0–15 and 10% spread over 16–255. What does global equalisation do to the dark region, and why can CLAHE be better?",
+   "marks": 5,
+   "a": "Global equalisation sees that most pixels are dark, so it stretches levels 0–15 over a large part of the output range and compresses the bright tail. This can amplify noise in flat dark areas. CLAHE works on small blocks and clips the histogram, so it improves local contrast without over-amplifying noise in any one region."
+  },
+  {
+   "level": "apply",
+   "q": "In a 3-bit specification, after equalising the input you get s = 4. The desired histogram gives G(2) = 3 and G(3) = 6. Which output level z do you choose?",
+   "marks": 3,
+   "a": "Choose the z whose G(z) is closest to s = 4. |4−3| = 1 and |4−6| = 2, so choose z = 2 because G(2) = 3 is closer."
+  },
+  {
+   "level": "remember",
+   "q": "What extra input does histogram specification need beyond the image itself?",
+   "marks": 2,
+   "a": "A desired histogram p_z(z), or a target image whose histogram is used as p_z(z)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is histogram equalisation called a point operation?",
+   "marks": 2,
+   "a": "Each output pixel depends only on the value of the same input pixel through the fixed curve s = T(r). No neighbouring pixels are used."
+  }
+ ],
+ "beyond": "Not for the exam. In production, histogram equalisation appears inside camera pipelines and display firmware, often as adaptive tone mapping. CLAHE is common in fundus imaging and endoscopy, where local contrast matters more than global brightness. Modern tone mapping for HDR images uses similar cumulative curves in a perceptual colour space. Search for 'CLAHE clip limit', 'adaptive tone mapping' and 'histogram matching for image registration'."
+}

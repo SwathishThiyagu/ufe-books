@@ -1,0 +1,238 @@
+{
+ "lead": "An image transform is a change of coordinates: the same pixels, rewritten as weights on fixed patterns. The DCT writes an 8×8 block as weights on cosines, and a smooth block puts almost all its weight in one coefficient. Wavelets and pyramids write the image at several scales, so coarse layout and fine detail sit in separate bands. This is the machinery behind JPEG, photo blending and multi-scale matching. Nothing is lost — the information is repacked into a form easier to compress, filter or compare.",
+ "prereq": "You need: Gaussian smoothing from <a href=\"#smoothing-spatial-filters\">Chapter 2.4</a> and keeping or killing bands from <a href=\"#filtering-in-the-frequency-domain\">Chapter 2.7</a>.",
+ "sections": [
+  {
+   "h3": "The DCT: a real transform on 8×8 blocks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The <a href=\"#fourier-transform-and-the-discrete-fourier-transform\">DFT</a> of a real image is complex, and its second half is the mirror conjugate of the first — the same magnitudes with opposite signs of the imaginary part. The discrete cosine transform (DCT) keeps only the cosine part, so every coefficient is real and nothing repeats. On an N×N block:"
+    },
+    {
+     "type": "formula",
+     "text": "F(u,v) = (2/N) · C(u) · C(v) · Σ<sub>x=0</sub><sup>N−1</sup> Σ<sub>y=0</sub><sup>N−1</sup> f(x,y) · cos((2x+1)uπ / 2N) · cos((2y+1)vπ / 2N)",
+     "where": "f(x,y) is the pixel at row x, column y; F(u,v) is the coefficient for vertical frequency u and horizontal frequency v; N is the block side (8 in JPEG); C(0) = 1/√2 and C(k) = 1 for k ≥ 1."
+    },
+    {
+     "type": "p",
+     "text": "The integers u and v count half-cycles of a cosine across the block. u = 3 means three half-cycles down the height. For N = 8, 2/N = 1/4 and C(0)C(0) = 1/2, so F(0,0) = (1/8) ΣΣ f(x,y) = 8 × (mean of the block). F(0,0) is the DC coefficient; the other 63 are AC coefficients."
+    },
+    {
+     "type": "p",
+     "text": "Energy compaction is the payoff. In a smooth block neighbours are nearly equal, so every cosine with u > 0 or v > 0 sums to almost zero. A nearly flat patch of sky leaves a big F(0,0) and a scatter of near-zero AC values; quantising those to zero costs almost nothing in picture quality and saves many bits. A busy block spreads its energy over many coefficients, so JPEG spends more bits on it."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Cut the image into 8×8 blocks.",
+      "Subtract 128 from each pixel, so the block is centred on zero.",
+      "Take the 2-D DCT of the block.",
+      "Divide each coefficient by its step from a quantisation table; many become exactly zero.",
+      "Read the coefficients in zigzag order, low frequency first, and entropy-code them."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The quantisation tables and the entropy coder belong to Unit 3, Image Restoration and Compression. The point here is that the DCT, not the DFT, is chosen: real, cheap, and it packs energy into few coefficients."
+    }
+   ]
+  },
+  {
+   "h3": "Gaussian and Laplacian pyramids",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A Gaussian pyramid keeps the same picture at falling resolution. Start with G<sub>0</sub>, the image. Blur it with a Gaussian and keep every second row and column: G<sub>1</sub> is half as wide and half as tall. Repeat to get G<sub>2</sub>, G<sub>3</sub> and so on."
+    },
+    {
+     "type": "formula",
+     "text": "G<sub>k+1</sub> = (G<sub>k</sub> ∗ g) ↓ 2",
+     "where": "G<sub>k</sub> is level k of the pyramid; g is the Gaussian kernel; ∗ is convolution; ↓2 means keep every second sample in each direction, so the result is half the width and half the height of G<sub>k</sub>."
+    },
+    {
+     "type": "p",
+     "text": "The blur is not optional. A 256-pixel-wide image can hold detail up to 128 cycles across. After subsampling to 128 pixels only 64 cycles fit, and anything finer folds back to a wrong, lower frequency — aliasing. The Gaussian blur removes the frequencies that cannot survive the subsampling."
+    },
+    {
+     "type": "p",
+     "text": "The Laplacian pyramid stores what each level lost: L<sub>k</sub> = G<sub>k</sub> − expand(G<sub>k+1</sub>), where expand upsamples by inserting zero rows and columns and then blurs. Each L<sub>k</sub> is band-pass: mostly near zero, bright only where that scale has edges. Reconstruction is exact: G<sub>k</sub> = L<sub>k</sub> + expand(G<sub>k+1</sub>), with the smallest level stored as it is."
+    },
+    {
+     "type": "p",
+     "text": "Blending uses this directly. Take the Laplacian pyramids of two photos and a Gaussian pyramid of a mask; at each level copy pixels from photo A where the mask is bright and from photo B where it is dark; add the levels back. Seams vanish because each scale is blended on its own. Pyramid matching splits the picture into 2<sup>l</sup> × 2<sup>l</sup> cells at level l and compares histograms cell by cell. Weight level l by 1/2<sup>l</sup> to favour coarse layout, or by 1/2<sup>L−l</sup> (the usual spatial pyramid matching choice) to favour fine detail; the weights are a design choice and must be stated with the result. With 1/2<sup>l</sup>, coarse layout counts more than exact position."
+    }
+   ]
+  },
+  {
+   "h3": "The Haar wavelet: averages and details",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Haar wavelet replaces each pair of neighbouring samples by one average and one difference."
+    },
+    {
+     "type": "formula",
+     "text": "a = (x<sub>1</sub> + x<sub>2</sub>) / √2,    d = (x<sub>1</sub> − x<sub>2</sub>) / √2",
+     "where": "x<sub>1</sub>, x<sub>2</sub> are two adjacent samples; a is the approximation (their scaled average); d is the detail (their scaled difference); √2 ≈ 1.41421."
+    },
+    {
+     "type": "p",
+     "text": "In two dimensions, transform every row, then every column. One level turns an N×N image into four (N/2)×(N/2) bands: LL, the approximation from two low-pass steps; LH, HL and HH, the details that catch horizontal, vertical and diagonal edges. Only LL is split again. A detail band is not a thumbnail of the picture — it holds differences and looks like noise."
+    },
+    {
+     "type": "p",
+     "text": "The 1/√2 factor preserves energy: a² + d² = x<sub>1</sub>² + x<sub>2</sub>². The transform is a rotation of the data, not a loss, and the original can be recovered exactly. If the factor is dropped, that check fails by a factor of 2 at each level."
+    },
+    {
+     "type": "p",
+     "text": "Only a few universities teach wavelets inside this unit; most stop at the DCT and pyramids, so treat this part as awareness. Wavelet subband coding replaces the 8×8 DCT in JPEG2000, and the whole-image transform is what removes the blockiness of DCT-coded pictures at high compression."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "One level splits the image into a quarter-size smoothed band LL1 plus three detail bands; the next level splits LL1 again, and the detail bands are kept as they are.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "aria": "A 256 by 256 image splits into LL1, which is 128 wide, plus detail bands LH1, HL1 and HH1, and LL1 splits again into LL2, which is 64 wide.",
+   "root": {
+    "label": "Image 256×256",
+    "children": [
+     {
+      "label": "LL1 128",
+      "edge": "avg",
+      "note": "half width and height",
+      "children": [
+       {
+        "label": "LL2 64",
+        "edge": "avg",
+        "note": "splits again next level",
+        "_d": 2,
+        "children": [],
+        "_x": 105.0,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 105.0,
+      "_y": 116
+     },
+     {
+      "label": "LH1",
+      "edge": "detail",
+      "_d": 1,
+      "children": [],
+      "_x": 275.0,
+      "_y": 116
+     },
+     {
+      "label": "HL1",
+      "edge": "detail",
+      "_d": 1,
+      "children": [],
+      "_x": 445.0,
+      "_y": 116
+     },
+     {
+      "label": "HH1",
+      "edge": "detail",
+      "_d": 1,
+      "children": [],
+      "_x": 615.0,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   }
+  }
+ },
+ "examples": [
+  {
+   "question": "Apply two levels of the 1-D Haar transform, with the 1/√2 scaling, to the signal x = [4, 6, 10, 12]. Give every coefficient and check that the energy is unchanged.",
+   "steps": [
+    "Pair the samples in order: (4, 6) and (10, 12).",
+    "Level 1: a1 = 10/√2 = 7.0711, a2 = 22/√2 = 15.5563, d1 = −2/√2 = −1.4142, d2 = −1.4142.",
+    "Level 2 works on (7.0711, 15.5563): A = 22.6274/√2 = 16.0, D = −8.4853/√2 = −6.0.",
+    "Coefficients, level 2 first: 16.0, −6.0, −1.4142, −1.4142.",
+    "Energy in: 16 + 36 + 100 + 144 = 296. Energy out: 256 + 36 + 2.0 + 2.0 = 296. Equal, so nothing was lost.",
+    "Storing 16.0, −6.0 and two small values of size 1.41 costs few bits once the two small details are quantised to zero; only two numbers then survive. That is the compression argument, and quantisation is what makes it work."
+   ],
+   "answer": "The Haar coefficients are 16.0, −6.0, −1.4142 and −1.4142, and the energy stays 296 before and after the transform.",
+   "check": "import math\nr2 = math.sqrt(2)\nx = [4.0, 6.0, 10.0, 12.0]\na1 = (x[0] + x[1]) / r2\na2 = (x[2] + x[3]) / r2\nd1 = (x[0] - x[1]) / r2\nd2 = (x[2] - x[3]) / r2\nA = (a1 + a2) / r2\nD = (a1 - a2) / r2\ne_in = sum(v * v for v in x)\ne_out = A * A + D * D + d1 * d1 + d2 * d2\nfor v in [a1, a2, d1, d2, A, D, e_in, e_out]:\n    print(round(v, 4))",
+   "values": [
+    7.0711,
+    15.5563,
+    -1.4142,
+    -1.4142,
+    16.0,
+    -6.0,
+    296.0,
+    296.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Subsampling before smoothing. Skipping the Gaussian makes high frequencies fold back as aliasing, so the blur comes first at every level.",
+  "Dropping the 1/√2 factor in the Haar transform. Averages come out √2 times too large and the energy check doubles at each level.",
+  "Expecting a detail band to look like a thumbnail. LH, HL and HH hold differences, so they look like noise or faint edges; only LL is a small image.",
+  "Confusing DCT with DFT. The DCT is real and has no repeated half; for an 8×8 block the DC coefficient is 8 × the block mean, not the mean.",
+  "Rebuilding a Laplacian level by plain upsampling. expand must upsample and then blur, else the pyramid no longer sums back to the original."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the Haar formulas for one pair of samples and name the two outputs.",
+   "marks": 2,
+   "a": "a = (x1 + x2)/√2 is the approximation and d = (x1 − x2)/√2 is the detail, for adjacent samples x1 and x2."
+  },
+  {
+   "level": "remember",
+   "q": "For an 8×8 block, how is the DC coefficient of the 2-D DCT related to the pixels?",
+   "marks": 2,
+   "a": "F(0,0) = (1/8) ΣΣ f(x,y), which is 8 times the mean of the 64 pixels. The other 63 coefficients are the AC coefficients."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a smooth 8×8 block put almost all its energy in F(0,0)?",
+   "marks": 3,
+   "a": "Neighbouring pixels are nearly equal, so products with cosines of u > 0 or v > 0 have positive and negative parts that cancel and sum to almost zero. Only the flat cosine (u = v = 0) matches the block."
+  },
+  {
+   "level": "apply",
+   "q": "Apply one level of the 1-D Haar transform, with the 1/√2 scaling, to x = [2, 4, 6, 8]. Give a1, a2, d1, d2 and check the energy.",
+   "marks": 4,
+   "a": "a1 = 6/√2 = 4.2426; a2 = 14/√2 = 9.8995; d1 = −2/√2 = −1.4142; d2 = −1.4142. Energy in = 4 + 16 + 36 + 64 = 120; energy out = 18.0 + 98.0 + 2.0 + 2.0 = 120, preserved."
+  },
+  {
+   "level": "apply",
+   "q": "A 256×256 image goes through two levels of 2-D Haar decomposition. Give the sizes of LL2, LH2 and LH1.",
+   "marks": 4,
+   "a": "Level 1 halves everything: LL1 and each level-1 detail band are 128×128. Level 2 splits LL1 only, so LL2, LH2, HL2 and HH2 are 64×64, while LH1 stays 128×128."
+  },
+  {
+   "level": "analyze",
+   "q": "In a Gaussian pyramid of a natural photo, one Laplacian level is almost uniformly grey. What does that tell you about the image at that scale?",
+   "marks": 4,
+   "a": "The level is the difference between two neighbouring Gaussian levels. Near-zero values mean the blurred image barely changed between those scales, so that scale carries almost no structure. Energy would sit where edges of that size exist."
+  },
+  {
+   "level": "analyze",
+   "q": "Give one reason for weighting level l of a pyramid by 1/2<sup>l</sup> in pyramid matching, and one cost of doing so.",
+   "marks": 5,
+   "a": "Coarse levels have few cells and describe overall layout, which is stable under small shifts, so a large weight makes matching tolerant of position changes. The cost is that fine detail is down-weighted, so two images with the same layout but different texture may score as similar."
+  },
+  {
+   "level": "understand",
+   "q": "Why can the Haar transform be called a rotation, not a loss, of the data?",
+   "marks": 3,
+   "a": "Because a² + d² = x1² + x2² for each pair, the sum of squares is unchanged. The same numbers are expressed on different axes, so nothing is destroyed and the original is recovered exactly."
+  }
+ ],
+ "beyond": "Not for the exam. JPEG2000 uses a longer biorthogonal 9/7 wavelet over the whole image, and wavelets stay the standard tool for denoising because thresholding small detail coefficients removes noise but keeps edges. Steerable and complex pyramids generalise the same scale idea for orientation-aware processing, and modern detectors still build pyramids as stacks of progressively blurred copies for multi-scale search. Search next for 'wavelet subband coding', 'Laplacian pyramid blending' and 'spatial pyramid matching'."
+}

@@ -1,0 +1,50 @@
+# c-cv-u2: free-model run
+
+- Book: `books/cse/c-cv/c-cv-u2.html`
+- Status: ok
+- Model calls so far: 28 (121,903 tokens in, 262,794 out), 5.7 minutes
+
+## Checker
+
+```
+c-cv-u2.html: 8 chapters, 15646 words, 9 figures, 173 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 3, power-law paragraph: The sentence reads 'For γ  1' with no inequality. The described effect (curve below identity, highlights expanded) is for γ > 1, not γ < 1.
+- ch 1 [high] Section 3, contrast-stretching paragraph: The condition is garbled: 'with r1 histogram processing.' It gives no ordering condition and inserts 'histogram processing' with no meaning.
+- ch 1 [low] Section 2, last paragraph: Says an unscaled log curve can exceed 255 and clip. For an 8-bit natural log with c = 1, the maximum is ln(256) ≈ 5.55, so it cannot exceed 255; only a too-large scale constant c causes clipping.
+- ch 1 [high] Exam traps, 'Top endpoint' bullet: States that a valid display curve must map r = 255 to s = 255. The negative is a valid curve in this chapter and maps 255 to 0.
+- ch 1 [high] Exam traps, 'Gamma on raw values' bullet: Says 255·r^γ with r = 64 gives a tiny number. It gives 255 × 64^0.4 ≈ 1346, a huge number; with γ = 2.5 it is far larger.
+- ch 1 [high] Quiz Q7: The numbers are wrong: 64→192 is a gain of 128, but 128→223 is a gain of 95, not 31. The value 31 is the output increment between r = 64 and r = 128 (223 − 192), not the gain of the second input.
+- ch 2 [high] Section 2, last paragraph: The stated cause of over-brightening is wrong and contradicts Quiz Q4. For a mostly dark image the cumulative curve rises steeply through the crowded dark levels, so it is the dark levels that get spread over much of the output range; the few bright levels are compressed into the top of the range, not stretched. Q4 correctly says levels 0–15 are stretched and the bright tail compressed.
+- ch 2 [low] Section 3, paragraph 2: 'equaliseHist' is not a standard library name (and is spelled in a non-standard way). Students may look for a function that does not exist under that name; OpenCV has equalizeHist and createCLAHE, scikit-image has equalize_hist and equalize_adapthist.
+- ch 2 [low] Section 3, paragraph 2: 'divides the image into blocks (often 8×8 tiles)' is ambiguous: 8×8 could be read as 8×8 pixels per block, whereas CLAHE normally means an 8×8 grid of tiles (64 blocks).
+- ch 3 [high] Worked example 1, steps 3–5 and answer; Figure: The convolution value 23 is attached to pixel (0,0), but it cannot be. With the anchor on the top-left entry of a 2×2 mask the offsets are s,t ∈ {0,1}, and convolution is g(x,y) = Σ w(s,t)·f(x−s,y−t), which needs pixels up and left of the anchor. On the 3×3 image 1 2 3 / 4 5 6 / 7 8 9 the sum 4+6+8+5 = 23 is the output at pixel (1,1), not (0,0); at (0,0) it would need pixels outside the image. Reversing the mask about its array centre and then keeping the anchor on the top-left cell of the reversed array is valid only for odd masks, whose anchor is the centre cell.
+- ch 3 [high] Quiz Q4: The answer says one-pixel replicate padding gives a 6×6 padded input. Padding one pixel on each side of a 6×6 image gives 6+2 = 8 columns and 8 rows, so the padded input is 8×8. The final 6×6 output is right, but the step shown is wrong.
+- ch 3 [low] Section 3, Padding: 'Mirror keeps local slope' is loose and can mislead. Reflecting across the edge (for example padding f(−1) = f(1) on the ramp 0,1,2) reverses the slope direction at the boundary; repeating the edge sample holds the value flat there. Neither continues the slope unchanged.
+- ch 4 [low] Figure (comparison of box and Gaussian weight): The two curves are plotted on different, unnormalised scales, so the picture contradicts the numbers in Section 2. The Gaussian series is exp(-x²/2), which is 1 at d = 0 and has no 1/(√(2π)σ) factor, while the text's mask weights are G(d) divided by the sum (centre 0.25, edge 0.125, corner 0.0625). The box is drawn at weight 1, not 1/9 ≈ 0.111. Read literally, the figure says the box weight (1) is larger than the Gaussian weight (0.61) at d = 1, which is the reverse of the real 3 × 3 masks (0.125 Gaussian vs 0.111 box).
+- ch 4 [low] Section 3, sentence on repeated smoothing in hardware: The sentence mixes two different ideas. 'Apply the separable 1-D mask twice' describes separability, which is what one single Gaussian pass already needs (once along rows, once along columns). Two Gaussian passes need four 1-D passes, not two. A student will think repeated smoothing and separability are the same saving.
+- ch 4 [low] Section 3, border handling: The text says 'the same rule applies at borders' but does not say which sum to divide by. If a student averages only the pixels that exist and then divides by the full mask sum (16 for the 3 × 3 Gaussian), the border darkens — the exact fault the paragraph warns about. Zero padding does the same.
+- ch 5 [high] Quiz Q5 (and its link with Exam traps, bullet 3): The answer says a mask whose coefficients sum to 1 gives a flat-region response of 100 and 'adding it doubles the brightness'. But Section 2 has already presented 0 −1 0 / −1 5 −1 / 0 −1 0, which sums to 1, as the correct folded sharpening mask applied directly to the image — on a flat region of 100 it returns exactly 100, unchanged. Used as a Laplacian residual inside g = f − ∇²f it returns 100 − 100 = 0, a black patch. Brightness doubles only if the response is added on top of the original. So the answer as printed mixes two conventions and contradicts the chapter's own folded mask.
+- ch 5 [low] Exam traps, bullet 3: 'A sharpening mask whose coefficients do not sum to zero ... brightens or darkens flat regions' is stated too broadly. A mask summing to zero and applied directly to the image turns flat regions black, and the folded mask that sums to 1 is the one the chapter recommends. Students will read this as contradicting Section 2.
+- ch 5 [low] Figure: A ramp edge and its derivatives: The f′ row uses the backward difference f(x) − f(x−1), not the forward difference f′(x) = f(x+1) − f(x) defined in Section 1. Under the chapter's formula f′(0) = 0 − 0 = 0 and the block of 2s sits at positions 1, 2 and 3, not 2, 3 and 4. The f″ row also shows a value at the last position, which needs f(7) and cannot be computed.
+- ch 5 [low] Section 1, closing paragraph: 'The second derivative locates detail finely but doubles it' can be misread as doubling the intensity. The intended meaning is that a step produces two responses, one positive and one negative.
+- ch 6 [low] Lead: "JPEG's parent transforms" is vague and can mislead: JPEG uses the discrete cosine transform, not the DFT directly, and the phrase does not say what the relation is.
+- ch 6 [low] Worked example 1, step 2: The DC check is written as "MN × mean" but x here is a 1-D signal of length 4, so M has no meaning. Only N exists.
+- ch 6 [low] Beyond: "Real systems rarely call the DFT yourself" mixes subject and object; second-language readers will stumble.
+- ch 7 [low] Section 3, and Worked example 1 step 2: D₀ is called 'a fixed half-power point'. With the filter as defined, H(D₀) = 0.5, so the power gain is H² = 0.25, i.e. −6 dB. That is the half-amplitude point, not the half-power point; the half-power (−3 dB) point where H = 0.707 lies at a smaller radius.
+- ch 7 [low] Section 4 and the last exam trap (notch duplicate): The mirror point is written as (M−u₀, N−v₀), which is correct only for the uncentred DFT, but the chapter tells the student to centre the spectrum before building any mask. After centring, the conjugate of (u₀,v₀) is (−u₀,−v₀), so a student following both instructions puts the second notch in the wrong place.
+- ch 7 [low] Quiz Q7: 'The ripples around each edge grow' is loose. The overshoot right next to a single step edge stays at roughly the same fraction (about 9%) whatever D₀ is. What a smaller D₀ changes is the spatial extent of the ripples, so ripples from neighbouring edges overlap and the ringing looks stronger.
+- ch 8 [high] Section 1, the 2-D DCT formula: The formula is written for a general N×N block but uses the fixed factor ¼. With the usual C(u) (C(0)=1/√2, C(k)=1) the correct leading factor is 2/N, which equals ¼ only when N = 8. A student who applies the printed formula to a 16×16 block gets coefficients half the right size, and the DC result (1/8)ΣΣf stops matching the stated 8 × mean.
+- ch 8 [high] Section 1, definition of F(u,v) and the sentence 'u = 3 means three half-cycles across the width': The chapter defines f(x,y) with x as the row index, and u is paired with x in the cosine. So u is the vertical frequency and v the horizontal one. The text says the opposite — 'F(u,v) is the coefficient for horizontal frequency u and vertical frequency v' — and then says u counts half-cycles across the width. The two statements contradict each other.
+- ch 8 [low] Section 1, opening paragraph: 'The DFT of a real image is complex, and its second half repeats the first' is loose. For a real image the spectrum is conjugate-symmetric: the second half is the mirrored complex conjugate of the first, not an exact repeat. Read literally, a student may think the values are identical.
+- ch 8 [low] Section 2, pyramid matching sentence: The chapter states as fact that level l is weighted by 1/2^l so that coarse levels weigh more. The widely used spatial pyramid matching kernel weights level l by 1/2^(L−l), i.e. fine levels weigh more. Presenting one convention as the definition will cost marks if the examiner follows the other.
+- ch 8 [low] Section 2, pyramid matching sentence (notation): '2l × 2l cells' and 'weight level l by 1/2l' are written without a superscript, so they read as 2 times l. Q7 uses 1/2^l, so the same quantity appears in two different forms.
+- ch 8 [low] Worked example 1, step 8: 'Storing 16.0, −6.0 and two values near 2' — the two detail values are −1.4142, not near 2; 2.0 is their square, i.e. their energy. The compression claim also does not follow from the four numbers alone, since 16.0 and −6.0 are not cheaper to store than the input.

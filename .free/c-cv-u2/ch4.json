@@ -1,0 +1,816 @@
+{
+ "lead": "A smoothing spatial filter replaces each output pixel with a weighted average of the input pixel and its neighbours. A single noisy pixel is pulled towards the local average, so noise falls. The same average also softens true changes, so edges and fine text blur. This is why smoothing is used before thresholding, before shrinking an image, or as a first step in edge detection, and why it must be tuned. A night photo of a vehicle number plate is a good test: smoothing can remove grain but can also merge the digits.",
+ "prereq": "You need: correlation, convolution and padding from <a href=\"#spatial-filtering-basics-correlation-and-convolution\">Chapter 2.3</a>; smoothing is correlation with a mask whose weights are positive and sum to 1.",
+ "sections": [
+  {
+   "h3": "Box filter: average of neighbours",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A box filter, also called a mean filter, replaces a pixel by the average of a k × k window around it. The mask is a small matrix of weights, here all 1/k², so every neighbour has equal say. For k = 3 each weight is 1/9. Correlation is enough because the mask is symmetric; see <a href=\"#spatial-filtering-basics-correlation-and-convolution\">Chapter 2.3</a>. On a night number-plate photo, grain appears as one or two pixels much brighter or darker than their neighbours. Averaging pulls an isolated bright pixel down. The cost is that a true edge is also averaged: background and digit mix, and the transition spreads over about k pixels. Inside a flat region the output equals the input. A larger window removes more noise but blurs more. A 3 × 3 is common; 5 × 5 is slower and visibly softer. Thin lines fade because the window contains more background than line."
+    },
+    {
+     "type": "formula",
+     "text": "g(x,y) = (1/k²) × Σ f(x+s, y+t)",
+     "where": "g(x,y) is the output pixel at row x and column y; f is the input image; k is the window width, so k² is the number of pixels; s and t run from −a to +a with k = 2a + 1."
+    },
+    {
+     "type": "p",
+     "text": "Use this filter when the noise is random and the objects are large. Do not use it when the smallest detail is the digit stroke itself. The next figure compares the box weight with a Gaussian weight at the same distance from the centre."
+    }
+   ]
+  },
+  {
+   "h3": "Gaussian mask: distance matters",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A Gaussian smoothing mask gives the centre pixel the largest weight and farther pixels smaller weights. The 3 × 3 mask with rows 1 2 1, 2 4 2, 1 2 1 has weights that sum to 16. Its centre weight is 4/16 = 0.25, an edge neighbour is 2/16 = 0.125, and a corner is 1/16 = 0.0625. The box filter gives every position 1/9 ≈ 0.111. So the Gaussian keeps the centre stronger and treats far neighbours less. That is why an edge survives a little better: the mix is less uniform. For an isolated spike the box can pull the value down more, but it also smears the spike equally in all directions."
+    },
+    {
+     "type": "formula",
+     "text": "G(d) = (1/(√(2π) σ)) exp(−d²/(2σ²))",
+     "where": "G(d) is the weight at distance d pixels from the mask centre; σ is the standard deviation in pixels, which sets the width of the blur; exp means e raised to the power shown; the factor before exp makes the area under the curve equal 1."
+    },
+    {
+     "type": "p",
+     "text": "In two dimensions the Gaussian is the product of two 1-D Gaussians, one along rows and one along columns. This is called separability: a k × k Gaussian costs about 2k operations per pixel instead of k². It is isotropic, meaning the blur is the same in every direction, so a slanted edge blurs like a vertical edge. In the frequency domain it has one smooth low-pass lobe and no ringing side lobes; see <a href=\"#filtering-in-the-frequency-domain\">Chapter 2.7</a>. A practical rule is that the mask width is about 6σ + 1, or radius about 3σ. For σ = 1 pixel, a 7 × 7 mask is a good fit; a 3 × 3 mask is a fast, rough approximation."
+    }
+   ]
+  },
+  {
+   "h3": "Normalisation, repeated smoothing and shrinking",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Always divide by the sum of the mask weights. If the weights sum to S, compute weighted sum / S. A mask that sums to 0.8 darkens the image; a mask that sums to 1.25 brightens it. A 3 × 3 Gaussian with weights summing to 16 must be divided by 16, not by 9. The same rule applies at borders, where a full window may not fit: pad the image, or average only over the pixels that exist. Otherwise dark borders appear."
+    },
+    {
+     "type": "formula",
+     "text": "σ_total² = σ₁² + σ₂²",
+     "where": "σ_total is the equivalent blur of two Gaussian passes in pixels; σ₁ and σ₂ are the standard deviations of the two passes. For n identical passes, σ_total = σ√n."
+    },
+    {
+     "type": "p",
+     "text": "Two small Gaussian passes therefore approximate one larger Gaussian. This is useful in hardware: apply the separable 1-D mask twice instead of storing a large 2-D mask. Smoothing also comes before downsampling. If you shrink an image by 2 without blurring first, fine grain and thin lines fold into false patterns, called aliasing. A low-pass blur removes the frequencies that the smaller grid cannot represent. That step is developed in <a href=\"#image-transforms-dct-wavelets-and-image-pyramids\">Chapter 2.8</a>. Smoothing is the opposite of sharpening in <a href=\"#sharpening-filters-derivatives-laplacian-and-unsharp-masking\">Chapter 2.5</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The Gaussian weight falls smoothly with distance, while the box weight stays flat inside the window and then drops to zero. Notice that the Gaussian gives the centre a much larger weight than the far neighbours.",
+  "spec": {
+   "type": "plot",
+   "aria": "Two curves of weight against distance from the centre: a Gaussian that falls smoothly to near zero by three pixels, and a box that stays at one and then drops to zero.",
+   "x": {
+    "label": "d",
+    "min": 0,
+    "max": 4
+   },
+   "y": {
+    "label": "weight",
+    "min": 0,
+    "max": 1
+   },
+   "series": [
+    {
+     "name": "Gaussian σ=1",
+     "expr": "exp(-x**2/2)",
+     "style": "accent",
+     "_pts": [
+      [
+       0.0,
+       1.0
+      ],
+      [
+       0.05,
+       0.9987507809245809
+      ],
+      [
+       0.1,
+       0.9950124791926823
+      ],
+      [
+       0.15,
+       0.9888130446112331
+      ],
+      [
+       0.2,
+       0.9801986733067553
+      ],
+      [
+       0.25,
+       0.9692332344763441
+      ],
+      [
+       0.3,
+       0.9559974818331
+      ],
+      [
+       0.35,
+       0.9405880633643421
+      ],
+      [
+       0.4,
+       0.9231163463866358
+      ],
+      [
+       0.45,
+       0.903707077873196
+      ],
+      [
+       0.5,
+       0.8824969025845955
+      ],
+      [
+       0.55,
+       0.8596327636025421
+      ],
+      [
+       0.6,
+       0.835270211411272
+      ],
+      [
+       0.65,
+       0.8095716486678869
+      ],
+      [
+       0.7,
+       0.7827045382418681
+      ],
+      [
+       0.75,
+       0.7548396019890073
+      ],
+      [
+       0.8,
+       0.7261490370736908
+      ],
+      [
+       0.85,
+       0.6968047754960348
+      ],
+      [
+       0.9,
+       0.6669768108584744
+      ],
+      [
+       0.95,
+       0.6368316143717432
+      ],
+      [
+       1.0,
+       0.6065306597126334
+      ],
+      [
+       1.05,
+       0.5762290736717999
+      ],
+      [
+       1.1,
+       0.5460744266397094
+      ],
+      [
+       1.15,
+       0.5162056739454964
+      ],
+      [
+       1.2,
+       0.4867522559599717
+      ],
+      [
+       1.25,
+       0.45783336177161427
+      ],
+      [
+       1.3,
+       0.4295573582107391
+      ],
+      [
+       1.35,
+       0.40202138309465485
+      ],
+      [
+       1.4,
+       0.37531109885139957
+      ],
+      [
+       1.45,
+       0.3495006001997565
+      ],
+      [
+       1.5,
+       0.32465246735834974
+      ],
+      [
+       1.55,
+       0.3008179543572755
+      ],
+      [
+       1.6,
+       0.2780373004531941
+      ],
+      [
+       1.65,
+       0.25634015141507366
+      ],
+      [
+       1.7,
+       0.23574607655586358
+      ],
+      [
+       1.75,
+       0.2162651668298873
+      ],
+      [
+       1.8,
+       0.19789869908361465
+      ],
+      [
+       1.85,
+       0.18063985161889395
+      ],
+      [
+       1.9,
+       0.1644744565771549
+      ],
+      [
+       1.95,
+       0.14938177525041804
+      ],
+      [
+       2.0,
+       0.1353352832366127
+      ],
+      [
+       2.05,
+       0.12230345334690061
+      ],
+      [
+       2.1,
+       0.11025052530448522
+      ],
+      [
+       2.15,
+       0.09913725251074738
+      ],
+      [
+       2.2,
+       0.0889216174593863
+      ],
+      [
+       2.25,
+       0.07955950871822769
+      ],
+      [
+       2.3,
+       0.07100535373963701
+      ],
+      [
+       2.35,
+       0.06321270307528883
+      ],
+      [
+       2.4,
+       0.056134762834133725
+      ],
+      [
+       2.45,
+       0.04972487341234958
+      ],
+      [
+       2.5,
+       0.04393693362340742
+      ],
+      [
+       2.55,
+       0.038725770351664364
+      ],
+      [
+       2.6,
+       0.03404745473459933
+      ],
+      [
+       2.65,
+       0.029859566641115533
+      ],
+      [
+       2.7,
+       0.026121409853918223
+      ],
+      [
+       2.75,
+       0.022794180883612344
+      ],
+      [
+       2.8,
+       0.019841094744370298
+      ],
+      [
+       2.85,
+       0.017227471311635108
+      ],
+      [
+       2.9,
+       0.014920786069067842
+      ],
+      [
+       2.95,
+       0.01289068914400147
+      ],
+      [
+       3.0,
+       0.011108996538242306
+      ],
+      [
+       3.05,
+       0.009549657395020316
+      ],
+      [
+       3.1,
+       0.008188701014374074
+      ],
+      [
+       3.15,
+       0.007004167149362422
+      ],
+      [
+       3.2,
+       0.0059760228950059375
+      ],
+      [
+       3.25,
+       0.005086069231012701
+      ],
+      [
+       3.3,
+       0.0043178400076330815
+      ],
+      [
+       3.35,
+       0.003656495880052896
+      ],
+      [
+       3.4,
+       0.0030887154082367718
+      ],
+      [
+       3.45,
+       0.0026025852527254006
+      ],
+      [
+       3.5,
+       0.002187491118182885
+      ],
+      [
+       3.55,
+       0.0018340108300731598
+      ],
+      [
+       3.6,
+       0.001533810679324463
+      ],
+      [
+       3.65,
+       0.0012795459378999237
+      ],
+      [
+       3.7,
+       0.0010647662366679196
+      ],
+      [
+       3.75,
+       0.00088382630693505
+      ],
+      [
+       3.8,
+       0.0007318024188804728
+      ],
+      [
+       3.85,
+       0.0006044147037595549
+      ],
+      [
+       3.9,
+       0.0004979554215032739
+      ],
+      [
+       3.95,
+       0.0004092231302281785
+      ],
+      [
+       4.0,
+       0.00033546262790251185
+      ]
+     ]
+    },
+    {
+     "name": "box 3×3",
+     "expr": "1 if x<=1.5 else 0",
+     "style": "live",
+     "_pts": [
+      [
+       0.0,
+       1.0
+      ],
+      [
+       0.05,
+       1.0
+      ],
+      [
+       0.1,
+       1.0
+      ],
+      [
+       0.15,
+       1.0
+      ],
+      [
+       0.2,
+       1.0
+      ],
+      [
+       0.25,
+       1.0
+      ],
+      [
+       0.3,
+       1.0
+      ],
+      [
+       0.35,
+       1.0
+      ],
+      [
+       0.4,
+       1.0
+      ],
+      [
+       0.45,
+       1.0
+      ],
+      [
+       0.5,
+       1.0
+      ],
+      [
+       0.55,
+       1.0
+      ],
+      [
+       0.6,
+       1.0
+      ],
+      [
+       0.65,
+       1.0
+      ],
+      [
+       0.7,
+       1.0
+      ],
+      [
+       0.75,
+       1.0
+      ],
+      [
+       0.8,
+       1.0
+      ],
+      [
+       0.85,
+       1.0
+      ],
+      [
+       0.9,
+       1.0
+      ],
+      [
+       0.95,
+       1.0
+      ],
+      [
+       1.0,
+       1.0
+      ],
+      [
+       1.05,
+       1.0
+      ],
+      [
+       1.1,
+       1.0
+      ],
+      [
+       1.15,
+       1.0
+      ],
+      [
+       1.2,
+       1.0
+      ],
+      [
+       1.25,
+       1.0
+      ],
+      [
+       1.3,
+       1.0
+      ],
+      [
+       1.35,
+       1.0
+      ],
+      [
+       1.4,
+       1.0
+      ],
+      [
+       1.45,
+       1.0
+      ],
+      [
+       1.5,
+       1.0
+      ],
+      [
+       1.55,
+       0.0
+      ],
+      [
+       1.6,
+       0.0
+      ],
+      [
+       1.65,
+       0.0
+      ],
+      [
+       1.7,
+       0.0
+      ],
+      [
+       1.75,
+       0.0
+      ],
+      [
+       1.8,
+       0.0
+      ],
+      [
+       1.85,
+       0.0
+      ],
+      [
+       1.9,
+       0.0
+      ],
+      [
+       1.95,
+       0.0
+      ],
+      [
+       2.0,
+       0.0
+      ],
+      [
+       2.05,
+       0.0
+      ],
+      [
+       2.1,
+       0.0
+      ],
+      [
+       2.15,
+       0.0
+      ],
+      [
+       2.2,
+       0.0
+      ],
+      [
+       2.25,
+       0.0
+      ],
+      [
+       2.3,
+       0.0
+      ],
+      [
+       2.35,
+       0.0
+      ],
+      [
+       2.4,
+       0.0
+      ],
+      [
+       2.45,
+       0.0
+      ],
+      [
+       2.5,
+       0.0
+      ],
+      [
+       2.55,
+       0.0
+      ],
+      [
+       2.6,
+       0.0
+      ],
+      [
+       2.65,
+       0.0
+      ],
+      [
+       2.7,
+       0.0
+      ],
+      [
+       2.75,
+       0.0
+      ],
+      [
+       2.8,
+       0.0
+      ],
+      [
+       2.85,
+       0.0
+      ],
+      [
+       2.9,
+       0.0
+      ],
+      [
+       2.95,
+       0.0
+      ],
+      [
+       3.0,
+       0.0
+      ],
+      [
+       3.05,
+       0.0
+      ],
+      [
+       3.1,
+       0.0
+      ],
+      [
+       3.15,
+       0.0
+      ],
+      [
+       3.2,
+       0.0
+      ],
+      [
+       3.25,
+       0.0
+      ],
+      [
+       3.3,
+       0.0
+      ],
+      [
+       3.35,
+       0.0
+      ],
+      [
+       3.4,
+       0.0
+      ],
+      [
+       3.45,
+       0.0
+      ],
+      [
+       3.5,
+       0.0
+      ],
+      [
+       3.55,
+       0.0
+      ],
+      [
+       3.6,
+       0.0
+      ],
+      [
+       3.65,
+       0.0
+      ],
+      [
+       3.7,
+       0.0
+      ],
+      [
+       3.75,
+       0.0
+      ],
+      [
+       3.8,
+       0.0
+      ],
+      [
+       3.85,
+       0.0
+      ],
+      [
+       3.9,
+       0.0
+      ],
+      [
+       3.95,
+       0.0
+      ],
+      [
+       4.0,
+       0.0
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A 3 × 3 window from a noisy night number-plate image has intensities 10, 10, 10 / 10, 80, 10 / 10, 10, 10, where 80 is a noise spike. (a) Apply a 3 × 3 box filter at the centre. (b) Apply the Gaussian mask 1 2 1 / 2 4 2 / 1 2 1 at the centre. Give each centre result.",
+   "steps": [
+    "Write the window and note that there are eight values equal to 10 and one centre value equal to 80.",
+    "Box filter: sum = 10 + 10 + 10 + 10 + 80 + 10 + 10 + 10 + 10 = 8 × 10 + 80 = 160.",
+    "Box average = 160 / 9 = 17.777... intensity units, which is 17.8 to one decimal place, or 18 if rounded to an integer.",
+    "Gaussian weighted sum, row by row: top row = 1 × 10 + 2 × 10 + 1 × 10 = 40; middle row = 2 × 10 + 4 × 80 + 2 × 10 = 20 + 320 + 20 = 360; bottom row = 1 × 10 + 2 × 10 + 1 × 10 = 40.",
+    "Total weighted sum = 40 + 360 + 40 = 440. The mask weights sum to 1 + 2 + 1 + 2 + 4 + 2 + 1 + 2 + 1 = 16.",
+    "Gaussian average = 440 / 16 = 27.5 intensity units.",
+    "The box result is 17.8, rounded to 18; the Gaussian result is 27.5. The box pulls the spike lower, but the Gaussian gives the centre more weight, so a true edge is preserved slightly better."
+   ],
+   "answer": "The box filter gives 17.8 intensity units (18 rounded), and the Gaussian mask gives 27.5 intensity units.",
+   "check": "w = [10,10,10,10,80,10,10,10,10]\nbox_sum = sum(w)\nbox_avg = box_sum / 9\nprint(round(box_avg, 1))\nprint(round(box_avg))\ng = [1,2,1,2,4,2,1,2,1]\ng_sum = sum(a*b for a,b in zip(w,g))\ng_avg = g_sum / sum(g)\nprint(g_avg)",
+   "values": [
+    17.8,
+    18,
+    27.5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Dividing by 9 when the mask weights sum to 16. Always divide by the sum of the weights; otherwise the output brightens.",
+  "Thinking a smoothing filter removes all noise without cost. It lowers noise and also blurs edges, thin lines and small text.",
+  "Using a large mask on a number plate because it gives a cleaner background. The digits merge, so choose the smallest mask that controls the noise.",
+  "Confusing box and Gaussian results. A box suppresses an isolated spike more, but it spreads the spike equally to all neighbours; the Gaussian keeps the centre stronger.",
+  "Forgetting border handling. At image edges a full window does not fit, so pad the image or use only valid pixels; otherwise values wrap or go dark."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State what a 3 × 3 box filter does to one pixel and its eight neighbours.",
+   "marks": 2,
+   "a": "It adds the nine pixel values and divides by 9, so the centre becomes their average. Every neighbour has weight 1/9."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a Gaussian mask preserve an edge slightly better than a box mask of the same 3 × 3 size?",
+   "marks": 3,
+   "a": "The Gaussian gives the centre weight 4/16 = 0.25 and far corners 1/16 = 0.0625, so nearby pixels count more. The box gives all nine pixels 1/9, so it mixes background and edge equally in all directions."
+  },
+  {
+   "level": "apply",
+   "q": "A 3 × 3 window has all values 20 except the centre, which is 100. Find the centre output for (a) the 3 × 3 box filter, (b) the Gaussian mask 1 2 1 / 2 4 2 / 1 2 1.",
+   "marks": 4,
+   "a": "(a) Box sum = 8 × 20 + 100 = 260; 260/9 = 28.888..., so 28.9 to one decimal place. (b) Gaussian weighted sum: top 80, middle 40 + 400 + 40 = 480, bottom 80; total 640. Divide by 16 gives 40. So box ≈ 28.9 and Gaussian = 40."
+  },
+  {
+   "level": "analyze",
+   "q": "A mask has weights summing to 16 but the code divides by 9. What happens to a flat region of intensity 50?",
+   "marks": 4,
+   "a": "The output is 50 × 16 / 9 = 88.888..., so the region brightens to about 88.9. In an 8-bit image this may clip near 255 on brighter areas. The blur is also wrong because normalisation is wrong."
+  },
+  {
+   "level": "remember",
+   "q": "How wide should a Gaussian mask be for σ = 2 pixels?",
+   "marks": 2,
+   "a": "About 6σ + 1 = 13 pixels wide, or radius about 3σ = 6 pixels."
+  },
+  {
+   "level": "understand",
+   "q": "Why blur an image before shrinking it by a factor of 2?",
+   "marks": 3,
+   "a": "Shrinking lowers the sampling rate. Fine detail above the new Nyquist limit would fold into false low-frequency patterns, called aliasing. A low-pass Gaussian removes those high frequencies first."
+  },
+  {
+   "level": "apply",
+   "q": "Two identical Gaussian passes each have σ = 1 pixel. What single Gaussian blur is equivalent?",
+   "marks": 3,
+   "a": "Use σ_total² = σ₁² + σ₂² = 1² + 1² = 2. So σ_total = √2 ≈ 1.41 pixels."
+  }
+ ],
+ "beyond": "Not for the exam. Modern systems replace the fixed Gaussian with edge-aware smoothing such as the bilateral filter, which averages similar nearby pixels and keeps strong edges. Non-local means goes further: it averages patches that look alike anywhere in the image. Learned denoisers use small convolutional neural networks trained on noisy and clean pairs. Search next for bilateral filter, non-local means, and Gaussian pyramid; the last connects directly to scale-space features."
+}

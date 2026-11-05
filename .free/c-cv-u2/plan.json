@@ -1,0 +1,477 @@
+{
+ "lead": "Enhancement makes an image easier to read, for a human or for the next algorithm. This unit covers point operations that remap single pixel values, neighbourhood filters that smooth or sharpen, and the Fourier view where filtering becomes simple multiplication. After it you can pick a transformation for a dark photo, remove noise with a kernel, sharpen an edge, and design a low-pass or high-pass filter in the frequency domain.",
+ "about": "This unit is about changing an image so that later steps — segmentation, feature detection, recognition — have an easier job. Chapter 2.1 starts with point operations that remap single pixel values. Chapter 2.2 uses the histogram of the whole image to choose that remapping automatically. Chapters 2.3 to 2.5 move to neighbourhoods: how a mask slides over an image, how averaging smooths noise away, and how derivatives put edges back. Chapter 2.6 introduces the Fourier transform and the DFT, and 2.7 uses them to filter by frequency instead of by pixel neighbourhood. Chapter 2.8 closes with the DCT, wavelets and pyramids, which carry the same filtering idea into compression and multiscale work.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A point operation changes a pixel using only its own value, through a fixed curve s = T(r).",
+   "depth": "Cover the identity, negative (s = L−1−r), log and inverse-log (s = c·log(1+r), with c = (L−1)/log(L) for an 8-bit image), and power-law (s = c·r^γ) on values normalised to 0–1. Show contrast stretching as a piecewise-linear curve. Explain that γ < 1 brightens a dark image, γ > 1 darkens a washed-out one, and that the log curve compresses a wide dynamic range (Fourier spectra are the classic user). Some syllabi call the whole family 'gray level transformations' or 'point operations'. Draw how a lookup table of 256 entries makes any of these one pass over the image.",
+   "figure": {
+    "type": "plot",
+    "aria": "Four curves on input 0 to 255 against output 0 to 255: a falling straight line for the negative, a rising log curve, and two power curves, one above and one below the identity.",
+    "x": {
+     "label": "input r",
+     "min": 0,
+     "max": 255
+    },
+    "y": {
+     "label": "output s",
+     "min": 0,
+     "max": 255
+    },
+    "series": [
+     {
+      "name": "negative",
+      "expr": "255-x",
+      "style": "muted"
+     },
+     {
+      "name": "log",
+      "expr": "255*log(1+x)/log(256)",
+      "style": "normal"
+     },
+     {
+      "name": "γ = 0.4",
+      "expr": "255*(x/255)**0.4",
+      "style": "accent"
+     },
+     {
+      "name": "γ = 2.5",
+      "expr": "255*(x/255)**2.5",
+      "style": "live"
+     }
+    ]
+   },
+   "example": "An 8-bit image has pixel values 0, 64, 128, 192 and 255. Apply (a) the negative, (b) the log transform s = 45.98·ln(1+r), (c) the power law with γ = 0.4. Negative gives 255, 191, 127, 63, 0. Log gives 0, 192, 223, 242, 255. Gamma 0.4 gives 0, 147, 194, 228, 255. Note the log curve pushes the low values 64 and 128 far up while the top stays near 255 — that is dynamic-range compression. Also check that the log curve maps r = 255 exactly to 255 because c was chosen for that.",
+   "trap": "Applying γ to the raw value instead of r/255, or forgetting c in the log transform so outputs cross 255 and clip. Marks are lost for a curve that does not map the top input to the top output.",
+   "prereq": "Unit 1: sampling, quantisation, and the 8-bit range 0 to 255 with L = 256 levels.",
+   "leave": "Choosing which curve to use from the histogram to chapter 2.2; per-neighbourhood operations to chapters 2.3–2.5; grey-level-to-colour mapping to Unit 1."
+  },
+  {
+   "k": 2,
+   "idea": "Equalisation builds a remapping curve from the image's own cumulative histogram, so the output uses the full range.",
+   "depth": "Define h(r_k) = n_k, the normalised histogram p(r_k) = n_k/MN with M×N pixels, and the equalisation s = T(r) = (L−1)·Σ p(r_j) over j ≤ k. Work in the continuous case to show s comes out uniform, then in the discrete case show rounding and the merging of levels. Cover specification (matching): equalise the input to a flat s, equalise the desired histogram to a flat G, then invert G to map s → z. Some syllabi call specification 'histogram matching'. Mention that a local (block-wise) histogram equalisation is what CLAHE does, and that most imaging libraries ship it.",
+   "figure": {
+    "type": "array",
+    "title": "Equalising a 3-bit image (4096 pixels)",
+    "aria": "Three rows of eight values: raw counts, running cumulative counts up to 4096, and the rounded output levels 1, 3, 5, 6, 6, 7, 7, 7.",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "n_k",
+      "cells": [
+       "790",
+       "1023",
+       "850",
+       "656",
+       "329",
+       "245",
+       "122",
+       "81"
+      ]
+     },
+     {
+      "label": "cdf",
+      "cells": [
+       "790",
+       "1813",
+       "2663",
+       "3319",
+       "3648",
+       "3893",
+       "4015",
+       "4096"
+      ]
+     },
+     {
+      "label": "s_k",
+      "cells": [
+       "1",
+       "3",
+       "5",
+       "6",
+       "6",
+       "7",
+       "7",
+       "7"
+      ],
+      "marks": {
+       "0": "accent",
+       "3": "live"
+      }
+     }
+    ]
+   },
+   "example": "A 3-bit image (L = 8, values 0 to 7) of 64×64 = 4096 pixels has counts 790, 1023, 850, 656, 329, 245, 122, 81. Cumulative counts are 790, 1813, 2663, 3319, 3648, 3893, 4015, 4096. Multiply each by (L−1)/MN = 7/4096 and round: level 0 → 7×790/4096 = 1.35 → 1; level 1 → 7×1813/4096 = 3.10 → 3; level 2 → 4.55 → 5; level 3 → 5.67 → 6; level 4 → 6.23 → 6; level 5 → 6.65 → 7; level 6 → 6.86 → 7; level 7 → 7.00 → 7. The mapping is 0→1, 1→3, 2→5, 3→6, 4→6, 5→7, 6→7, 7→7: five input levels merge into the top two output levels.",
+   "trap": "Scaling by 1/MN instead of 7/MN, or applying the transform to the histogram instead of to the pixels. Equalisation does not give a flat histogram in the discrete case — say so, do not claim it does.",
+   "prereq": "Chapter 2.1: monotonic curves and the 0 to L−1 output range.",
+   "leave": "Order-statistic filters and mean filters for noise, which share the histogram idea, to Unit 3; Otsu thresholding, which works on a histogram, to Unit 4."
+  },
+  {
+   "k": 3,
+   "idea": "Spatial filtering replaces each pixel with a weighted sum of its neighbours; correlation uses the mask as it is, convolution flips it by 180° first.",
+   "depth": "Define the mask (also called kernel, window, template), the anchor, and the sliding sum. Write correlation as g(x,y) = Σ w(s,t)·f(x+s, y+t) and convolution with w(−s,−t), over a 3×3 window with a 1-pixel border. Explain padding choices (zero, replicate, mirror) and why the output shrinks. Show that separable masks (Gaussian, box) cost two 1-D passes instead of a full 2-D pass. State the conditions for a linear shift-invariant system so that the same mask acts everywhere. Keep to grey images here; colour is Unit 1.",
+   "figure": {
+    "type": "array",
+    "title": "One output pixel, two rules",
+    "aria": "Five short rows: a 2 by 2 window, a 2 by 2 mask, the mask flipped, the four correlation products and the four convolution products.",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "window",
+      "cells": [
+       "1",
+       "2",
+       "4",
+       "5"
+      ]
+     },
+     {
+      "label": "w",
+      "cells": [
+       "1",
+       "2",
+       "3",
+       "4"
+      ]
+     },
+     {
+      "label": "flip w",
+      "cells": [
+       "4",
+       "3",
+       "2",
+       "1"
+      ]
+     },
+     {
+      "label": "corr terms",
+      "cells": [
+       "1",
+       "4",
+       "12",
+       "20"
+      ],
+      "marks": {
+       "3": "accent"
+      }
+     },
+     {
+      "label": "conv terms",
+      "cells": [
+       "4",
+       "6",
+       "8",
+       "5"
+      ],
+      "marks": {
+       "3": "live"
+      }
+     }
+    ]
+   },
+   "example": "A 3×3 image has rows 1 2 3 / 4 5 6 / 7 8 9 and the 2×2 mask w is 1 2 / 3 4. Take the top-left window 1 2 / 4 5. Correlation: 1×1 + 2×2 + 4×3 + 5×4 = 1 + 4 + 12 + 20 = 37. Convolution flips w to 4 3 / 2 1: 1×4 + 2×3 + 4×2 + 5×1 = 4 + 6 + 8 + 5 = 23. The two answers differ because w is not symmetric about its centre; for a symmetric mask such as the Laplacian they are equal.",
+   "trap": "Skipping the flip in a convolution question, and flipping about the wrong point when the mask size is even. Also state which pixels are lost at the border, or the answer will not match the image size given.",
+   "prereq": "Unit 1: pixel neighbourhoods and coordinate conventions; chapter 2.1 for the point-operation contrast.",
+   "leave": "Edge detectors that use these masks (Sobel, Prewitt, Canny) to Unit 4; adaptive and order-statistic filters to Unit 3."
+  },
+  {
+   "k": 4,
+   "idea": "A smoothing filter averages a pixel with its neighbours, which lowers noise but also blurs edges.",
+   "depth": "Cover the box (mean) filter with all weights 1/9, weighted averages, and the Gaussian mask with weights 1 2 1 / 2 4 2 / 1 2 1 summed to 16, explaining why the Gaussian is preferred (isotropic, separable, one lobe in frequency). Relate σ to mask size, roughly a mask spanning 6σ. Give the 1-D Gaussian form and show the weights fall with distance. Discuss how repeated small smoothing approximates one larger Gaussian, and that blur before downsampling prevents aliasing — this points ahead to chapter 2.8. Use it on a noisy photo of a number plate at night as the running example.",
+   "figure": {
+    "type": "plot",
+    "aria": "Two curves of weight against distance from the centre: a Gaussian that falls smoothly to near zero by three pixels, and a box that stays at one and then drops to zero.",
+    "x": {
+     "label": "d",
+     "min": 0,
+     "max": 4
+    },
+    "y": {
+     "label": "weight",
+     "min": 0,
+     "max": 1
+    },
+    "series": [
+     {
+      "name": "Gaussian σ=1",
+      "expr": "exp(-x**2/2)",
+      "style": "accent"
+     },
+     {
+      "name": "box 3×3",
+      "expr": "1 if x<=1.5 else 0",
+      "style": "live"
+     }
+    ]
+   },
+   "example": "A 3×3 window holds 10, 10, 10 / 10, 80, 10 / 10, 10, 10, where 80 is a noise spike. Box filter: sum = 8×10 + 80 = 160, divided by 9 gives 17.8, rounded to 18. Gaussian 1 2 1 / 2 4 2 / 1 2 1 (weights sum to 16): 10+20+10 + 20+320+20 + 10+20+10 = 440, divided by 16 gives 27.5. The box filter suppresses the spike more but smears the whole 3×3 area equally; the Gaussian leaves the centre twice as strong, so edges survive a little better.",
+   "trap": "Dividing by 9 when the weights sum to 16, or forgetting to normalise at all so the image brightens. A mask that does not sum to 1 changes overall brightness, not just blur.",
+   "prereq": "Chapter 2.3: correlation, convolution and padding.",
+   "leave": "Median and other order-statistic filters to Unit 3; the Gaussian in scale space for SIFT to Unit 5; blurring as the first step of Canny to Unit 4."
+  },
+  {
+   "k": 5,
+   "idea": "Derivatives respond to change, so adding a derivative image back to the original sharpens edges.",
+   "depth": "Compare first and second derivatives on a ramp and a step: the first gives a thick response at the ramp, the second gives a thin double response at each end. Write the digital first difference f(x+1) − f(x) and the second difference f(x+1) − 2f(x) + f(x−1). Give the 4-neighbour Laplacian 0 1 0 / 1 −4 1 / 0 1 0 and the 8-neighbour version with diagonals, then g = f − ∇²f (or plus, depending on sign convention). Cover unsharp masking g = f + k·(f − f̄) with f̄ the blurred image from chapter 2.4, and high-boost filtering with A ≥ 1 written as (A−1)f + mask. One line that a gradient operator such as Sobel is the first-order cousin, with edge detection in Unit 4.",
+   "figure": {
+    "type": "array",
+    "title": "A ramp edge and its derivatives",
+    "aria": "Three rows over seven positions: a ramp from 0 to 6, its first difference showing a block of 2s, and its second difference showing a +2 spike at the start and a −2 spike at the end.",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "f",
+      "cells": [
+       "0",
+       "0",
+       "2",
+       "4",
+       "6",
+       "6",
+       "6"
+      ]
+     },
+     {
+      "label": "f′",
+      "cells": [
+       "–",
+       "0",
+       "2",
+       "2",
+       "2",
+       "0",
+       "0"
+      ],
+      "marks": {
+       "2": "accent"
+      }
+     },
+     {
+      "label": "f″",
+      "cells": [
+       "–",
+       "2",
+       "0",
+       "0",
+       "-2",
+       "0",
+       "0"
+      ],
+      "marks": {
+       "1": "live",
+       "4": "live"
+      }
+     }
+    ]
+   },
+   "example": "A 3×3 patch is 10 10 10 / 10 20 10 / 10 10 10; the centre pixel sits on a small bright spot. Apply the 4-neighbour Laplacian at the centre: 10 + 10 + 10 + 10 − 4×20 = 40 − 80 = −40. With g = f − ∇²f the sharpened centre is 20 − (−40) = 60, so the spot becomes much brighter than its surroundings. Using g = f + ∇²f instead gives 20 − 40 = −20, which is clearly the wrong sign and shows why the convention must be stated.",
+   "trap": "Mixing the two sign conventions for the Laplacian so the sharpened image darkens instead of brightening. Also, unsharp masking needs a genuinely blurred f̄ — subtracting a shifted copy of the original is not a mask.",
+   "prereq": "Chapters 2.3 and 2.4: convolution and the Gaussian blur that supplies f̄.",
+   "leave": "Gradient operators, Canny and Marr-Hildreth edge detection to Unit 4; sharpening as deblurring (Wiener) to Unit 3."
+  },
+  {
+   "k": 6,
+   "idea": "The Fourier transform rewrites an image as a sum of sinusoids, and the DFT gives the weight of each frequency in a form a computer can compute.",
+   "depth": "Start with the 1-D continuous transform pair, then sample it to get the DFT X(k) = Σ x(n)·e^(−j2πkn/N) for k = 0…N−1, and the inverse. Extend to two variables with the double sum over M×N, and show the exponential is separable so rows then columns works. Give the properties examiners ask for: periodicity, conjugate symmetry for real images, linearity, the shift theorem, the convolution theorem, and that F(0,0) equals MN times the mean. Explain magnitude and phase, and that phase carries position. End with the FFT: (N/2)·log₂N complex multiplications against N² for the direct DFT.",
+   "figure": {
+    "type": "plot",
+    "aria": "Four bars of magnitude for a 4-point transform: 2 at k=0, 1.414 at k=1, 0 at k=2 and 1.414 at k=3, showing symmetry about the middle.",
+    "x": {
+     "label": "k",
+     "min": 0,
+     "max": 3
+    },
+    "y": {
+     "label": "|X(k)|",
+     "min": 0,
+     "max": 2.5
+    },
+    "series": [
+     {
+      "name": "|X(k)|",
+      "points": [
+       [
+        0,
+        2
+       ],
+       [
+        1,
+        1.414
+       ],
+       [
+        2,
+        0
+       ],
+       [
+        3,
+        1.414
+       ]
+      ],
+      "style": "accent"
+     }
+    ]
+   },
+   "example": "Find the 4-point DFT of x = [1, 1, 0, 0]. X(k) = 1 + e^(−j2πk/4). k = 0: 1 + 1 = 2. k = 1: 1 + e^(−jπ/2) = 1 − j, magnitude √2 = 1.414. k = 2: 1 + e^(−jπ) = 1 − 1 = 0. k = 3: 1 + e^(−j3π/2) = 1 + j, magnitude 1.414. So |X| = 2, 1.414, 0, 1.414, symmetric as expected for a real signal. Check the DC term: MN × mean = 4 × 0.5 = 2. For N = 1024 the direct DFT needs about 1,048,576 complex multiplications and the FFT needs (1024/2)×10 = 5120.",
+   "trap": "Forgetting that the DFT index runs 0 to N−1, so negative frequencies appear at the top of the array, and forgetting that the spectrum is periodic — the DC term must be moved to the centre before display.",
+   "prereq": "Unit 1: sampling and the image as a discrete function f(x,y).",
+   "leave": "Fast convolution in practice and periodic-noise removal to Unit 3; filtering itself to chapter 2.7."
+  },
+  {
+   "k": 7,
+   "idea": "In the frequency domain, filtering is just multiplying the DFT by a transfer function H(u,v) that keeps some bands and kills others.",
+   "depth": "Give the pipeline: DFT, multiply by H, inverse DFT, take the real part. Define distance D(u,v) from the centred origin. Cover the ideal low-pass (1 inside radius D₀, 0 outside) and its ringing, then Butterworth of order n, H = 1/(1 + (D/D₀)^(2n)), and the Gaussian H = e^(−D²/2D₀²), noting the Gaussian has no ringing. Derive high-pass as H_hp = 1 − H_lp, so edges survive. Cover selective filtering: notch and band-reject masks for periodic noise, and a short note on homomorphic filtering for uneven lighting. Explain why the FFT makes this practical for full images.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Frequency-domain filtering",
+    "aria": "Five boxes in a row: the input image, its DFT giving F, multiplication by H, the inverse DFT, and the filtered output image.",
+    "nodes": [
+     {
+      "id": "f",
+      "label": "f(x,y)"
+     },
+     {
+      "id": "dft",
+      "label": "DFT",
+      "note": "F(u,v)"
+     },
+     {
+      "id": "mul",
+      "label": "Multiply H",
+      "note": "H·F",
+      "style": "accent"
+     },
+     {
+      "id": "idft",
+      "label": "Inverse DFT"
+     },
+     {
+      "id": "g",
+      "label": "g(x,y)"
+     }
+    ],
+    "edges": [
+     {
+      "from": "f",
+      "to": "dft"
+     },
+     {
+      "from": "dft",
+      "to": "mul"
+     },
+     {
+      "from": "mul",
+      "to": "idft"
+     },
+     {
+      "from": "idft",
+      "to": "g"
+     }
+    ]
+   },
+   "example": "A low-pass filter has D₀ = 50 pixels. At a point with D = 50, the ideal filter gives H = 1 (right on the boundary, the ringing source). The Butterworth of order 2 gives H = 1/(1 + (50/50)⁴) = 1/2 = 0.5, a smooth half-power point. At D = 100 the same filter gives 1/(1 + 2⁴) = 1/17 = 0.0588, so that frequency is almost removed. A Gaussian filter with the same D₀ gives e^(−0.5) = 0.607 at D = 50 and e^(−2) = 0.135 at D = 100, a gentler roll-off and no ringing.",
+   "trap": "Forgetting to take the real part after the inverse DFT (small imaginary rounding errors remain), and forgetting to centre the spectrum before drawing or applying a radial mask.",
+   "prereq": "Chapter 2.6: the DFT pair, separability and the convolution theorem.",
+   "leave": "Notch filtering of periodic noise and Wiener deblurring to Unit 3; orientation-selective filters for texture to Unit 4 and Unit 5."
+  },
+  {
+   "k": 8,
+   "idea": "Other transforms — the DCT, wavelets and pyramids — repack the same image information so that a few coefficients carry most of the energy, and so that scale can be separated.",
+   "depth": "Cover the 2-D DCT as a real, even-symmetric cousin of the DFT, its use on 8×8 blocks in JPEG, and energy compaction: a smooth block leaves almost only the DC coefficient. Cover the Gaussian pyramid (blur, then subsample by 2) and the Laplacian pyramid (difference between levels, used for blending). Cover the Haar wavelet: approximation and detail from pairs of samples, one level of decomposition splitting into LL, LH, HL and HH, and further levels on LL only. State that the Haar transform preserves energy when scaled by 1/√2. Only a few universities teach wavelets in this unit; keep it shorter and say so.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "aria": "A three-level decomposition: the 256 by 256 image splits into LL1 plus three detail bands, and LL1 splits again into LL2 plus three more detail bands.",
+    "root": {
+     "label": "Image 256×256",
+     "children": [
+      {
+       "label": "LL1 128",
+       "edge": "avg",
+       "children": [
+        {
+         "label": "LL2 64",
+         "edge": "avg"
+        },
+        {
+         "label": "LH2",
+         "edge": "detail"
+        },
+        {
+         "label": "HL2",
+         "edge": "detail"
+        },
+        {
+         "label": "HH2",
+         "edge": "detail"
+        }
+       ]
+      },
+      {
+       "label": "LH1",
+       "edge": "detail"
+      },
+      {
+       "label": "HL1",
+       "edge": "detail"
+      },
+      {
+       "label": "HH1",
+       "edge": "detail"
+      }
+     ]
+    }
+   },
+   "example": "Apply the 1-D Haar transform with the 1/√2 scaling to x = [4, 6, 10, 12]. Level 1 averages: (4+6)/√2 = 7.07 and (10+12)/√2 = 15.56; details: (4−6)/√2 = −1.414 and (10−12)/√2 = −1.414. Level 2 on the averages: (7.07+15.56)/√2 = 16 and (7.07−15.56)/√2 = −6. Coefficients are 16, −6, −1.414, −1.414. Energy check: input 16 + 36 + 100 + 144 = 296; output 256 + 36 + 2 + 2 = 296. Four values became one big average and three small details, which is exactly the compression argument.",
+   "trap": "Subsampling before smoothing, which folds high frequencies back as aliasing, and dropping the 1/√2 factor so the energy check fails. Also, a detail band is not a small image of the picture — it holds differences, so it looks like noise.",
+   "prereq": "Chapters 2.4 and 2.7: Gaussian smoothing and the idea of keeping or killing bands.",
+   "leave": "The JPEG bitstream, Huffman coding and quantisation tables to Unit 3; scale space and SIFT keypoints to Unit 5; Laplacian-pyramid blending of photos as a short application here only."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the histogram picks the remapping curve automatically"
+  ],
+  [
+   2,
+   3,
+   "local histograms need a sliding neighbourhood"
+  ],
+  [
+   3,
+   4,
+   "convolution is the engine under smoothing masks"
+  ],
+  [
+   4,
+   5,
+   "the blur f̄ for unsharp masking comes from a smoothing filter"
+  ],
+  [
+   3,
+   5,
+   "a derivative mask is just a correlation kernel"
+  ],
+  [
+   5,
+   6,
+   "a derivative becomes multiplication by jω in frequency"
+  ],
+  [
+   6,
+   7,
+   "the DFT is what frequency filters multiply"
+  ],
+  [
+   7,
+   8,
+   "keep-or-kill bands repeat in DCT and wavelet sub-bands"
+  ]
+ ]
+}
