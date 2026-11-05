@@ -221,7 +221,7 @@ class OpenAICompat(Gemini):
                 names = [m.get('id') for m in js['data']]
                 model = model or names[0]
                 log(f'server ready; models {names[:4]}, using {model}'); break
-            log(f'waiting for the model server (HTTP {st}) ...'); time.sleep(30)
+            log(f'waiting for the model server (HTTP {st} {str(js)[:120]}) ...'); time.sleep(30)
         else:
             raise SystemExit('The model server at OPENAI_BASE_URL did not answer for 45 minutes. Is the pod running?')
         return cls(base, key, model, os.environ.get('REVIEW_MODEL', ''), log)
@@ -258,7 +258,7 @@ class OpenAICompat(Gemini):
 
 def _openai(method, url, key, body=None, timeout=600):
     data = json.dumps(body).encode() if body is not None else None
-    h = {'Content-Type': 'application/json'}
+    h = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'ufe-books-pipeline/1.0 (+https://github.com/SwathishThiyagu/ufe-books)'}
     if key: h['Authorization'] = f'Bearer {key}'
     req = urllib.request.Request(url, data=data, method=method, headers=h)
     try:
