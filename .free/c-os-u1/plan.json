@@ -1,0 +1,571 @@
+{
+ "lead": "This unit introduces the operating system as the software layer that sits between computer hardware and user applications. You will learn how the hardware uses interrupts and dual-mode execution to protect itself, how system calls bridge user programs to kernel services, and how operating systems are structured, built, and booted.",
+ "about": "Unit 1 establishes the hardware and architectural foundations of modern operating systems. Chapter 1.1 defines the role of an OS as an extended machine and resource allocator alongside basic hardware organization. Chapter 1.2 explains the hardware interrupt mechanism and direct memory access. Chapter 1.3 traces the historical evolution across batch, multiprogrammed, time-sharing, distributed, and real-time systems. Chapter 1.4 covers dual-mode CPU operation and hardware timers that prevent runaway execution. Chapter 1.5 examines the core functional services provided to users and system components. Chapter 1.6 details system calls, parameter passing, and execution tracing. Chapter 1.7 compares monolithic, layered, and microkernel architectures. Chapter 1.8 walks through system generation, configuration, and the multi-stage boot sequence. Finally, Chapter 1.9 covers fundamental kernel data structures, hypervisor virtualization, and modern computing environments.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "An operating system acts as a resource allocator and an extended machine that hides raw hardware complexity from user programs.",
+   "depth": "Cover the definition of an operating system, its primary dual goals (convenience for users and efficient operation of hardware), abstract system view (hardware, OS, system programs, application programs, users), computer-system organization (CPUs, device controllers, shared memory via common bus), and storage hierarchy basics (registers, cache, main memory, non-volatile storage). Some syllabi call this 'The Systems Stack and Role of OS'.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "aria": "Four-tier abstract view of a computer system showing users on top, application programs, operating system, and hardware at the base.",
+    "items": [
+     {
+      "label": "Users",
+      "note": "People, machines, other systems",
+      "style": "muted"
+     },
+     {
+      "label": "Application Software",
+      "note": "Compilers, DBMS, web browsers",
+      "style": "normal"
+     },
+     {
+      "label": "Operating System",
+      "note": "Controls hardware & allocates resources",
+      "style": "accent"
+     },
+     {
+      "label": "Computer Hardware",
+      "note": "CPU, RAM, storage, I/O devices",
+      "style": "live"
+     }
+    ]
+   },
+   "example": "A system contains 1 CPU, 8 GB of main memory, and 2 processes (P1 requiring 5 GB and P2 requiring 4 GB) that request execution simultaneously. Explain how the OS resolves this resource contention as a resource allocator versus what would happen on bare hardware without an OS.",
+   "trap": "Confusing an operating system with system software like compilers, linkers, or the shell; the OS kernel is the core program running at all times in privileged mode.",
+   "prereq": "",
+   "leave": "Detailed interrupt hardware wiring is left to Chapter 1.2; detailed memory allocation policies are left to Unit 4."
+  },
+  {
+   "k": 2,
+   "idea": "Hardware interrupts signal the CPU to stop current execution and transfer control to an interrupt service routine via the interrupt vector.",
+   "depth": "Cover computer-system architecture (single-processor, multiprocessor, clustered systems), interrupt-driven I/O cycle, hardware interrupt signals, software interrupts (traps/exceptions), Interrupt Vector Table (IVT) and Interrupt Descriptor Table (IDT), interrupt priorities and masking, and Direct Memory Access (DMA) compared to programmed I/O and polling.",
+   "figure": {
+    "type": "sequence",
+    "aria": "Sequence diagram showing an I/O device controller asserting an interrupt line to the CPU, vector lookup, ISR execution, and return from interrupt.",
+    "actors": [
+     "Device Controller",
+     "CPU",
+     "Memory (IVT/ISR)"
+    ],
+    "messages": [
+     {
+      "from": "Device Controller",
+      "to": "CPU",
+      "label": "Asserts IRQ line",
+      "dashed": false
+     },
+     {
+      "from": "CPU",
+      "to": "Memory (IVT/ISR)",
+      "label": "Save state & fetch vector",
+      "dashed": false
+     },
+     {
+      "from": "Memory (IVT/ISR)",
+      "to": "CPU",
+      "label": "Execute ISR instructions",
+      "dashed": false
+     },
+     {
+      "from": "CPU",
+      "to": "Device Controller",
+      "label": "Acknowledge transfer / Reset",
+      "dashed": true
+     },
+     {
+      "from": "CPU",
+      "to": "CPU",
+      "label": "Restore state via IRET",
+      "dashed": false
+     }
+    ]
+   },
+   "example": "A disk controller transfers a 4 KB block to RAM. Calculate the CPU time wasted in pure polling if checking the status register takes 0.2 µs and the disk takes 5 ms to read the sector, compared to an interrupt-driven approach whose ISR and context switch overhead totals 4 µs.",
+   "trap": "Treating software traps and hardware interrupts as identical; hardware interrupts are asynchronous (external clock or pin), while software exceptions/traps are synchronous (caused directly by the executing instruction stream).",
+   "prereq": "1.1",
+   "leave": "Dual mode bit changes during interrupts are detailed in Chapter 1.4; disk scheduling algorithms belong to Unit 5."
+  },
+  {
+   "k": 3,
+   "idea": "Operating systems evolved from simple manual job setups to batch, multiprogrammed, time-shared, distributed, and real-time systems to optimize hardware utilization.",
+   "depth": "Trace history from bare machine (serial processing, punch cards) to simple batch systems (monitors, card-to-tape), multiprogrammed batch systems (spooling, CPU utilization), time-sharing systems (interactive, round-robin slicing), distributed systems, and real-time systems (hard vs soft real-time constraints). Contrast turnaround time and response time across these types.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "aria": "Gantt chart contrasting simple sequential execution with multiprogrammed overlap of CPU bursts and I/O wait times.",
+    "lanes": [
+     {
+      "label": "Sequential",
+      "bars": [
+       {
+        "label": "P1 CPU",
+        "start": 0,
+        "end": 10,
+        "style": "accent"
+       },
+       {
+        "label": "P1 I/O Wait",
+        "start": 10,
+        "end": 25,
+        "style": "muted"
+       },
+       {
+        "label": "P2 CPU",
+        "start": 25,
+        "end": 35,
+        "style": "next"
+       }
+      ]
+     },
+     {
+      "label": "Multiprogrammed",
+      "bars": [
+       {
+        "label": "P1 CPU",
+        "start": 0,
+        "end": 10,
+        "style": "accent"
+       },
+       {
+        "label": "P2 CPU",
+        "start": 10,
+        "end": 20,
+        "style": "next"
+       },
+       {
+        "label": "P1 CPU",
+        "start": 25,
+        "end": 30,
+        "style": "accent"
+       }
+      ]
+     }
+    ]
+   },
+   "example": "Consider two jobs, J1 and J2. Each requires 20 ms of CPU computation followed by 30 ms of I/O. Calculate the total elapsed time and CPU utilization under uniprogramming versus multiprogramming.",
+   "trap": "Confusing multiprogramming (keeping multiple jobs in memory to maximize CPU utilization) with multiprocessing (multiple physical CPUs running concurrently) and multitasking/time-sharing (rapidly switching between tasks to provide interactive response).",
+   "prereq": "1.1",
+   "leave": "Detailed scheduling algorithms like Round Robin or SJF are left to Unit 2."
+  },
+  {
+   "k": 4,
+   "idea": "Hardware dual-mode operation and programmable timers protect the operating system and other users from misbehaving programs.",
+   "depth": "Cover user mode versus kernel/supervisor/monitor mode, the hardware mode bit (0 = kernel, 1 = user), privileged instructions (I/O instructions, halt, disable interrupts, modify timer or base/limit registers), transitions between modes via traps, exceptions, and interrupts, and the role of the hardware timer in preventing infinite loops and implementing preemption.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "aria": "Flow diagram of dual-mode transition: user application executing, issuing a trap to enter kernel mode with mode bit set to 0, running the kernel routine, and returning to user mode with mode bit set to 1.",
+    "nodes": [
+     {
+      "id": "user",
+      "label": "User Process",
+      "note": "Mode bit = 1 (User)",
+      "style": "normal"
+     },
+     {
+      "id": "trap",
+      "label": "Trap / System Call",
+      "note": "Sets mode bit = 0",
+      "style": "live"
+     },
+     {
+      "id": "kernel",
+      "label": "Kernel Handler",
+      "note": "Privileged execution",
+      "style": "accent"
+     },
+     {
+      "id": "return",
+      "label": "Return from Trap",
+      "note": "Sets mode bit = 1",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "user",
+      "to": "trap",
+      "label": "Request service",
+      "style": "solid"
+     },
+     {
+      "from": "trap",
+      "to": "kernel",
+      "label": "Switch to kernel",
+      "style": "live"
+     },
+     {
+      "from": "kernel",
+      "to": "return",
+      "label": "Service done",
+      "style": "solid"
+     },
+     {
+      "from": "return",
+      "to": "user",
+      "label": "Resume app",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A user-mode program attempts to execute the assembly instruction 'CLI' (Clear Interrupts, opcode 0xFA). Trace the hardware actions taken by the processor step-by-step, including register state, mode bit check, trap generation, and OS response.",
+   "trap": "Believing that the mode switch itself is executed by software instructions alone; the hardware processor register bit automatically flips upon interrupt or trap entry and cannot be altered directly while in user mode.",
+   "prereq": "1.2",
+   "leave": "Context switching mechanisms and PCB saving are taught in Unit 2; access control matrices in Unit 6."
+  },
+  {
+   "k": 5,
+   "idea": "The operating system provides an organized suite of services to ensure convenient program execution and efficient, protected system operation.",
+   "depth": "Cover operating-system services for the user/program (user interfaces: CLI/GUI/touch, program execution, I/O operations, file-system manipulation, communications: shared memory and message passing, error detection) and services for system efficiency (resource allocation, accounting/logging, protection and security). Explain the role of system programs (utilities, status reporters, file management) versus application programs.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "aria": "Architectural stack showing user interface on top, system services in the middle, and system calls wrapping the OS kernel at the bottom.",
+    "items": [
+     {
+      "label": "User Interfaces",
+      "note": "CLI, GUI, Batch Scripts",
+      "style": "muted"
+     },
+     {
+      "label": "System Programs",
+      "note": "File managers, compilers, editors",
+      "style": "normal"
+     },
+     {
+      "label": "System Services Layer",
+      "note": "Exec, I/O, Files, IPC, Accounting",
+      "style": "accent"
+     },
+     {
+      "label": "OS Kernel & System Calls",
+      "note": "Resource allocation & hardware access",
+      "style": "live"
+     }
+    ]
+   },
+   "example": "Classify the following six operations into 'User Convenience Services' or 'System Efficiency Services': (a) File creation, (b) CPU time tracking for billing, (c) IPC socket creation, (d) Deadlock prevention, (e) Displaying a divide-by-zero error, (f) Enforcing read-only file permissions.",
+   "trap": "Confusing system programs (like 'ls', 'cp', or shell) with kernel code; system programs are user-mode utilities providing an interface to underlying system calls.",
+   "prereq": "1.1, 1.4",
+   "leave": "Detailed implementations of process scheduling services belong to Unit 2; file allocation schemes belong to Unit 5."
+  },
+  {
+   "k": 6,
+   "idea": "System calls provide the programming interface between a running application and the privileged services of the operating system kernel.",
+   "depth": "Cover the definition of system calls, Application Programming Interfaces (APIs like POSIX, Win32, Java API) vs system calls, libc runtime wrappers, system call numbers and dispatch tables, parameter passing techniques (registers, memory blocks/tables, stack push/pop), and types of system calls: Process Control (fork, exec, exit, wait), File Management (open, read, write, close), Device Management (ioctl, read), Information Maintenance (getpid, time), Communications (pipe, shmget, send), and Protection (chmod, umask).",
+   "figure": {
+    "type": "sequence",
+    "aria": "Sequence diagram tracing a user write() API call through the standard library wrapper, CPU trap instruction, system call table lookup, kernel execution, and return.",
+    "actors": [
+     "User App",
+     "C Library (libc)",
+     "OS Kernel Trap Handler",
+     "Syscall Table"
+    ],
+    "messages": [
+     {
+      "from": "User App",
+      "to": "C Library (libc)",
+      "label": "printf() / write()",
+      "dashed": false
+     },
+     {
+      "from": "C Library (libc)",
+      "to": "OS Kernel Trap Handler",
+      "label": "Load syscall # & trap (sysenter/svc)",
+      "dashed": false
+     },
+     {
+      "from": "OS Kernel Trap Handler",
+      "to": "Syscall Table",
+      "label": "Index sys_call_table[sys_write]",
+      "dashed": false
+     },
+     {
+      "from": "Syscall Table",
+      "to": "OS Kernel Trap Handler",
+      "label": "Execute sys_write() in kernel",
+      "dashed": true
+     },
+     {
+      "from": "OS Kernel Trap Handler",
+      "to": "C Library (libc)",
+      "label": "Return code / errno, mode bit = 1",
+      "dashed": false
+     },
+     {
+      "from": "C Library (libc)",
+      "to": "User App",
+      "label": "Return bytes written",
+      "dashed": false
+     }
+    ]
+   },
+   "example": "Trace the step-by-step parameter passing and register state when a C program invokes read(fd, buffer, 128) using register passing on x86-64 Linux (syscall number in %rax, arguments in %rdi, %rsi, %rdx).",
+   "trap": "Assuming system calls are regular function calls; standard function calls execute within user stack space with user privileges, while system calls cause a hardware privilege level switch via an architectural trap instruction.",
+   "prereq": "1.4, 1.5",
+   "leave": "IPC pipe implementation internals and fork-exec process tree lifecycles belong to Unit 2."
+  },
+  {
+   "k": 7,
+   "idea": "Operating system structures differ in how kernel components are partitioned, layered, and isolated across memory protection boundaries.",
+   "depth": "Examine architectural designs: Simple/Monolithic architecture (MS-DOS, early UNIX, modern Linux with loadable kernel modules), Layered approach (Dijkstra's THE system, layer N invoking N-1, verification benefits, performance costs), Microkernel architecture (Mach, QNX: minimal kernel with IPC, virtual memory, scheduling; user-space servers for file system, device drivers), and Hybrid structures (macOS/Darwin, Windows NT). Compare performance, modularity, reliability, and security tradeoffs.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "aria": "Block diagram contrasting a Monolithic OS where all subsystems sit in kernel space with a Microkernel where drivers and file systems run as user-mode servers around a minimal microkernel.",
+    "nodes": [
+     {
+      "id": "app",
+      "label": "User Applications",
+      "note": "User Mode",
+      "style": "normal"
+     },
+     {
+      "id": "user_servers",
+      "label": "File Server & Drivers",
+      "note": "User Mode (Microkernel design)",
+      "style": "live"
+     },
+     {
+      "id": "ipc_gate",
+      "label": "IPC / System Bus",
+      "note": "Message passing boundary",
+      "style": "accent"
+     },
+     {
+      "id": "micro_core",
+      "label": "Microkernel Core",
+      "note": "Kernel Mode: CPU sched, VM, IPC",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "app",
+      "to": "user_servers",
+      "label": "Requests service",
+      "style": "solid"
+     },
+     {
+      "from": "user_servers",
+      "to": "ipc_gate",
+      "label": "Passes message",
+      "style": "solid"
+     },
+     {
+      "from": "ipc_gate",
+      "to": "micro_core",
+      "label": "Dispatches IPC",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A network device driver crashes due to a null pointer dereference. Analyze the impact on system stability and explain the recovery sequence under (a) a monolithic kernel and (b) a microkernel architecture.",
+   "trap": "Believing Linux is not monolithic because it supports Loadable Kernel Modules (LKMs); LKMs execute directly in kernel address space with full supervisor privileges, retaining a monolithic design.",
+   "prereq": "1.4, 1.6",
+   "leave": "Detailed inter-process communication mechanisms (shared memory vs message passing) are taught in Unit 2."
+  },
+  {
+   "k": 8,
+   "idea": "Booting an operating system requires a staged hardware-software handoff from firmware to bootstrap loader to the kernel initialization sequence.",
+   "depth": "Cover OS design principles (mechanisms vs policies, user goals vs system goals), implementation languages (assembly vs C/C++ vs Rust), building an OS (compilation, configuration, system generation / SYSGEN), debugging (core dumps, crash dumps, kernel debuggers, trace points), and the complete boot process: power-on reset, firmware initialization (BIOS/UEFI), Master Boot Record (MBR) or GUID Partition Table (GPT), Stage 1 / Stage 2 bootloaders (e.g., GRUB), kernel loading into RAM, hardware detection, init/systemd launching (PID 1).",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "aria": "Horizontal process flow diagram illustrating the system boot sequence from Power-On Reset through Firmware, Bootloader, Kernel Initialization, to Init PID 1.",
+    "nodes": [
+     {
+      "id": "power",
+      "label": "Power-On / Reset",
+      "note": "CPU reads reset vector",
+      "style": "muted"
+     },
+     {
+      "id": "firmware",
+      "label": "BIOS / UEFI",
+      "note": "POST & device probe",
+      "style": "normal"
+     },
+     {
+      "id": "bootloader",
+      "label": "Bootloader (GRUB)",
+      "note": "Loads kernel into RAM",
+      "style": "live"
+     },
+     {
+      "id": "kernel",
+      "label": "Kernel Init",
+      "note": "Mounts root & drivers",
+      "style": "accent"
+     },
+     {
+      "id": "init",
+      "label": "Init / Systemd",
+      "note": "PID 1 user environment",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "power",
+      "to": "firmware",
+      "label": "POST",
+      "style": "solid"
+     },
+     {
+      "from": "firmware",
+      "to": "bootloader",
+      "label": "Read MBR/ESP",
+      "style": "solid"
+     },
+     {
+      "from": "bootloader",
+      "to": "kernel",
+      "label": "Transfer control",
+      "style": "solid"
+     },
+     {
+      "from": "kernel",
+      "to": "init",
+      "label": "Spawns",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "Given a computer with a legacy BIOS and MBR disk partition: why cannot the BIOS directly load a 15 MB modern Linux kernel into memory, necessitating a multi-stage bootloader like GRUB?",
+   "trap": "Thinking BIOS/UEFI loads the entire operating system kernel directly; firmware only loads the initial 512-byte sector or boot partition binary (bootloader), which then locates, loads, and decompresses the OS kernel.",
+   "prereq": "1.1, 1.4",
+   "leave": "File system superblock mounting details are covered in Unit 5."
+  },
+  {
+   "k": 9,
+   "idea": "Operating systems employ core data structures like queues, trees, and bitmaps, and extend resource control across virtualized and distributed computing environments.",
+   "depth": "Cover fundamental kernel data structures (singly/doubly linked lists, circular lists, stacks, queues, hash tables, balanced binary trees, red-black trees, bitmaps). Overview of computing environments: traditional desktop/client-server, peer-to-peer (P2P), mobile computing (power management, sensors), cloud computing, and real-time embedded systems. Introduction to virtualization concepts (virtual machines, hypervisors: Type 1 bare-metal vs Type 2 hosted, hardware-assisted virtualization). Open-source operating systems overview. Tag: advanced.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "aria": "Block diagram contrasting a Type-1 bare-metal hypervisor directly managing hardware with a Type-2 hypervisor running on top of a host operating system.",
+    "nodes": [
+     {
+      "id": "t1_vms",
+      "label": "Guest VMs (A & B)",
+      "note": "Running guest OS",
+      "style": "normal"
+     },
+     {
+      "id": "t1_hyp",
+      "label": "Type 1 Hypervisor",
+      "note": "Direct bare-metal access",
+      "style": "accent"
+     },
+     {
+      "id": "t2_vms",
+      "label": "Guest VMs (C & D)",
+      "note": "Running guest OS",
+      "style": "normal"
+     },
+     {
+      "id": "t2_hyp",
+      "label": "Type 2 Hypervisor",
+      "note": "Hosted virtualization app",
+      "style": "live"
+     },
+     {
+      "id": "host_os",
+      "label": "Host OS",
+      "note": "Standard kernel",
+      "style": "muted"
+     },
+     {
+      "id": "hw",
+      "label": "Physical Hardware",
+      "note": "CPU, RAM, Disks, NIC",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "t1_vms",
+      "to": "t1_hyp",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "t1_hyp",
+      "to": "hw",
+      "label": "Direct hardware control",
+      "style": "live"
+     },
+     {
+      "from": "t2_vms",
+      "to": "t2_hyp",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "t2_hyp",
+      "to": "host_os",
+      "label": "Host syscalls",
+      "style": "solid"
+     },
+     {
+      "from": "host_os",
+      "to": "hw",
+      "label": "Hardware driver",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A kernel uses a bitmap to track free disk blocks where each bit represents one 4 KB block. If the storage device has a total capacity of 512 GB, calculate the exact size of the bitmap in megabytes, and explain why a bitmap is preferred over a linked list when searching for contiguous blocks.",
+   "trap": "Confusing Type-1 hypervisors (e.g., VMware ESXi, Xen, KVM) with Type-2 hypervisors (e.g., VirtualBox, VMware Workstation); Type-1 runs directly on hardware without an underlying host OS.",
+   "prereq": "1.1, 1.4, 1.7",
+   "leave": "Process control block lists are used in Unit 2; free-space disk allocation bitmaps are expanded in Unit 5; distributed synchronization is detailed in Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "Hardware bus organization leads to the interrupt and DMA mechanisms"
+  ],
+  [
+   2,
+   3,
+   "Interrupt-driven I/O enabled the evolution from batch systems to multiprogramming"
+  ],
+  [
+   2,
+   4,
+   "Interrupt handling hardware forms the basis for CPU dual-mode privilege transitions"
+  ],
+  [
+   4,
+   5,
+   "Dual-mode enforcement allows the OS to securely expose system services"
+  ],
+  [
+   5,
+   6,
+   "Operating system services are formally accessed by applications using system calls"
+  ],
+  [
+   6,
+   7,
+   "How system calls and services are placed inside or outside the kernel dictates the OS architecture"
+  ],
+  [
+   7,
+   8,
+   "The chosen structural architecture determines how the kernel image is built, configured, and booted"
+  ],
+  [
+   8,
+   9,
+   "Once booted, the kernel relies on internal data structures to manage computing environments and virtualization"
+  ]
+ ]
+}
