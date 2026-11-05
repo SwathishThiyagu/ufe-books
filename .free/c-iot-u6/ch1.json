@@ -1,0 +1,295 @@
+{
+ "lead": "A smart home turns sensor events into rules that switch actuators and inform the owner. A PIR sensor notices motion, a door sensor notices an open door, a hub holds the rule, and a relay switches the lamp. The same event can travel to a cloud service so a phone app alerts you while you are at the office. People use this for lighting, fans, door and camera alerts, and to cut electricity bills. This chapter builds the whole path — sensor, hub, local rule, cloud rule, actuator — and then costs the energy it uses.",
+ "prereq": "You need: Unit 2 on sensors and actuators, Unit 3 on MQTT publish-subscribe, Unit 4 on Raspberry Pi and GPIO interfacing, and Unit 5 on cloud platforms and IoT security.",
+ "sections": [
+  {
+   "h3": "Sensors, actuators and the home hub",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A smart home is one building run as a small IoT system. It has the same four parts as any deployment: sensors that produce events, actuators that change the physical world, a hub that decides, and an app that shows the owner what happened."
+    },
+    {
+     "type": "p",
+     "text": "A PIR (passive infrared) sensor detects the body heat of a moving person and gives a digital output: 1 for motion, 0 for none. A door sensor is a reed switch that closes when a magnet fixed to the door is beside it, so it reports open or closed. A temperature sensor reports room temperature in °C. A light sensor (an LDR or photodiode, often read through an ADC) reports illuminance in lux; the hub uses it to decide whether a room is dark enough to need the lamp."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Relay module: an electrically operated switch that turns a mains lamp or fan on and off.",
+      "Smart plug: a relay inside a plug body, controlled over Wi-Fi.",
+      "Siren or buzzer: the local alarm for a door or smoke event.",
+      "Smart lock: an actuator that opens the door after a rule passes."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The hub is an always-on small computer — a Raspberry Pi, or a dedicated ZigBee gateway — that joins the sensors and holds the rules. A rule is an if-then line: IF motion = 1 AND lux < 200 THEN relay ON for 5 minutes. Here lux is light level; the lamp is needed only when the room is dark."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The sensor sends its value to the hub over Wi-Fi, ZigBee or a wired bus.",
+      "The hub evaluates every rule that mentions that sensor.",
+      "A rule that fires sends a command to an actuator.",
+      "The hub logs the event and, if a cloud rule exists, publishes it.",
+      "The actuator changes state and the app shows the new state."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Local rules and cloud rules",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A rule can run on the hub (local rule) or on a cloud service (cloud rule). Local rules keep working when the internet link drops. Cloud rules exist so you can act from outside the home and keep history in one place."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Aspect",
+      "Local rule",
+      "Cloud rule"
+     ],
+     "rows": [
+      [
+       "Runs on",
+       "hub in the house",
+       "server outside"
+      ],
+      [
+       "Internet down",
+       "still works",
+       "stops"
+      ],
+      [
+       "You are away",
+       "only if the hub is reachable",
+       "always"
+      ],
+      [
+       "Typical delay",
+       "milliseconds",
+       "0.1 s to a few seconds"
+      ],
+      [
+       "Needs",
+       "hub powered",
+       "hub, router, internet"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A power cut is not the same as an internet outage. A hub and router on mains die with the supply, so local rules stop too. Put both on a small UPS or battery and the local rules survive; the cloud rules return only when the fibre or 4G link comes back."
+    },
+    {
+     "type": "p",
+     "text": "Door and camera alerts use both paths. The hub sounds the siren immediately, and the cloud sends the phone notification with a short camera clip. Changing default passwords and keeping cameras on a separate network are covered in Unit 5."
+    }
+   ]
+  },
+  {
+   "h3": "A Raspberry Pi as a web-enabled home device",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A Raspberry Pi is a constrained web-enabled device: it runs Linux, has GPIO pins, and can serve a small page to a phone on the same Wi-Fi. Reading a sensor and answering one HTTP request fit in a short program. On real hardware the first two lines read a GPIO pin and a light sensor through an ADC (see Unit 4). The version below uses fixed values so it runs anywhere."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "pir = 1                  # 1 = motion seen, 0 = no motion\nlux = 120                # light level in lux\nTHRESHOLD = 200          # lamp is needed below this lux\n\nlamp = \"ON\" if (pir == 1 and lux < THRESHOLD) else \"OFF\"\npage = \"<h1>Home hub</h1><p>motion \" + str(pir) + \"</p><p>lamp \" + lamp + \"</p>\"\n\nprint(\"HTTP/1.1 200 OK\")\nprint(\"Content-Type: text/html\")\nprint()\nprint(page)\n",
+     "stdin": "",
+     "output": "HTTP/1.1 200 OK\nContent-Type: text/html\n\n<h1>Home hub</h1><p>motion 1</p><p>lamp ON</p>\n"
+    },
+    {
+     "type": "p",
+     "text": "The rule sits in one line of Python: motion and darkness together switch the lamp. When a home has twenty devices, the hub publishes events over MQTT instead of polling, and the packet format is in Unit 3."
+    }
+   ]
+  },
+  {
+   "h3": "Standby power and running cost",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A large share of a smart home bill is always-on power. Bulbs run a few hours, but the hub and the cameras run all day — nearly half the energy in the example below — so they must be counted for 24 h."
+    },
+    {
+     "type": "formula",
+     "text": "E_day = (Σ Pᵢ × tᵢ) ÷ 1000",
+     "where": "E_day is energy per day in kWh; Pᵢ is the power of device i in watts (W); tᵢ is the hours device i runs per day (h); dividing by 1000 converts watt-hours (Wh) to kilowatt-hours (kWh)."
+    },
+    {
+     "type": "p",
+     "text": "Cost = E_day × number of days × tariff, where the tariff is in rupees per kWh. Convert to kWh before multiplying by the tariff, never after."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Two sensors feed the hub, which applies local rules at once and also publishes events upward. The cloud answers remote commands to the relay and sends phone notifications; notice that the local path never depends on the cloud.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Smart home control path",
+   "nodes": [
+    {
+     "id": "pir",
+     "label": "PIR sensor",
+     "note": "motion",
+     "style": "normal"
+    },
+    {
+     "id": "door",
+     "label": "Door sensor",
+     "note": "open/close",
+     "style": "normal"
+    },
+    {
+     "id": "hub",
+     "label": "Home hub",
+     "note": "local rules",
+     "style": "accent"
+    },
+    {
+     "id": "cloud",
+     "label": "Cloud rules",
+     "note": "remote app",
+     "style": "live"
+    },
+    {
+     "id": "relay",
+     "label": "Relay lamp",
+     "note": "actuator",
+     "style": "next"
+    },
+    {
+     "id": "phone",
+     "label": "Phone app",
+     "note": "user alert",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "pir",
+     "to": "hub",
+     "label": "event",
+     "style": "solid"
+    },
+    {
+     "from": "door",
+     "to": "hub",
+     "label": "event",
+     "style": "solid"
+    },
+    {
+     "from": "hub",
+     "to": "cloud",
+     "label": "MQTT",
+     "style": "dashed"
+    },
+    {
+     "from": "hub",
+     "to": "relay",
+     "label": "command (local)",
+     "style": "solid"
+    },
+    {
+     "from": "cloud",
+     "to": "relay",
+     "label": "command (remote)",
+     "style": "solid"
+    },
+    {
+     "from": "cloud",
+     "to": "phone",
+     "label": "notify",
+     "style": "solid"
+    }
+   ],
+   "aria": "A home hub collects motion and door events, switches the relay lamp locally, and can also send events to cloud rules that can command the relay and notify a phone app."
+  }
+ },
+ "examples": [
+  {
+   "question": "A home has 10 smart bulbs rated 9 W used 5 h a day, one hub rated 3 W running all day, and 2 cameras rated 5 W running all day. Electricity costs ₹7.50 per kWh. Find the monthly energy use and cost for 30 days.",
+   "steps": [
+    "One bulb: 9 W × 5 h = 45 Wh/day. Ten bulbs: 10 × 45 = 450 Wh/day.",
+    "Hub: 3 W × 24 h = 72 Wh/day.",
+    "One camera: 5 W × 24 h = 120 Wh/day. Two cameras: 240 Wh/day.",
+    "Total per day: 450 + 72 + 240 = 762 Wh/day.",
+    "Convert once: 762 ÷ 1000 = 0.762 kWh/day.",
+    "For 30 days: 0.762 × 30 = 22.86 kWh.",
+    "Cost: 22.86 kWh × ₹7.50/kWh = ₹171.45."
+   ],
+   "answer": "The home uses 22.86 kWh in 30 days and pays ₹171.45.",
+   "check": "bulbs = 10 * 9 * 5\nhub = 3 * 24\ncams = 2 * 5 * 24\ndaily = bulbs + hub + cams\nmonthly = daily * 30 / 1000\ncost = monthly * 7.50\nprint(bulbs)\nprint(hub)\nprint(cams)\nprint(daily)\nprint(round(monthly, 2))\nprint(round(cost, 2))\n",
+   "values": [
+    450,
+    72,
+    240,
+    762,
+    22.86,
+    171.45
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Standby power is not zero. The hub and cameras here use 312 of the 762 Wh/day, about 41 % of the bill, from two small devices running 24 h.",
+  "Unit slip: 762 Wh is 0.762 kWh, not 762 kWh. Divide by 1000 once, before multiplying by the tariff.",
+  "'Local control survives a power cut' is true only if the hub and router sit on a UPS or battery. On mains they stop with the supply.",
+  "An internet outage and a power cut are different failures. A powered hub keeps local rules alive with no internet; cloud rules do not.",
+  "Watch the examiner's wording: a 5 W camera used 24 h is 120 Wh, but two cameras are 240 Wh, not 120 Wh."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a PIR sensor detect, and what is its output?",
+   "marks": 2,
+   "a": "It detects the infrared radiation from a warm moving body. The output is digital: 1 when motion is seen, 0 when not."
+  },
+  {
+   "level": "remember",
+   "q": "Name two actuators used in a smart home and say what each switches.",
+   "marks": 2,
+   "a": "A relay module switches a mains lamp or fan. A smart plug switches whatever appliance is plugged into it, such as a geyser."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a cloud rule reach the home from outside, while a local rule cannot?",
+   "marks": 3,
+   "a": "The cloud rule runs on a server with a public address, so a phone anywhere can reach it and it can send commands down to the hub. A local rule runs inside the home network, which is normally not reachable from outside without a tunnel or a broker connection."
+  },
+  {
+   "level": "understand",
+   "q": "A hub runs on mains power. Explain why its local rules stop in a power cut and what fixes this.",
+   "marks": 3,
+   "a": "The hub needs electricity to execute rules, so losing the supply stops it even though the rule is local. Putting the hub and router on a small UPS or battery keeps the local rules running."
+  },
+  {
+   "level": "apply",
+   "q": "A smart plug runs a 40 W fan for 8 h a day. A 6 W camera runs all day. The tariff is ₹8 per kWh. Find the energy and cost for 30 days.",
+   "marks": 5,
+   "a": "Fan: 40 × 8 = 320 Wh/day. Camera: 6 × 24 = 144 Wh/day. Total 464 Wh/day = 0.464 kWh/day. For 30 days: 0.464 × 30 = 13.92 kWh. Cost: 13.92 × 8 = ₹111.36."
+  },
+  {
+   "level": "apply",
+   "q": "A door sensor rule sends a phone alert through the cloud. The home internet fails at the same moment. What should the hub do locally?",
+   "marks": 4,
+   "a": "The hub must still evaluate the door rule locally and sound the siren or buzzer, and store the event for upload later. The phone alert is retried when the link returns."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare local and cloud rules for delay, failure and reach, and say which one a door alert should use.",
+   "marks": 5,
+   "a": "Local rules act in milliseconds and keep working with no internet, but they are reachable only inside the home. Cloud rules work from anywhere and keep history, but add network delay and fail when the link fails. A door alert should fire locally first, with the cloud notification as a second path."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, hubs are being replaced by border routers that speak Matter over Thread and Wi-Fi, so devices from different brands pair without a vendor app. Camera analytics has moved onto the device itself, using small neural networks, so a clip is only uploaded when a person is actually detected. Energy monitoring has moved from the whole house to per-circuit clamps that identify individual appliances from their power signature. Search for Matter specification, Thread border router, and non-intrusive load monitoring to go further."
+}

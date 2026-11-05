@@ -1,0 +1,215 @@
+{
+ "lead": "Remote monitoring puts a sensor, a gateway and a cloud service between a distant process and the person who acts on it. The sensor measures, the gateway collects and forwards, the cloud stores and compares each reading against limits, and only a crossed limit becomes an alert on a phone or a dashboard. It exists because nobody can sit beside every tank and every patient. It is used for home health wearables, hospital-at-home kits, and municipal or campus water supply, where a pump house and a hundred tanks are watched from one screen.",
+ "prereq": "You need: sensors from Unit 2, MQTT topics from Unit 3, a Raspberry Pi or ESP8266 gateway from Unit 4, a cloud dashboard from Unit 5, and the rule-and-actuator pattern of <a href=\"#home-automation-and-smart-homes\">Chapter 6.1</a>.",
+ "sections": [
+  {
+   "h3": "The chain from a distant process to a person",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Remote monitoring has one job: keep a person informed about a process they cannot stand next to, and disturb them only when something must be done. Four parts do the work. The sensing point is a sensor plus a small board. The gateway holds the network link and a short buffer. The cloud stores readings, runs threshold rules and serves a dashboard. The human is the operator, the nurse or the engineer who acts."
+    },
+    {
+     "type": "formula",
+     "text": "R = f × n × b",
+     "where": "R is the raw data rate in bit/s, f is samples per second, n is the number of channels, and b is bits per sample. A 3-axis accelerometer at 50 Hz with 16-bit samples gives R = 50 × 3 × 16 = 2400 bit/s."
+    },
+    {
+     "type": "formula",
+     "text": "T = C ÷ I_avg",
+     "where": "T is battery life in hours, C is cell capacity in mAh, and I_avg is average current in mA. A node drawing 12 mA from a 2000 mAh cell lasts 2000 ÷ 12 ≈ 167 h, about 7 days."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The sensor turns the physical quantity into an electrical signal; the board turns it into a number.",
+      "The board stamps the reading with a time and keeps it in a small buffer.",
+      "Every upload interval the gateway publishes the buffer over MQTT to a topic.",
+      "The cloud stores the reading, evaluates the threshold rule, and refreshes the dashboard.",
+      "If the rule fires, the cloud sends an alert and repeats it until someone acknowledges it."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The radio, not the sensor, decides the battery. A 100-byte packet is 800 bits; one per minute averages 800 ÷ 60 ≈ 13 bit/s, against 2400 bit/s for the raw stream. Send summaries and keep raw samples on the device."
+    },
+    {
+     "type": "p",
+     "text": "The upload interval also sets how late an alarm can be. A reading every minute means a limit crossed at 10:02.10 is caught by 10:03 at the latest. Shorten the interval, or check the limit on the device, when minutes matter."
+    }
+   ]
+  },
+  {
+   "h3": "E-health: wearables, ECG, SpO2 and falls",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A health wearable measures a few quantities and sends them, or features of them, through a phone to the cloud. SpO2 is the percentage of haemoglobin carrying oxygen, found from the ratio of red to infrared light absorbed through the finger; a healthy resting value at sea level is roughly 95-100%. The band reports a number, and only a clinician turns that number into a diagnosis."
+    },
+    {
+     "type": "p",
+     "text": "An ECG lead is sampled at 250 samples per second with 12-bit samples, so 250 × 12 = 3000 bit/s. Bluetooth Low Energy carries that easily, but a radio left on flattens a small cell. So the band filters the signal and uploads features, or a ten-second strip when an event fires."
+    },
+    {
+     "type": "p",
+     "text": "Fall detection uses the acceleration vector magnitude a = √(ax² + ay² + az²), where ax, ay and az are the three axis readings in m/s². At rest a ≈ 9.81 m/s². A fall shows a free-fall dip near 0, then a spike, then stillness. One rule: spike above 2.5 g, then 10 s without motion → ask the wearer to cancel within 30 s → if nobody cancels, escalate."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Level 1: the band vibrates.",
+      "Level 2: phone notification.",
+      "Level 3: SMS to a family contact.",
+      "Level 4: call to the clinician on duty."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Each level has a timeout, so silence pushes the alert one step up. This ladder is the part that makes remote monitoring safe: an alert that nobody sees is the same as no alert. A 200 mAh patch drawing 0.5 mA average lasts 200 ÷ 0.5 = 400 h, about 16 days."
+    }
+   ]
+  },
+  {
+   "h3": "Water management: tank level, pump control, leak detection",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A centralized water management system puts many tanks, pumps and flow meters under one dashboard: a housing society, a campus, or a ward of a city. Each tank has a level sensor at the rim. An ultrasonic sensor measures the distance d from the sensor down to the water surface, so the water depth is h = H − d, where H is the tank's internal height. The level in percent is 100 × h ÷ H."
+    },
+    {
+     "type": "p",
+     "text": "Pump control uses two thresholds, not one. Start the pump when the level falls to 20% and stop it at 90%. The gap is hysteresis: it stops the pump switching on and off every few seconds, a fault called short cycling that damages the motor."
+    },
+    {
+     "type": "p",
+     "text": "Leak detection uses the minimum night flow. Between 2 am and 4 am genuine demand is small, so a clean zone reads close to zero. If a meter still shows more than 5 L/min on three nights, that zone has a leak. A second method compares volume in with volume billed: a gap above 10% over a week points to a leak somewhere in the zone."
+    },
+    {
+     "type": "p",
+     "text": "The water-level control lab has a small tank, a level sensor, a relay, a pump and a Raspberry Pi. Log every reading to the cloud, watch the dashboard, pour water in by hand, and confirm the pump stops at 90%. This controller adds dead-band logic to a simple level reading:"
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "level = 35          # water level as percent of tank depth\nlow, high = 20, 90  # start below low, stop above high\n\nif level <= low:\n    print(\"pump ON\")\nelif level >= high:\n    print(\"pump OFF\")\nelse:\n    print(\"hold\")",
+     "stdin": "",
+     "output": "hold"
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One reading a minute leaves the patient or tank, passes through the gateway to the cloud, and only the cloud's threshold check decides whether a person is disturbed.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Tank or patient",
+    "Gateway",
+    "Cloud",
+    "Operator or clinician"
+   ],
+   "messages": [
+    {
+     "from": "Tank or patient",
+     "to": "Gateway",
+     "label": "reading every 1 min",
+     "dashed": false
+    },
+    {
+     "from": "Gateway",
+     "to": "Cloud",
+     "label": "upload via MQTT",
+     "dashed": false
+    },
+    {
+     "from": "Cloud",
+     "to": "Operator or clinician",
+     "label": "alert if over limit",
+     "dashed": false
+    }
+   ],
+   "aria": "A sensor reading travels every minute through a gateway and cloud, where a threshold check sends an alert to a remote operator or clinician."
+  }
+ },
+ "examples": [
+  {
+   "question": "A rooftop tank is 2 m long, 1.5 m wide and 1.2 m deep. A 0.5 HP pump fills it at 20 L/min, and the tank is empty at 6:00 am. Find the tank volume in m³ and in litres, the fill time in minutes and hours, the pump's electrical input power in W and kW, the electrical energy used in kWh, and the cost at ₹7 per kWh.",
+   "steps": [
+    "Volume V = length × width × depth = 2 m × 1.5 m × 1.2 m = 3.6 m³.",
+    "1 m³ is 1000 L, so capacity = 3.6 × 1000 = 3600 L.",
+    "Fill time = capacity ÷ flow = 3600 L ÷ 20 L/min = 180 min.",
+    "In hours: 180 ÷ 60 = 3 h.",
+    "Electrical input power P = 0.5 HP × 746 W/HP = 373 W.",
+    "In kW: 373 ÷ 1000 = 0.373 kW.",
+    "Energy E = P × t = 0.373 kW × 3 h = 1.119 kWh.",
+    "Cost = 1.119 kWh × ₹7/kWh = ₹7.833, that is ₹7.83."
+   ],
+   "answer": "The tank holds 3.6 m³ (3600 L), fills in 180 min (3 h), uses 1.119 kWh and costs ₹7.83.",
+   "check": "length = 2.0\nwidth = 1.5\ndepth = 1.2\nflow = 20.0\nhp = 0.5\ntariff = 7.0\n\nvolume = round(length * width * depth, 2)\nlitres = round(volume * 1000.0, 2)\nminutes = round(litres / flow, 2)\nhours = round(minutes / 60.0, 2)\nwatts = round(hp * 746.0, 2)\nkilowatts = round(watts / 1000.0, 3)\nkwh = round(kilowatts * hours, 3)\ncost = round(kwh * tariff, 2)\n\nfor value in (volume, litres, minutes, hours, watts, kilowatts, kwh, cost):\n    print(value)",
+   "values": [
+    3.6,
+    3600.0,
+    180.0,
+    3.0,
+    373.0,
+    0.373,
+    1.119,
+    7.83
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "1 HP is 746 W, not 1000 W. Using 1000 W turns 373 W into 500 W and inflates the cost.",
+  "1 m³ is 1000 L, not 100 L. The litre figure shifts by a factor of 10 and so does the fill time.",
+  "The worked example uses electrical input power. The hydraulic power the pump delivers to the water is a different, smaller number; mixing the two is the commonest slip.",
+  "A faster sampling rate does not make the alarm quicker if the threshold is checked only at upload. The check interval, not the sample rate, sets the delay.",
+  "Level percent is 100 × h ÷ H with h the water depth. Using the sensor-to-surface distance d instead of h inverts the reading, so a full tank shows 0%."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four parts of a remote monitoring chain.",
+   "marks": 2,
+   "a": "The sensing point (sensor plus board), the gateway, the cloud service, and the human who acts on the alert."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a tank controller use two level thresholds instead of one?",
+   "marks": 3,
+   "a": "Two thresholds give hysteresis. With a single threshold the pump starts and stops repeatedly around that level (short cycling), which wears the motor. Starting at 20% and stopping at 90% keeps each run long."
+  },
+  {
+   "level": "apply",
+   "q": "A 3-axis accelerometer samples at 100 Hz with 12 bits per axis. Find the raw data rate in bit/s and in kbit/s.",
+   "marks": 4,
+   "a": "R = f × n × b = 100 × 3 × 12 = 3600 bit/s = 3.6 kbit/s."
+  },
+  {
+   "level": "apply",
+   "q": "A wearable node draws 15 mA average from a 1200 mAh cell. Find its life in hours and in days.",
+   "marks": 5,
+   "a": "T = C ÷ I_avg = 1200 mAh ÷ 15 mA = 80 h. In days: 80 ÷ 24 ≈ 3.3 days."
+  },
+  {
+   "level": "analyze",
+   "q": "A cloud rule checks SpO2 only when a reading arrives, every 5 minutes. A patient's SpO2 falls at 10:02 and recovers at 10:04. What happens, and how do you fix it?",
+   "marks": 6,
+   "a": "The 10:05 reading is normal, so the rule never fires and the event is lost. Fix it by running the threshold on the device at the full sample rate and publishing an event the moment the limit is crossed, or by shortening the upload interval so a two-minute dip cannot fall between readings."
+  },
+  {
+   "level": "analyze",
+   "q": "An ECG band streams 250 samples/s at 12 bits continuously over Bluetooth Low Energy. Explain why such bands usually send features or short strips instead.",
+   "marks": 5,
+   "a": "The raw rate is 3000 bit/s, which BLE carries fine, but a radio on continuously drains the small cell in days or less. The raw stream is also noisy and useless without filtering. So the band filters on the device, sends features or a ten-second strip on an event, and the battery lasts weeks."
+  },
+  {
+   "level": "understand",
+   "q": "Why is leak detection done on night flow rather than on daytime flow?",
+   "marks": 3,
+   "a": "At night genuine demand is close to zero, so almost all measured flow is loss. In the daytime real use hides the leak, so a normal-looking reading can still contain a large loss."
+  }
+ ],
+ "beyond": "Not for the exam. Utilities now read domestic water meters over NB-IoT once or twice a day and use that data for non-revenue water accounting, which is the industry name for water that is pumped but never billed. Remote patient monitoring is moving the threshold rules from the cloud to the device, because a round trip to a data centre is wasted milliseconds when a fall has already happened. Digital twins of water networks replay logged flow and pressure to locate a leak to a street rather than a zone. Search next for ambient assisted living, minimum night flow, and SCADA for water utilities."
+}
