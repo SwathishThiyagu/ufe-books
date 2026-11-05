@@ -1,0 +1,233 @@
+{
+ "lead": "ARQ error control retransmits lost or corrupted frames. Go‑Back‑N (GBN) resends the whole unacknowledged block, while Selective Repeat (SR) resends only the missing frames. Both use sliding windows, cumulative or selective acknowledgements, and sequence numbers that wrap around. They are used in Ethernet, Wi‑Fi and satellite links where occasional frame loss is normal.",
+ "prereq": "You need: flow control basics from <a href=\"#flow-control-stop-and-wait-and-sliding-window\">section 3.4</a>.",
+ "sections": [
+  {
+   "h3": "Sender and receiver windows",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A sender window holds frames that have been transmitted but not yet acknowledged. Its size is called the window size W. A receiver window holds frames that have been received out of order and are waiting for missing earlier frames."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Sender window moves forward when ACKs are received.",
+      "Receiver window moves forward when in‑order frames are delivered to the network layer."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "W ≤ M for Go‑Back‑N; W ≤ (M+1)/2 for Selective Repeat",
+     "where": "W is the window size; M is the largest sequence number (modulo value). The first inequality applies to Go‑Back‑N, the second to Selective Repeat. The bound prevents ambiguity between new and old frames."
+    },
+    {
+     "type": "p",
+     "text": "Sequence numbers are taken modulo M+1. For example, with M = 7 the numbers are 0‑7 and after 7 the next number is 0 again."
+    }
+   ]
+  },
+  {
+   "h3": "Go‑Back‑N ARQ",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "GBN uses a cumulative ACK. The ACK number N means that all frames up to N‑1 have been received correctly. If a frame is lost, the receiver cannot acknowledge any later frame, so the sender eventually times out and retransmits the lost frame and all following frames."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sender transmits frames 0,1,2,3 (W=4).",
+      "Frame 2 is lost; receiver acknowledges 0 and 1, sending ACK=2.",
+      "Sender receives ACK=2 and slides the window to start at 2.",
+      "Timer for frame 2 expires because no ACK for frame 2 is received (ACK=3 cannot be sent until frame 2 is received).",
+      "Sender retransmits frames 2 and 3."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Total transmissions = original 4 frames + 2 retransmissions = 6 frames."
+    }
+   ]
+  },
+  {
+   "h3": "Selective Repeat ARQ",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SR uses individual ACKs (or NACKs). The receiver stores out‑of‑order frames in a buffer. Only the missing frames are retransmitted."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sender transmits frames 0,1,2,3 (W=4).",
+      "Frame 2 is lost; receiver ACKs 0,1 and also ACKs 3 (out‑of‑order).",
+      "Sender receives ACK for 3 and knows only frame 2 is missing.",
+      "Sender retransmits only frame 2.",
+      "Receiver delivers frames 0‑3 in order to the network layer."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Total transmissions = original 4 frames + 1 retransmission = 5 frames."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "def simulate_gbn(window, loss_idx):\n    sent = list(range(window))\n    acks = []\n    # loss of one frame\n    for i in sent:\n        if i == loss_idx:\n            continue\n        acks.append(i+1)\n    # timeout -> retransmit lost and later\n    retrans = list(range(loss_idx, window))\n    return len(sent) + len(retrans)\n\ndef simulate_sr(window, loss_idx):\n    sent = list(range(window))\n    # loss of one frame\n    acks = [i+1 for i in sent if i != loss_idx]\n    # only lost frame retransmitted\n    retrans = [loss_idx]\n    return len(sent) + len(retrans)\n\nprint(simulate_gbn(4, 2))  # 6\nprint(simulate_sr(4, 2))   # 5",
+     "stdin": "",
+     "output": "6\n5"
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Shows the sender window, timer expiry and retransmission in Go‑Back‑N.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "aria": "Shows sender window, timer expiry and retransmission in Go‑Back‑N.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Send window",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Timer",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "ACK recv",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Retransmit",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A link uses Go‑Back‑N with window size W=4 and sequence numbers modulo 8. The sender transmits frames 0‑3. Frame 2 is lost. All other frames and ACKs arrive correctly. How many frame transmissions occur until the sender can slide the window past frame 3?",
+   "steps": [
+    "Step 1: Original transmission sends 4 frames (0,1,2,3).",
+    "Step 2: Receiver ACKs 0 and 1, then sends ACK=2 (cumulative) for frame 1.",
+    "Step 3: No ACK for frame 2 arrives, timer for frame 2 expires.",
+    "Step 4: Sender retransmits frames 2 and 3.",
+    "Step 5: Receiver now gets frames 2 and 3, sends ACK=4.",
+    "Step 6: Sender slides window to start at 4."
+   ],
+   "answer": "Total frame transmissions = 6 (four original + two retransmissions).",
+   "check": "W=4\nlost=2\noriginal=W\nretrans=W-lost\nprint(original+retrans)",
+   "values": [
+    6
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int W=4, lost=2;\n    int total=W + (W - lost);\n    printf(\"%d\\n\", total);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "i",
+     "frame",
+     "total"
+    ],
+    "rows": [
+     [
+      "0",
+      "0‑3",
+      "4"
+     ],
+     [
+      "1",
+      "2,3",
+      "2"
+     ]
+    ]
+   },
+   "output": "6"
+  }
+ ],
+ "traps": [
+  "Confusing cumulative ACK (GBN) with individual ACK (SR) leads to counting too many retransmissions.",
+  "Using the same window size for SR without providing an extra buffer of size ≥ W causes buffer overflow.",
+  "Assuming the timer expires for every lost frame in SR; only the missing frame needs a timer.",
+  "For modulo arithmetic, forgetting that sequence numbers wrap around can make the sender think a new frame is a duplicate.",
+  "Counting the original transmission twice when adding retransmissions."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does ARQ stand for?",
+   "marks": 2,
+   "a": "Automatic Repeat reQuest."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why Go‑Back‑N uses a cumulative ACK.",
+   "marks": 3,
+   "a": "A cumulative ACK tells the sender that all frames up to a certain number have been received correctly, allowing the sender to slide its window forward without tracking each individual frame."
+  },
+  {
+   "level": "apply",
+   "q": "With window size 5 and sequence numbers modulo 10, what is the maximum number of outstanding frames allowed?",
+   "marks": 4,
+   "a": "The maximum is 5 frames, because the window size itself limits the number of unacknowledged frames."
+  },
+  {
+   "level": "apply",
+   "q": "In Selective Repeat, if the receiver buffer can hold 3 out‑of‑order frames, what is the largest window size you may safely use?",
+   "marks": 5,
+   "a": "Window size must be ≤ buffer size, so the largest safe window is 3."
+  },
+  {
+   "level": "analyze",
+   "q": "A link experiences a 10 % frame loss rate. Compare the expected number of transmissions per successful delivery for Go‑Back‑N (W=4) and Selective Repeat (W=4). Which protocol uses fewer transmissions and why?",
+   "marks": 6,
+   "a": "Selective Repeat uses fewer transmissions because only lost frames are resent. In Go‑Back‑N a loss forces retransmission of the lost frame and all later frames, increasing the average number of transmissions."
+  },
+  {
+   "level": "remember",
+   "q": "What inequality must hold between window size W and the maximum sequence number M for both GBN and SR?",
+   "marks": 2,
+   "a": "For Go‑Back‑N: W ≤ M. For Selective Repeat: W ≤ (M+1)/2."
+  },
+  {
+   "level": "understand",
+   "q": "Why must SR maintain a separate timer for each unacknowledged frame?",
+   "marks": 3,
+   "a": "Because each frame may be lost independently, and the sender must know exactly which frame needs retransmission without affecting others."
+  },
+  {
+   "level": "apply",
+   "q": "If a sender using GBN has a timeout of 200 ms and the round‑trip time is 150 ms, will the protocol be efficient? Briefly justify.",
+   "marks": 4,
+   "a": "Yes, because the timeout is only slightly larger than the RTT, so the sender will not wait long after a loss before retransmitting, keeping the pipeline busy."
+  }
+ ],
+ "beyond": "Not for the exam. In modern data‑center networks, selective repeat ideas are built into TCP selective acknowledgements (SACK) to improve performance over high‑latency links. Research continues on hybrid ARQ schemes that combine forward error correction with retransmission to reduce latency for 5G and satellite communications. Next you may explore \"Hybrid ARQ\" and \"TCP SACK\" in the transport‑layer chapters."
+}
