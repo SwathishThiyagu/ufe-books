@@ -1,0 +1,480 @@
+{
+ "lead": "This unit explains how an operating system creates, manages and schedules programs. After reading you will be able to draw state diagrams, compute waiting times and explain Linux scheduling choices.",
+ "about": "Unit 2 consists of nine chapters that start with the basic idea of a process and its life‑cycle (2.1). It then shows how the OS moves processes among queues and switches context (2.2). Creation and termination of processes are covered next (2.3) followed by ways processes talk to each other (2.4). Threads and their models are introduced in 2.5. Scheduling goals and the difference between preemptive and non‑preemptive policies are explained in 2.6. Chapter 2.7 lists the classic algorithms FCFS, SJF, priority and round‑robin. Chapter 2.8 extends scheduling to multiple cores and real‑time deadlines. Finally 2.9 gives a brief look at Linux’s O(1) and Completely Fair Scheduler, an advanced topic taught by only a few universities.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A process is an executing program with its own resources.",
+   "depth": "Define process and its life‑cycle states: new, ready, running, waiting, terminated. List PCB fields: pid, state, pc, registers, memory limits, open files. Mention that some syllabi call it process descriptor. Explain why PCB is needed for a context switch.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Process states",
+    "nodes": [
+     {
+      "id": "n",
+      "label": "New",
+      "style": "normal"
+     },
+     {
+      "id": "r",
+      "label": "Ready",
+      "style": "accent"
+     },
+     {
+      "id": "u",
+      "label": "Running",
+      "style": "live"
+     },
+     {
+      "id": "w",
+      "label": "Waiting",
+      "style": "muted"
+     },
+     {
+      "id": "t",
+      "label": "Terminated",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "n",
+      "to": "r",
+      "label": "admit"
+     },
+     {
+      "from": "r",
+      "to": "u",
+      "label": "dispatch"
+     },
+     {
+      "from": "u",
+      "to": "w",
+      "label": "I/O"
+     },
+     {
+      "from": "w",
+      "to": "r",
+      "label": "event"
+     },
+     {
+      "from": "u",
+      "to": "t",
+      "label": "exit"
+     }
+    ],
+    "aria": "A right‑ward flow diagram showing the five process states and transitions."
+   },
+   "example": "Process P arrives at time 0, needs 5 ms CPU, then I/O for 3 ms, then 2 ms CPU. Show the sequence New→Ready→Running→Waiting→Ready→Running→Terminated and compute total time 10 ms.",
+   "trap": "Confusing the waiting state (blocked for I/O) with the ready state (waiting for CPU).",
+   "prereq": "",
+   "leave": "Scheduling queues and context switching are handled in the next chapter."
+  },
+  {
+   "k": 2,
+   "idea": "The OS moves processes among queues and saves/restores their state.",
+   "depth": "Describe ready, waiting, device and priority queues. Explain the steps of a context switch: save PCB, choose next PCB, load registers. Define dispatch latency and give the term dispatcher. Some syllabi refer to this as process control and dispatch.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Scheduling queues",
+    "nodes": [
+     {
+      "id": "r",
+      "label": "Ready queue",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "CPU",
+      "style": "live"
+     },
+     {
+      "id": "w",
+      "label": "Waiting queue",
+      "style": "muted"
+     },
+     {
+      "id": "d",
+      "label": "Device queue",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "r",
+      "to": "c",
+      "label": "dispatch",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "w",
+      "label": "block",
+      "style": "dashed"
+     },
+     {
+      "from": "w",
+      "to": "d",
+      "label": "I/O request",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "r",
+      "label": "I/O complete",
+      "style": "solid"
+     }
+    ],
+    "aria": "A vertical block diagram showing processes moving from the ready queue to the CPU, then to waiting or device queues and back."
+   },
+   "example": "Saving registers takes 2 µs, loading takes 2 µs, scheduler overhead is 1 µs. Total context‑switch time = 5 µs.",
+   "trap": "Omitting the scheduler overhead when computing total switch time.",
+   "prereq": "1",
+   "leave": "Process creation and termination are covered next."
+  },
+  {
+   "k": 3,
+   "idea": "The OS creates new processes and destroys finished ones.",
+   "depth": "Explain fork, exec, spawn, clone system calls. Show parent‑child relationship, PID and PPID. Describe exit, wait, signal, zombie state and exit status. Some syllabi call this process lifecycle management.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Parent (PID 1000)",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Child A (PID 1001)",
+       "style": "normal",
+       "children": [
+        {
+         "label": "Grandchild (PID 1002)",
+         "style": "muted",
+         "children": []
+        }
+       ]
+      },
+      {
+       "label": "Child B (PID 1003)",
+       "style": "normal",
+       "children": []
+      }
+     ]
+    },
+    "aria": "A tree diagram showing a parent process and its two children, one of which creates a grandchild."
+   },
+   "example": "A program calls fork twice. After the first fork there are 2 processes. After the second fork each existing process creates a child, giving 4 processes total. List their PIDs assuming the first child gets 2000 and subsequent children get consecutive numbers.",
+   "trap": "Mixing up the return values of fork: child gets 0, parent gets child's PID.",
+   "prereq": "2",
+   "leave": "Inter‑process communication is introduced in the next chapter."
+  },
+  {
+   "k": 4,
+   "idea": "Processes exchange data without sharing the same address space.",
+   "depth": "Cover shared memory segments, required synchronization, message queues, and pipes (anonymous and named). Define buffer, producer, consumer, and blocking semantics. Some syllabi use the term IPC for all these mechanisms.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Producer",
+     "Pipe",
+     "Consumer"
+    ],
+    "messages": [
+     {
+      "from": "Producer",
+      "to": "Pipe",
+      "label": "write 4 KB",
+      "dashed": false
+     },
+     {
+      "from": "Pipe",
+      "to": "Consumer",
+      "label": "read 4 KB",
+      "dashed": false
+     },
+     {
+      "from": "Producer",
+      "to": "Pipe",
+      "label": "write 4 KB",
+      "dashed": false
+     },
+     {
+      "from": "Pipe",
+      "to": "Consumer",
+      "label": "read 4 KB",
+      "dashed": false
+     }
+    ],
+    "aria": "A sequence diagram showing a producer writing two blocks to a pipe and a consumer reading them."
+   },
+   "example": "Pipe buffer size = 4 KB. Producer writes 8 KB in two writes. After the first write the pipe is full and the producer blocks. Consumer reads 4 KB, unblocks producer, which writes the remaining 4 KB. Total time = write + read + block + unblock overhead.",
+   "trap": "Assuming a pipe has infinite capacity and never blocks.",
+   "prereq": "3",
+   "leave": "Thread concepts are explored in the next chapter."
+  },
+  {
+   "k": 5,
+   "idea": "Threads are lightweight execution units that share a process address space.",
+   "depth": "Define thread control block (TCB), per‑thread stack, shared code and data. Explain many‑to‑one, one‑to‑one and many‑to‑many threading models. Mention why threads improve responsiveness on multicore phones. Some syllabi refer to them as lightweight processes.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Process with threads",
+    "nodes": [
+     {
+      "id": "p",
+      "label": "Process",
+      "style": "accent"
+     },
+     {
+      "id": "t1",
+      "label": "Thread 1",
+      "style": "live"
+     },
+     {
+      "id": "t2",
+      "label": "Thread 2",
+      "style": "live"
+     },
+     {
+      "id": "t3",
+      "label": "Thread 3",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p",
+      "to": "t1",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "t2",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "t3",
+      "style": "solid"
+     }
+    ],
+    "aria": "A block diagram showing a single process containing three threads that share the same memory."
+   },
+   "example": "A mobile app creates 4 threads on a 4‑core phone to download four images. Each download takes 200 ms. With one thread per core the total time ≈ 200 ms, versus 800 ms if the downloads were sequential.",
+   "trap": "Equating the number of threads with the number of CPU cores; excess threads may contend for the same core.",
+   "prereq": "4",
+   "leave": "Scheduling criteria are discussed next."
+  },
+  {
+   "k": 6,
+   "idea": "Schedulers are judged by measurable performance criteria.",
+   "depth": "Define CPU utilization (percentage), throughput (jobs / hour), turnaround time (completion − arrival), waiting time (time in ready queue), response time (first response − arrival). Explain preemptive versus non‑preemptive execution. Some syllabi call these scheduling metrics.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "CPU",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 6,
+        "style": "accent"
+       },
+       {
+        "label": "P2",
+        "start": 6,
+        "end": 10,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "A Gantt chart showing two processes executed non‑preemptively, then preemptively, to illustrate waiting and response times."
+   },
+   "example": "Two processes: P1 burst = 6 ms, P2 burst = 4 ms. FCFS (non‑preemptive) waiting times: P1 = 0 ms, P2 = 6 ms, average = 3 ms. Preemptive shortest‑remaining‑time: P2 runs first, waiting times: P1 = 4 ms, P2 = 0 ms, average = 2 ms.",
+   "trap": "Adding turnaround time to waiting time instead of computing them separately.",
+   "prereq": "5",
+   "leave": "Specific scheduling algorithms are introduced in the next chapter."
+  },
+  {
+   "k": 7,
+   "idea": "Different policies decide which ready process runs next.",
+   "depth": "Describe FCFS, SJF (non‑preemptive), priority scheduling, and Round Robin with time quantum. List advantages, disadvantages and possible starvation. Some syllabi label these as classic scheduling algorithms.",
+   "figure": {
+    "type": "array",
+    "title": "Ready queue order",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "FCFS",
+      "cells": [
+       "P1",
+       "P2",
+       "P3"
+      ],
+      "marks": {}
+     },
+     {
+      "label": "SJF",
+      "cells": [
+       "P2",
+       "P1",
+       "P3"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "Priority",
+      "cells": [
+       "P3",
+       "P1",
+       "P2"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "RR",
+      "cells": [
+       "P1",
+       "P2",
+       "P3"
+      ],
+      "marks": {}
+     }
+    ],
+    "aria": "Four rows showing the order of processes in the ready queue for each algorithm."
+   },
+   "example": "Processes: P1 arrival = 0 ms, burst = 8 ms; P2 arrival = 1 ms, burst = 4 ms; P3 arrival = 2 ms, burst = 2 ms, priority = 1 (high). Draw Gantt charts for each algorithm and compute average waiting time.",
+   "trap": "Forgetting to consider arrival times when building the FCFS order.",
+   "prereq": "6",
+   "leave": "Scheduling on multiple CPUs and real‑time constraints follows."
+  },
+  {
+   "k": 8,
+   "idea": "Scheduling must handle several CPUs and time‑critical tasks.",
+   "depth": "Explain load balancing, CPU affinity, SMP runqueues. Introduce real‑time concepts: deadline, jitter, hard vs soft. Describe Rate‑Monotonic (RM) and Earliest‑Deadline‑First (EDF) algorithms. Some syllabi refer to this as multiprocessor and real‑time scheduling.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "time (ms)",
+     "min": 0,
+     "max": 30
+    },
+    "y": {
+     "label": "task",
+     "min": 0,
+     "max": 3
+    },
+    "series": [
+     {
+      "name": "Task A",
+      "expr": "0 if x%5<1 else None",
+      "style": "accent"
+     },
+     {
+      "name": "Task B",
+      "expr": "1 if x%10<2 else None",
+      "style": "live"
+     },
+     {
+      "name": "Task C",
+      "expr": "2 if x%20<2 else None",
+      "style": "muted"
+     }
+    ],
+    "aria": "A timeline plot showing three periodic real‑time tasks with different periods."
+   },
+   "example": "Task A: C = 1 ms, T = 5 ms; Task B: C = 2 ms, T = 10 ms; Task C: C = 2 ms, T = 20 ms. Utilization U = (1/5)+(2/10)+(2/20)=0.5 ≤ 1, so the set is schedulable under EDF.",
+   "trap": "Ignoring context‑switch overhead when applying the utilization test.",
+   "prereq": "7",
+   "leave": "Linux‑specific schedulers are covered in the final chapter."
+  },
+  {
+   "k": 9,
+   "idea": "Linux uses O(1) and Completely Fair Scheduler to pick the next task.",
+   "depth": "Only a few universities teach this advanced topic. Summarize O(1) scheduler: per‑CPU runqueues, constant‑time selection using priority arrays. Summarize CFS: red‑black tree keyed by virtual runtime (vruntime), weight derived from nice value, fair share of CPU. Define vruntime, load average, and the term ‘nice’.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "vruntime",
+     "style": "normal",
+     "children": [
+      {
+       "label": "Task 1",
+       "style": "accent",
+       "children": []
+      },
+      {
+       "label": "Task 2",
+       "style": "live",
+       "children": []
+      },
+      {
+       "label": "Task 3",
+       "style": "muted",
+       "children": []
+      }
+     ]
+    },
+    "aria": "A red‑black tree showing tasks ordered by their virtual runtime in the CFS."
+   },
+   "example": "Task A nice = ‑5 (weight ≈ 1.25), Task B nice = 0 (weight = 1). Over 100 ms, CPU share ≈ 1.25 : 1, so Task A gets ≈ 56 ms and Task B gets ≈ 44 ms.",
+   "trap": "Assuming CFS is a simple priority scheduler; it is based on fair runtime, not static priority.",
+   "prereq": "8",
+   "leave": ""
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "states → queues"
+  ],
+  [
+   2,
+   3,
+   "queues → creation"
+  ],
+  [
+   3,
+   4,
+   "creation → IPC"
+  ],
+  [
+   4,
+   5,
+   "IPC → threads"
+  ],
+  [
+   5,
+   6,
+   "threads → criteria"
+  ],
+  [
+   6,
+   7,
+   "criteria → algorithms"
+  ],
+  [
+   7,
+   8,
+   "algorithms → multiprocessor"
+  ],
+  [
+   8,
+   9,
+   "multiprocessor → Linux"
+  ]
+ ]
+}

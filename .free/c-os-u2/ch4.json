@@ -1,0 +1,253 @@
+{
+ "lead": "Inter‑process communication (IPC) lets two or more processes exchange data even though each process has its own private address space. IPC is needed when a producer generates data that a consumer must use, for example a sensor process sending readings to a logger, or a web server handing a request to a worker. The main mechanisms are shared memory, message queues, and pipes (both anonymous and named). Each mechanism has its own way of handling buffers, blocking, and synchronization, and the OS provides system calls to create and use them.",
+ "prereq": "You need: process concepts from <a href=\"#process-concept-states-and-process-control-block\">Process concept, states and PCB</a> and basic scheduling from <a href=\"#process-scheduling-queues-and-context-switching\">Process scheduling queues</a>.",
+ "sections": [
+  {
+   "h3": "Shared‑memory IPC",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Shared memory creates a memory segment that multiple processes can map into their own virtual address spaces. The segment is identified by a key and attached with the <code>shmat</code> system call. Because the segment is a common buffer, processes must coordinate access with synchronization primitives such as semaphores or mutexes to avoid race conditions."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Segment size is fixed when created; typical size is a few megabytes.",
+      "Producer writes data into the segment, then signals the consumer.",
+      "Consumer reads data after receiving the signal."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Create segment with <code>shmget(key, size, IPC_CREAT|0666)</code>.",
+      "Attach segment in producer with <code>shmat</code>.",
+      "Attach segment in consumer with <code>shmat</code>.",
+      "Use a semaphore to protect the buffer.",
+      "Detach with <code>shmdt</code> and remove with <code>shmctl</code>."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "Effective throughput = (Data size) ÷ (Write time + Read time + Sync overhead)",
+     "where": "Data size in bytes; Write time and Read time are the time each process spends copying; Sync overhead is the time spent on semaphore operations."
+    }
+   ]
+  },
+  {
+   "h3": "Message‑queue IPC",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A message queue stores messages in kernel space. Each message has a type (an integer) and a payload. Processes use <code>msgsnd</code> to enqueue and <code>msgrcv</code> to dequeue. The queue can be bounded; when full, the sender blocks until space becomes available."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Message size is limited (often 8192 bytes).",
+      "Multiple receivers can read messages of specific types.",
+      "Queue attributes (max bytes, max messages) are set at creation."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Create queue with <code>msgget(key, IPC_CREAT|0666)</code>.",
+      "Define a struct with <code>long mtype;</code> and <code>char mtext[SIZE];</code>.",
+      "Sender fills <code>mtype</code> and <code>mtext</code>, then calls <code>msgsnd</code>.",
+      "Receiver calls <code>msgrcv</code> with the desired type.",
+      "Remove queue with <code>msgctl</code> when done."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Pipe IPC (anonymous and named)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A pipe provides a unidirectional byte stream between a writer and a reader. An anonymous pipe is created with <code>pipe()</code> before a <code>fork()</code>; the child inherits the file descriptors. A named pipe (FIFO) is created with <code>mkfifo()</code> and can be opened by unrelated processes."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Pipe buffer size is kernel defined; typical default is 4 KB.",
+      "Write blocks when buffer is full; read blocks when buffer is empty.",
+      "Blocking semantics implement producer‑consumer flow control."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\\n#include <unistd.h>\\n#include <string.h>\\n\\nint main() {\\n    int fd[2];\\n    pipe(fd);\\n    pid_t pid = fork();\\n    if (pid == 0) {\\n        // Child reads\\n        close(fd[1]);\\n        char buf[100];\\n        read(fd[0], buf, sizeof(buf));\\n        printf(\"Child read: %s\\n\", buf);\\n    } else {\\n        // Parent writes\\n        close(fd[0]);\\n        const char *msg = \"Hello through pipe\";\\n        write(fd[1], msg, strlen(msg)+1);\\n    }\\n    return 0;\\n}",
+     "stdin": "",
+     "output": "Child read: Hello through pipe"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Call <code>pipe(fd)</code> to obtain two file descriptors.",
+      "Fork the process; child closes the write end, parent closes the read end.",
+      "Parent writes a null‑terminated string with <code>write</code>.",
+      "Child reads with <code>read</code> into a buffer and prints it."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Sequence of two writes and two reads on a pipe showing when the producer blocks and is later unblocked.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Producer",
+    "Pipe",
+    "Consumer"
+   ],
+   "messages": [
+    {
+     "from": "Producer",
+     "to": "Pipe",
+     "label": "write 4 KB",
+     "dashed": false
+    },
+    {
+     "from": "Pipe",
+     "to": "Consumer",
+     "label": "read 4 KB",
+     "dashed": false
+    },
+    {
+     "from": "Producer",
+     "to": "Pipe",
+     "label": "write 4 KB",
+     "dashed": false
+    },
+    {
+     "from": "Pipe",
+     "to": "Consumer",
+     "label": "read 4 KB",
+     "dashed": false
+    }
+   ],
+   "aria": "A sequence diagram showing a producer writing two blocks to a pipe and a consumer reading them."
+  }
+ },
+ "examples": [
+  {
+   "question": "A pipe has a buffer size of 4 KB. The producer writes 8 KB in two successive writes of 4 KB each. The write operation for each KB takes 1 ms. The read operation for each KB also takes 1 ms. When the buffer becomes full, the producer blocks and incurs a 2 ms blocking overhead. When the consumer reads data, the producer is unblocked and incurs a 1 ms unblock overhead. Compute the total elapsed time from the start of the first write until the consumer has read the entire 8 KB.",
+   "steps": [
+    "Write first 4 KB: 4 KB × 1 ms/KB = 4 ms.",
+    "Buffer is now full → producer blocks: add 2 ms.",
+    "Consumer reads first 4 KB: 4 KB × 1 ms/KB = 4 ms.",
+    "Unblock producer: add 1 ms.",
+    "Producer writes second 4 KB: 4 ms.",
+    "Consumer reads second 4 KB: 4 ms.",
+    "Total time = 4 + 2 + 4 + 1 + 4 + 4 = 19 ms."
+   ],
+   "answer": "The total elapsed time is 19 ms.",
+   "check": "write_time = 4 * 1\nblock_overhead = 2\nread_time1 = 4 * 1\nunblock_overhead = 1\nwrite_time2 = 4 * 1\nread_time2 = 4 * 1\ntotal = write_time + block_overhead + read_time1 + unblock_overhead + write_time2 + read_time2\nprint(total)",
+   "values": [
+    19
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\\nint main(){\\n    int write_time = 4*1; // ms\\n    int block = 2;\\n    int read1 = 4*1;\\n    int unblock = 1;\\n    int write2 = 4*1;\\n    int read2 = 4*1;\\n    int total = write_time + block + read1 + unblock + write2 + read2;\\n    printf(\"Total time = %d ms\\n\", total);\\n    return 0;\\n}",
+    "stdin": "",
+    "output": "Total time = 19 ms"
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Time (ms)"
+    ],
+    "rows": [
+     [
+      "Write 1st 4KB",
+      "4"
+     ],
+     [
+      "Block",
+      "2"
+     ],
+     [
+      "Read 1st 4KB",
+      "4"
+     ],
+     [
+      "Unblock",
+      "1"
+     ],
+     [
+      "Write 2nd 4KB",
+      "4"
+     ],
+     [
+      "Read 2nd 4KB",
+      "4"
+     ]
+    ]
+   },
+   "output": "Total time = 19 ms"
+  }
+ ],
+ "traps": [
+  "Assuming a pipe can hold unlimited data and therefore never blocks; the kernel imposes a fixed buffer size (often 4 KB).",
+  "Confusing the time to copy data (write/read) with the blocking overhead; they must be added, not multiplied.",
+  "Treating the unblock overhead as part of the consumer’s read time; it belongs to the producer’s state change.",
+  "Using the same variable name for both producer and consumer buffers, which hides the fact that they are separate logical entities.",
+  "Forgetting that the write call includes the terminating null byte when sending a string; this adds one extra byte to the transfer."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does IPC stand for?",
+   "marks": 2,
+   "a": "Inter‑process communication."
+  },
+  {
+   "level": "remember",
+   "q": "Name the system call used to create an anonymous pipe.",
+   "marks": 2,
+   "a": "<code>pipe()</code>."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a semaphore is required when two processes share a memory segment.",
+   "marks": 4,
+   "a": "Both processes may try to read or write the same buffer at the same time. Without mutual exclusion, their operations can interleave, causing race conditions and corrupted data. A semaphore enforces exclusive access, ensuring that only one process manipulates the buffer while the other waits."
+  },
+  {
+   "level": "apply",
+   "q": "A message queue is created with a maximum of 10 messages, each up to 256 bytes. If a sender tries to enqueue the 11th message, what will happen?",
+   "marks": 4,
+   "a": "The <code>msgsnd</code> call will block (or fail with <code>EAGAIN</code> if non‑blocking mode is set) until the consumer removes at least one message, freeing space."
+  },
+  {
+   "level": "apply",
+   "q": "Given a pipe buffer of 4 KB, a producer writes 6 KB in one call. The write system call returns after writing 4 KB. How many bytes remain to be written, and what must the producer do next?",
+   "marks": 4,
+   "a": "2 KB remain. The producer must either wait for the consumer to read some data (the call will block) or handle the partial write by retrying the <code>write</code> after the consumer has read."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare shared memory and message queues in terms of data copying, synchronization, and typical use cases.",
+   "marks": 6,
+   "a": "Shared memory avoids copying because both processes map the same physical pages; it requires explicit synchronization (semaphores, mutexes) to avoid races. It is ideal for large data transfers or high‑throughput scenarios (e.g., video frames). Message queues copy data into kernel buffers, providing built‑in ordering and type filtering but incur copy overhead; they are suited for control messages or small payloads where simplicity is more important than raw speed."
+  },
+  {
+   "level": "analyze",
+   "q": "A system uses a named pipe (FIFO) for logging from many processes to a single logger. Identify a potential problem and suggest a mitigation.",
+   "marks": 6,
+   "a": "Multiple writers can interleave their writes, causing garbled log lines. Mitigation: open the FIFO in O_WRONLY | O_NONBLOCK mode and protect each write with a file‑lock (e.g., <code>flock</code>) or have each writer prepend a length field and let the logger parse messages atomically."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between an anonymous pipe and a named pipe regarding process relationships?",
+   "marks": 4,
+   "a": "An anonymous pipe exists only between a parent and its child after <code>fork()</code>, because the file descriptors are inherited. A named pipe (FIFO) exists as a file in the filesystem and can be opened by any unrelated processes that have permission."
+  }
+ ],
+ "beyond": "Not for the exam. Modern operating systems extend classic IPC with zero‑copy mechanisms such as Linux’s <code>splice</code> and <code>memfd_create</code>, which combine the benefits of shared memory and message passing. Distributed systems use network‑transparent IPC like gRPC or D-Bus, building on the same concepts but adding serialization and transport layers. Researchers explore lock‑free shared memory and hardware‑assisted message queues to reduce latency in multi‑core and many‑core processors. To continue, search for \"POSIX shared memory performance\" and \"Linux pipe splice\"."
+}

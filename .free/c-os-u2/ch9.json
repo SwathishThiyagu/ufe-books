@@ -1,0 +1,226 @@
+{
+ "lead": "Linux must decide which runnable task runs next on each CPU. Early kernels used the O(1) scheduler that picks a task in constant time. Modern kernels use the Completely Fair Scheduler (CFS) that gives each task a share of CPU proportional to its weight. Both designs keep the system responsive and fair, especially on multi‑core phones and servers.",
+ "prereq": "You need: <a href=\"#process-concept-states-and-process-control-block\">process concept</a>, <a href=\"#process-scheduling-queues-and-context-switching\">scheduling queues</a> and <a href=\"#scheduling-algorithms-fcfs-sjf-priority-round-robin\">basic algorithms</a>.",
+ "sections": [
+  {
+   "h3": "O(1) scheduler and per‑CPU runqueues",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The O(1) scheduler was introduced in Linux 2.6. It keeps a separate runqueue for each CPU. A runqueue holds tasks in an array of priority lists called a priority array. The array has 140 entries, one for each static priority value from 0 (highest) to 139 (lowest)."
+    },
+    {
+     "type": "p",
+     "text": "When a task becomes runnable, the kernel inserts it into the list that matches its static priority. Insertion is O(1) because it is a simple linked‑list add at the head."
+    },
+    {
+     "type": "p",
+     "text": "To select the next task, the scheduler scans the priority array from highest to lowest until it finds a non‑empty list. The scan is bounded by the fixed size of the array, so the selection time is also O(1)."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Per‑CPU runqueue avoids lock contention on SMP systems.",
+      "Constant‑time selection makes the scheduler scalable.",
+      "Static priority cannot express fine‑grained fairness."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "next_task = first_non_empty(priority_array[i])",
+     "where": "i is the smallest index with a ready list; priority_array[i] holds tasks of static priority i."
+    },
+    {
+     "type": "p",
+     "text": "The O(1) design works well for real‑time classes that need deterministic latency. However, it gives lower‑priority tasks very little CPU if higher‑priority tasks keep arriving."
+    }
+   ]
+  },
+  {
+   "h3": "Completely Fair Scheduler (CFS) and virtual runtime",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CFS replaced the O(1) scheduler in Linux 2.6.23. It treats CPU as a perfectly divisible resource. Each task accumulates a virtual runtime (vruntime) that measures how much CPU time it has received, adjusted by its weight."
+    },
+    {
+     "type": "p",
+     "text": "Weight is derived from the nice value. Nice ranges from -20 (high priority) to +19 (low priority). The kernel maps nice to a weight factor; for example nice = 0 gives weight = 1024, nice = ‑5 gives weight = 2825, nice = 10 gives weight = 102."
+    },
+    {
+     "type": "formula",
+     "text": "vruntime = actual_runtime × (1024 ÷ weight)",
+     "where": "actual_runtime is CPU time in nanoseconds; weight is the task's weight; 1024 is the reference weight for nice = 0."
+    },
+    {
+     "type": "p",
+     "text": "All runnable tasks are kept in a red‑black tree ordered by vruntime. The leftmost node has the smallest vruntime and is chosen to run next. After a time slice, the task's vruntime is increased, and the node is re‑inserted."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Pick the leftmost node in the red‑black tree.",
+      "Run the task for a slice computed from the target latency (default ≈ 20 ms) and the task's weight, with a minimum granularity of ≈ 1 ms.",
+      "Update vruntime using the formula above.",
+      "Re‑balance the tree with the new vruntime."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "CFS guarantees that over a long period each task receives CPU proportional to its weight. If two tasks have weights 2825 and 1024, the first gets 2825/(2825+1024) ≈ 0.734 → 73.4 % of CPU."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Fairness is achieved without static priorities.",
+      "Load average is the average number of runnable tasks over a period of time. CFS uses the sum of task weights to compute a scaled load metric, but this is not the system load average.",
+      "CFS works on all CPUs; each CPU has its own red‑black tree."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Red‑black tree of tasks ordered by vruntime; notice the leftmost node runs next.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "vruntime",
+    "style": "normal",
+    "children": [
+     {
+      "label": "Task 1",
+      "style": "accent",
+      "children": [],
+      "_d": 1,
+      "_x": 240.03279999999998,
+      "_y": 106
+     },
+     {
+      "label": "Task 2",
+      "style": "live",
+      "children": [],
+      "_d": 1,
+      "_x": 360.0,
+      "_y": 106
+     },
+     {
+      "label": "Task 3",
+      "style": "muted",
+      "children": [],
+      "_d": 1,
+      "_x": 479.9672,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "A red‑black tree showing tasks ordered by their virtual runtime in the CFS."
+  }
+ },
+ "examples": [
+  {
+   "question": "Task A has nice = ‑5 (weight = 2825) and Task B has nice = 0 (weight = 1024). The CPU slice is 100 ms. Compute the CPU time each task receives in one slice according to CFS.",
+   "steps": [
+    "Total weight = 2825 + 1024 = 3849.",
+    "Share of A = 2825 ÷ 3849 ≈ 0.734.",
+    "Share of B = 1024 ÷ 3849 ≈ 0.266.",
+    "CPU time for A = 0.734 × 100 ms ≈ 73.4 ms.",
+    "CPU time for B = 0.266 × 100 ms ≈ 26.6 ms."
+   ],
+   "answer": "Task A gets about 73.4 ms and Task B gets about 26.6 ms of CPU in the 100 ms slice.",
+   "check": "import math\nweight_a = 2825\nweight_b = 1024\nslice_ms = 100.0\ntotal = weight_a + weight_b\nshare_a = weight_a/total\nshare_b = weight_b/total\nprint(round(share_a*slice_ms,2))\nprint(round(share_b*slice_ms,2))",
+   "values": [
+    73.4,
+    26.6
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    double weight_a=2825, weight_b=1024, slice=100.0;\n    double total=weight_a+weight_b;\n    double a = weight_a/total*slice;\n    double b = weight_b/total*slice;\n    printf(\"%0.2f %0.2f\\n\", a, b);\n    return 0;\n}"
+   },
+   "stdin": "",
+   "output": "73.40 26.60"
+  }
+ ],
+ "dry_run": {
+  "head": [
+   "Task",
+   "Weight",
+   "CPU(ms)"
+  ],
+  "rows": [
+   [
+    "A",
+    "2825",
+    "73.4"
+   ],
+   [
+    "B",
+    "1024",
+    "26.6"
+   ]
+  ]
+ },
+ "output": "73.4 26.6",
+ "traps": [
+  "Confusing static priority (O(1) scheduler) with nice‑based weight (CFS).",
+  "Using actual runtime instead of weight‑adjusted vruntime in the CFS formula.",
+  "Assuming CFS always runs the highest‑priority task; it chooses the smallest vruntime instead.",
+  "Treating the priority array scan as O(n) – it is bounded by a constant size."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What data structure does the O(1) scheduler use to store tasks of the same priority?",
+   "marks": 2,
+   "a": "A linked list."
+  },
+  {
+   "level": "remember",
+   "q": "What is the name of the tree used by CFS?",
+   "marks": 2,
+   "a": "Red‑black tree."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why CFS can provide fairness without static priorities.",
+   "marks": 3,
+   "a": "CFS orders tasks by virtual runtime, which grows slower for heavier (higher‑weight) tasks. The leftmost node has received the least weighted CPU, so each task gets CPU proportional to its weight over time."
+  },
+  {
+   "level": "apply",
+   "q": "A task with nice = 10 has weight = 102. If it runs for 20 ms, what is its vruntime increase?",
+   "marks": 4,
+   "a": "vruntime increase = 20 ms × (1024 ÷ 102) ≈ 200 ms."
+  },
+  {
+   "level": "apply",
+   "q": "Two tasks have weights 1024 and 256. In a 40 ms slice, how much CPU does each receive?",
+   "marks": 4,
+   "a": "Total weight = 1280. Share1 = 1024/1280 = 0.8 → 32 ms. Share2 = 256/1280 = 0.2 → 8 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "If a CPU has four cores, how does CFS maintain fairness across cores?",
+   "marks": 5,
+   "a": "Each core keeps its own red‑black tree and vruntime values. Load balancing moves tasks between trees when vruntime differences exceed a threshold, keeping overall fairness."
+  },
+  {
+   "level": "analyze",
+   "q": "Why did Linux replace the O(1) scheduler with CFS?",
+   "marks": 5,
+   "a": "O(1) could not express proportional sharing and suffered from priority inversion for interactive workloads. CFS provides fine‑grained fairness, better interactivity, and scales to many CPUs."
+  },
+  {
+   "level": "apply",
+   "q": "Given a task with nice = ‑10 (weight = 9049) and another with nice = 5 (weight = 335), compute their CPU shares in a 200 ms slice.",
+   "marks": 6,
+   "a": "Total weight = 9384. Share‑high = 9049/9384 ≈ 0.964 → 192.8 ms. Share‑low = 335/9384 ≈ 0.036 → 7.2 ms."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, CFS concepts influence container orchestrators that need fair CPU quotas. Research explores deadline‑aware extensions to CFS for real‑time workloads. Emerging kernels experiment with hybrid schedulers that combine O(1)‑style fast paths with CFS fairness. Students can explore the Linux source code in sched.c to see the actual implementation."
+}

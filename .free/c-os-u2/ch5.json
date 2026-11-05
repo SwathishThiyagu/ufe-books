@@ -1,0 +1,213 @@
+{
+ "lead": "A thread is a lightweight unit of execution that lives inside a process. All threads of a process share the same address space, code segment, global variables and open files, but each thread has its own thread control block (TCB) and a private stack. Because threads reuse the process resources, they are cheaper to create and switch than full processes. Modern smartphones and laptops have multiple CPU cores, so using several threads lets an application run parts of its work in parallel, improving responsiveness and reducing perceived waiting time.",
+ "prereq": "You need: <a href=\"#process-concept-states-and-process-control-block\">process concept</a> and <a href=\"#process-scheduling-queues-and-context-switching\">process scheduling</a>.",
+ "sections": [
+  {
+   "h3": "Thread control block and per‑thread resources",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When a thread is created the OS allocates a Thread Control Block (TCB). The TCB stores the thread identifier, current register values, program counter, thread state (ready, running, blocked) and a pointer to the thread’s private stack. The stack holds the thread’s local variables, function call frames and return addresses. All threads of the same process point to the same code segment and the same global data segment, so they can read or write the same variables without extra copying."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "TCB – metadata for scheduling and context switching.",
+      "Per‑thread stack – isolated call frames, prevents corruption between threads.",
+      "Shared code – only one copy of the executable is kept in memory.",
+      "Shared data – global variables, heap, open file descriptors are common."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "Memory_{process} = Code + Heap + Data + Σ(Stack_i)",
+     "where": "Code, Heap and Data are shared; Stack_i is the private stack of thread i."
+    }
+   ]
+  },
+  {
+   "h3": "Threading models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Operating systems provide three classic mappings between user threads and kernel threads."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Many‑to‑one: many user threads are multiplexed onto a single kernel thread. The OS sees only one thread, so only one core can execute at a time. Example: early Green Threads."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "One‑to‑one: each user thread has a dedicated kernel thread. The kernel can schedule each thread on a different CPU core. Most modern OSes (Linux, Windows) use this model."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Many‑to‑many: a pool of kernel threads is created and user threads are bound to any free kernel thread. This gives flexibility and limits kernel resource use. Solaris 9 introduced this model."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The choice of model affects scalability. On a 4‑core phone, a many‑to‑one program cannot use more than one core, while a one‑to‑one program can run four threads in parallel, reducing total execution time."
+    }
+   ]
+  },
+  {
+   "h3": "Multicore programming and responsiveness",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Mobile applications often need to perform I/O, network calls or image processing while keeping the UI smooth. By creating a separate thread for each independent task, the UI thread stays responsive. The OS scheduler places each runnable thread on any idle core, so work proceeds concurrently."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Identify tasks that can run independently (e.g., downloading images).",
+      "Create a thread for each task using the one‑to‑one model.",
+      "Start all threads; the scheduler runs them on available cores.",
+      "Join the threads or use callbacks to combine results."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <pthread.h>\n#include <unistd.h>\n\nvoid* download(void* arg) {\n    int id = *(int*)arg;\n    usleep(200000);               // 200 ms simulated download\n    printf(\"Image %d done\\n\", id);\n    return NULL;\n}\n\nint main() {\n    const int N = 4;\n    pthread_t th[N];\n    int ids[N];\n    for (int i = 0; i < N; ++i) {\n        ids[i] = i + 1;\n        pthread_create(&th[i], NULL, download, &ids[i]);\n    }\n    for (int i = 0; i < N; ++i) {\n        pthread_join(th[i], NULL);\n    }\n    printf(\"All downloads complete\\n\");\n    return 0;\n}\n",
+     "stdin": "",
+     "output": "Image 1 done\nImage 3 done\nImage 4 done\nImage 2 done\nAll downloads complete"
+    },
+    {
+     "type": "p",
+     "text": "If the same program used a single thread, the four downloads would be performed sequentially, taking about 800 ms. With four cores and four threads, the total wall‑clock time is roughly the longest single download, about 200 ms, showing a 4× speed‑up."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A process contains several threads that share the same memory; each thread has its own stack.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Process with threads",
+   "nodes": [
+    {
+     "id": "p",
+     "label": "Process",
+     "style": "accent"
+    },
+    {
+     "id": "t1",
+     "label": "Thread 1",
+     "style": "live"
+    },
+    {
+     "id": "t2",
+     "label": "Thread 2",
+     "style": "live"
+    },
+    {
+     "id": "t3",
+     "label": "Thread 3",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "p",
+     "to": "t1",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "t2",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "t3",
+     "style": "solid"
+    }
+   ],
+   "aria": "A block diagram showing a single process containing three threads that share the same memory."
+  }
+ },
+ "examples": [
+  {
+   "question": "A mobile app creates 4 threads on a 4‑core phone. Each thread downloads an image in 200 ms. Assume no overhead. Compute the total elapsed time if the threads run concurrently versus sequentially.",
+   "steps": [
+    "Concurrent case: All 4 threads start at time 0 and run on separate cores.",
+    "The longest individual download is 200 ms, so total time = 200 ms.",
+    "Sequential case: Downloads run one after another.",
+    "Total time = 4 × 200 ms = 800 ms."
+   ],
+   "answer": "Concurrent execution finishes in 200 ms, while sequential execution takes 800 ms.",
+   "check": "t_conc = 0.2  # seconds\nt_seq = 4 * 0.2\nprint(t_conc)\nprint(t_seq)",
+   "values": [
+    0.2,
+    0.8
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    double t_conc = 0.2; // seconds\n    double t_seq = 4 * 0.2;\n    printf(\"Concurrent: %.1f s\\n\", t_conc);\n    printf(\"Sequential: %.1f s\\n\", t_seq);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Case",
+     "Threads",
+     "Time (ms)"
+    ],
+    "rows": [
+     [
+      "Concurrent",
+      "4",
+      "200"
+     ],
+     [
+      "Sequential",
+      "1",
+      "800"
+     ]
+    ]
+   },
+   "output": "Concurrent: 0.2 s\nSequential: 0.8 s"
+  }
+ ],
+ "traps": [
+  "Assuming the number of threads must equal the number of cores; extra threads can still be useful for I/O‑bound work.",
+  "Confusing the thread stack with the process heap; only the stack is private to a thread.",
+  "Thinking that many‑to‑one threads can run in parallel on multiple cores – they cannot because the kernel sees only one thread.",
+  "Ignoring the cost of thread creation and context switching; for very short tasks, the overhead may outweigh the benefit."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What data structure does the OS allocate for each thread?",
+   "marks": 2,
+   "a": "Thread Control Block (TCB)."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why threads share the same code segment but have separate stacks.",
+   "marks": 4,
+   "a": "The code segment contains read‑only instructions that can be used by any thread, so keeping one copy saves memory. Each thread needs its own stack to store local variables and return addresses; sharing a stack would corrupt each other's execution."
+  },
+  {
+   "level": "apply",
+   "q": "A program creates 3 threads on a dual‑core CPU. Each thread needs 150 ms of CPU time. Estimate the minimum wall‑clock time assuming perfect scheduling.",
+   "marks": 5,
+   "a": "Two threads run together for 150 ms on the two cores. The third thread runs after one core becomes free, adding another 150 ms. Minimum time = 150 ms + 150 ms = 300 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the many‑to‑one and many‑to‑many models in terms of scalability and kernel overhead.",
+   "marks": 6,
+   "a": "Many‑to‑one maps many user threads to a single kernel thread, so only one thread can run at a time; scalability is poor on multicore systems but kernel overhead is low because few kernel threads exist. Many‑to‑many maintains a pool of kernel threads; it can schedule many user threads on multiple cores, offering better scalability while keeping kernel thread count moderate, reducing overhead compared to one‑to‑one."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, thread libraries now expose work‑stealing schedulers that dynamically balance load across cores, as seen in Java Fork/Join and C++ std::async. Research explores lightweight user‑level threading (fibers) that avoid kernel calls for even lower overhead. Emerging curricula add topics on data‑parallel models (OpenMP, CUDA) that complement traditional threading for GPU acceleration."
+}

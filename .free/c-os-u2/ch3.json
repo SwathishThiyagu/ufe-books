@@ -1,0 +1,230 @@
+{
+ "lead": "The operating system must be able to start new programs and stop those that have finished. System calls such as fork, exec, spawn and clone let a running process create another process. The new process receives a unique PID and a link to its parent. When a process ends it calls exit, and the parent can retrieve the exit status with wait. If the parent does not wait, the finished process becomes a zombie, consuming a PID slot. This lifecycle is the basis for all user‑level applications, from a banking app using UPI to a server handling cricket scores.",
+ "prereq": "You need: understanding of process states and PCB from <a href=\"#process-concept-states-and-process-control-block\">Process concept, states and process control block</a>.",
+ "sections": [
+  {
+   "h3": "System calls for creating a process",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The primitive call in Unix‑like systems is <code>fork()</code>. It duplicates the calling process. The child receives a copy of the parent’s address space, file descriptors and environment. The return value distinguishes the two: the child gets 0, the parent gets the child’s PID."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Parent executes <code>pid = fork()</code>.",
+      "Kernel creates a new PCB, assigns a fresh PID, and copies the parent’s context.",
+      "Kernel returns 0 to the child and the child’s PID to the parent."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<code>execve()</code> replaces the child’s memory image with a new program.",
+      "<code>spawn()</code> (Windows) combines creation and loading in one call.",
+      "<code>clone()</code> (Linux) lets the child share selected resources such as memory or file tables."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "PID_child = fork() ? 0 : new_PID",
+     "where": "new_PID is the unique identifier allocated by the kernel; the expression evaluates to 0 in the child and to new_PID in the parent."
+    }
+   ]
+  },
+  {
+   "h3": "Ending a process and collecting its status",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process ends by calling <code>exit(status)</code>. The status is an 8‑bit integer supplied by the program. The kernel marks the process as terminated but keeps its PCB until the parent reads the status."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Child calls <code>exit(code)</code>.",
+      "Kernel stores <code>code</code> in the child’s PCB and changes the state to <i>terminated</i>.",
+      "Parent calls <code>wait(&amp;status)</code> or <code>waitpid(childPID,&amp;status,0)</code>.",
+      "Kernel copies the stored code into <code>status</code> and removes the PCB."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\\n#include <unistd.h>\\n#include <sys/wait.h>\\n\\nint main() {\\n    pid_t pid = fork();\\n    if (pid == 0) {\\n        printf(\"Child PID %d doing work...\\n\", getpid());\\n        exit(42); // return code 42\\n    } else {\\n        int status;\\n        waitpid(pid, &status, 0);\\n        if (WIFEXITED(status)) {\\n            printf(\"Parent received exit code %d from child %d\\n\", WEXITSTATUS(status), pid);\\n        }\\n    }\\n    return 0;\\n}",
+     "stdin": "",
+     "output": "Child PID 12345 doing work...\\nParent received exit code 42 from child 12345"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "If the parent never calls <code>wait</code>, the child stays in <i>zombie</i> state.",
+      "A zombie still occupies a PID slot, which can exhaust the PID pool on long‑running servers."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Parent‑child hierarchy and zombie processes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every process (except the init process) has a parent identified by PPID. The kernel maintains a tree of processes. When a process terminates, its children are re‑parented to init (PID 1) so they can still be waited on."
+    },
+    {
+     "type": "formula",
+     "text": "PPID_child = PID_parent",
+     "where": "PPID_child is stored in the child’s PCB; it equals the PID of the process that called <code>fork</code>."
+    },
+    {
+     "type": "p",
+     "text": "A zombie appears when the child has exited but the parent has not yet performed <code>wait</code>. The state diagram shows a transition from <i>running</i> → <i>terminated</i> → <i>zombie</i> → <i>reaped</i>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Process hierarchy after two forks: one parent, two children and one grandchild.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "Parent 1000",
+    "style": "accent",
+    "children": [
+     {
+      "label": "Child A 1001",
+      "style": "normal",
+      "children": [
+       {
+        "label": "Grandchild 1002",
+        "style": "muted",
+        "children": [],
+        "_d": 2,
+        "_x": 273.4528,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 273.4528,
+      "_y": 106
+     },
+     {
+      "label": "Child B 1003",
+      "style": "normal",
+      "children": [],
+      "_d": 1,
+      "_x": 446.54720000000003,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "A tree diagram showing a parent process with two child processes, one of which creates a grandchild."
+  }
+ },
+ "examples": [
+  {
+   "question": "A program executes <code>fork()</code> twice in a row. The first call creates Child A with PID 2000. Each subsequent <code>fork</code> call creates a child that receives the next consecutive PID. List all PIDs that exist after the second <code>fork</code> and indicate which are parents and which are children.",
+   "steps": [
+    "First <code>fork</code>: parent (PID 1000) creates Child A (PID 2000). Now two processes exist: 1000 (parent) and 2000 (child).",
+    "Second <code>fork</code> is executed by both existing processes.",
+    "Parent (PID 1000) creates Child B with the next PID 2001.",
+    "Child A (PID 2000) creates Child C with the next PID 2002.",
+    "After the second call there are four processes: 1000 (parent), 2000 (child A), 2001 (child B of parent), 2002 (child C of Child A)."
+   ],
+   "answer": "The four PIDs are 1000 (original parent), 2000 (first child), 2001 (second child of the parent), and 2002 (second child of the first child).",
+   "check": "pids = [1000, 2000, 2001, 2002]\\nfor pid in pids:\\n    print(pid)",
+   "values": [
+    1000,
+    2000,
+    2001,
+    2002
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\\n#include <unistd.h>\\n#include <sys/wait.h>\\n\\nint main() {\\n    pid_t pid1 = fork();\\n    if (pid1 == 0) {\\n        // Child A\\n        pid_t pid2 = fork();\\n        if (pid2 == 0) {\\n            printf(\"Grandchild PID %d, PPID %d\\n\", getpid(), getppid());\\n        } else {\\n            printf(\"Child A PID %d created Grandchild PID %d\\n\", getpid(), pid2);\\n        }\\n    } else {\\n        // Parent\\n        pid_t pid3 = fork();\\n        if (pid3 == 0) {\\n            printf(\"Child B PID %d, PPID %d\\n\", getpid(), getppid());\\n        } else {\\n            printf(\"Parent PID %d created Child A PID %d and Child B PID %d\\n\", getpid(), pid1, pid3);\\n        }\\n    }\\n    // Wait for all children to finish to avoid zombies\\n    while (wait(NULL) > 0) {}\\n    return 0;\\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "PID",
+     "Role"
+    ],
+    "rows": [
+     [
+      "1000",
+      "Parent"
+     ],
+     [
+      "2000",
+      "Child A"
+     ],
+     [
+      "2001",
+      "Child B"
+     ],
+     [
+      "2002",
+      "Grandchild"
+     ]
+    ]
+   },
+   "output": "Parent PID 1000 created Child A PID 2000 and Child B PID 2001\\nChild A PID 2000 created Grandchild PID 2002\\nChild B PID 2001, PPID 1000\\nGrandchild PID 2002, PPID 2000"
+  }
+ ],
+ "traps": [
+  "Confusing the return value of <code>fork()</code>: the child receives 0, the parent receives the child's PID.",
+  "Assuming <code>exit()</code> immediately frees all resources; the PCB remains until the parent calls <code>wait</code>.",
+  "Treating a zombie as a running process; it cannot execute but still holds a PID.",
+  "Using <code>wait()</code> without checking <code>WIFEXITED</code>, which may misinterpret signals as exit codes."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What system call creates a new process by duplicating the calling process?",
+   "marks": 2,
+   "a": "<code>fork()</code>"
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a child process receives 0 as the return value from <code>fork()</code>.",
+   "marks": 3,
+   "a": "The kernel uses the return value to tell the two execution paths apart: 0 indicates the code is running in the newly created copy, while the parent needs the child's PID to manage it."
+  },
+  {
+   "level": "apply",
+   "q": "A program calls <code>fork()</code> once and then the child calls <code>execve(\"/bin/ls\", argv, envp)</code>. What program runs in the child after <code>execve</code>?",
+   "marks": 4,
+   "a": "<code>/bin/ls</code> replaces the child's address space, so the child now runs the <code>ls</code> command."
+  },
+  {
+   "level": "apply",
+   "q": "If a parent process never calls <code>wait()</code>, what state does the terminated child enter and what resource is still consumed?",
+   "marks": 4,
+   "a": "The child becomes a zombie; the PID slot in the kernel's process table remains allocated."
+  },
+  {
+   "level": "analyze",
+   "q": "Given a process tree where the init process (PID 1) re‑parents a zombie child, describe how the zombie can be finally removed.",
+   "marks": 5,
+   "a": "Init periodically calls <code>wait()</code> on its children. When it reaps the zombie, the kernel frees the PCB and the PID becomes available."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between <code>spawn()</code> (Windows) and the <code>fork()+exec()</code> pair (Unix)?",
+   "marks": 3,
+   "a": "<code>spawn()</code> creates a new process and loads a program in one call, whereas <code>fork()</code> only duplicates the caller and <code>exec()</code> must be invoked separately to load a new program."
+  },
+  {
+   "level": "apply",
+   "q": "Write a short C snippet that creates a child process, makes the child exit with status 7, and the parent prints the received status.",
+   "marks": 6,
+   "a": "#include <stdio.h>\\n#include <unistd.h>\\n#include <sys/wait.h>\\n\\nint main(){\\n    pid_t pid = fork();\\n    if(pid==0){\\n        exit(7);\\n    } else {\\n        int st;\\n        waitpid(pid,&st,0);\\n        if(WIFEXITED(st)) printf(\"status %d\\n\", WEXITSTATUS(st));\\n    }\\n    return 0;\\n}"
+  }
+ ],
+ "beyond": "Not for the exam. In cloud platforms, container runtimes use <code>clone()</code> with fine‑grained namespace sharing to isolate micro‑services. Research on lightweight process creation explores <i>fork‑free</i> models to reduce overhead in high‑frequency trading systems. Modern languages such as Go provide goroutine scheduling on top of OS threads, but still rely on the OS for actual process creation and termination. For deeper study, look into the Linux <code>pid_namespace</code> implementation and the design of the Completely Fair Scheduler."
+}
