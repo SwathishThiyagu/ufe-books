@@ -1,0 +1,475 @@
+{
+ "lead": "This unit turns a parsed program into a checked, machine-independent middle form. You attach attributes to grammar rules, build trees and DAGs, check types, then emit postfix and three-address code. By the end you can translate declarations, assignments, boolean tests and procedure calls into jump-based intermediate code.",
+ "about": "Chapter 4.1 starts with syntax-directed definitions: semantic rules attached to a grammar compute synthesized and inherited attributes. Chapter 4.2 uses those rules to build syntax trees and DAGs, where shared subexpressions become one node. Chapter 4.3 adds semantic analysis, representing types as type expressions and checking assignments and operators. Chapter 4.4 introduces intermediate languages and postfix notation, a linear form evaluated on a stack. Chapter 4.5 stores three-address instructions in quadruples, triples and indirect triples. Chapter 4.6 translates declarations and assignments, including array address arithmetic. Chapter 4.7 closes with boolean expressions, control flow, backpatching and procedure calls. Each chapter needs the previous one: attributes feed trees, trees feed type rules, and type-correct expressions feed intermediate code.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Attach semantic rules to grammar productions and compute attributes in the right direction.",
+   "depth": "Semantic rules attached to grammar productions; synthesized attributes computed from children; inherited attributes from parent or siblings; S-attributed and L-attributed definitions; dependency order. Some syllabi call these attribute grammars or semantic actions.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "+",
+     "note": "val = 17",
+     "children": [
+      {
+       "label": "*",
+       "note": "val = 12",
+       "children": [
+        {
+         "label": "3",
+         "note": "val = 3"
+        },
+        {
+         "label": "4",
+         "note": "val = 4"
+        }
+       ]
+      },
+      {
+       "label": "5",
+       "note": "val = 5"
+      }
+     ]
+    },
+    "aria": "Expression tree for 3 * 4 + 5; values rise from the leaves so the root shows 17."
+   },
+   "example": "Grammar: E → E + T | T, T → T * F | F, F → digit. Write semantic rules for val and evaluate 3 * 4 + 5. Answer: F.val=3, T.val=3, T.val=12, E.val=12, F.val=5, T.val=5, E.val=17.",
+   "trap": "Inherited attributes do not flow up from children.",
+   "prereq": "Unit 2: context-free grammars and parse trees.",
+   "leave": "Parsing algorithms to Units 2 and 3; type checking to 4.3; intermediate code to 4.4."
+  },
+  {
+   "k": 2,
+   "idea": "Remove punctuation from a parse tree to get a syntax tree, and share repeated subexpressions to get a DAG.",
+   "depth": "Build syntax trees with mknode and mkleaf; build DAGs by merging identical subexpressions; value-number method; sharing gives common subexpression elimination. Some syllabi call the DAG an expression DAG.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "M",
+      "label": "-",
+      "x": 2,
+      "y": 0,
+      "note": "root"
+     },
+     {
+      "id": "P",
+      "label": "*",
+      "x": 1,
+      "y": 1
+     },
+     {
+      "id": "C",
+      "label": "c",
+      "x": 3,
+      "y": 1
+     },
+     {
+      "id": "S",
+      "label": "+",
+      "x": 1,
+      "y": 2,
+      "style": "accent",
+      "note": "shared"
+     },
+     {
+      "id": "A",
+      "label": "a",
+      "x": 0,
+      "y": 3
+     },
+     {
+      "id": "B",
+      "label": "b",
+      "x": 2,
+      "y": 3
+     }
+    ],
+    "edges": [
+     {
+      "from": "M",
+      "to": "P",
+      "label": "L",
+      "style": "solid"
+     },
+     {
+      "from": "M",
+      "to": "C",
+      "label": "R",
+      "style": "solid"
+     },
+     {
+      "from": "P",
+      "to": "S",
+      "label": "L",
+      "style": "accent"
+     },
+     {
+      "from": "P",
+      "to": "S",
+      "label": "R",
+      "style": "accent"
+     },
+     {
+      "from": "S",
+      "to": "A",
+      "label": "L",
+      "style": "solid"
+     },
+     {
+      "from": "S",
+      "to": "B",
+      "label": "R",
+      "style": "solid"
+     }
+    ],
+    "aria": "DAG for (a+b)*(a+b)-c; the single plus node is shared by both inputs of the multiplication."
+   },
+   "example": "Draw the syntax tree and the DAG for (a + b) * (a + b) - c. Answer: the syntax tree has two + nodes; the DAG has one + node shared by both children of *.",
+   "trap": "A DAG shares identical subexpressions; a syntax tree does not.",
+   "prereq": "4.1 attributes; Unit 2 parse trees.",
+   "leave": "Basic-block DAGs and optimization to Unit 6; type checking to 4.3."
+  },
+  {
+   "k": 3,
+   "idea": "Model types as expressions and check that each operation and assignment respects them.",
+   "depth": "Type expressions: basic types, array, pointer, product, function; type checking of expressions and assignments; structural versus name equivalence; static checking; type inference in some syllabi. Some syllabi call this type system or type analysis.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "array",
+     "note": "type of a",
+     "children": [
+      {
+       "label": "10",
+       "note": "index bound"
+      },
+      {
+       "label": "int",
+       "note": "element type"
+      }
+     ]
+    },
+    "aria": "Type expression tree for int a[10]; the array constructor has a bound and an element type."
+   },
+   "example": "Declarations: int a[10]; int i; int x; Write the type expression of a and check x = a[i] + 1. Answer: a has type array(10, int); a[i] is int; int + int is int; assignment to int x is correct.",
+   "trap": "Name equivalence and structural equivalence are different tests.",
+   "prereq": "4.1 semantic rules; Unit 5 symbol tables.",
+   "leave": "Symbol-table implementation to Unit 5; runtime type checks to Unit 5."
+  },
+  {
+   "k": 4,
+   "idea": "Choose a machine-independent intermediate form, with postfix as the stack-friendly linear one.",
+   "depth": "Intermediate representations: syntax tree, DAG, postfix, three-address code; prefix and postfix Polish and reverse Polish conversion by precedence; stack evaluation. Some syllabi call postfix reverse Polish notation.",
+   "figure": {
+    "type": "array",
+    "title": "Postfix stack for 3 + 4 * 2",
+    "show_index": false,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "3",
+      "cells": [
+       "3"
+      ]
+     },
+     {
+      "label": "4",
+      "cells": [
+       "3",
+       "4"
+      ]
+     },
+     {
+      "label": "2",
+      "cells": [
+       "3",
+       "4",
+       "2"
+      ]
+     },
+     {
+      "label": "*",
+      "cells": [
+       "3",
+       "8"
+      ],
+      "marks": {
+       "1": "accent"
+      }
+     },
+     {
+      "label": "+",
+      "cells": [
+       "11"
+      ],
+      "marks": {
+       "0": "live"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 4,
+      "cell": 0,
+      "label": "top"
+     }
+    ],
+    "aria": "Stack after each postfix token for 3 + 4 * 2; the final stack holds 11."
+   },
+   "example": "Convert 3 + 4 * 2 to postfix and evaluate it. Answer: 3 4 2 * +; stack after * is 3 8; after + is 11.",
+   "trap": "For a - b, postfix is a b -, not b a -.",
+   "prereq": "4.2 syntax trees.",
+   "leave": "Three-address code tables to 4.5; target code to Unit 6."
+  },
+  {
+   "k": 5,
+   "idea": "Write each three-address instruction in a table as a quadruple, triple or indirect triple.",
+   "depth": "Three-address instruction forms; temporaries; quadruple table (op, arg1, arg2, result); triple table with instruction numbers; indirect triples with a pointer list; compare space and reordering.",
+   "figure": {
+    "type": "array",
+    "title": "Quadruples for x = a + b * c - d",
+    "show_index": false,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "0",
+      "cells": [
+       "*",
+       "b",
+       "c",
+       "T1"
+      ]
+     },
+     {
+      "label": "1",
+      "cells": [
+       "+",
+       "a",
+       "T1",
+       "T2"
+      ]
+     },
+     {
+      "label": "2",
+      "cells": [
+       "-",
+       "T2",
+       "d",
+       "T3"
+      ]
+     },
+     {
+      "label": "3",
+      "cells": [
+       "=",
+       "T3",
+       "",
+       "x"
+      ]
+     }
+    ],
+    "pointers": [],
+    "aria": "Quadruple table with operator, two operands and result for the four three-address instructions."
+   },
+   "example": "Translate x = a + b * c - d into three-address code, then show quadruples, triples and indirect triples. Answer: t1 = b * c; t2 = a + t1; t3 = t2 - d; x = t3.",
+   "trap": "In triples the result is a triple number, not a temporary name.",
+   "prereq": "4.4 intermediate languages.",
+   "leave": "Register allocation and target code to Unit 6."
+  },
+  {
+   "k": 6,
+   "idea": "Use syntax-directed rules to enter declarations and emit code for assignments, including array addresses.",
+   "depth": "Translate declarations into symbol-table entries with type and width; translate assignments with address arithmetic for arrays; type conversion; emit three-address code. Some syllabi call this syntax-directed translation of declarations and assignments.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Declaration to assignment code",
+    "nodes": [
+     {
+      "id": "d",
+      "label": "int a[10]",
+      "note": "declaration",
+      "style": "normal"
+     },
+     {
+      "id": "t",
+      "label": "Symbol table",
+      "note": "a: array, width 4",
+      "style": "accent"
+     },
+     {
+      "id": "x",
+      "label": "x = a[i] + 1",
+      "note": "assignment",
+      "style": "normal"
+     },
+     {
+      "id": "a",
+      "label": "Address",
+      "note": "1000 + i * 4",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Three-address code",
+      "note": "t1 to t4",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "d",
+      "to": "t",
+      "label": "enter",
+      "style": "solid"
+     },
+     {
+      "from": "t",
+      "to": "x",
+      "label": "lookup",
+      "style": "solid"
+     },
+     {
+      "from": "x",
+      "to": "a",
+      "label": "address",
+      "style": "solid"
+     },
+     {
+      "from": "a",
+      "to": "c",
+      "label": "emit",
+      "style": "solid"
+     }
+    ],
+    "aria": "Declaration enters a symbol table; the assignment looks up a and computes an address before emitting code."
+   },
+   "example": "Assume int is 4 bytes and array a has base address 1000. For int a[10]; int i; int x; translate x = a[i] + 1. Answer: enter a as array(0..9, int), width 4; t1 = i * 4; t2 = 1000 + t1; t3 = *t2; t4 = t3 + 1; x = t4.",
+   "trap": "Array address uses index × element width, not index alone.",
+   "prereq": "4.1 attributes; 4.3 types; 4.5 three-address code.",
+   "leave": "Boolean and case translation to 4.7; symbol-table internals to Unit 5."
+  },
+  {
+   "k": 7,
+   "idea": "Turn boolean tests and control statements into jumps and labels, and patch jump targets later.",
+   "depth": "Boolean expressions with short-circuit && and ||; if, while, for and case statements; backpatching with truelist and falselist; procedure calls: param, call, return; activation record link. Some syllabi call this flow of control and backpatching.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Short-circuit if-else",
+    "nodes": [
+     {
+      "id": "start",
+      "label": "a < b ?",
+      "style": "accent"
+     },
+     {
+      "id": "yes",
+      "label": "c > d ?",
+      "style": "accent"
+     },
+     {
+      "id": "then",
+      "label": "x = 1",
+      "style": "live"
+     },
+     {
+      "id": "else",
+      "label": "x = 0",
+      "style": "muted"
+     },
+     {
+      "id": "end",
+      "label": "next",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "start",
+      "to": "yes",
+      "label": "yes",
+      "style": "solid"
+     },
+     {
+      "from": "start",
+      "to": "else",
+      "label": "no",
+      "style": "solid"
+     },
+     {
+      "from": "yes",
+      "to": "then",
+      "label": "yes",
+      "style": "solid"
+     },
+     {
+      "from": "yes",
+      "to": "else",
+      "label": "no",
+      "style": "solid"
+     },
+     {
+      "from": "then",
+      "to": "end",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "else",
+      "to": "end",
+      "label": "",
+      "style": "solid"
+     }
+    ],
+    "aria": "Flow for if (a < b && c > d): a false goes straight to x = 0, skipping the second test."
+   },
+   "example": "Translate if (a < b && c > d) x = 1; else x = 0; into three-address code with labels starting at 100. Answer: 100: if a < b goto 102; 101: goto 106; 102: if c > d goto 104; 103: goto 106; 104: x = 1; 105: goto 107; 106: x = 0; 107: next.",
+   "trap": "Short-circuit && must not evaluate the right side after a false left side.",
+   "prereq": "4.5 three-address code; Unit 5 activation records.",
+   "leave": "Activation-record layout to Unit 5; final code generation to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "attributes compute tree node values"
+  ],
+  [
+   2,
+   3,
+   "trees carry types for checking"
+  ],
+  [
+   3,
+   4,
+   "checked expressions lower to postfix"
+  ],
+  [
+   4,
+   5,
+   "postfix becomes three-address instructions"
+  ],
+  [
+   5,
+   6,
+   "quadruples store translated assignments"
+  ],
+  [
+   6,
+   7,
+   "assignment code extends to jumps and calls"
+  ],
+  [
+   1,
+   5,
+   "attributes also generate three-address code"
+  ]
+ ]
+}

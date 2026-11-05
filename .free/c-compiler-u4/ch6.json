@@ -1,0 +1,226 @@
+{
+ "lead": "Syntax-directed translation puts semantic actions on grammar productions. A declaration action enters a name, type and width into the symbol table. An assignment action looks up names, computes storage addresses, converts types where needed, and emits three-address code. The idea exists because later phases need exact facts: where a variable lives, how many bytes it occupies, and what operation each instruction performs. Compilers use it for every scalar variable, every array index, and every mixed-type assignment, from a C program that stores daily power units in an array to a Java loop that totals UPI payments.",
+ "prereq": "You need: <a href=\"#syntax-directed-definitions-synthesized-and-inherited-attributes\">4.1</a> attributes, <a href=\"#semantic-analysis-type-expressions-and-type-checking\">4.3</a> type checking, and <a href=\"#three-address-code-quadruples-triples-indirect-triples\">4.5</a> three-address code.",
+ "sections": [
+  {
+   "h3": "Declarations enter the symbol table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Declarations create symbol-table entries. For a simple declaration grammar, the production <code>D → T id ;</code> has a type T and a name id. The action after id computes the entry and advances the offset. The offset is the byte position of the next free cell in the current scope. The width is the number of bytes the object occupies. For <code>T → int</code>, set T.type = int and T.width = 4 if int is 4 bytes. For <code>T → int [ num ]</code>, set T.type = array(0..num−1, int) and T.width = num × 4. The element width is 4 bytes; the whole array width is 40 bytes for 10 elements."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Compute T.type and T.width from the type production.",
+      "Enter id.name with T.type, T.width and the current offset.",
+      "Set id.place to that offset.",
+      "Add T.width to offset."
+     ]
+    },
+    {
+     "type": "table",
+     "head": [
+      "Name",
+      "Type",
+      "Width (bytes)",
+      "Offset"
+     ],
+     "rows": [
+      [
+       "a",
+       "array(0..9, int)",
+       "40 (4 per element)",
+       "0"
+      ],
+      [
+       "i",
+       "int",
+       "4",
+       "40"
+      ],
+      [
+       "x",
+       "int",
+       "4",
+       "44"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "For <code>int a[10]; int i; int x;</code> the table holds these entries. This table is the declaration result; the assignment uses it. A name not in the table is an undeclared-variable error."
+    }
+   ]
+  },
+  {
+   "h3": "Assignments: l-values and r-values",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An assignment needs a place to store and a value to store. The l-value is the location named on the left. The r-value is the value computed on the right. For a scalar id, the symbol-table entry gives the location directly. For an array element, no per-element address is stored. The compiler computes it from the base address, the index and the element width."
+    },
+    {
+     "type": "formula",
+     "text": "addr(a[i]) = base(a) + (i − low) × w",
+     "where": "base(a) is the byte address of the first element; i is the index; low is the first legal index; w is the element width in bytes."
+    },
+    {
+     "type": "p",
+     "text": "If low is 0, the formula is base(a) + i × w. For a two-dimensional row-major array A[l1..u1, l2..u2], the same idea adds a row stride: addr(A[i,j]) = base(A) + ((i − l1) × (u2 − l2 + 1) + (j − l2)) × w. The table stores the base, bounds and element width, not every address."
+    }
+   ]
+  },
+  {
+   "h3": "Emitting three-address code for the assignment",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For <code>S → id = E ;</code>, look up id, check that the assignment respects the types from 4.3, and emit <code>id.place = E.place</code>. For <code>E → E1 + E2</code>, make a new temporary t and emit <code>t = E1.place + E2.place</code>; then set E.place = t. For <code>E → id</code>, set E.place to the name. For <code>E → id [ E1 ]</code>, compute the address into a temporary, then load: <code>t = *addr</code>. The star means load the value stored at that address."
+    },
+    {
+     "type": "p",
+     "text": "If x is real and E is int, emit a conversion before the store: <code>t = inttofloat(E.place)</code>, then <code>x = t</code>. If x is int and E is real, use <code>realtoint</code>; that truncates toward zero in many languages. The emitted code is linear three-address code: each instruction has at most one operator and three names."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A declaration creates a symbol-table entry; the assignment reads that entry, forms 1000 + i × 4, and emits the four temporaries. With i = 4, the address is 1016 bytes.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Declaration to assignment code",
+   "nodes": [
+    {
+     "id": "d",
+     "label": "int a[10]",
+     "note": "declaration",
+     "style": "normal"
+    },
+    {
+     "id": "t",
+     "label": "Symbol table",
+     "note": "a: array, elem 4B",
+     "style": "accent"
+    },
+    {
+     "id": "x",
+     "label": "x = a[i] + 1",
+     "note": "assignment",
+     "style": "normal"
+    },
+    {
+     "id": "a",
+     "label": "Address",
+     "note": "1000 + i × 4",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Three-address code",
+     "note": "t1 to t4",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "d",
+     "to": "t",
+     "label": "enter",
+     "style": "solid"
+    },
+    {
+     "from": "t",
+     "to": "x",
+     "label": "lookup",
+     "style": "solid"
+    },
+    {
+     "from": "x",
+     "to": "a",
+     "label": "address",
+     "style": "solid"
+    },
+    {
+     "from": "a",
+     "to": "c",
+     "label": "emit",
+     "style": "solid"
+    }
+   ],
+   "aria": "Declaration enters a symbol table; the assignment looks up a and computes an address before emitting code."
+  }
+ },
+ "examples": [
+  {
+   "question": "Assume int is 4 bytes, a has byte base address 1000, i = 4 and a[4] = 20. Translate the declarations int a[10]; int i; int x; and the assignment x = a[i] + 1. Show the symbol-table facts used, the element address, and the three-address code. What is x?",
+   "steps": [
+    "Enter a: type array(0..9, int), element width 4 bytes, total width 40 bytes, base address 1000.",
+    "Enter i and x as int, width 4 bytes each.",
+    "Look up a and i. The address of a[i] is base(a) + (i − 0) × w = 1000 + 4 × 4 = 1016 bytes.",
+    "Emit t1 = i * 4 = 4 × 4 = 16.",
+    "Emit t2 = 1000 + t1 = 1000 + 16 = 1016.",
+    "Emit t3 = *t2 = a[4] = 20.",
+    "Emit t4 = t3 + 1 = 20 + 1 = 21.",
+    "Emit x = t4, so x = 21."
+   ],
+   "answer": "The element address is 1016 bytes; the temporaries are t1 = 16, t2 = 1016, t3 = 20, t4 = 21, so x = 21.",
+   "check": "i = 4\nw = 4\nbase = 1000\na4 = 20\nt1 = i * w\nt2 = base + t1\nt3 = a4\nt4 = t3 + 1\nprint(t1)\nprint(t2)\nprint(t3)\nprint(t4)",
+   "values": [
+    16,
+    1016,
+    20,
+    21
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Array address uses index × element width, not index alone.",
+  "Do not put total array width where element width is needed: int a[10] has element width 4 bytes and total width 40 bytes.",
+  "Subtract the lower bound before multiplying; for a[1..10] the first element is at base, not base + 4.",
+  "Conversion direction matters: inttofloat changes int to real; realtoint changes real to int.",
+  "Lookup must happen before emit; an undeclared name should produce an error, not code."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a declaration action store for a scalar int variable in a symbol table?",
+   "marks": 2,
+   "a": "Name, type int, width 4 bytes, and offset."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a compiler compute the address of a[i] at each use instead of storing an address for every element?",
+   "marks": 3,
+   "a": "Storing every address wastes table space. The address depends on i, so it is computed as base + (i − low) × w when needed."
+  },
+  {
+   "level": "apply",
+   "q": "For int a[10] at byte base 2000, i = 3, and element width 4 bytes, what is addr(a[i])?",
+   "marks": 3,
+   "a": "addr(a[i]) = 2000 + (3 − 0) × 4 = 2012 bytes."
+  },
+  {
+   "level": "analyze",
+   "q": "For x = a[i] + 1, write the three-address code and identify the load instruction.",
+   "marks": 4,
+   "a": "t1 = i * 4; t2 = 1000 + t1; t3 = *t2; t4 = t3 + 1; x = t4. The load is t3 = *t2."
+  },
+  {
+   "level": "apply",
+   "q": "If x is real and E is int, what conversion instruction is emitted before x = E?",
+   "marks": 2,
+   "a": "t = inttofloat(E.place); x = t."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is the total width of a[10] not used in the address of a[i]?",
+   "marks": 4,
+   "a": "The total width advances the offset after the whole declaration. The address of a[i] needs the element width, because that is the distance between consecutive elements."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers separate the front-end symbol table from the IR builder. LLVM uses getelementptr to express array addresses and alloca for local storage. GCC's GIMPLE is a three-address-like IR. Search for \"LLVM GEP array indexing\" or \"syntax-directed translation symbol table\" to see real implementations."
+}

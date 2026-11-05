@@ -1,0 +1,227 @@
+{
+ "lead": "A grammar says which strings are legal. It says nothing about what they mean. A syntax-directed definition adds the meaning: each grammar symbol carries attributes, and each production carries semantic rules that compute them. A value built up from a node's children is a synthesized attribute; a value pushed down from the parent or across from a sibling is an inherited attribute. Compilers use these rules to compute values, types, addresses and code while parsing. This chapter separates the two kinds of attribute, fixes the order in which they may be evaluated, and shows the restricted S-attributed and L-attributed forms that real parsers accept.",
+ "prereq": "You need: context-free grammars, derivations and parse trees from Unit 2, so that a node in a tree and a production instance are the same thing to you.",
+ "sections": [
+  {
+   "h3": "Attributes and semantic rules",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A grammar symbol can carry attributes. An attribute is a named property of that symbol at one node of the parse tree: a number, a type, an address, or a piece of code. A syntax-directed definition (SDD) pairs every production with semantic rules that compute attributes. A rule has the form b = f(c<sub>1</sub>, c<sub>2</sub>, …): b is an attribute of the production's head, and each c is an attribute of a symbol in that same production. Some syllabi call an SDD an attribute grammar and call the rules semantic actions."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Production",
+      "Semantic rule"
+     ],
+     "rows": [
+      [
+       "E → E<sub>1</sub> + T",
+       "E.val = E<sub>1</sub>.val + T.val"
+      ],
+      [
+       "E → T",
+       "E.val = T.val"
+      ],
+      [
+       "T → T<sub>1</sub> * F",
+       "T.val = T<sub>1</sub>.val × F.val"
+      ],
+      [
+       "T → F",
+       "T.val = F.val"
+      ],
+      [
+       "F → digit",
+       "F.val = digit.lexval"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Subscripts only separate two instances of one symbol. In E → E<sub>1</sub> + T, the symbols E and E<sub>1</sub> are both the nonterminal E, sitting at the parent and at the left child."
+    },
+    {
+     "type": "p",
+     "text": "An attribute is synthesized when the rule at node N reads only attributes of N and of N's children. Values flow upward: leaves first, root last. F.val = digit.lexval is synthesized, and digit.lexval is not computed by any rule — the lexical analyzer supplies it with the token. In E → E<sub>1</sub> + T with E.val = E<sub>1</sub>.val + T.val, both children must be finished before the parent can be computed."
+    }
+   ]
+  },
+  {
+   "h3": "Inherited attributes and evaluation order",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An attribute is inherited when the rule at node N reads attributes of N's parent or of N's siblings: values flow downward or sideways. Reading a decimal number needs each digit's place value. The place value is 10 raised to the number of digits to the right, which is the length of the remaining suffix. So we compute the suffix length as a synthesized attribute:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "N → D: N.val = D.val",
+      "D → digit D<sub>1</sub>: D.len = D<sub>1</sub>.len + 1, D.val = digit.lexval × 10<sup>D<sub>1</sub>.len</sup> + D<sub>1</sub>.val",
+      "D → ε: D.len = 0, D.val = 0"
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Read the string 3 4 5. The rightmost digit 5 sits above the empty suffix, so D<sub>1</sub>.len = 0 and its value is 5 × 10⁰ + 0 = 5. Moving left, digit 4 has one digit to its right, so D<sub>1</sub>.len = 1 and its value is 4 × 10¹ + 5 = 45. Digit 3 has two digits to its right, so D<sub>1</sub>.len = 2 and its value is 3 × 10² + 45 = 345. The upward pass carries both len and val."
+    },
+    {
+     "type": "p",
+     "text": "Which rule runs first? Draw a dependency graph whose nodes are the attribute instances in the parse tree, and add an edge c → b whenever the rule that computes b reads c. Any topological order of that graph is a legal evaluation order, and most definitions allow several. A cycle means the definition is circular, no order exists, and the rules must be rewritten."
+    }
+   ]
+  },
+  {
+   "h3": "S-attributed and L-attributed definitions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two restricted forms matter, because a parser can evaluate them in one pass without holding the whole tree."
+    },
+    {
+     "type": "p",
+     "text": "A definition is S-attributed when every attribute in it is synthesized. Evaluation is bottom-up, and it matches LR parsing exactly: when the parser reduces by A → X Y Z the three children are already on the stack, so A's attributes can be computed at once. Attribute values sit on the parser's value stack beside the grammar symbols. Most YACC actions are of this kind."
+    },
+    {
+     "type": "p",
+     "text": "A definition is L-attributed when attributes may be synthesized or inherited, and every inherited attribute of a right-side symbol depends only on the parent and on symbols to its left. In A → B C D, C may read attributes of A and of B, never of D. One left-to-right depth-first walk then suffices: enter A, pass values down to B, finish B, pass to C, and so on. Recursive-descent compilers use this form, placing actions in the right side where their inputs are ready. Every S-attributed definition is L-attributed; the converse fails."
+    },
+    {
+     "type": "p",
+     "text": "The number grammar above is S-attributed: both len and val are synthesized. Definitions that build <a href=\"#syntax-trees-and-dags-for-expressions\">syntax trees</a> or emit <a href=\"#three-address-code-quadruples-triples-indirect-triples\">three-address code</a> are usually written L-attributed because a place to put the result must be passed down."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The parse tree of 3 * 4 + 5 with val written on every node. Each value is computed only after its children, so the number 17 reaches the root last.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "aria": "Expression tree for 3 * 4 + 5; values rise from the leaves so the root shows 17.",
+   "root": {
+    "label": "+",
+    "note": "val = 17",
+    "style": "accent",
+    "children": [
+     {
+      "label": "*",
+      "note": "val = 12",
+      "children": [
+       {
+        "label": "3",
+        "note": "val = 3",
+        "_d": 2,
+        "children": [],
+        "_x": 298.2056,
+        "_y": 170
+       },
+       {
+        "label": "4",
+        "note": "val = 4",
+        "_d": 2,
+        "children": [],
+        "_x": 360.0,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 329.1028,
+      "_y": 106
+     },
+     {
+      "label": "5",
+      "note": "val = 5",
+      "_d": 1,
+      "children": [],
+      "_x": 421.7944,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 375.4486,
+    "_y": 42
+   }
+  }
+ },
+ "examples": [
+  {
+   "question": "The grammar is E → E + T | T, T → T * F | F, F → digit, with the rules E.val = E<sub>1</sub>.val + T.val, E.val = T.val, T.val = T<sub>1</sub>.val × F.val, T.val = F.val, F.val = digit.lexval. Give every attribute value needed to evaluate 3 * 4 + 5, in a legal evaluation order, and state the final value.",
+   "steps": [
+    "Parse 3 * 4 + 5: the rule E → E + T splits it into the left expression 3 * 4 and the right term 5. The left part uses E → T → T * F; the right part uses T → F → digit 5.",
+    "Leaf F → digit 3: F.val = digit.lexval = 3.",
+    "T → F above it: T.val = F.val = 3.",
+    "Leaf F → digit 4: F.val = digit.lexval = 4.",
+    "Multiplication node T → T * F: T.val = T<sub>1</sub>.val × F.val = 3 × 4 = 12.",
+    "E → T on the left: E.val = T.val = 12.",
+    "Right side: F → digit 5 gives F.val = 5, then T → F gives T.val = 5.",
+    "Root E → E + T: E.val = E<sub>1</sub>.val + T.val = 12 + 5 = 17."
+   ],
+   "answer": "The expression 3 * 4 + 5 evaluates to 17, and since every attribute here is synthesized the definition is S-attributed, so this order is exactly the bottom-up reduction order.",
+   "check": "a = 3\nb = 4\nmul = a * b\nc = 5\nroot = mul + c\nfor v in (a, b, mul, c, root):\n    print(v)",
+   "values": [
+    3,
+    4,
+    12,
+    5,
+    17
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "An inherited attribute of a node may not take its value from that node's children or from a right sibling — such a value is synthesized, and if a right-side symbol's inherited attribute depends on a symbol to its right the definition stops being L-attributed.",
+  "digit.lexval is supplied by the lexer, not by a semantic rule. Writing F.val = F.lexval, or calling lexval a synthesized attribute of this grammar, loses marks.",
+  "A single inherited attribute disqualifies a definition from being S-attributed. When asked 'S-attributed or L-attributed?', check every rule before answering.",
+  "Evaluation follows the dependency graph, not the drawing order of the tree. Computing the root before the leaves gives a wrong number even though the rules look right.",
+  "In A → B C D, letting C.inh depend on D.val is a legal SDD but not an L-attributed one. The restriction is about evaluation order, not about meaning."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a synthesized attribute in one sentence.",
+   "marks": 2,
+   "a": "An attribute whose value at a tree node is computed using only attribute values of that node and of its children, so values flow upward."
+  },
+  {
+   "level": "remember",
+   "q": "Define an inherited attribute in one sentence.",
+   "marks": 2,
+   "a": "An attribute whose value at a tree node is computed from attributes of its parent and/or its siblings, so values flow downward or sideways."
+  },
+  {
+   "level": "understand",
+   "q": "Why can an S-attributed definition be evaluated during LR parsing without storing the whole parse tree?",
+   "marks": 3,
+   "a": "Every value is synthesized, so a node's attributes are ready the moment its production is reduced. The parser keeps attribute values on its value stack beside the symbols, pops the children's values, computes the parent's and pushes it."
+  },
+  {
+   "level": "apply",
+   "q": "With E → E + T | T, T → T * F | F, F → digit and the val rules, evaluate 2 * 3 + 4 in bottom-up order.",
+   "marks": 4,
+   "a": "F.val = 2, T.val = 2; F.val = 3, T.val = 2 × 3 = 6; E.val = 6; F.val = 4, T.val = 4; E.val = 6 + 4 = 10."
+  },
+  {
+   "level": "apply",
+   "q": "Using the number grammar with D.len, give D<sub>1</sub>.len and the value computed at each digit of 4 0 7, and the final value.",
+   "marks": 5,
+   "a": "At digit 7: D<sub>1</sub>.len = 0, value = 7 × 10⁰ + 0 = 7. At digit 0: D<sub>1</sub>.len = 1, value = 0 × 10¹ + 7 = 7. At digit 4: D<sub>1</sub>.len = 2, value = 4 × 10² + 7 = 407. Final value 407."
+  },
+  {
+   "level": "analyze",
+   "q": "A definition contains A → B C with the rule B.inh = C.val. Is it L-attributed? Justify in two lines.",
+   "marks": 5,
+   "a": "No. B.inh depends on a symbol to its right, so a single left-to-right depth-first walk cannot compute it. The SDD is still meaningful, but it needs a different evaluation order or a rewritten grammar."
+  },
+  {
+   "level": "analyze",
+   "q": "Two rules read X.a = Y.b + 1 and Y.b = X.a × 2. What goes wrong, and what is the fix?",
+   "marks": 6,
+   "a": "The dependency graph has the cycle X.a → Y.b → X.a, so no topological order exists and the definition is circular. Rewrite so the value is computed once and passed down, or split the symbol."
+  }
+ ],
+ "beyond": "Not for the exam. Attribute grammars grew into real metaprogramming tools: reference attribute grammars drive the JastAdd compiler framework, and Silver and Rascal build language tooling on similar ideas. IDEs reuse the machinery for semantic highlighting and quick fixes, because each editor feature is a small attribute computation over a syntax tree. Incremental attribute evaluation, which recomputes only the attributes whose inputs changed, is an active topic in program analysis. Search for 'reference attribute grammars', 'L-attributed translation scheme' and 'incremental attribute evaluation' to go further."
+}

@@ -1,0 +1,206 @@
+{
+ "lead": "Three-address code is a linear intermediate form. Each instruction does at most one operation and names at most three operands. A compiler can store these instructions in a table instead of drawing a tree. The three common tables are quadruples, triples and indirect triples. They differ in how the result of an instruction is named: quadruples put a new temporary name in a result field, triples use the row number itself as the name, and indirect triples use the same triple numbers but keep execution order in a separate pointer list of row numbers. Compilers use these tables before code generation and during optimization.",
+ "prereq": "You need: <a href=\"#intermediate-languages-and-postfix-notation\">4.4 Intermediate languages and postfix notation</a> for the place of three-address code among IRs, and <a href=\"#syntax-trees-and-dags-for-expressions\">4.2 Syntax trees and DAGs</a> for how expressions produce temporaries.",
+ "sections": [
+  {
+   "h3": "Instructions and temporaries",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A three-address instruction has the general form x = y op z. Here x is the result, y and z are the two operands, and op is one binary operator. An operand can be a variable name, a constant, or a compiler-made temporary. A temporary is a name such as t1 that holds an intermediate value and usually does not appear in the source program."
+    },
+    {
+     "type": "p",
+     "text": "Other common forms are x = op y for a unary operation, x = y for a copy, x = y[i] for an array load, x[i] = y for an array store, goto L, if x relop y goto L (relop is a relational operator such as < or ==), param x, call p, n (p is the callee and n is the argument count), and return x. Each form still has at most one operator. This is why the order of work is explicit: one instruction, one job."
+    },
+    {
+     "type": "p",
+     "text": "For x = a + b * c - d, multiplication has higher precedence than addition and subtraction. The compiler emits t1 = b * c, then t2 = a + t1, then t3 = t2 - d, then x = t3. The names t1, t2 and t3 are temporaries. A later pass may reuse a temporary after its last use, but the table normally gives each new value a fresh name so that data flow stays visible. Postfix notation, covered in 4.4, is the stack-based linear form of the same code."
+    }
+   ]
+  },
+  {
+   "h3": "Quadruples",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A quadruple writes every part of an instruction in its own field: op, arg1, arg2, result. The row number is the instruction's position. For x = a + b * c - d the figure shows four rows: row 0 is (*, b, c, t1), row 1 is (+, a, t1, t2), row 2 is (-, t2, d, t3), and row 3 is (=, t3, blank, x)."
+    },
+    {
+     "type": "p",
+     "text": "arg1 and arg2 are the two operands. For a binary operator both are used. For a unary operator arg2 is blank. For a copy or assignment, arg1 is the source and arg2 is blank; the destination sits in result. A blank field is not zero and not an empty string value; it means 'this field is not used'."
+    },
+    {
+     "type": "p",
+     "text": "Quadruples are easy to rearrange. Take two rows with no dependence between them, say row 0 is (*, b, c, t1) and row 1 is (*, e, f, t4). Neither row uses the other's result, so an optimizer may swap them. Only rows with no dependence between them may be moved. After a legal move the temporary names still travel with their rows, so later uses do not have to be rewritten. The cost is four fields per instruction. Each temporary gets a name in the result column and is written again in later arg fields, so names are repeated."
+    }
+   ]
+  },
+  {
+   "h3": "Triples and indirect triples",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Triples remove the result field. A triple has three fields: op, arg1, arg2. The result of a triple is the triple's number. To use that result in a later triple, write the number in parentheses. For the same example the triple table is:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "0: (*, b, c)",
+      "1: (+, a, (0))",
+      "2: (-, (1), d)",
+      "3: (=, x, (2))"
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The temporaries t1, t2 and t3 do not appear. (0) means 'the value produced by triple 0'. For the assignment triple, arg1 is the target x and arg2 is (2). There is no result column to hold x, so the assignment must name its target in an operand field."
+    },
+    {
+     "type": "p",
+     "text": "Note the swap. In a quadruple the assignment names the source in arg1 and the target in result; in a triple there is no result column, so the target moves into arg1 and the source into arg2: (=, t3, blank, x) becomes (=, x, (2))."
+    },
+    {
+     "type": "p",
+     "text": "Indirect triples keep the triple table unchanged and add a pointer list. Each pointer is an index into the triple table, and the pointer list gives the execution order. For this straight-line code the pointer list is [0, 1, 2, 3]. If an optimizer wants to move a statement, it moves a pointer, not a triple. The triple numbers stay fixed, so references such as (0) and (1) do not change."
+    },
+    {
+     "type": "p",
+     "text": "Space for n instructions: quadruples use 4n fields, triples use 3n fields, and indirect triples use 3n fields plus n pointers. If a pointer is one word, indirect triples use 4n words, the same as quadruples. Triples are the smallest. Reordering: quadruples move rows but must keep result names consistent; triples must renumber and rewrite references; indirect triples avoid renumbering by moving pointers."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Quadruples for x = a + b * c - d. Row numbers give instruction order; the result column holds the temporary that a later row uses.",
+  "spec": {
+   "type": "array",
+   "title": "Quadruples for x = a + b * c - d",
+   "show_index": false,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "0",
+     "cells": [
+      "*",
+      "b",
+      "c",
+      "t1"
+     ]
+    },
+    {
+     "label": "1",
+     "cells": [
+      "+",
+      "a",
+      "t1",
+      "t2"
+     ]
+    },
+    {
+     "label": "2",
+     "cells": [
+      "-",
+      "t2",
+      "d",
+      "t3"
+     ]
+    },
+    {
+     "label": "3",
+     "cells": [
+      "=",
+      "t3",
+      "",
+      "x"
+     ]
+    }
+   ],
+   "pointers": [],
+   "aria": "Quadruple table with operator, two operands and result for the four three-address instructions."
+  }
+ },
+ "examples": [
+  {
+   "question": "Translate the assignment x = a + b * c - d into three-address code. Show the quadruple table, the triple table and the indirect-triple representation. Then evaluate the code with a = 5, b = 2, c = 3, d = 4 and give the final value of x.",
+   "steps": [
+    "1. Precedence: multiplication binds tighter than addition and subtraction, and + and - group left to right. So compute b * c first.",
+    "2. Emit t1 = b * c. With a = 5, b = 2, c = 3, d = 4, t1 = 2 × 3 = 6.",
+    "3. Emit t2 = a + t1, so t2 = 5 + 6 = 11.",
+    "4. Emit t3 = t2 - d, so t3 = 11 - 4 = 7.",
+    "5. Emit x = t3, so x = 7.",
+    "6. Quadruples (op, arg1, arg2, result): row 0 (*, b, c, t1); row 1 (+, a, t1, t2); row 2 (-, t2, d, t3); row 3 (=, t3, blank, x).",
+    "7. Triples (op, arg1, arg2): 0 (*, b, c); 1 (+, a, (0)); 2 (-, (1), d); 3 (=, x, (2)). The result of triple 0 is (0), not t1.",
+    "8. Indirect triples: same triple table, pointer list [0, 1, 2, 3]. The list gives the execution order; here no reordering is possible because each triple uses the previous result.",
+    "9. Numeric result: x = 7."
+   ],
+   "answer": "Three-address code: t1 = b * c; t2 = a + t1; t3 = t2 - d; x = t3. It gives 4 quadruples, 4 triples with results (0), (1), (2), and indirect triples with pointer list [0, 1, 2, 3]; with a = 5, b = 2, c = 3, d = 4, x = 7.",
+   "check": "a = 5\nb = 2\nc = 3\nd = 4\nt1 = b * c\nt2 = a + t1\nt3 = t2 - d\nx = t3\nprint(t1)\nprint(t2)\nprint(t3)\nprint(x)",
+   "values": [
+    6,
+    11,
+    7,
+    7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "In a triple table the result is the triple number, written (0), (1), not a temporary name such as t1. Writing t1 in a triple loses the link to the row.",
+  "A quadruple for a copy or assignment has a blank arg2, not a zero and not a repeat of arg1. The blank field still occupies a column.",
+  "Indirect triples are not a fourth field added to each triple. They are a triple table plus a separate pointer list; the pointer entries are indices into the triple table, not final machine addresses.",
+  "For n instructions, indirect triples use 3n fields plus n pointers, which is 4n words with one-word pointers. They are not smaller than quadruples in that accounting; triples alone use 3n fields."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the four fields of a quadruple in order.",
+   "marks": 2,
+   "a": "op, arg1, arg2, result."
+  },
+  {
+   "level": "understand",
+   "q": "Why is there no result field in a triple?",
+   "marks": 3,
+   "a": "The triple's position number acts as its result. A later triple refers to that number in parentheses, such as (0)."
+  },
+  {
+   "level": "apply",
+   "q": "Give the three-address code and the quadruples for p = q + r * s.",
+   "marks": 4,
+   "a": "t1 = r * s; t2 = q + t1; p = t2. Quadruples: row 0: (*, r, s, t1); row 1: (+, q, t1, t2); row 2: (=, t2, blank, p)."
+  },
+  {
+   "level": "apply",
+   "q": "Write the triple table for x = a + b * c - d.",
+   "marks": 3,
+   "a": "0: (*, b, c); 1: (+, a, (0)); 2: (-, (1), d); 3: (=, x, (2))."
+  },
+  {
+   "level": "analyze",
+   "q": "An optimizer wants to move the first triple of a triple table below the second. Reordering triples carries a bookkeeping cost. What is that cost, and how do indirect triples remove it?",
+   "marks": 5,
+   "a": "Moving a triple changes its number, so references such as (0) in later triples now point to the wrong instruction; every reference must be rewritten. Indirect triples move pointer entries instead, leaving triple numbers and all references unchanged. Either way the move is allowed only when no dependence is violated: a triple that uses (0) can never be placed above triple 0."
+  },
+  {
+   "level": "analyze",
+   "q": "For n three-address instructions, compare words used by quadruples, triples and indirect triples if every field and pointer is one word.",
+   "marks": 4,
+   "a": "Quadruples use 4n words; triples use 3n words; indirect triples use 3n + n = 4n words, equal to quadruples."
+  },
+  {
+   "level": "remember",
+   "q": "What is stored in the pointer list of indirect triples?",
+   "marks": 2,
+   "a": "Indices into the triple table, in execution order."
+  },
+  {
+   "level": "apply",
+   "q": "Use the triple table from the worked example with a = 1, b = 2, c = 3, d = 4. Give t1, t2, t3 and x.",
+   "marks": 6,
+   "a": "t1 = b * c = 6; t2 = a + t1 = 7; t3 = t2 - d = 3; x = 3."
+  }
+ ],
+ "beyond": "Not for the exam. Modern compilers often convert three-address code into static single assignment (SSA) form, where each name is assigned once and phi functions merge values at control-flow joins. LLVM IR and GCC's GIMPLE are production intermediate forms with three-address-like instructions. Search for 'SSA form', 'LLVM IR language reference' and 'GIMPLE tuple' to see how these tables become real data structures."
+}

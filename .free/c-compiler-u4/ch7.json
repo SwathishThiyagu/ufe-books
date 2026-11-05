@@ -1,0 +1,280 @@
+{
+ "lead": "Programs decide, and decisions become jumps. A compiler turns a boolean expression into two lists of jump instructions — one taken when the expression is true, one when it is false — and turns if, while and case statements into labels and gotos. The target label often does not exist yet when the jump is emitted, so the compiler records the jump's position and fills the target in later; that is backpatching. A procedure call adds param, call and return instructions plus a link back to the caller's activation record.",
+ "prereq": "You need: <a href=\"#three-address-code-quadruples-triples-indirect-triples\">three-address code</a> (4.5) and <a href=\"#translating-declarations-and-assignment-statements\">assignment translation</a> (4.6); activation-record layout is in Unit 5.",
+ "sections": [
+  {
+   "h3": "Boolean expressions become jumps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A boolean expression E is often used as a condition. The compiler can compute its value as 0 or 1, but for a condition it is faster to translate E into jumps: control reaches one label when E is true and another when E is false."
+    },
+    {
+     "type": "p",
+     "text": "The truelist of E is the list of positions of jump instructions that must be completed with the label where E is true. The falselist does the same for the label where E is false. A position is the index of an instruction whose target is still blank."
+    },
+    {
+     "type": "p",
+     "text": "For a test a &lt; b, emit two instructions: <code>if a &lt; b goto _</code> and <code>goto _</code>. The first position goes into the truelist, the second into the falselist."
+    },
+    {
+     "type": "formula",
+     "text": "E1 &amp;&amp; E2: backpatch(E1.truelist, start of E2); E.truelist = E2.truelist; E.falselist = merge(E1.falselist, E2.falselist)",
+     "where": "merge joins two lists of jump positions. A true E1 continues to E2, so E1.truelist is backpatched to the start of E2; a false E1 joins the false exits."
+    },
+    {
+     "type": "p",
+     "text": "Short-circuit rules follow from the meaning of the operators. If E1 is false in E1 &amp;&amp; E2, the whole expression is false and E2 is never evaluated; the false exits of E1 join the false exits of the whole expression. For E1 || E2 the mirror rule holds: backpatch E1.falselist to the start of E2; E.truelist = merge(E1.truelist, E2.truelist); E.falselist = E2.falselist. For !E, swap the two lists."
+    }
+   ]
+  },
+  {
+   "h3": "if, while, for and case statements",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every statement gets a start label and a next label from a counter. newlabel() returns 101, 102, ... in order. A label is an instruction number, and <code>goto L</code> sets the program counter to L."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "if (B) S1 else S2: translate B, then backpatch B.truelist to the first instruction of S1, and emit S1.",
+      "Emit <code>goto _</code> with a blank target; this jump is the end of the then-branch.",
+      "Backpatch B.falselist to the first instruction of S2, then emit S2.",
+      "Backpatch the blank goto from step 2 to the instruction after S2."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "This is the shape of the figure: a false a &lt; b jumps straight past the test c &gt; d. Without an else, B.falselist is patched to the next label."
+    },
+    {
+     "type": "p",
+     "text": "while (B) S: record the instruction number L1 before translating B. Backpatch B.truelist to the start of S and B.falselist to the label after the loop. S ends with <code>goto L1</code>. A for loop is rewritten first: for (init; test; step) body becomes init; while (test) { body; step; }."
+    },
+    {
+     "type": "p",
+     "text": "case: evaluate the selector once into a temporary t, compare t with each case constant and jump to that case's label. break is a goto to the exit label; without break, C falls through into the next case. When the constants are dense, a jump table of labels indexed by t − low is cheaper."
+    }
+   ]
+  },
+  {
+   "h3": "Backpatching",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A jump is emitted before its target label is known. Backpatching keeps the jump with a blank target and remembers its position in a list."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Function",
+      "Effect"
+     ],
+     "rows": [
+      [
+       "makelist(i)",
+       "returns a new list holding only i, the position of one jump"
+      ],
+      [
+       "merge(p1, p2)",
+       "joins two lists and returns the result"
+      ],
+      [
+       "backpatch(p, i)",
+       "writes i, an instruction number, into the target of every jump in p"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The marker nonterminal M carries one synthesized attribute, M.instr = nextinstr. In S → if (B) M S1, M records where S1 starts, so B.truelist can be backpatched to M.instr. Lists are needed because a condition such as a &lt; b || c &lt; d produces jumps from more than one place, and all of them go to the same target."
+    },
+    {
+     "type": "p",
+     "text": "Emit placeholder jumps with target 0. Instruction 0 is never a real target, so a forgotten backpatch shows up at once during testing."
+    }
+   ]
+  },
+  {
+   "h3": "Procedure calls",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A procedure call must return to the instruction after the call, so it needs more than a jump."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "param x passes the actual parameter x; the compiler usually copies it into the callee's frame.",
+      "call p, n calls procedure p with n actual parameters and saves the return address.",
+      "return y returns the value y; in three-address code the value may be written as y = call p, n."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Each live call owns an activation record on the stack: actual parameters, return address, saved registers, local variables, temporaries and links. The control link points to the caller's record. The static link points to the record of the enclosing scope, which is how a nested procedure reaches a non-local variable. Layout and parameter passing are in Unit 5."
+    },
+    {
+     "type": "p",
+     "text": "Recursion works because every call gets a fresh record. The callee stores the return value at the agreed place, sets the stack pointer back and jumps to the saved return address."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A false a &lt; b jumps straight to x = 0, so c &gt; d is never tested — that is short-circuit &amp;&amp;. A true c &gt; d falls into x = 1, and both arms meet at next.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Short-circuit if-else",
+   "nodes": [
+    {
+     "id": "start",
+     "label": "a < b ?",
+     "style": "accent"
+    },
+    {
+     "id": "yes",
+     "label": "c > d ?",
+     "style": "accent"
+    },
+    {
+     "id": "then",
+     "label": "x = 1",
+     "style": "live"
+    },
+    {
+     "id": "else",
+     "label": "x = 0",
+     "style": "muted"
+    },
+    {
+     "id": "end",
+     "label": "next",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "start",
+     "to": "yes",
+     "label": "yes",
+     "style": "solid"
+    },
+    {
+     "from": "start",
+     "to": "else",
+     "label": "no",
+     "style": "solid"
+    },
+    {
+     "from": "yes",
+     "to": "then",
+     "label": "yes",
+     "style": "solid"
+    },
+    {
+     "from": "yes",
+     "to": "else",
+     "label": "no",
+     "style": "solid"
+    },
+    {
+     "from": "then",
+     "to": "end",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "else",
+     "to": "end",
+     "label": "",
+     "style": "solid"
+    }
+   ],
+   "aria": "Flow for if (a < b && c > d): a false a < b goes straight to x = 0, skipping the second test."
+  }
+ },
+ "examples": [
+  {
+   "question": "Translate if (a < b && c > d) x = 1; else x = 0; into three-address code. Instruction numbers start at 100. Show the truelist and falselist after each step.",
+   "steps": [
+    "The condition is E1 && E2 with E1 = a < b and E2 = c > d. Instruction 100 is the first emitted.",
+    "E1: emit 100: if a < b goto _ and 101: goto _. E1.truelist = {100}, E1.falselist = {101}.",
+    "Mark the start of E2: M.instr = 102. Backpatch E1.truelist to 102, so instruction 100 reads if a < b goto 102.",
+    "E2: emit 102: if c > d goto _ and 103: goto _. E2.truelist = {102}, E2.falselist = {103}.",
+    "Combined condition: truelist = {102}; falselist = {101, 103}.",
+    "Mark the start of the then-branch: 104. Backpatch the condition's truelist to 104, so instruction 102 reads if c > d goto 104. Emit 104: x = 1.",
+    "Emit 105: goto _ for the end of the then-branch. Backpatch the condition's falselist to the start of the else part, 106. Emit 106: x = 0.",
+    "Emit label 107: next. Backpatch instruction 105 to 107."
+   ],
+   "answer": "100: if a < b goto 102; 101: goto 106; 102: if c > d goto 104; 103: goto 106; 104: x = 1; 105: goto 107; 106: x = 0; 107: next.",
+   "check": "base = 100\nn = 8\nfor i in range(n):\n    print(base + i)",
+   "values": [
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Short-circuit &amp;&amp; must not evaluate the right side after a false left side; place the code for E2 after the jump taken on a false E1.",
+  "A truelist holds instruction positions, not labels. Writing truelist = {Ltrue} is wrong.",
+  "Backpatching a list twice silently moves the earlier jumps; check the merge order.",
+  "In a while loop the falselist is patched after the body, never at the body start, or the loop never ends.",
+  "In call p, n the n is the number of actual parameters, not the procedure's number."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define the truelist and falselist of a boolean expression E.",
+   "marks": 2,
+   "a": "Truelist: positions of jump instructions that must be completed with the label where E is true. Falselist: the same for the label where E is false."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the code for E2 be skipped when E1 is false in E1 &amp;&amp; E2?",
+   "marks": 3,
+   "a": "Short-circuit semantics say a false E1 fixes the whole expression as false. Evaluating E2 could be wasted work or even a fault, as in p != null &amp;&amp; p->x &gt; 0. So the jump on a false E1 must land past E2's code."
+  },
+  {
+   "level": "apply",
+   "q": "Give the three-address code for while (a &lt; b) x = x + 1; with instruction numbers starting at 200.",
+   "marks": 5,
+   "a": "200: if a &lt; b goto 202; 201: goto 204; 202: x = x + 1; 203: goto 200; 204: next. truelist {200} is patched to 202, falselist {201} to 204, and the body ends with goto 200."
+  },
+  {
+   "level": "apply",
+   "q": "A condition has truelist merge(makelist(100), makelist(102)). It is backpatched to instruction 104. Write the two jumps.",
+   "marks": 4,
+   "a": "100: if a &lt; b goto 104; 102: if c &lt; d goto 104. backpatch writes the same target 104 into every jump in the merged list."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is a goto emitted at the end of the then-branch of an if-else, with a blank target?",
+   "marks": 3,
+   "a": "After S1 runs, the else part must be skipped. The instruction to jump to is not known until S2 has been generated, so the goto is emitted as a placeholder and backpatched afterwards."
+  },
+  {
+   "level": "remember",
+   "q": "What does call p, n do and what is n?",
+   "marks": 2,
+   "a": "It transfers control to procedure p after n actual parameters have been passed, and saves the return address so execution resumes after the call. n is the number of actual parameters."
+  },
+  {
+   "level": "analyze",
+   "q": "Distinguish the control link from the static link in an activation record.",
+   "marks": 4,
+   "a": "Control link: caller's record, used for return/dynamic chain. Static link: record of the lexically enclosing scope, used for non-local access. For a non-nested procedure the static link points to the global/enclosing-scope record, and need not equal the control link."
+  }
+ ],
+ "beyond": "Not for the exam. Real compilers keep this idea and change the data structures: LLVM IR uses labelled basic blocks with br instructions, and SSA form adds phi nodes wherever control flows merge. Switch statements on dense integers become jump tables, while sparse cases become a tree of comparisons. Java bytecode uses tableswitch and lookupswitch for the same reason. Search 'backpatching', 'LLVM switch lowering' or 'SSA phi node construction' to go further."
+}
