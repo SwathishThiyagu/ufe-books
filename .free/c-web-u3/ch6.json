@@ -1,0 +1,262 @@
+{
+ "lead": "JavaScript has one call stack, so it runs one piece of code at a time. Slow work such as a timer or a network reply is handed to the browser, and JavaScript picks up the result later through queues and the event loop. This chapter shows the order: normal code first, then promise callbacks, then timer callbacks. You will use callbacks, promises and async/await to keep a page responsive while data loads. The same idea powers a UPI payment status check that updates without freezing the screen.",
+ "prereq": "You need: <a href=\"#functions-arrays-and-objects\">3.2</a> for callbacks and <a href=\"#javascript-basics-variables-operators-and-control-statements\">3.1</a> for statements and expressions.",
+ "sections": [
+  {
+   "h3": "The stack, Web APIs and two queues",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "JavaScript runs on one call stack. A function call pushes a frame; a return pops it. The engine does one thing at a time, so if a function waits 2 seconds, nothing else on the stack runs. The browser helps by providing Web APIs: timers, network requests and DOM events. When such work finishes, its callback is not run immediately. It is placed in a queue."
+    },
+    {
+     "type": "p",
+     "text": "There are two queues to know. The task queue (also called macrotask queue) holds timer callbacks and events. The microtask queue holds promise callbacks and <code>queueMicrotask</code> callbacks. The event loop follows one rule: run the stack until empty; drain every microtask; then take one macrotask. After each macrotask, microtasks drain again."
+    },
+    {
+     "type": "p",
+     "text": "Timers use milliseconds (ms). <code>setTimeout(fn, delay)</code> schedules fn to run after at least delay ms. <code>setInterval(fn, delay)</code> repeats every delay ms. <code>clearTimeout(id)</code> and <code>clearInterval(id)</code> cancel them. A delay of 0 does not mean immediate: the callback still waits for the stack and all microtasks."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Task queue: timer callbacks, DOM events, network replies.",
+      "Microtask queue: promise <code>.then</code>, <code>.catch</code>, <code>.finally</code> callbacks.",
+      "Rule: stack empty → all microtasks → one macrotask → repeat."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Callbacks, callback hell and promises",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A callback is a function passed to another function, to be called later. Event handlers are callbacks (see <a href=\"#events-and-event-handling\">3.3</a>). Nesting many callbacks for sequential steps creates callback hell: deep indentation, repeated error checks and shared variables that are hard to follow."
+    },
+    {
+     "type": "p",
+     "text": "A promise is an object for a future value. It has three states: pending (not settled), fulfilled (completed with a value) and rejected (failed with a reason). You create one with <code>new Promise((resolve, reject) =&gt; { ... })</code> or with <code>Promise.resolve(value)</code>."
+    },
+    {
+     "type": "p",
+     "text": "<code>then(onFulfilled)</code> runs when fulfilled. <code>catch(onRejected)</code> runs when rejected. <code>finally(fn)</code> runs when settled, whatever the result. <code>then</code> returns a new promise, so calls chain. Returning a value fulfils the next promise; throwing rejects it."
+    },
+    {
+     "type": "p",
+     "text": "Combinators handle many promises. <code>Promise.all(list)</code> fulfils with an array when all fulfil, and rejects on the first rejection. <code>Promise.race(list)</code> settles with the first promise to settle. <code>Promise.allSettled(list)</code> waits for all and gives each result as fulfilled or rejected."
+    }
+   ]
+  },
+  {
+   "h3": "async/await, errors and parallel requests",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An <code>async</code> function always returns a promise. A returned value fulfils it; a thrown error rejects it. Inside it, <code>await p</code> pauses that async function until promise p settles. Other code still runs. Use <code>try/catch</code> around <code>await</code> to handle rejection."
+    },
+    {
+     "type": "p",
+     "text": "Do not <code>await</code> independent requests one by one inside a loop. Start all promises first, then <code>await Promise.all</code>. If 3 requests each take about 200 ms, serial awaits wait about 600 ms; parallel waits about 200 ms, plus small overhead. This is the usual fix for a slow dashboard loading several cards."
+    },
+    {
+     "type": "p",
+     "text": "To wait with a timer, wrap it: <code>await new Promise(r =&gt; setTimeout(r, 1000))</code> waits at least 1000 ms. In a React component, async state initialization means starting the load and calling the state setter when it resolves; the first render shows a loading state (see Unit 5). Network calls with <code>fetch</code> are in <a href=\"#ajax-xmlhttprequest-and-json\">3.7</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Synchronous logs A and D finish first; the promise callback C runs from the microtask queue before timer callback B.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Order of output for A, B, C, D",
+   "aria": "Flow diagram: synchronous logs A and D run first, then the promise callback C from the microtask queue, then timer callback B.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "log A, then D",
+     "note": "sync code",
+     "style": "accent"
+    },
+    {
+     "id": "b",
+     "label": "setTimeout 0",
+     "note": "Web API",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "promise .then",
+     "note": "microtask queue",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "microtask C runs",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "timer B runs",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b"
+    },
+    {
+     "from": "a",
+     "to": "c"
+    },
+    {
+     "from": "c",
+     "to": "d"
+    },
+    {
+     "from": "b",
+     "to": "e"
+    },
+    {
+     "from": "d",
+     "to": "e"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Predict the exact output order of the program below. Also state how many synchronous logs, microtask logs and timer logs there are, and the total number of logs. Program: console.log('A'); setTimeout(() =&gt; console.log('B'), 0); Promise.resolve().then(() =&gt; console.log('C')); console.log('D');",
+   "steps": [
+    "The program has 2 direct console.log calls: A and D. They run on the call stack in source order. Output so far: A, D. Synchronous logs = 2.",
+    "setTimeout(() =&gt; console.log('B'), 0) passes the callback to the browser timer Web API. With 0 ms, it is queued as a macrotask after at least 0 ms, not run now. Timer logs = 1.",
+    "Promise.resolve() makes an already fulfilled promise. .then(() =&gt; console.log('C')) queues its callback as a microtask. Microtask logs = 1.",
+    "After the synchronous code, the stack is empty. The event loop drains all microtasks first, so C runs. Output: A, D, C.",
+    "Then the event loop takes the timer macrotask, so B runs. Output: A, D, C, B.",
+    "Total logs = 2 synchronous + 1 microtask + 1 timer = 4."
+   ],
+   "answer": "The output order is A, D, C, B: 2 synchronous logs, 1 microtask log, 1 timer log, and 4 logs in total.",
+   "check": "sync_logs = 2\nmicrotask_logs = 1\ntimer_logs = 1\ntotal = sync_logs + microtask_logs + timer_logs\nprint(sync_logs)\nprint(microtask_logs)\nprint(timer_logs)\nprint(total)",
+   "values": [
+    2,
+    1,
+    1,
+    4
+   ],
+   "code": {
+    "lang": "text",
+    "code": "console.log('A');\nsetTimeout(() => console.log('B'), 0);\nPromise.resolve().then(() => console.log('C'));\nconsole.log('D');",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Action",
+     "Queue after action",
+     "Printed so far"
+    ],
+    "rows": [
+     [
+      "1",
+      "console.log('A')",
+      "stack empty",
+      "A"
+     ],
+     [
+      "2",
+      "setTimeout(..., 0)",
+      "timer B in Web API",
+      "A"
+     ],
+     [
+      "3",
+      "Promise.resolve().then(...)",
+      "microtask C queued",
+      "A"
+     ],
+     [
+      "4",
+      "console.log('D')",
+      "stack empty",
+      "A, D"
+     ],
+     [
+      "5",
+      "stack empty; drain microtasks",
+      "C runs; microtask queue empty",
+      "A, D, C"
+     ],
+     [
+      "6",
+      "next task: timer B",
+      "task queue empty",
+      "A, D, C, B"
+     ]
+    ]
+   },
+   "output": "A\nD\nC\nB"
+  }
+ ],
+ "traps": [
+  "Thinking setTimeout(fn, 0) runs immediately. It runs only after the current stack and all microtasks finish.",
+  "Reading an async function's result without await. You get a pending promise, not the value.",
+  "Expecting a timer set first to beat a promise. Promise callbacks are microtasks and run before the next timer macrotask.",
+  "Awaiting independent requests inside a loop, which makes them serial. Use Promise.all for parallel work.",
+  "Treating the delay in setTimeout as exact. It is a minimum; long synchronous code delays the callback."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What are the three states of a promise?",
+   "marks": 2,
+   "a": "Pending, fulfilled and rejected."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a promise .then callback run before a setTimeout(..., 0) callback?",
+   "marks": 3,
+   "a": "The .then callback is queued as a microtask. The timer callback is a macrotask. After the stack empties, all microtasks drain before the next macrotask."
+  },
+  {
+   "level": "apply",
+   "q": "Give the output order: console.log('1'); setTimeout(() =&gt; console.log('2'), 0); Promise.resolve().then(() =&gt; console.log('3')); console.log('4');",
+   "marks": 3,
+   "a": "1, 4, 3, 2. The synchronous logs 1 and 4 run first, then microtask 3, then timer 2."
+  },
+  {
+   "level": "analyze",
+   "q": "An async function awaits 3 fetch calls one by one in a loop, each taking about 200 ms. A second version starts all 3 and uses Promise.all. Compare the approximate waiting time.",
+   "marks": 4,
+   "a": "Serial version waits about 200 + 200 + 200 = 600 ms. Promise.all version waits about 200 ms plus small overhead, because the requests run in parallel."
+  },
+  {
+   "level": "apply",
+   "q": "Rewrite this promise chain with async/await: step1().then(a =&gt; step2(a)).then(b =&gt; console.log(b)).catch(e =&gt; console.log(e));",
+   "marks": 4,
+   "a": "async function run() { try { const a = await step1(); const b = await step2(a); console.log(b); } catch (e) { console.log(e); } } run();"
+  },
+  {
+   "level": "remember",
+   "q": "What does clearInterval(id) do?",
+   "marks": 2,
+   "a": "It cancels the repeating timer created by setInterval that returned id."
+  },
+  {
+   "level": "understand",
+   "q": "What does an async function return if it returns the number 5?",
+   "marks": 2,
+   "a": "It returns a fulfilled promise whose value is 5."
+  },
+  {
+   "level": "analyze",
+   "q": "Predict the output order: setTimeout(() =&gt; console.log('A'), 0); Promise.resolve().then(() =&gt; { console.log('B'); Promise.resolve().then(() =&gt; console.log('C')); }); Promise.resolve().then(() =&gt; console.log('D'));",
+   "marks": 5,
+   "a": "B, D, C, A. The first microtask logs B and queues C; the second microtask logs D; then C drains; only then does timer A run."
+  }
+ ],
+ "beyond": "Not for the exam. Real code adds cancellation with AbortController, Promise.any for the first success, and async iterators for streams. The same queue rules appear in Node.js, whose event loop has extra phases (see Unit 6). React effects and async state initialization depend on promise ordering (see Unit 5). Search for 'AbortController fetch', 'Promise.any', 'async iterators' and 'microtask queue'."
+}
