@@ -1,0 +1,222 @@
+{
+ "lead": "A load balancer is a front door that sends each request to a healthy server. Replication keeps extra copies of data and servers, so one failure does not stop service. Together they give high availability: the service stays reachable for a promised share of time. You meet this in every UPI payment, IRCTC ticket search and video stream: many servers behind one address, and databases with copies in another rack or zone.",
+ "prereq": "You need: <a href=\"#elastic-and-on-demand-computing-automated-scaling\">Chapter 2.4</a> for adding instances and <a href=\"#networks-isps-and-data-centre-technologies\">Chapter 2.1</a> for regions and zones.",
+ "sections": [
+  {
+   "h3": "Load balancing: spreading requests",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A load balancer sits between clients and a pool of servers. It accepts one public address and forwards each request to a chosen server. The pool can grow or shrink without clients changing their code. A health check is a small probe, such as GET /health every 5 seconds; a server that fails the probe is removed from the pool until it recovers."
+    },
+    {
+     "type": "p",
+     "text": "Algorithms use different rules. Define request as one client call. Round robin sends requests in order: 1→Server 1, 2→Server 2, 3→Server 3, then repeats. Weighted round robin gives more turns to stronger servers: weights 3,1,1 send three requests to Server 1 for every one to each of the other two. Least connections sends the next request to the server with the fewest open connections. Least response time uses the fastest recent response. IP hash computes hash(client IP) mod N and sends that client to the same server, where N is the number of servers."
+    },
+    {
+     "type": "p",
+     "text": "Layer 4 balancing looks only at IP and TCP/UDP ports. It is fast and does not read HTTP. Layer 7 balancing reads HTTP method, path and cookies; it can send /images to an image server and /pay to a payment server. Sticky sessions keep one user on one server by cookie. A shared session store, such as Redis, is better for failover because any server can read the session."
+    }
+   ]
+  },
+  {
+   "h3": "Replication: keeping copies in step",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Replication stores the same data on more than one node. A primary-replica setup sends writes to one primary database and copies them to replicas. Read replicas serve read queries; writes still go to the primary. This raises read capacity and keeps a copy for failover."
+    },
+    {
+     "type": "p",
+     "text": "Synchronous replication waits for the replica to confirm before the write is acknowledged. If the primary dies, the replica has the latest write, but each write costs a network round trip. Asynchronous replication acknowledges at the primary and copies later. It is faster, but a crash can lose the last few writes. Replication lag is the delay between a write on the primary and its arrival at a replica. A read from a lagging replica may miss a just-written value."
+    },
+    {
+     "type": "p",
+     "text": "Quorum replication needs agreement from a majority. Let N be the number of replicas, W the writes that must confirm, and R the reads that must confirm. If R + W > N, a read set and the latest write set overlap, so the read sees the write. Example: N=3, W=2, R=2 gives 4>3. Quorum tolerates one failed node."
+    }
+   ]
+  },
+  {
+   "h3": "High availability and failover",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "High availability (HA) means the service is reachable for a large share of time, usually written as a percentage. Availability A is uptime divided by total time. Downtime is 1−A times total time. In series, all parts must work: A_series = A₁ × A₂ × … × Aₖ, where A_i is the availability of part i and k is the number of parts. In parallel, the service works if at least one copy works: A_parallel = 1−∏(1−A_i), where the product covers all parallel copies. For two copies each at 0.99, A_parallel = 1−0.01×0.01 = 0.9999."
+    },
+    {
+     "type": "p",
+     "text": "Active-passive has one working node and one standby. A failover system detects failure, promotes the standby and moves the address. Active-active has both nodes serving traffic; losing one reduces capacity but not service. Redundancy is the extra copy itself. Failover takes time; recovery time objective (RTO) is the maximum acceptable downtime, and recovery point objective (RPO) is the maximum acceptable data loss. Chapter 2.6 treats SLA targets."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The load balancer sends new requests to Server 1 and Server 2 and skips Server 3 after a failed health check; writes go to the primary and copy asynchronously to the replica.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Balanced web tier with a replicated database",
+   "nodes": [
+    {
+     "id": "client",
+     "label": "Client",
+     "note": "HTTPS",
+     "style": "normal"
+    },
+    {
+     "id": "lb",
+     "label": "Load balancer",
+     "note": "0.999, L7",
+     "style": "accent"
+    },
+    {
+     "id": "s1",
+     "label": "Server 1",
+     "note": "healthy, 0.99",
+     "style": "normal"
+    },
+    {
+     "id": "s2",
+     "label": "Server 2",
+     "note": "healthy, 0.99",
+     "style": "normal"
+    },
+    {
+     "id": "s3",
+     "label": "Server 3",
+     "note": "failed",
+     "style": "muted"
+    },
+    {
+     "id": "db",
+     "label": "Primary DB",
+     "note": "writes",
+     "style": "normal"
+    },
+    {
+     "id": "rep",
+     "label": "Replica DB",
+     "note": "reads, async",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "client",
+     "to": "lb",
+     "style": "solid"
+    },
+    {
+     "from": "lb",
+     "to": "s1",
+     "style": "solid"
+    },
+    {
+     "from": "lb",
+     "to": "s2",
+     "style": "solid"
+    },
+    {
+     "from": "lb",
+     "to": "s3",
+     "style": "dashed"
+    },
+    {
+     "from": "s1",
+     "to": "db",
+     "style": "solid"
+    },
+    {
+     "from": "s2",
+     "to": "db",
+     "style": "solid"
+    },
+    {
+     "from": "s3",
+     "to": "db",
+     "style": "dashed"
+    },
+    {
+     "from": "db",
+     "to": "rep",
+     "label": "async",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A client reaches a load balancer that sends traffic to two healthy servers and skips a failed third; the healthy servers write to a primary database that copies asynchronously to a replica."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three web servers each have availability 0.99 and sit behind one load balancer with availability 0.999. The servers fail independently, and the service works if the load balancer works and at least one server works. Find the server-group availability, the service availability, and the yearly downtime in 8,760 hours.",
+   "steps": [
+    "For one server, failure probability is 1 − 0.99 = 0.01.",
+    "All three fail independently with probability 0.01³ = 0.000001.",
+    "At least one server works with probability 1 − 0.000001 = 0.999999. This is the parallel group availability.",
+    "The load balancer is in series with the group: A_service = 0.999 × 0.999999 = 0.998999001.",
+    "Downtime = (1 − 0.998999001) × 8,760 hours = 0.001000999 × 8,760 = 8.76875124 hours per year, about 8.77 hours."
+   ],
+   "answer": "Server-group availability is 0.999999, service availability is 0.998999001 (about 99.90%), and downtime is 8.76875124 hours per year (about 8.77 hours); the load balancer is now the bottleneck.",
+   "check": "a = 0.99\nlb = 0.999\nhours = 8760\ngroup = 1 - (1 - a) ** 3\nservice = lb * group\ndowntime = (1 - service) * hours\nprint(round(group, 6))\nprint(round(service, 9))\nprint(round(downtime, 8))",
+   "values": [
+    0.999999,
+    0.998999001,
+    8.76875124
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Available parts in series multiply; a 99.9% load balancer can cap the whole service below the servers' 99.9999% group.",
+  "A parallel group is 1 minus the product of failure probabilities, not the sum of availabilities or failure probabilities.",
+  "Synchronous replication lowers data loss but adds write latency; asynchronous replication can lose recent writes and creates replication lag.",
+  "Health checks remove a failed server from new traffic; they do not repair it or move its in-memory session unless a shared session store exists.",
+  "Active-passive failover is not zero downtime; RTO is the allowed recovery time, RPO the allowed data loss."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a load balancer.",
+   "marks": 2,
+   "a": "A load balancer is a front device that receives client requests on one address and forwards each request to one server from a pool."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a load balancer use health checks?",
+   "marks": 3,
+   "a": "A health check probes each server. A server that fails the probe is removed from the pool, so new requests go only to working servers."
+  },
+  {
+   "level": "apply",
+   "q": "A weighted round-robin pool has weights 3, 1, 1 and receives 10 requests. How many requests go to each server?",
+   "marks": 4,
+   "a": "Total weight = 3+1+1 = 5. Server 1 gets 10×3/5 = 6. Server 2 gets 10×1/5 = 2. Server 3 gets 10×1/5 = 2."
+  },
+  {
+   "level": "apply",
+   "q": "Two parallel servers have availability 0.9 each. Find the group availability.",
+   "marks": 3,
+   "a": "Failure probability of one server = 1−0.9 = 0.1. Both fail with probability 0.1×0.1 = 0.01. Group availability = 1−0.01 = 0.99."
+  },
+  {
+   "level": "analyze",
+   "q": "In the worked example, why is the load balancer the bottleneck?",
+   "marks": 4,
+   "a": "Service availability is the product 0.999×0.999999 = 0.998999001. The load balancer's 0.999 is lower than the server group's 0.999999, so most service downtime comes from the load balancer."
+  },
+  {
+   "level": "analyze",
+   "q": "A payment ledger and a photo-likes counter need replication. Which should use synchronous or quorum replication, and which can use asynchronous replication?",
+   "marks": 4,
+   "a": "The payment ledger needs low data loss, so use synchronous or quorum replication. Photo likes can use asynchronous replication because a lost recent like is less costly and low latency matters more."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between RTO and RPO.",
+   "marks": 2,
+   "a": "RTO is the maximum acceptable time to restore service after a failure. RPO is the maximum acceptable amount of data lost, measured in time."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, load balancing is often split across a cloud load balancer, a Kubernetes Service and a service mesh sidecar such as Envoy. Replication protocols such as Raft use quorums and leader election to survive failures without manual promotion. Teams practise failover with game days and chaos tests, and multi-region active-active designs trade cost for lower RTO. Search next for service mesh, leader election, quorum reads and writes, and chaos engineering."
+}

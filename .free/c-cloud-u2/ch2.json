@@ -1,0 +1,195 @@
+{
+ "lead": "Cloud software is a web application before it is anything else. A user types a name, DNS turns it into an address, and an HTTP request carries the user's identity to a server. Multitenancy is how one running stack serves many customers without giving each its own machine. The application keeps tenants apart in rows, schemas, databases, caches and network rules. The path runs from browser to tenant rows; the isolation models and the failures that leak data across tenants follow.",
+ "prereq": "You need: <a href=\"#networks-isps-and-data-centre-technologies\">Chapter 2.1</a> for the client-to-data-centre path, and Unit 1 for SaaS and the cloud reference model.",
+ "sections": [
+  {
+   "h3": "DNS, HTTP and the stateless web",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "DNS (Domain Name System) is the phone book of the web. The browser asks a resolver for api.shop.in and receives an A record: the IPv4 address of the host. The record carries a TTL (time to live), for example 60 seconds, so resolvers cache the address for that long. A short TTL helps a provider move traffic after a failure; a long TTL reduces lookup load."
+    },
+    {
+     "type": "p",
+     "text": "The browser opens a TCP connection and runs a TLS (Transport Layer Security) handshake: ClientHello, ServerHello with the server certificate, key exchange and Finished. Only then does it send HTTP (HyperText Transfer Protocol) over the encrypted channel. A request has a method, a path, headers and an optional body, for example GET /orders HTTP/1.1 with a Host header and a Cookie header. A response has a status code, headers and a body, for example 200 OK, Content-Type: application/json, then JSON such as [{\"id\":7,\"amount\":499}]. HTML (HyperText Markup Language) is the same response shape for a page."
+    },
+    {
+     "type": "p",
+     "text": "HTTP is stateless: the server keeps no memory of an earlier request. Sessions add memory. After login the server sets a cookie, for example sid=abc123. The browser sends that cookie on every later request, and the server maps sid to a user and a tenant. The cookie is a key, so it must be random and protected; HttpOnly and Secure flags stop script access and plain-HTTP leakage."
+    },
+    {
+     "type": "p",
+     "text": "A web server such as nginx terminates TLS and serves static files. An application server runs business code, calls databases and builds JSON. Chapter 2.3 covers the REST style used by most cloud APIs; Chapter 2.5 covers the load balancer in front."
+    }
+   ]
+  },
+  {
+   "h3": "Multitenancy models and isolation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Multitenancy means one running instance of software, and often one database server, serves many tenants. A tenant is a customer organisation: a company using a CRM (customer relationship management) system, a subscriber on a media stream, a clan in an online game. Sharing saves cost. The provider must still keep every tenant's data separate."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Shared database, shared schema: every row has a tenant_id column. A read is SELECT ... WHERE tenant_id = 42. This is the cheapest model and the easiest to leak: one forgotten predicate returns another tenant's rows.",
+      "Shared database, separate schemas: tenant 42 owns schema t42. Queries name the schema, so a missing predicate is less likely to cross tenants. Migrations must run once per schema.",
+      "Separate databases: each tenant gets its own database. This gives the strongest separation and the highest cost; regulated data or very large tenants often justify it."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Caches follow the same rule. A key must contain the tenant, for example order:42:7, never order:7. A shared cache also produces noisy-neighbour effects: one tenant's heavy query, cache-miss storm or bulk import slows every other tenant on the same database. Per-tenant rate limits, queues and resource quotas reduce that effect."
+    },
+    {
+     "type": "p",
+     "text": "A logical network perimeter is the tenant's boundary drawn in software: firewall rules, virtual network segments or policy that lets tenant 42's application reach only tenant 42's database. It is not a separate physical LAN. Some syllabi call this boundary a logical network perimeter. CRM, social feeds, streaming and gaming all use these patterns."
+    }
+   ]
+  },
+  {
+   "h3": "One request from browser to tenant rows",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Figure 1 follows a request. The browser looks up api.shop.in and gets an A record with TTL 60. It sends GET /orders with cookie sid. The web server passes sid to the application, which maps it to tenant 42. The application sends SELECT ... WHERE tenant_id = 42 to the tenant database. Two rows come back; the application writes JSON; the web server returns 200 OK."
+    },
+    {
+     "type": "p",
+     "text": "The index decides the cost. With no index and no tenant filter, the engine scans every row. With an index on (tenant_id, id), it seeks to tenant 42 and reads only that tenant's range. The worked example puts numbers on this difference. The tenant key is checked in the data path, not only at login. A missing tenant predicate in any query, background job or cache key breaks the model. The figure's order matters: identity first, tenant second, data last."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The cookie is translated into tenant 42 before the query; the tenant key appears in the database predicate, not in a separate database.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Browser",
+    "DNS",
+    "Web server",
+    "App",
+    "Tenant DB"
+   ],
+   "messages": [
+    {
+     "from": "Browser",
+     "to": "DNS",
+     "label": "lookup api.shop.in",
+     "dashed": false
+    },
+    {
+     "from": "DNS",
+     "to": "Browser",
+     "label": "A record TTL 60",
+     "dashed": true
+    },
+    {
+     "from": "Browser",
+     "to": "Web server",
+     "label": "GET /orders, sid",
+     "dashed": false
+    },
+    {
+     "from": "Web server",
+     "to": "App",
+     "label": "sid → tenant 42",
+     "dashed": false
+    },
+    {
+     "from": "App",
+     "to": "Tenant DB",
+     "label": "WHERE tenant_id = 42",
+     "dashed": false
+    },
+    {
+     "from": "Tenant DB",
+     "to": "App",
+     "label": "2 rows",
+     "dashed": true
+    },
+    {
+     "from": "App",
+     "to": "Web server",
+     "label": "JSON body",
+     "dashed": true
+    },
+    {
+     "from": "Web server",
+     "to": "Browser",
+     "label": "200 OK",
+     "dashed": true
+    }
+   ],
+   "aria": "A browser looks up api.shop.in in DNS, sends GET /orders with cookie sid, the app maps sid to tenant 42, queries WHERE tenant_id = 42, gets two rows and returns JSON with 200 OK."
+  }
+ },
+ "examples": [
+  {
+   "question": "A SaaS order table holds 1,000,000 rows shared by 500 tenants. (a) How many rows does a query scan with no tenant filter? (b) With an index on (tenant_id, id), roughly how many rows does one tenant query scan on average? (c) What is the reduction factor?",
+   "steps": [
+    "Total rows N = 1,000,000. Number of tenants T = 500.",
+    "(a) No tenant filter means a full table scan: 1,000,000 rows.",
+    "(b) Average rows per tenant = N ÷ T = 1,000,000 ÷ 500 = 2,000 rows.",
+    "(c) Reduction = N ÷ rows per tenant = 1,000,000 ÷ 2,000 = 500."
+   ],
+   "answer": "(a) 1,000,000 rows, (b) 2,000 rows on average, (c) 500 times fewer rows.",
+   "check": "N = 1000000\nT = 500\na = N\nb = N // T\nc = N // b\nprint(a)\nprint(b)\nprint(c)",
+   "values": [
+    1000000,
+    2000,
+    500
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Multitenancy does not mean one machine per customer. One stack serves many tenants; separation is logical, in rows, schemas, caches and network policy.",
+  "A missing tenant_id in a WHERE clause or in a cache key leaks another tenant's data. The filter and the key are security controls, not performance extras.",
+  "HTTP is stateless; cookies and sessions store state. A server that appears to remember you is reading a cookie, a token or a server-side session store.",
+  "A logical network perimeter is policy and routing in software, not a separate physical LAN or a dedicated VLAN for every tenant.",
+  "DNS TTL is not a request timeout. TTL is how long a resolver may cache an address; a timeout is how long a client waits for a response."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does an A record contain, and what does its TTL control?",
+   "marks": 2,
+   "a": "An A record contains an IPv4 address for a name. TTL is the number of seconds a resolver may cache that answer."
+  },
+  {
+   "level": "understand",
+   "q": "HTTP is stateless. How does a cookie let a server recognise a returning user?",
+   "marks": 3,
+   "a": "The server sets a cookie such as sid=abc123 at login. The browser returns it with each request. The server looks up sid in a session store to find the user and tenant. State lives in the cookie and the store, not in HTTP itself."
+  },
+  {
+   "level": "apply",
+   "q": "A table has 2,000,000 rows shared by 400 tenants. With an index on (tenant_id, id), roughly how many rows does one tenant query scan on average?",
+   "marks": 3,
+   "a": "2,000,000 ÷ 400 = 5,000 rows."
+  },
+  {
+   "level": "analyze",
+   "q": "A developer writes cache key order:7 instead of order:42:7. Explain the failure and the fix.",
+   "marks": 4,
+   "a": "Tenant 43 asking for order 7 can hit tenant 42's cached order, so the cache returns another tenant's data. The fix is to put tenant_id in the key: order:42:7. Test cross-tenant cache hits."
+  },
+  {
+   "level": "understand",
+   "q": "Name the three multitenancy data models and give one cost of each.",
+   "marks": 4,
+   "a": "Shared schema: cheapest, but a missing tenant_id leaks rows. Separate schemas: safer, but migrations and schema changes run per tenant. Separate databases: strongest isolation, highest cost in servers and operations."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a noisy neighbour matter in a shared database, and name two controls that limit it.",
+   "marks": 4,
+   "a": "One tenant's long query or cache-miss storm consumes CPU, I/O and connections, so other tenants see higher latency. Controls: per-tenant connection limits, rate limits, resource quotas, and separate read replicas or databases for large tenants."
+  }
+ ],
+ "beyond": "Not for the exam. Industry is moving tenant isolation from ad-hoc WHERE clauses to row-level security, policy engines and per-tenant encryption keys. Search for PostgreSQL row-level security, OpenPolicy Agent, and cell-based architecture. Newer curricula discuss tenant units and shuffle sharding to limit blast radius. The same ideas appear in Kubernetes namespaces and service meshes, where policy replaces a physical perimeter."
+}
