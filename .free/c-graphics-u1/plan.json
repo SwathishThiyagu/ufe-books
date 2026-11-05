@@ -1,0 +1,700 @@
+{
+ "lead": "This unit explains how a computer turns geometry into the glowing pixels of a screen. You start with the two ways to store a picture, meet the hardware that paints it, then learn the integer algorithms for lines, circles and filled polygons. After the unit you can size a frame buffer, convert colours between RGB, CMY and HSV, trace a Bresenham line by hand, and explain sampling and colour depth in a digital image.",
+ "about": "Chapter 1.1 places graphics among its applications; 1.2 separates raster from vector storage. 1.3 shows the raster and random scan displays that read a frame buffer, and 1.4 gives the colour models used to fill it. 1.5 sketches the OpenGL pipeline that carries vertices to fragments. The second half is algorithmic: 1.6 builds lines with DDA and Bresenham, 1.7 extends the same decision step to circles and ellipses, and 1.8 fills polygons scan line by scan line. 1.9 closes by treating the finished screen as a sampled image and linking sampling, bit depth and human perception.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Computer graphics builds a picture from a numerical model, while image processing starts from a picture already captured.",
+   "depth": "Short timeline from vector drawing terminals to raster screens and GPUs; Sketchpad is usually named as the first interactive drawing program, so mention it without dates. Cover applications: CAD and product design, GIS and metro maps, medical scans and surgery planning, weather radar, film and cricket graphics, user interfaces and games. Classify each task as modelling, rendering or display. Keep history to about one page.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Graphics uses",
+     "style": "normal",
+     "note": "from model to picture",
+     "children": [
+      {
+       "label": "CAD",
+       "note": "product design",
+       "style": "normal"
+      },
+      {
+       "label": "Maps",
+       "note": "metro and GIS",
+       "style": "normal"
+      },
+      {
+       "label": "Medicine",
+       "note": "scans and planning",
+       "style": "normal"
+      },
+      {
+       "label": "Film",
+       "note": "effects and cricket",
+       "style": "normal"
+      },
+      {
+       "label": "UI",
+       "note": "icons and games",
+       "style": "normal"
+      }
+     ]
+    },
+    "aria": "A tree of five application areas that all use computer graphics, branching from the root Graphics uses."
+   },
+   "example": "A phone screen is 1080 × 1920 pixels and uses 3 bytes per pixel. One full frame needs 1080 × 1920 × 3 = 6,220,800 bytes, about 5.93 MiB. At 60 frames per second the display path must supply 6,220,800 × 60 = 373,248,000 bytes per second, about 373 MB/s. This is why a phone has a dedicated GPU.",
+   "trap": "Confusing graphics with image processing: graphics synthesises a picture from a model, image processing analyses or improves a captured picture.",
+   "prereq": "",
+   "leave": "Colour models to 1.4; rasterization to 1.6 to 1.8; file formats and compression to Unit 4; transformations and viewing to Unit 2."
+  },
+  {
+   "k": 2,
+   "idea": "A raster image stores colour at every grid point; a vector image stores shapes and lets the renderer make the grid.",
+   "depth": "Define pixel, resolution, aspect ratio and bit depth. Compare bitmap and vector for scaling, file size, editing and typical use: photos are raster; logos, fonts and CAD drawings are often vector. Name common formats only as examples. Include a comparison table and the memory cost of a full-screen bitmap.",
+   "figure": {
+    "type": "array",
+    "title": "5 × 5 bitmap of letter L",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "y=4",
+      "cells": [
+       "1",
+       "0",
+       "0",
+       "0",
+       "0"
+      ]
+     },
+     {
+      "label": "y=3",
+      "cells": [
+       "1",
+       "0",
+       "0",
+       "0",
+       "0"
+      ]
+     },
+     {
+      "label": "y=2",
+      "cells": [
+       "1",
+       "0",
+       "0",
+       "0",
+       "0"
+      ]
+     },
+     {
+      "label": "y=1",
+      "cells": [
+       "1",
+       "0",
+       "0",
+       "0",
+       "0"
+      ]
+     },
+     {
+      "label": "y=0",
+      "cells": [
+       "1",
+       "1",
+       "1",
+       "1",
+       "1"
+      ]
+     }
+    ],
+    "pointers": [],
+    "aria": "A 5 by 5 grid of pixel values where the 1 cells form the letter L."
+   },
+   "example": "A logo is a circle of radius 2 cm. Its diameter is 4 cm, which is 4 ÷ 2.54 = 1.5748 in. On a 300 dpi printer the vector version needs 1.5748 × 300 = 472 dots across the diameter. If the same logo is stored as a 100 × 100 pixel bitmap and printed 4 cm wide, its printed resolution is 100 ÷ 1.5748 = 63.5 dpi, so the edge looks jagged.",
+   "trap": "Thinking vector always means small: a complex vector drawing can be larger than a bitmap, but a photograph is almost always raster. Also dpi is printer dots per inch, while ppi is image pixels per inch.",
+   "prereq": "Chapter 1.1",
+   "leave": "Colour depth and colour models to 1.4; anti-aliasing to 1.6; JPEG, GIF and SVG details to Unit 4."
+  },
+  {
+   "k": 3,
+   "idea": "A raster display sweeps every screen line in order; a random scan display draws only the lines in its display list.",
+   "depth": "Advanced: only a few universities teach this in depth. Cover the CRT electron gun, deflection coils, frame buffer, video controller, refresh rate and interlacing by name. Explain random scan or calligraphic displays, then LCD and OLED as flat panels. Compare cost, flicker and resolution. Keep electron optics out.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Raster scan display path",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "CPU",
+      "note": "host",
+      "style": "normal"
+     },
+     {
+      "id": "dp",
+      "label": "Display processor",
+      "note": "geometry to pixels",
+      "style": "normal"
+     },
+     {
+      "id": "fb",
+      "label": "Frame buffer",
+      "note": "bitmap",
+      "style": "accent"
+     },
+     {
+      "id": "vc",
+      "label": "Video controller",
+      "note": "reads and refreshes",
+      "style": "normal"
+     },
+     {
+      "id": "mon",
+      "label": "Monitor",
+      "note": "screen",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cpu",
+      "to": "dp",
+      "style": "solid"
+     },
+     {
+      "from": "dp",
+      "to": "fb",
+      "style": "solid"
+     },
+     {
+      "from": "fb",
+      "to": "vc",
+      "style": "solid"
+     },
+     {
+      "from": "vc",
+      "to": "mon",
+      "style": "solid"
+     }
+    ],
+    "aria": "A five-block chain from CPU through display processor, frame buffer and video controller to the monitor."
+   },
+   "example": "A display is 1024 × 768 pixels with 24 bits per pixel. One frame needs 1024 × 768 × 3 = 2,359,296 bytes, about 2.25 MiB. At 60 Hz the controller reads 2,359,296 × 60 = 141,557,760 bytes per second, about 141.6 MB/s, just to refresh the screen.",
+   "trap": "Raster scan does not follow a line from endpoint to endpoint; it visits every pixel row. Refresh rate is screen redraws per second, not the animation frame rate.",
+   "prereq": "Chapter 1.2",
+   "leave": "Colour palettes and models to 1.4; double buffering in animation to Unit 5; deep display hardware beyond this not needed."
+  },
+  {
+   "k": 4,
+   "idea": "RGB adds light, CMY subtracts ink, and HSV re-describes RGB as hue, saturation and value for human choice.",
+   "depth": "Cover additive and subtractive mixing, 24-bit RGB, the RGB cube, CMY and CMYK with the reason for black ink, and the HSV hexcone. Give conversions for RGB to CMY and RGB to HSV, with hue in degrees and saturation and value from 0 to 1. Mention device gamut in one line. Do not go into colour science.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Colour models",
+     "style": "normal",
+     "note": "same colour, different numbers",
+     "children": [
+      {
+       "label": "RGB",
+       "note": "additive light",
+       "style": "accent",
+       "children": [
+        {
+         "label": "R",
+         "style": "normal"
+        },
+        {
+         "label": "G",
+         "style": "normal"
+        },
+        {
+         "label": "B",
+         "style": "normal"
+        }
+       ]
+      },
+      {
+       "label": "CMY",
+       "note": "subtractive ink",
+       "style": "normal",
+       "children": [
+        {
+         "label": "C",
+         "style": "normal"
+        },
+        {
+         "label": "M",
+         "style": "normal"
+        },
+        {
+         "label": "Y",
+         "style": "normal"
+        }
+       ]
+      },
+      {
+       "label": "HSV",
+       "note": "hue-based choice",
+       "style": "normal",
+       "children": [
+        {
+         "label": "H",
+         "style": "normal"
+        },
+        {
+         "label": "S",
+         "style": "normal"
+        },
+        {
+         "label": "V",
+         "style": "normal"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A tree with root Colour models and three branches RGB, CMY and HSV, each with its three components."
+   },
+   "example": "Convert RGB (255, 128, 0) to CMY and HSV. CMY is 1 minus each channel on a 0 to 1 scale, so C = 0, M = 1 − 128/255 = 0.502, Y = 1; in 0 to 255 form this is (0, 127, 255). For HSV, max = 255 and min = 0, so V = 1 and S = 1. The maximum is red, so H = 60 × (128 − 0) ÷ 255 = 30.1°, about 30°. The colour is a bright orange.",
+   "trap": "Forgetting that CMY is the inverse of RGB, and treating hue as a 0 to 255 channel rather than an angle.",
+   "prereq": "Chapter 1.2",
+   "leave": "YUV, chroma subsampling and colour in video to Unit 4; gamma and monitor calibration not needed here."
+  },
+  {
+   "k": 5,
+   "idea": "OpenGL is a state machine that pushes vertices through a pipeline until they become coloured fragments.",
+   "depth": "Advanced: only a few universities teach this. Cover the role of the API, the context and the viewport, then the stages: vertex fetch, vertex shader, primitive assembly, clipping, rasterizer, fragment shader, tests and framebuffer. Mention immediate mode glBegin and glVertex as historical, and modern buffers and shaders by name only. Explain double buffering and swap. No full program listing.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "OpenGL pipeline",
+    "nodes": [
+     {
+      "id": "v",
+      "label": "Vertices",
+      "note": "model data",
+      "style": "normal"
+     },
+     {
+      "id": "vs",
+      "label": "Vertex shader",
+      "note": "positions",
+      "style": "normal"
+     },
+     {
+      "id": "pa",
+      "label": "Primitive assembly",
+      "note": "points, lines, triangles",
+      "style": "normal"
+     },
+     {
+      "id": "rs",
+      "label": "Rasterizer",
+      "note": "fragments",
+      "style": "accent"
+     },
+     {
+      "id": "fs",
+      "label": "Fragment shader",
+      "note": "colour",
+      "style": "normal"
+     },
+     {
+      "id": "fb",
+      "label": "Framebuffer",
+      "note": "pixels",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "v",
+      "to": "vs",
+      "style": "solid"
+     },
+     {
+      "from": "vs",
+      "to": "pa",
+      "style": "solid"
+     },
+     {
+      "from": "pa",
+      "to": "rs",
+      "style": "solid"
+     },
+     {
+      "from": "rs",
+      "to": "fs",
+      "style": "solid"
+     },
+     {
+      "from": "fs",
+      "to": "fb",
+      "style": "solid"
+     }
+    ],
+    "aria": "A six-stage vertical pipeline from vertices through shaders and rasterizer to the framebuffer."
+   },
+   "example": "A triangle has vertices (0,0), (1,0) and (0,1) in a 200 × 200 viewport. If x and y in 0 to 1 map to 0 to 200 pixels, the screen vertices are (0,0), (200,0) and (0,200). The area is half of 200 × 200, so about 20,000 fragments fall inside the triangle.",
+   "trap": "OpenGL does not draw a line in world coordinates directly; transforms and the viewport come first. State stays until changed, and glBegin is deprecated.",
+   "prereq": "Chapters 1.3 and 1.4",
+   "leave": "Transformations and viewing to Unit 2; shading and hidden surfaces to Unit 3; full shader programming not needed."
+  },
+  {
+   "k": 6,
+   "idea": "DDA steps along the longer axis with floating increments; Bresenham makes the same choice with integer arithmetic only.",
+   "depth": "Cover the digital differential analyser, rounding and handling all octants by symmetry. Teach Bresenham or the midpoint line: derive p0 = 2Δy − Δx, give the update rules and show why integers avoid rounding error. Work through a slope less than 1, then say steep lines swap the axes. Include pseudocode and a trace table. Mention anti-aliasing only by name.",
+   "figure": {
+    "type": "array",
+    "title": "Bresenham line from (2,3) to (8,6)",
+    "show_index": true,
+    "index_from": 2,
+    "rows": [
+     {
+      "label": "y=6",
+      "cells": [
+       ".",
+       ".",
+       ".",
+       ".",
+       ".",
+       "X",
+       "X"
+      ]
+     },
+     {
+      "label": "y=5",
+      "cells": [
+       ".",
+       ".",
+       ".",
+       "X",
+       "X",
+       ".",
+       "."
+      ]
+     },
+     {
+      "label": "y=4",
+      "cells": [
+       ".",
+       "X",
+       "X",
+       ".",
+       ".",
+       ".",
+       "."
+      ]
+     },
+     {
+      "label": "y=3",
+      "cells": [
+       "X",
+       ".",
+       ".",
+       ".",
+       ".",
+       ".",
+       "."
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     }
+    ],
+    "pointers": [],
+    "aria": "A pixel grid where the X cells trace a rising line from the bottom left to the top right."
+   },
+   "example": "Trace Bresenham from (2,3) to (8,6). Δx = 6, Δy = 3, p0 = 2Δy − Δx = 0. With p = 0, choose the diagonal: (3,4), p = −6. Then choose east: (4,4), p = 0. Then diagonal: (5,5), p = −6. Then east: (6,5), p = 0. Then diagonal: (7,6), p = −6. Then east: (8,6). The plotted pixels are (2,3), (3,4), (4,4), (5,5), (6,5), (7,6), (8,6).",
+   "trap": "Using p0 = Δy/Δx instead of 2Δy − Δx, and incrementing both x and y every step. The final endpoint must be plotted.",
+   "prereq": "Chapter 1.2",
+   "leave": "Line clipping to Unit 2; circles and ellipses to 1.7; polygon filling to 1.8."
+  },
+  {
+   "k": 7,
+   "idea": "The midpoint circle algorithm uses one decision variable to choose between two pixels, then mirrors the point into eight octants.",
+   "depth": "Cover eight-way symmetry, the midpoint circle with p0 = 1 − r and its two updates, and Bresenham circle as the same idea. Then cover the midpoint ellipse split into two regions with different decision variables. Use a trace table; keep derivations short.",
+   "figure": {
+    "type": "array",
+    "title": "Midpoint circle, r = 8",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "k=0",
+      "cells": [
+       "0",
+       "0",
+       "8",
+       "-7"
+      ]
+     },
+     {
+      "label": "k=1",
+      "cells": [
+       "1",
+       "1",
+       "8",
+       "-4"
+      ]
+     },
+     {
+      "label": "k=2",
+      "cells": [
+       "2",
+       "2",
+       "8",
+       "1"
+      ]
+     },
+     {
+      "label": "k=3",
+      "cells": [
+       "3",
+       "3",
+       "7",
+       "-6"
+      ]
+     },
+     {
+      "label": "k=4",
+      "cells": [
+       "4",
+       "4",
+       "7",
+       "3"
+      ]
+     },
+     {
+      "label": "k=5",
+      "cells": [
+       "5",
+       "5",
+       "6",
+       "2"
+      ]
+     },
+     {
+      "label": "k=6",
+      "cells": [
+       "6",
+       "6",
+       "5",
+       "5"
+      ]
+     }
+    ],
+    "pointers": [],
+    "aria": "A table of seven decision steps for a circle of radius 8, listing k, x, y and p."
+   },
+   "example": "For a circle of radius 8 centred at the origin, p0 = 1 − 8 = −7. The first-octant points are (0,8), (1,8), (2,8), (3,7), (4,7), (5,6) and (6,5). For (3,7) the eight symmetric points are (3,7), (7,3), (−3,7), (−7,3), (−3,−7), (−7,−3), (3,−7) and (7,−3).",
+   "trap": "Using p0 = r instead of 1 − r, or stopping too late: stop when x > y. An ellipse needs separate decisions in region 1 and region 2.",
+   "prereq": "Chapter 1.6",
+   "leave": "3D spheres and quadrics to Unit 3; Bezier and B-spline curves to Unit 3; clipping to Unit 2."
+  },
+  {
+   "k": 8,
+   "idea": "Scan conversion decides which pixels lie inside a polygon, then fills them span by span along each scan line.",
+   "depth": "Cover the even-odd and nonzero winding inside tests. Teach scan-line fill with an edge table and active edge table: find intersections, sort, pair and fill spans. Cover boundary fill and flood fill with a seed, and mention span coherence. Work a small convex polygon by hand and note concave and self-intersecting cases.",
+   "figure": {
+    "type": "array",
+    "title": "Filled pixels of the trapezoid",
+    "show_index": true,
+    "index_from": 1,
+    "rows": [
+     {
+      "label": "y=6",
+      "cells": [
+       ".",
+       ".",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       ".",
+       "."
+      ]
+     },
+     {
+      "label": "y=5",
+      "cells": [
+       ".",
+       ".",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       ".",
+       "."
+      ]
+     },
+     {
+      "label": "y=4",
+      "cells": [
+       ".",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "."
+      ]
+     },
+     {
+      "label": "y=3",
+      "cells": [
+       ".",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "."
+      ]
+     },
+     {
+      "label": "y=2",
+      "cells": [
+       ".",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "X",
+       "."
+      ]
+     }
+    ],
+    "pointers": [],
+    "aria": "A pixel grid with X cells forming a filled trapezoid that is wider at the bottom than at the top."
+   },
+   "example": "A polygon has vertices (1,1), (9,1), (7,7) and (3,7). At y = 4, the left edge (1,1) to (3,7) gives x = 1 + (3/6) × 2 = 2, and the right edge (9,1) to (7,7) gives x = 9 + (3/6) × (−2) = 8. The span is x = 2 to 8, so 7 pixels are filled. At y = 6 the intersections are x = 2.667 and x = 7.333; pixels whose centres lie inside are 3 to 7, so 5 pixels are filled.",
+   "trap": "Horizontal edges and vertices counted twice break the parity rule. Rounding intersections carelessly leaves gaps. Boundary fill and flood fill need a seed inside, not on the border.",
+   "prereq": "Chapters 1.6 and 1.7",
+   "leave": "Polygon clipping to Unit 2; hidden surface removal to Unit 3; texture mapping not needed."
+  },
+  {
+   "k": 9,
+   "idea": "A digital image is a sampled and quantised version of a continuous scene, and the eye judges it by contrast and edges, not by raw pixel values.",
+   "depth": "Cover the sampling grid and reconstruction, spatial resolution, bit depth, greyscale and colour, ppi and dpi, and aliasing by name. For perception, cover rods and cones, the nonlinear brightness response, Mach bands, simultaneous contrast and acuity. Compare nearest-neighbour and bilinear interpolation. Keep image processing and graphics distinct.",
+   "figure": {
+    "type": "array",
+    "title": "4 × 4 image and its 2 × 2 average",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "4×4 row 1",
+      "cells": [
+       "2",
+       "4",
+       "6",
+       "8"
+      ]
+     },
+     {
+      "label": "4×4 row 2",
+      "cells": [
+       "4",
+       "6",
+       "8",
+       "6"
+      ]
+     },
+     {
+      "label": "4×4 row 3",
+      "cells": [
+       "6",
+       "8",
+       "6",
+       "4"
+      ]
+     },
+     {
+      "label": "4×4 row 4",
+      "cells": [
+       "8",
+       "6",
+       "4",
+       "2"
+      ]
+     },
+     {
+      "label": "2×2 row 1",
+      "cells": [
+       "4",
+       "7"
+      ]
+     },
+     {
+      "label": "2×2 row 2",
+      "cells": [
+       "7",
+       "4"
+      ]
+     }
+    ],
+    "pointers": [],
+    "aria": "A table showing a 4 by 4 grey image and the 2 by 2 image made by averaging each block of four pixels."
+   },
+   "example": "A photo is 4 cm × 3 cm and is scanned at 300 ppi. The width is 4 ÷ 2.54 = 1.5748 in, so 1.5748 × 300 = 472 pixels. The height is 3 ÷ 2.54 = 1.1811 in, so 1.1811 × 300 = 354 pixels. The image has 472 × 354 = 167,088 pixels. At 24-bit colour it needs 167,088 × 3 = 501,264 bytes, about 489.5 KiB. At 8-bit grey it needs 167,088 bytes, about 163 KiB.",
+   "trap": "Treating pixel resolution as physical size: the same 72 ppi image can be printed small and sharp. Equal steps in stored grey value do not look equally spaced to the eye.",
+   "prereq": "Chapters 1.2 and 1.4",
+   "leave": "JPEG and PNG compression to Unit 4; image filters, features and camera models to later units or specialist courses."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "pictures stored as pixels or paths"
+  ],
+  [
+   2,
+   3,
+   "pixels need a display to appear"
+  ],
+  [
+   2,
+   4,
+   "each pixel carries a colour"
+  ],
+  [
+   4,
+   5,
+   "colour travels through the graphics API"
+  ],
+  [
+   5,
+   6,
+   "the API draws lines with algorithms"
+  ],
+  [
+   6,
+   7,
+   "the same decision step draws circles"
+  ],
+  [
+   7,
+   8,
+   "curves become filled shapes"
+  ],
+  [
+   8,
+   9,
+   "filled shapes form the sampled image"
+  ]
+ ]
+}
