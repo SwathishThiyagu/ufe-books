@@ -30,7 +30,7 @@ def answer(P):
                     'about': para('This unit', 110),
                     'chapters': [{'k': k, 'idea': s['t'], 'figure': 'blocks', 'example': 'a small numeric question', 'trap': 'a common slip'} for k, s in enumerate(U['subtopics'], 1)],
                     'links': [[k, k + 1, 'leads to'] for k in range(1, len(U['subtopics']))]}
-        m = re.match(r'(ch|revise|resize)(\d+)', task)
+        m = re.match(r'(ch|revise|resize|chfix)(\d+)', task)
         if m:
             k = int(m.group(2)); t = U['subtopics'][k - 1]['t']
             ex = {'question': f'A system runs 4 jobs of 3, 5, 2 and 6 ms. Find the average time for {t.lower()}.',
