@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-cn-u1.html: 8 chapters, 10063 words, 9 figures, 119 KB
+c-cn-u1.html: 8 chapters, 10063 words, 9 figures, 121 KB
 OK
 ```
 
