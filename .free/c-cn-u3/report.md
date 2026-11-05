@@ -1,15 +1,14 @@
 # c-cn-u3: free-model run
 
 - Book: `books/cse/c-cn/c-cn-u3.html`
-- Status: problems
-- Model calls so far: 18 (67,597 tokens in, 90,139 out), 11.5 minutes
+- Status: ok
+- Model calls so far: 19 (70,305 tokens in, 91,520 out), 11.9 minutes
 
 ## Checker
 
 ```
-c-cn-u3.html: 9 chapters, 11822 words, 10 figures, 142 KB
-PROBLEMS:
- - chapter "data-link-protocols-hdlc-and-ppp": needs a <div class="quiz"> with at least 5 <details data-level=...> questions
+c-cn-u3.html: 9 chapters, 12116 words, 10 figures, 144 KB
+OK
 ```
 
 ## For the reviewer
@@ -33,7 +32,6 @@ Make the shown output and any explanation match what the program really prints
 - chapter 6: a c program's shown output was replaced by its real output; check the text around it
 - chapter 6: give 6 to 8 quiz questions
 - chapter 6: worked example 1: the worked example states [21005.0] but recomputing it gives [522.0]; fix the steps and the answer so they match the correct values
-- checker: chapter "data-link-protocols-hdlc-and-ppp": needs a <div class="quiz"> with at least 5 <details data-level=...> questions
 
 ## Reviewer notes (after any revision)
 
