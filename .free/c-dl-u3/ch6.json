@@ -1,0 +1,237 @@
+{
+ "lead": "Transfer learning reuses a network trained on a large dataset, such as ImageNet, and adapts it to a new task. Early layers already detect edges, colours and textures; later layers detect object parts. You keep those learned filters and train a small new classifier on your own data. This saves labelled images, time and GPU cost. It is used in medical imaging, factory defect checks, crop disease apps and phone photo apps. Fine-tuning goes one step further and adjusts some pretrained layers.",
+ "prereq": "You need: <a href=\"#classic-architectures-alexnet-zfnet-and-vgg\">3.4</a> and <a href=\"#deeper-architectures-inception-and-resnet\">3.5</a> for CNN blocks, and Unit 2 for learning rate and regularization.",
+ "sections": [
+  {
+   "h3": "Feature extraction: freeze the convolution base",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <b>pretrained model</b> is a network whose weights were learned on a large source dataset. ImageNet is the common source: about a million photographs labelled with 1,000 object classes. The <b>convolution base</b> is the stack of convolution and pooling layers. The <b>classifier head</b> is the final fully connected layer, often with softmax. The base turns an image into a feature vector."
+    },
+    {
+     "type": "p",
+     "text": "In <b>feature extraction</b>, you freeze the base. Frozen means the weights do not change during backpropagation. You delete the old 1,000-way head and attach a new head for your K classes. For ResNet-50, global average pooling gives F = 2,048 features per image. The new fully connected layer has F inputs and K outputs."
+    },
+    {
+     "type": "formula",
+     "text": "P = F × K + K",
+     "where": "P is the number of parameters in the new fully connected layer; F is the number of input features (2,048 for ResNet-50 after global pooling); K is the number of new classes (10 in the example)."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Load the pretrained weights.",
+      "Remove the original classifier head.",
+      "Freeze every convolution and pooling layer.",
+      "Add global pooling and a new K-way fully connected layer.",
+      "Train only the new head with cross-entropy loss."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Feature extraction is fast because the frozen base can run once and store features. It works well when the new task is similar to the source, such as classifying flowers or machine parts. It needs fewer labelled images than training from scratch."
+    }
+   ]
+  },
+  {
+   "h3": "Fine-tuning: unfreeze the top, train slowly",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Fine-tuning unfreezes some top blocks of the base and trains them with the new head. Top blocks hold task-specific parts, so they adapt best. Use a small learning rate, often 10 to 100 times smaller than training from scratch. A large rate can overwrite useful filters in a few updates."
+    },
+    {
+     "type": "p",
+     "text": "The amount you unfreeze depends on data size. Small dataset: freeze more. Large dataset: unfreeze more."
+    },
+    {
+     "type": "table",
+     "head": [
+      "New dataset",
+      "Trainable part",
+      "Learning rate"
+     ],
+     "rows": [
+      [
+       "2,000 images",
+       "New head only",
+       "1e-3 for head"
+      ],
+      [
+       "20,000 images",
+       "Last block + head",
+       "1e-4"
+      ],
+      [
+       "100,000+ images",
+       "Whole network",
+       "1e-4 to 1e-5"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Batch normalization layers need care. When the base is frozen, keep each BN layer in evaluation mode. It then uses stored running mean and variance instead of batch statistics. This stops small batches from changing the base's normalization."
+    }
+   ]
+  },
+  {
+   "h3": "Match preprocessing and replace the head",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The pretrained base expects the same input recipe used in pretraining. Match three things: input size, colour order, and per-channel mean and standard deviation. A common ImageNet recipe resizes to 224×224, scales pixels to [0,1], and subtracts mean [0.485, 0.456, 0.406] with standard deviation [0.229, 0.224, 0.225] for RGB. A different recipe shifts the feature values and lowers accuracy."
+    },
+    {
+     "type": "p",
+     "text": "Always replace the old head. Its 1,000 outputs do not match your classes. Some syllabi call the freeze and unfreeze choices fine-tuning strategies. Domain adaptation uses the same idea when source and target images differ, such as daytime road images to night images."
+    },
+    {
+     "type": "p",
+     "text": "A safe order is: train the new head with the base frozen; check validation accuracy; then unfreeze the last block with a smaller learning rate; stop when validation loss rises."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "New images pass through a frozen or partly unfrozen ResNet-50 base, global pooling gives 2,048 features, and a new 10-class fully connected layer is trained.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Transfer learning",
+   "nodes": [
+    {
+     "id": "img",
+     "label": "New images",
+     "note": "2,000 images",
+     "style": "normal"
+    },
+    {
+     "id": "base",
+     "label": "Pretrained CNN",
+     "note": "freeze or fine-tune top",
+     "style": "muted"
+    },
+    {
+     "id": "gap",
+     "label": "Global pool",
+     "note": "2048 features",
+     "style": "normal"
+    },
+    {
+     "id": "fc",
+     "label": "New FC",
+     "note": "10 classes",
+     "style": "accent"
+    },
+    {
+     "id": "soft",
+     "label": "Softmax",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "img",
+     "to": "base",
+     "style": "solid"
+    },
+    {
+     "from": "base",
+     "to": "gap",
+     "style": "solid"
+    },
+    {
+     "from": "gap",
+     "to": "fc",
+     "style": "solid"
+    },
+    {
+     "from": "fc",
+     "to": "soft",
+     "style": "solid"
+    }
+   ],
+   "aria": "New images pass through a pretrained CNN and global pooling into a new 10-class fully connected layer."
+  }
+ },
+ "examples": [
+  {
+   "question": "A ResNet-50 pretrained on ImageNet has 1,000 output classes. Its global average pooling layer produces 2,048 features. You replace the final fully connected layer with a new layer for 10 classes. (a) Find the number of parameters in the new FC layer, counting weights and biases. (b) State a training plan for 2,000 new images. (c) What changes if the new dataset grows to 50,000 images?",
+   "steps": [
+    "Remove the old 1,000-way classifier head. Keep the convolution base and global pooling.",
+    "The new fully connected layer has a weight matrix of size 10 × 2,048. Number of weights = 10 × 2,048 = 20,480.",
+    "The new layer has one bias per class: 10 biases.",
+    "Total parameters = 20,480 weights + 10 biases = 20,490 parameters.",
+    "For 2,000 images, freeze the convolution base and train only the new 10-way head. Use the pretrained input size, mean and standard deviation.",
+    "For 50,000 images, unfreeze the last residual block along with the head. Use a small learning rate such as 1e-4, and keep batch normalization layers in evaluation mode while the base is mostly frozen."
+   ],
+   "answer": "The new FC layer has 20,490 parameters. For 2,000 images, freeze the base and train the new head; for 50,000 images, also unfreeze the last block with a small learning rate.",
+   "check": "features = 2048\nclasses = 10\nparams = features * classes + classes\nprint(params)",
+   "values": [
+    20490
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not fine-tune all layers with a large learning rate; that destroys pretrained features.",
+  "Replace the head and keep the same preprocessing: input size, colour order, mean and standard deviation.",
+  "When counting FC parameters, include the biases. A 2,048-to-10 layer has 20,490 parameters, not 20,480.",
+  "Do not update batch normalization running statistics on very small batches while the base is frozen; keep BN in evaluation mode.",
+  "Do not confuse feature extraction with fine-tuning: feature extraction freezes the whole base, while fine-tuning trains some top base blocks."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does freezing a layer mean during training?",
+   "marks": 2,
+   "a": "Freezing means the layer's weights are not updated. Backpropagation does not change them."
+  },
+  {
+   "level": "understand",
+   "q": "Why can ImageNet features help a small new image dataset?",
+   "marks": 3,
+   "a": "Early convolution filters learn general patterns such as edges, colours and textures. These patterns transfer to many image tasks, so the new classifier needs less data."
+  },
+  {
+   "level": "apply",
+   "q": "A pretrained CNN gives 2,048 features after global pooling. You add a new fully connected layer for 7 classes. Find the number of parameters, counting weights and biases.",
+   "marks": 3,
+   "a": "Weights = 2,048 × 7 = 14,336. Biases = 7. Total = 14,343 parameters."
+  },
+  {
+   "level": "analyze",
+   "q": "You have 1,500 labelled images. Should you fine-tune the whole pretrained network? Justify your choice.",
+   "marks": 4,
+   "a": "No. With 1,500 images, fine-tuning the whole network can overfit and destroy useful pretrained filters. Freeze the convolution base and train the new head. If needed, unfreeze only the last block with a small learning rate."
+  },
+  {
+   "level": "apply",
+   "q": "Training from scratch uses a learning rate of 1e-3. You unfreeze the last block of a pretrained CNN. What learning rate range is safer?",
+   "marks": 2,
+   "a": "A smaller rate, about 1e-4 to 1e-5, is safer for fine-tuning the last block."
+  },
+  {
+   "level": "understand",
+   "q": "Why keep batch normalization layers in evaluation mode when the base is frozen?",
+   "marks": 3,
+   "a": "Evaluation mode uses stored running mean and variance. It stops small training batches from changing the base's normalization statistics."
+  },
+  {
+   "level": "analyze",
+   "q": "A model was pretrained with ImageNet mean and standard deviation, but your new pipeline uses raw pixels without normalization. What goes wrong?",
+   "marks": 4,
+   "a": "The input feature distribution shifts away from what the pretrained filters expect. Activations become biased, and accuracy drops even if the architecture and weights are unchanged."
+  },
+  {
+   "level": "remember",
+   "q": "What is the classifier head in a pretrained CNN?",
+   "marks": 2,
+   "a": "The classifier head is the final fully connected layer, often followed by softmax, that maps features to class scores."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, transfer learning is the default start for image, audio and text models. Search linear probing, gradual unfreezing, discriminative learning rates and domain adaptation. Vision transformers and self-supervised pretraining use the same freeze-then-finetune pattern. Model hubs publish pretrained weights with preprocessing recipes; always copy them."
+}

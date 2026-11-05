@@ -1,0 +1,269 @@
+{
+ "lead": "An image classifier says what is in a picture. A detector says what is in it and where. It returns boxes, each with a class and a score. Face unlock, number-plate reading and PCB defect spotting are detection. This chapter builds detectors from CNN blocks: R-CNN proposals to YOLO's single regression over a grid.",
+ "prereq": "You need <a href=\"#cnn-architecture-building-a-basic-cnn\">3.3</a> to <a href=\"#deeper-architectures-inception-and-resnet\">3.5</a> for the CNN backbone, plus softmax and cross-entropy from Unit 2.",
+ "sections": [
+  {
+   "h3": "What detection asks for",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Classification gives one label. Localization gives one box. Detection gives a variable number of boxes and labels: a photo may hold zero, two or twenty objects."
+    },
+    {
+     "type": "p",
+     "text": "A box is (x, y, w, h): x and y are the centre, w and h are width and height. Some systems use the top-left corner. State your convention; mixing them shifts every box by half its size."
+    },
+    {
+     "type": "p",
+     "text": "Compare predicted box B<sub>p</sub> with true box B<sub>g</sub> by intersection over union."
+    },
+    {
+     "type": "formula",
+     "text": "IoU = area(B<sub>p</sub> ∩ B<sub>g</sub>) ÷ area(B<sub>p</sub> ∪ B<sub>g</sub>)",
+     "where": "B<sub>p</sub> is the predicted box; B<sub>g</sub> is the ground-truth box; ∩ is the overlap; ∪ is the combined area, counting overlap once. IoU is 0 when boxes miss and 1 when they match exactly."
+    },
+    {
+     "type": "p",
+     "text": "A model emits many overlapping boxes. Non-maximum suppression (NMS) is a fixed rule. Sort by score, keep the best, delete boxes whose IoU with it is above a threshold (0.5 is common), and repeat."
+    },
+    {
+     "type": "p",
+     "text": "Precision and recall at several IoU thresholds, averaged, give mean average precision (mAP). It is the standard detector score."
+    }
+   ]
+  },
+  {
+   "h3": "R-CNN: proposals then classify",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "R-CNN (2014) has two stages. Stage one proposes regions. Stage two classifies each region with a CNN."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Run selective search: merge similar neighbouring pixel regions and return about 2,000 candidate boxes.",
+      "Warp each box to a fixed 224×224 image.",
+      "Push each warp through a CNN, such as <a href=\"#classic-architectures-alexnet-zfnet-and-vgg\">AlexNet</a>, and keep the feature vector.",
+      "Classify the vector with one SVM per class, and regress a small box correction.",
+      "Apply NMS."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The CNN runs about 2,000 times per image, and proposals come from a separate hand-made algorithm."
+    },
+    {
+     "type": "p",
+     "text": "Fast R-CNN convolves the whole image once. Each proposal is projected onto the shared feature map and cropped by ROI pooling: divide the region into fixed bins and max-pool each bin, so every region becomes the same small tensor. A softmax head and box regressor share it."
+    },
+    {
+     "type": "p",
+     "text": "Faster R-CNN replaces selective search with a region proposal network (RPN). A small net slides over the feature map. At each position it scores anchor boxes of a few sizes and shapes and regresses their offsets. Proposals and detection train together as one network."
+    }
+   ]
+  },
+  {
+   "h3": "YOLO: detection as one regression",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "YOLO (You Only Look Once, 2016) drops proposals. Divide the image into an S×S grid. The cell containing an object's centre is responsible for that object."
+    },
+    {
+     "type": "p",
+     "text": "Each cell predicts B boxes. Each box has 5 numbers: x, y, w, h and confidence. Here x and y are offsets inside the cell, scaled to 0–1; w and h are sizes relative to the whole image. Confidence is estimated as Pr(object) × IoU with the truth box. It measures objectness, not class probability."
+    },
+    {
+     "type": "p",
+     "text": "Each cell also predicts C class scores. At test time, multiply class score by box confidence to get the per-class score for that box. One forward pass produces every prediction."
+    },
+    {
+     "type": "formula",
+     "text": "depth = B × 5 + C",
+     "where": "depth is numbers predicted per grid cell; B is boxes per cell; 5 is x, y, w, h and confidence; C is the number of classes."
+    },
+    {
+     "type": "p",
+     "text": "The output tensor is S×S×depth. After the network, drop boxes below a confidence threshold and run NMS. YOLO is fast because the CNN runs once, but the coarse grid limits it: one cell predicts only B objects, so a tight flock of small birds is missed. Later versions add anchors, several scales and stronger backbones."
+    }
+   ]
+  },
+  {
+   "h3": "SSD, RetinaNet and the vocabulary",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SSD predicts boxes from several feature maps: deep maps for large objects, shallow maps for small ones, using default boxes of many shapes. RetinaNet keeps a feature pyramid and adds focal loss. Focal loss multiplies the usual loss by (1 − p<sub>t</sub>)<sup>γ</sup>, where p<sub>t</sub> is the probability given to the true class and γ (gamma, 2 is standard) is a focusing constant. Thousands of easy background boxes then contribute little, and rare hard boxes dominate the gradient."
+    },
+    {
+     "type": "p",
+     "text": "Detectors with a separate proposal step are two-stage; detectors that regress boxes straight from the feature map are one-stage. Some syllabi use these names for the R-CNN and YOLO families."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "YOLO in one pass: the backbone turns the image into a 7×7 grid, each cell emits 30 numbers (two boxes of five numbers plus twenty class scores), and NMS keeps the best boxes.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "YOLO detection",
+   "nodes": [
+    {
+     "id": "img",
+     "label": "Input image",
+     "style": "normal"
+    },
+    {
+     "id": "back",
+     "label": "CNN backbone",
+     "note": "features",
+     "style": "normal"
+    },
+    {
+     "id": "grid",
+     "label": "S×S grid",
+     "note": "7×7",
+     "style": "accent"
+    },
+    {
+     "id": "pred",
+     "label": "Box + class",
+     "note": "30 per cell",
+     "style": "accent"
+    },
+    {
+     "id": "nms",
+     "label": "NMS",
+     "style": "live"
+    },
+    {
+     "id": "out",
+     "label": "Detections",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "img",
+     "to": "back",
+     "style": "solid"
+    },
+    {
+     "from": "back",
+     "to": "grid",
+     "style": "solid"
+    },
+    {
+     "from": "grid",
+     "to": "pred",
+     "style": "solid"
+    },
+    {
+     "from": "pred",
+     "to": "nms",
+     "style": "solid"
+    },
+    {
+     "from": "nms",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "An image goes through a CNN backbone into a 7 by 7 grid that predicts boxes and classes, then non-maximum suppression gives detections."
+  }
+ },
+ "examples": [
+  {
+   "question": "A YOLO model is trained for C = 20 classes with an S = 7 grid and B = 2 boxes per cell. (a) How many numbers does each cell predict? (b) What is the output tensor size? (c) How many box predictions are made before NMS? (d) A cell contains a dog; its box confidence is 0.9 and the dog class score is 0.8. Give the class-specific score.",
+   "steps": [
+    "Each box uses 5 numbers: x, y, w, h and confidence. B = 2 boxes use 2 × 5 = 10 numbers per cell.",
+    "Add class scores: depth = B × 5 + C = 2 × 5 + 20 = 10 + 20 = 30.",
+    "Tensor size = S × S × depth = 7 × 7 × 30. There are 49 cells, so 49 × 30 = 1470 numbers.",
+    "Boxes per image = S × S × B = 7 × 7 × 2 = 49 × 2 = 98.",
+    "Class-specific score = confidence × class score = 0.9 × 0.8 = 0.72."
+   ],
+   "answer": "Each cell predicts 30 numbers, the tensor has 1470 numbers, one image gives 98 box predictions, and the dog's class-specific score is 0.72.",
+   "check": "S = 7\nB = 2\nC = 20\ndepth = B * 5 + C\ntotal = S * S * depth\nboxes = S * S * B\nscore = 0.9 * 0.8\nprint(depth)\nprint(total)\nprint(boxes)\nprint(score)",
+   "values": [
+    30,
+    1470,
+    98,
+    0.72
+   ],
+   "output": ""
+  },
+  {
+   "question": "Two boxes in centre form: predicted box B<sub>p</sub> has centre (2, 2) with w = 4, h = 4; true box B<sub>g</sub> has centre (4, 2) with w = 4, h = 4. All values are in the same pixel units. Find the IoU.",
+   "steps": [
+    "B<sub>p</sub> spans x from 0 to 4 and y from 0 to 4. Area = 4 × 4 = 16 square units.",
+    "B<sub>g</sub> spans x from 2 to 6 and y from 0 to 4. Area = 16 square units.",
+    "Overlap in x: 2 to 4, width 2. Overlap in y: 0 to 4, height 4. Intersection area = 2 × 4 = 8.",
+    "Union area = 16 + 16 − 8 = 24.",
+    "IoU = 8 ÷ 24 = 0.333."
+   ],
+   "answer": "IoU = 0.333, so the boxes overlap by about one third.",
+   "check": "w1 = h1 = w2 = h2 = 4\nx1, y1 = 2, 2\nx2, y2 = 4, 2\np_x0, p_x1 = x1 - w1/2, x1 + w1/2\np_y0, p_y1 = y1 - h1/2, y1 + h1/2\ng_x0, g_x1 = x2 - w2/2, x2 + w2/2\ng_y0, g_y1 = y2 - h2/2, y2 + h2/2\nix = max(0, min(p_x1, g_x1) - max(p_x0, g_x0))\niy = max(0, min(p_y1, g_y1) - max(p_y0, g_y0))\ninter = ix * iy\nunion = w1*h1 + w2*h2 - inter\nprint(inter)\nprint(union)\nprint(round(inter/union, 3))",
+   "values": [
+    8,
+    24,
+    0.333
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "YOLO's x and y are offsets inside the responsible cell, not image pixels; w and h are fractions of the full image, not the cell.",
+  "Confidence is objectness times IoU with the truth box. It is not class probability; class probability is the separate C-way score, multiplied only at test time.",
+  "NMS is a rule applied after the network. It has no weights and is not trained; it is not a learned layer.",
+  "Faster R-CNN's RPN only proposes regions. The classifier head decides the class, so do not credit the RPN with final labels.",
+  "IoU divides by union area, not by the sum of the two areas; the overlap is counted once in the union."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a bounding box and name its four numbers.",
+   "marks": 2,
+   "a": "A box is (x, y, w, h): x and y give its centre, w and h give width and height, all in image units."
+  },
+  {
+   "level": "understand",
+   "q": "Why is Fast R-CNN faster than R-CNN on the same image?",
+   "marks": 3,
+   "a": "R-CNN warps 2,000 proposals and runs the CNN on each, repeating convolution 2,000 times. Fast R-CNN convolves the whole image once and crops the shared feature map with ROI pooling, so the expensive part runs once."
+  },
+  {
+   "level": "apply",
+   "q": "A YOLO model uses a 13×13 grid, B = 3 boxes per cell and C = 80 classes. Find numbers per cell, tensor size and box predictions.",
+   "marks": 4,
+   "a": "depth = B × 5 + C = 3 × 5 + 80 = 15 + 80 = 95. Tensor = 13 × 13 × 95 = 169 × 95 = 16,055 numbers. Boxes = 13 × 13 × 3 = 169 × 3 = 507."
+  },
+  {
+   "level": "analyze",
+   "q": "A 7×7 grid with B = 2 must detect a flock of 20 small birds in one part of the image. Explain why it fails, and name one fix.",
+   "marks": 4,
+   "a": "One cell predicts only B = 2 boxes, so the few cells covering the flock output at most 2 boxes each; many birds get no box. Fixes: raise B, use a finer grid, or predict from several feature maps at different scales as SSD does."
+  },
+  {
+   "level": "remember",
+   "q": "What does non-maximum suppression do?",
+   "marks": 2,
+   "a": "It sorts boxes by score, keeps the highest, removes boxes whose IoU with the kept box exceeds a threshold, and repeats until none remain."
+  },
+  {
+   "level": "understand",
+   "q": "Why does RetinaNet need focal loss?",
+   "marks": 3,
+   "a": "A dense detector makes tens of thousands of boxes, almost all easy background. Plain cross-entropy lets those easy examples dominate. Focal loss scales each example by (1 − p<sub>t</sub>)<sup>γ</sup>, shrinking the loss for easy confident examples so hard ones matter more."
+  },
+  {
+   "level": "analyze",
+   "q": "A detector scores boxes A (0.9), B (0.8), C (0.7). A and B overlap with IoU 0.6, A and C with IoU 0.1, using a 0.5 NMS threshold. Which boxes survive?",
+   "marks": 3,
+   "a": "Keep A at 0.9. B has IoU 0.6 with A, above 0.5, so B is suppressed. C has IoU 0.1 with A, so C survives. Final set: A and C."
+  }
+ ],
+ "beyond": "Not for the exam. Modern detectors moved two ways. Anchor-free heads such as FCOS and CenterNet predict box corners or object centres instead of anchors, removing anchor sizes you must tune. Transformer detectors such as DETR treat detection as set prediction: the model outputs a fixed set of boxes, matched to truth by one-to-one assignment, so NMS is not needed. Segmentation and detection also merge into panoptic models that label every pixel, where <a href=\"#cnns-for-segmentation-and-siamese-networks\">3.9</a> picks up. Search terms: focal loss, DETR set prediction, feature pyramid network, anchor-free detection."
+}

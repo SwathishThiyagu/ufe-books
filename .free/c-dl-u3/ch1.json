@@ -1,0 +1,238 @@
+{
+ "lead": "The convolution operation slides a small kernel over an image and sums products to build a feature map. The map records where a pattern such as an edge occurs. A phone photo is a height × width × colour-channel tensor. A kernel is a tiny learnable tensor. Convolution is the main layer of a CNN: low layers detect edges, deeper layers detect parts. It is used in face unlock, medical scans and road-sign reading.",
+ "prereq": "You need matrix multiplication and forward propagation from Unit 1, plus gradients from Unit 2; training comes in <a href=\"#cnn-architecture-building-a-basic-cnn\">3.3</a>.",
+ "sections": [
+  {
+   "h3": "Sliding a kernel over an image",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An image tensor X has shape H × W × C. H is height in pixels, W is width, C is channels: 3 for RGB, 1 for grey. A kernel K has shape K_h × K_w × C and one bias b. Some syllabi call a kernel a filter or a mask."
+    },
+    {
+     "type": "p",
+     "text": "Place the kernel on a patch. Multiply each weight by the pixel under it, sum all products, add b. The result is one cell of the feature map Y. Slide and repeat."
+    },
+    {
+     "type": "p",
+     "text": "Strict mathematics flips the kernel before sliding. Libraries do not flip; they compute cross-correlation. Everyone still says convolution. The flip would only mirror learned weights."
+    },
+    {
+     "type": "formula",
+     "text": "y[i,j] = b + Σ<sub>u=0</sub><sup>K_h−1</sup> Σ<sub>v=0</sub><sup>K_w−1</sup> Σ<sub>c=0</sub><sup>C−1</sup> K[u,v,c] × X[iS+u, jS+v, c]",
+     "where": "y[i,j] is one output cell at output row i, column j; b is bias; K[u,v,c] is kernel weight at row u, column v, channel c; X[...] is input pixel; S is stride."
+    },
+    {
+     "type": "p",
+     "text": "The feature map records where the kernel pattern occurs. A 3×3 vertical-edge kernel with left column +1 and right column −1 gives a high value at a vertical edge."
+    }
+   ]
+  },
+  {
+   "h3": "Padding, stride and output size",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Padding P adds P rows and P columns on every side, so 2P extra rows and columns. Stride S is the step between kernel positions. S=2 skips one pixel each move."
+    },
+    {
+     "type": "formula",
+     "text": "H_out = floor((H + 2P − K_h)/S) + 1",
+     "where": "H_out is output height; H is input height; P is padding per side; K_h is kernel height; S is stride; floor rounds down. Use W, W_out and K_w for width."
+    },
+    {
+     "type": "p",
+     "text": "Only complete windows count, so take floor. P=0 is valid padding. Stride reduces output size; padding can keep it."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Padding same keeps H_out=H when S=1 and K_h,K_w are odd.",
+      "Use P=(K−1)÷2: K=3 gives P=1; K=5 gives P=2.",
+      "Border pixels get fewer visits, so padding protects edge information."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Channels, filters and parameter count",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Multi-channel input has a kernel of the same depth C. The formula sums over c. A colour edge detector has three 3×3 slices, one per channel."
+    },
+    {
+     "type": "p",
+     "text": "One kernel gives one output channel. F kernels give F output channels. The output tensor is H_out × W_out × F."
+    },
+    {
+     "type": "formula",
+     "text": "N<sub>params</sub> = K_h × K_w × C<sub>in</sub> × C<sub>out</sub> + C<sub>out</sub>",
+     "where": "N<sub>params</sub> is learnable parameter count; K_h, K_w are kernel height and width; C<sub>in</sub> is input channels; C<sub>out</sub> is number of filters; the last C<sub>out</sub> is one bias per filter."
+    },
+    {
+     "type": "p",
+     "text": "Example: 3×3 kernel, C<sub>in</sub>=3, C<sub>out</sub>=16 gives 3×3×3×16+16 = 448 parameters."
+    },
+    {
+     "type": "p",
+     "text": "A 1×1 convolution has K_h=K_w=1. It cannot see neighbours; it mixes channels at each pixel. It is used to change channel count cheaply."
+    },
+    {
+     "type": "p",
+     "text": "Visualization draws each kernel as a small grid. Early kernels look like edge or blob detectors; deeper kernels are less readable. See <a href=\"#visualizing-cnns-kernels-deconvolution-and-deep-dream\">3.7</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A 4×4 input, a 3×3 vertical-edge kernel and the 2×2 feature map for stride 1 and no padding. The top-left 3×3 window marked in the input produces the marked output value −2.",
+  "spec": {
+   "type": "array",
+   "title": "3×3 kernel, stride 1, no padding",
+   "show_index": false,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Input 4×4",
+     "cells": [
+      "1",
+      "2",
+      "3",
+      "0",
+      "0",
+      "1",
+      "2",
+      "3",
+      "3",
+      "2",
+      "1",
+      "0",
+      "0",
+      "1",
+      "2",
+      "1"
+     ],
+     "marks": {
+      "0": "muted",
+      "1": "muted",
+      "2": "muted",
+      "4": "muted",
+      "5": "muted",
+      "6": "muted",
+      "8": "muted",
+      "9": "muted",
+      "10": "muted"
+     }
+    },
+    {
+     "label": "Kernel 3×3",
+     "cells": [
+      "1",
+      "0",
+      "-1",
+      "1",
+      "0",
+      "-1",
+      "1",
+      "0",
+      "-1"
+     ],
+     "marks": {
+      "0": "accent",
+      "1": "accent",
+      "2": "accent",
+      "3": "accent",
+      "4": "accent",
+      "5": "accent",
+      "6": "accent",
+      "7": "accent",
+      "8": "accent"
+     }
+    },
+    {
+     "label": "Output 2×2",
+     "cells": [
+      "-2",
+      "2",
+      "-2",
+      "0"
+     ],
+     "marks": {
+      "0": "next"
+     }
+    }
+   ],
+   "aria": "A 4 by 4 input grid with the top-left 3 by 3 window marked, a 3 by 3 edge kernel, and the 2 by 2 output grid."
+  }
+ },
+ "examples": [
+  {
+   "question": "An input image slice is I = [[1,2,3,0],[0,1,2,3],[3,2,1,0],[0,1,2,1]]. A kernel is K = [[1,0,−1],[1,0,−1],[1,0,−1]]. Use stride S = 1 and padding P = 0. Find the output size and compute the full feature map.",
+   "steps": [
+    "H=4, W=4, K=3, S=1, P=0. H_out=floor((4+0−3)/1)+1=2; W_out=2. Output is 2×2.",
+    "Top-left window rows 0–2, columns 0–2: [[1,2,3],[0,1,2],[3,2,1]]. Row products: 1−3=−2; 0−2=−2; 3−1=2. Sum = −2−2+2 = −2. y[0,0]=−2.",
+    "Top-right window rows 0–2, columns 1–3: [[2,3,0],[1,2,3],[2,1,0]]. Row products: 2; −2; 2. Sum = 2−2+2 = 2. y[0,1]=2.",
+    "Bottom-left window rows 1–3, columns 0–2: [[0,1,2],[3,2,1],[0,1,2]]. Row products: −2; 2; −2. Sum = −2+2−2 = −2. y[1,0]=−2.",
+    "Bottom-right window rows 1–3, columns 1–3: [[1,2,3],[2,1,0],[1,2,1]]. Row products: −2; 2; 0. Sum = −2+2+0 = 0. y[1,1]=0."
+   ],
+   "answer": "The output size is 2×2 and the feature map is [[−2, 2], [−2, 0]]; bias is 0.",
+   "check": "I = [[1,2,3,0],[0,1,2,3],[3,2,1,0],[0,1,2,1]]\nK = [[1,0,-1],[1,0,-1],[1,0,-1]]\nS = 1\nP = 0\nH_out = (4 + 2*P - 3)//S + 1\nprint(H_out)\nout = []\nfor i in range(H_out):\n    row = []\n    for j in range(H_out):\n        s = 0\n        for u in range(3):\n            for v in range(3):\n                s += I[i*S+u][j*S+v] * K[u][v]\n        row.append(s)\n    out.append(row)\nfor row in out:\n    for val in row:\n        print(val)",
+   "values": [
+    2,
+    -2,
+    2,
+    -2,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using (H−K)/S without floor; 4×4 with K=3, S=2 gives floor(0.5)+1=1, not 1.5.",
+  "Adding P once instead of 2P. One pixel border on both sides adds 2 to H and W.",
+  "Forgetting depth C<sub>in</sub> in parameter count. A 3×3 kernel on RGB has 27 weights per filter, not 9.",
+  "Mixing stride with kernel size: stride is the step between windows, not the window width.",
+  "Thinking deep learning flips the kernel. It computes cross-correlation and calls it convolution."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define the image tensor H×W×C. What does each symbol mean?",
+   "marks": 2,
+   "a": "H is height in pixels, W is width in pixels, C is number of channels: 3 for RGB, 1 for grey."
+  },
+  {
+   "level": "understand",
+   "q": "Why does padding same need P=(K−1)÷2 when S=1?",
+   "marks": 3,
+   "a": "It adds K−1 rows and columns in total. With K odd, P=(K−1)/2 per side keeps H_out=H."
+  },
+  {
+   "level": "apply",
+   "q": "Input 6×6, kernel 3×3, stride S=2, padding P=1. Find H_out.",
+   "marks": 3,
+   "a": "H_out=floor((6+2−3)/2)+1=floor(5/2)+1=2+1=3. Output is 3×3."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a 1×1 convolution mix channels but not neighbouring pixels?",
+   "marks": 4,
+   "a": "Its window has size 1×1, so it has no neighbour weights. It sums across input channels at each pixel, so it changes channel count without spatial blur."
+  },
+  {
+   "level": "apply",
+   "q": "A layer uses 5×5 kernels, C<sub>in</sub>=3, C<sub>out</sub>=32. Count parameters including bias.",
+   "marks": 3,
+   "a": "5×5×3×32 + 32 = 2400 + 32 = 2432 parameters."
+  },
+  {
+   "level": "understand",
+   "q": "What does a high positive value in a feature map mean?",
+   "marks": 2,
+   "a": "The patch under the kernel matches the pattern the kernel detects; a negative value means the opposite pattern."
+  }
+ ],
+ "beyond": "Not for the exam. Libraries lower convolution to matrix multiply (im2col) or use direct kernels tuned for the GPU. Dilated convolution inserts gaps in the kernel to grow the receptive field without more weights. Depthwise separable convolution splits channel mixing from spatial filtering, which mobile phone models use. Search 'im2col convolution', 'dilated convolution' and 'depthwise separable convolution'."
+}

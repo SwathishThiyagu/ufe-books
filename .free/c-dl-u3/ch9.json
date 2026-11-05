@@ -1,0 +1,273 @@
+{
+ "lead": "A classifier says what is in an image. A segmenter says what is at every pixel. Semantic segmentation labels each pixel with a class; instance segmentation also separates objects of the same class. Siamese networks take two inputs, pass both through one shared network, and decide same or different. These ideas cover medical scans, road masks, satellite maps, face unlock and duplicate-photo cleanup.",
+ "prereq": "You need: <a href=\"#cnn-architecture-building-a-basic-cnn\">3.3</a> and <a href=\"#the-convolution-operation-kernels-padding-and-stride\">3.1</a> for convolution shapes, <a href=\"#deeper-architectures-inception-and-resnet\">3.5</a> for skip connections, <a href=\"#cnns-for-object-detection-r-cnn-and-yolo\">3.8</a> for Mask R-CNN, and the loss functions of Unit 2.",
+ "sections": [
+  {
+   "h3": "Semantic segmentation and the fully convolutional network",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Semantic segmentation gives every pixel a class. A classifier gives one label per image; a detector gives boxes; a segmenter gives a mask with the same height and width as the input. It does not separate two cows in a field — every cow pixel gets the class <i>cow</i>. Instance segmentation does separate them: cow 1 and cow 2 become different masks."
+    },
+    {
+     "type": "formula",
+     "text": "H_out = ⌊(H_in + 2p − k) / s⌋ + 1",
+     "where": "H_out is the output height in pixels, H_in the input height, k the kernel size, p the padding and s the stride; ⌊ ⌋ means round down."
+    },
+    {
+     "type": "p",
+     "text": "A dense layer blocks segmentation because it fixes the input size and flattens the spatial grid. On a 7×7×512 feature map, a 4096-unit dense layer is a 7×7 convolution with 4096 filters. Replace dense layers this way and the whole network becomes fully convolutional (FCN). Its output is a grid of class scores, for example 16×16×21 for 21 classes; it then enlarges the coarse grid back to input resolution."
+    },
+    {
+     "type": "p",
+     "text": "Enlarging uses a <b>deconvolution</b> (transposed convolution): a learnable kernel that writes one input value into a k×k output patch. Stride 2 doubles each spatial side — 64 becomes 128. Channel count comes from filters, never stride."
+    },
+    {
+     "type": "p",
+     "text": "Pooling discards position detail, so boundaries blur. An FCN adds an early high-resolution score map to the upsampled coarse map, restoring sharp edges. SegNet stores the argmax index of each 2×2 max-pool window and reuses it while decoding; its upsampling has no parameters."
+    }
+   ]
+  },
+  {
+   "h3": "U-Net and Mask R-CNN",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "U-Net is an encoder-decoder with a skip into every level. The encoder repeats conv 3×3 + ReLU, then 2×2 max pool; each pool halves both spatial sides and the next block doubles channels. The decoder upsamples by 2 and <i>concatenates</i> the matching encoder map on the channel axis. A final 1×1 convolution gives one score per class per pixel."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Conv 3×3, pad 1, 64 filters on 128×128×3 gives 128×128×64.",
+      "Max pool 2×2, stride 2 gives 64×64×64.",
+      "Upsample 2×2, stride 2 gives 128×128×64.",
+      "Concatenate with the step 1 map: 64 + 64 = 128 channels, so 128×128×128.",
+      "1×1 conv with 5 filters gives 128×128×5 scores; softmax runs across the 5 channels of each pixel."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Training minimises pixel-wise cross-entropy over all 16 384 pixels. Skips carry fine detail that pooling destroyed, so U-Net learns from a few hundred images — useful in medical imaging, where one 128×128 MRI slice can be split into 5 tissue classes."
+    },
+    {
+     "type": "p",
+     "text": "Mask R-CNN adds a mask branch to Faster R-CNN. ROIPool rounds proposal coordinates and bin edges to the integer feature-map grid, so pooled features can be off by up to one feature-map pixel — several image pixels at stride 16. ROIAlign samples at exact floating-point positions with bilinear interpolation, so a pixel-accurate mask lines up. A small conv head outputs a 28×28 mask for each class in each region. Loss = classification + box regression + per-pixel binary cross-entropy on the mask."
+    }
+   ]
+  },
+  {
+   "h3": "Siamese networks: same or different",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A Siamese network answers: are these two inputs the same? Two branches with identical architecture and <b>shared weights</b> map each input to an embedding f(x). One parameter set is applied twice, so the count does not double. The embeddings are compared by distance."
+    },
+    {
+     "type": "formula",
+     "text": "d = ‖f(x₁) − f(x₂)‖₂",
+     "where": "d is the Euclidean distance between the two embeddings, f is the shared network, x₁ and x₂ are the two inputs."
+    },
+    {
+     "type": "p",
+     "text": "At test time pick a threshold τ: if d ≤ τ the pair is the same, otherwise different. Training uses pairs with contrastive loss or triplets with triplet loss."
+    },
+    {
+     "type": "formula",
+     "text": "L = ½(1 − y)·d² + ½·y·max(0, m − d)²",
+     "where": "y = 0 for a matching pair and y = 1 for a non-matching pair, d is the embedding distance and m is the margin in the same units as d."
+    },
+    {
+     "type": "p",
+     "text": "The first term pulls matching inputs together. The second pushes non-matching inputs apart, but only until d reaches m; beyond the margin the loss is zero and no gradient is spent."
+    },
+    {
+     "type": "formula",
+     "text": "L = max(0, d(a, p) − d(a, n) + α)",
+     "where": "a is the anchor, p a positive of the same identity, n a negative of a different identity, d the distance and α the margin."
+    },
+    {
+     "type": "p",
+     "text": "Triplet loss is zero when the negative is farther than the positive by at least α. Ranking loss states the same ordering with a margin; only a few syllabi teach it in detail. Siamese training powers face unlock, signature verification, one-shot recognition and duplicate-photo search."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "One U-Net pass: the encoder halves the grid, the decoder restores it, and the dashed skip brings the 128×128×64 encoder map into the concatenation. The 1×1 convolution turns 128 channels into 5 class scores per pixel.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "U-Net shape",
+   "nodes": [
+    {
+     "id": "input",
+     "label": "Input",
+     "note": "128×128×3",
+     "style": "normal"
+    },
+    {
+     "id": "enc",
+     "label": "Encoder",
+     "note": "128×128×64",
+     "style": "accent"
+    },
+    {
+     "id": "pool",
+     "label": "Pool",
+     "note": "64×64×64",
+     "style": "normal"
+    },
+    {
+     "id": "dec",
+     "label": "Upsample",
+     "note": "128×128×64",
+     "style": "normal"
+    },
+    {
+     "id": "cat",
+     "label": "Concat skip",
+     "note": "128×128×128",
+     "style": "live"
+    },
+    {
+     "id": "conv",
+     "label": "1×1 Conv",
+     "note": "5 classes",
+     "style": "accent"
+    },
+    {
+     "id": "mask",
+     "label": "Mask",
+     "note": "128×128×5",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "input",
+     "to": "enc",
+     "style": "solid"
+    },
+    {
+     "from": "enc",
+     "to": "pool",
+     "style": "solid"
+    },
+    {
+     "from": "pool",
+     "to": "dec",
+     "style": "solid"
+    },
+    {
+     "from": "dec",
+     "to": "cat",
+     "style": "solid"
+    },
+    {
+     "from": "cat",
+     "to": "conv",
+     "style": "solid"
+    },
+    {
+     "from": "conv",
+     "to": "mask",
+     "style": "solid"
+    },
+    {
+     "from": "enc",
+     "to": "cat",
+     "label": "skip",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A U-Net with an encoder, pool, upsample, skip concatenation and a 1 by 1 convolution to a 5-class mask."
+  }
+ },
+ "examples": [
+  {
+   "question": "A U-Net takes a 128×128×3 image. Encoder: 3×3 convolution, 64 filters, pad 1, stride 1; then 2×2 max pool, stride 2; then 2×2 upsample, stride 2. Concatenate the result with the encoder output. A final 1×1 convolution with 5 filters makes the mask. Give every tensor shape and the last convolution's parameter count.",
+   "steps": [
+    "Conv 3×3, pad 1, stride 1: H_out = ⌊(128 + 2 − 3)/1⌋ + 1 = 128. Shape 128×128×64.",
+    "Max pool 2×2, stride 2: 128/2 = 64. Shape 64×64×64; pooling keeps channels.",
+    "Upsample 2×2, stride 2: 64 × 2 = 128. Shape 128×128×64.",
+    "Concatenate on channels with the encoder map: 64 + 64 = 128. Shape 128×128×128.",
+    "1×1 conv with 5 filters: shape 128×128×5.",
+    "Last conv parameters: 1×1×128×5 = 640 weights + 5 biases = 645."
+   ],
+   "answer": "Channels after concatenation = 128; final mask 128×128×5; last 1×1 convolution has 645 parameters.",
+   "check": "H, W = 128, 128\nf = 64\nenc = (H, W, f)\npool = (H // 2, W // 2, f)\nup = (H, W, f)\ncat = (H, W, f + f)\nout = (H, W, 5)\nfor shape in [enc, pool, up, cat, out]:\n    for n in shape:\n        print(n)\nprint(1 * 1 * (f + f) * 5 + 5)",
+   "values": [
+    128,
+    128,
+    64,
+    64,
+    64,
+    64,
+    128,
+    128,
+    64,
+    128,
+    128,
+    128,
+    128,
+    128,
+    5,
+    645
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Segmentation output is one label per pixel, not one label per image: a 128×128 mask over 5 classes is a 128×128×5 tensor, not a vector of 5 numbers.",
+  "U-Net skips <i>concatenate</i> channels (64 + 64 = 128). FCN skips <i>add</i> equal-shaped tensors: the 2× upsampled coarse score map is summed with the score map predicted from the earlier layer. ResNet shortcuts also add. Mixing the rules loses marks.",
+  "Siamese branches share one set of weights — it is a single network applied twice. Writing two separately trained networks doubles the parameter count and is wrong.",
+  "State your label convention before writing contrastive loss. Here y = 0 means a matching pair; many texts use y = 1. The examiner marks your declared convention, not someone else's notes.",
+  "A 2×2 upsample with stride 2 doubles each spatial side but leaves channels unchanged; only the later 1×1 convolution changes channels."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define semantic segmentation and instance segmentation in one line each.",
+   "marks": 2,
+   "a": "Semantic segmentation assigns one class label to every pixel but does not separate two objects of the same class. Instance segmentation outputs a separate mask for each individual object."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an FCN replace fully connected layers with convolutions?",
+   "marks": 3,
+   "a": "A dense layer fixes input size and flattens the spatial grid. A convolution keeps the grid, so the output is a spatial class-score map whose size follows the input and the same filters slide over any image size."
+  },
+  {
+   "level": "understand",
+   "q": "What does the margin α do in the triplet loss L = max(0, d(a,p) − d(a,n) + α)?",
+   "marks": 3,
+   "a": "It sets how much closer the positive must be than the negative before loss hits zero. A larger α demands a wider gap and produces gradients for harder triplets; α = 0 accepts equal distances."
+  },
+  {
+   "level": "apply",
+   "q": "A triplet has d(a,p) = 0.4, d(a,n) = 0.9 and margin α = 0.3. Compute the triplet loss and say what the gradient is.",
+   "marks": 4,
+   "a": "L = max(0, 0.4 − 0.9 + 0.3) = max(0, −0.2) = 0. The negative is already farther than the positive by 0.5, which exceeds α = 0.3, so the triplet is satisfied and the gradient is zero."
+  },
+  {
+   "level": "apply",
+   "q": "A U-Net input is 256×256×3. The encoder uses 3×3 conv with 32 filters and pad 1, then 2×2 max pool. The decoder upsamples 2×2, concatenates the encoder map and applies a 1×1 conv with 10 filters. Give every shape.",
+   "marks": 4,
+   "a": "Encoder: 256×256×32. After pool: 128×128×32. After upsample: 256×256×32. After concatenation: 256×256×64. After 1×1 conv: 256×256×10, i.e. 10 class scores for each of 65 536 pixels."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does Mask R-CNN use ROIAlign instead of ROIPool for the mask branch?",
+   "marks": 5,
+   "a": "ROIPool rounds proposal boundaries and bin edges to integer feature-map grid coordinates, so pooled features shift by up to one feature-map pixel — several image pixels at stride 16 — and a pixel-accurate mask shows that shift. ROIAlign samples at exact floating-point positions with bilinear interpolation and keeps the mask aligned."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a U-Net skip concatenate instead of adding, and what does it cost?",
+   "marks": 5,
+   "a": "Concatenation keeps encoder detail and decoder semantics side by side; the next convolution learns to mix them. Addition would force one shared channel and require matching counts. Cost: the next convolution sees 128 input channels, not 64."
+  }
+ ],
+ "beyond": "Not for the exam. Panoptic segmentation unifies semantic and instance masks. Promptable segmenters produce a mask for any object you point at or name. Contrastive training now appears in self-supervised pretraining: two augmented views of one photo are a positive pair, and the rest of the batch supplies negatives. Phone face unlock and duplicate-photo cleanup are Siamese inference running quietly. Search next for: ROIAlign, triplet mining, hard negative mining, panoptic segmentation, InfoNCE loss."
+}
