@@ -1,0 +1,263 @@
+{
+ "lead": "A MAC is a short tag computed over a message with a shared secret key. It answers two questions at once: did this message come from someone holding the key, and was it changed in transit? Nothing is encrypted, so a MAC protects integrity, not secrecy. TLS, IPsec and the traffic between bank servers and the UPI switch carry a MAC on every record. This chapter defines the MAC, contrasts it with a plain hash and a signature, works through HMAC, and places it next to encryption.",
+ "prereq": "You need <a href=\"#cryptographic-hash-functions-and-sha\">4.6</a> for hash properties and the Merkle–Damgård structure, and Unit 3 for CBC mode, block ciphers and CCA security.",
+ "sections": [
+  {
+   "h3": "What a MAC is and what it gives",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A message authentication code (MAC) is a short tag T computed over a message M with a secret key K that both sides share in advance. The sender sends M and T together. The receiver recomputes the tag from the received message with the same key and compares. Equal tags mean the message came from a key holder and arrived unchanged."
+    },
+    {
+     "type": "formula",
+     "text": "T = MAC(K, M)    Verify(K, M, T) → accept or reject",
+     "where": "K is the shared secret key; M is the message, of any length; T is the tag, a fixed n bits. Both sides run the same key, so a MAC is a symmetric-key tool."
+    },
+    {
+     "type": "p",
+     "text": "Every bit of M affects T, so one flipped bit changes the tag almost always. The MAC hides nothing: M travels in the clear, or is encrypted separately."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Message authentication: only a key holder can produce a valid tag.",
+      "Integrity: any change to M or to T is caught.",
+      "Replay protection only if M carries a nonce or sequence number that the receiver checks; the tag alone says nothing about freshness.",
+      "No confidentiality: M is readable.",
+      "No non-repudiation: the receiver holds K too, so neither side can prove to a third party who sent it."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A plain hash (<a href=\"#cryptographic-hash-functions-and-sha\">4.6</a>) has no key, so anyone recomputes it and an attacker changes message and digest together. A digital signature (<a href=\"#digital-signatures-and-rsa-signatures\">4.8</a>) uses the sender's private key, needs no shared secret, gives non-repudiation, and is far slower."
+    }
+   ]
+  },
+  {
+   "h3": "CBC-MAC and the length-extension trap",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CBC-MAC reuses a block cipher from Unit 3. Encrypt the message in CBC mode with IV = 0 and key K; the last ciphertext block is the tag."
+    },
+    {
+     "type": "formula",
+     "text": "C₁ = E_K(M₁),   Cᵢ = E_K(Mᵢ ⊕ Cᵢ₋₁),   T = Cₗ",
+     "where": "M₁ … Mₗ are the message blocks, b bits each; E_K is AES or DES under key K; l is the block count; T is the one-block tag."
+    },
+    {
+     "type": "p",
+     "text": "Requirement: every message must have the same fixed length. Otherwise, given the tag T = E_K(M₁) of a one-block message M₁, an attacker forges the tag of the two-block message M₁ ‖ (M₁ ⊕ T), because its tag is E_K((M₁ ⊕ T) ⊕ T) = E_K(M₁) = T. CMAC repairs this by deriving two subkeys from K and using one of them on the last block."
+    },
+    {
+     "type": "p",
+     "text": "The shortcut T = H(K ‖ M) is unsafe with any Merkle–Damgård hash such as SHA-256. The digest is the final chaining value, and the next block is absorbed as if the chain continued. An attacker who sees M and T knows the internal state, appends blocks X without knowing K, and predicts the new tag; the receiver accepts M ‖ pad ‖ X. This is length extension."
+    },
+    {
+     "type": "p",
+     "text": "HMAC hides that inner state."
+    }
+   ]
+  },
+  {
+   "h3": "HMAC in full",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "HMAC hashes twice, with the key under two different pads."
+    },
+    {
+     "type": "formula",
+     "text": "tag = H( (K ⊕ opad) ‖ H( (K ⊕ ipad) ‖ M ) )",
+     "where": "K is the shared key, zero-padded to the hash block size b (64 bytes for SHA-256, 128 for SHA-512); ipad is the byte 0x36 repeated b times; opad is 0x5C repeated b times; ⊕ is XOR; ‖ is concatenation; H is SHA-256 here; the tag is n = 256 bits."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "If K is longer than b bytes, replace it by H(K), 32 bytes for SHA-256. Zero-pad it on the right to exactly b bytes.",
+      "Inner key = K ⊕ ipad. Inner digest = H(inner key ‖ M), n bits.",
+      "Outer key = K ⊕ opad.",
+      "tag = H(outer key ‖ inner digest).",
+      "Truncate to t bits if the protocol wants a shorter tag."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The attacker never sees the inner digest, because the outer step hashes it again, so the chain cannot be continued. The two pads make the inner and outer keys different."
+    },
+    {
+     "type": "p",
+     "text": "Key length: at least n bits (256 for SHA-256) from a random source; longer keys are hashed down. Truncation: keep at least half of n as a rule of thumb; NIST permits shorter truncations, down to 32 bits, with security about 2^t, and real protocols use tags of 80 or 96 bits. Quote the t the protocol specifies. Verification runs in constant time: XOR the received and computed tags, OR the byte differences into one accumulator, and test once at the end. A loop that stops at the first mismatch leaks, through timing, how many leading bytes were right."
+    }
+   ]
+  },
+  {
+   "h3": "Where the MAC goes next to encryption",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Unit 3 closed with CCA security: an attacker who asks for decryptions and watches which ciphertexts are rejected can break naive CBC. A MAC shuts that door, because a modified ciphertext fails verification before any decryption happens."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Encrypt-and-MAC: encrypt the plaintext, and separately compute the tag over the plaintext; ciphertext and tag travel side by side, the tag in the clear (as in SSH). A tag over plaintext sent openly can leak information about the plaintext, so avoid it.",
+      "MAC-then-encrypt: encrypt plaintext ‖ tag together. Used in older TLS; the receiver must decrypt before checking, which led to padding-oracle attacks.",
+      "Encrypt-then-MAC: encrypt, then tag the ciphertext and the header. The receiver checks the tag first and drops bad data without decrypting. Preferred."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Authenticated encryption with associated data (AEAD) modes do both jobs in one pass. AES-GCM and ChaCha20-Poly1305 produce ciphertext and tag together, and the tag also covers header bytes sent in the clear."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The key is XORed with the inner pad before hashing with the message; that digest is hashed again under the outer pad, and the last block is the tag sent with the message.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "HMAC tag computation",
+   "aria": "The key is mixed with the inner pad and hashed with the message, then mixed with the outer pad and hashed again to give the tag.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Key K",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "K ⊕ ipad",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "H(inner ‖ M)",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "K ⊕ opad",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "H(outer ‖ inner)",
+     "style": "live"
+    },
+    {
+     "id": "f",
+     "label": "Tag",
+     "note": "sent with M",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "then message",
+     "style": "solid"
+    },
+    {
+     "from": "a",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "e",
+     "label": "inner digest",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A toy hash adds message blocks modulo 16, starting from h₀ = 0: hᵢ = (hᵢ₋₁ + Xᵢ) mod 16. The 4-bit stand-ins are key K = 5, ipad = 6, opad = 12, and the message blocks are 7 and 4. (a) Compute the HMAC tag. (b) Compute the naive tag H(K ‖ M). (c) Say in one line why the naive value cannot be trusted.",
+   "steps": [
+    "Inner key: K ⊕ ipad = 5 ⊕ 6 = 3, since 0101 ⊕ 0110 = 0011.",
+    "Inner digest: h runs 0 + 3 = 3, then 3 + 7 = 10, then 10 + 4 = 14. Inner digest = 14.",
+    "Outer key: K ⊕ opad = 5 ⊕ 12 = 9, since 0101 ⊕ 1100 = 1001.",
+    "Outer digest: h runs 0 + 9 = 9, then 9 + 14 = 23; 23 mod 16 = 7. Tag = 7.",
+    "(b) Naive: h runs 0 + 5 = 5, 5 + 7 = 12, 12 + 4 = 16; 16 mod 16 = 0. Naive tag = 0.",
+    "(c) An attacker who sees M = 7, 4 and tag 0 knows the running state, so it appends any block X and predicts the new tag (0 + X) mod 16; the receiver accepts the longer message. The key is only a prefix of the data, not a hidden state, which is exactly what length extension exploits."
+   ],
+   "answer": "The HMAC tag is 7 and the naive H(K ‖ M) tag is 0; the naive form is forgeable by length extension.",
+   "check": "def H(blocks, m=16):\n    h = 0\n    for x in blocks:\n        h = (h + x) % m\n    return h\n\nm = 16\nK, ipad, opad = 5, 6, 12\nmsg = [7, 4]\ninner_key = K ^ ipad\ninner = H([inner_key] + msg)\nouter_key = K ^ opad\ntag = H([outer_key, inner])\nnaive = H([K] + msg)\nfor v in (inner_key, inner, outer_key, tag, naive):\n    print(v)\n",
+   "values": [
+    3,
+    14,
+    9,
+    7,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A MAC does not encrypt. If confidentiality is also wanted, pair it with encryption; a tag over plaintext leaves the plaintext readable.",
+  "Both sides hold the MAC key, so a MAC gives no non-repudiation. Only a signature with the sender's private key does.",
+  "Never present T = H(K ‖ M) as a valid MAC: with a Merkle–Damgård hash it falls to length extension. Show the appended-block attack.",
+  "HMAC is H(outer ‖ H(inner ‖ M)): inner layer first, key XORed with the pad, not concatenated with it. Reversing the layers or dropping the XOR loses the marks.",
+  "Encrypt-then-MAC means the tag covers the ciphertext. Tagging the plaintext is a different scheme and breaks the CCA argument."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Give the values of ipad and opad and say how they are applied.",
+   "marks": 2,
+   "a": "ipad = 0x36 and opad = 0x5C, each repeated to the hash block size b bytes and XORed with the zero-padded key."
+  },
+  {
+   "level": "understand",
+   "q": "State two security properties a MAC provides and two it does not.",
+   "marks": 3,
+   "a": "Provides message authentication and integrity, plus replay protection when a nonce or sequence number is inside the message. It gives no confidentiality and no non-repudiation, because the receiver holds the same key."
+  },
+  {
+   "level": "apply",
+   "q": "HMAC-SHA-256 has block size b = 64 bytes and output 32 bytes. The shared key is 100 bytes long. What key material enters the inner and outer hashes?",
+   "marks": 4,
+   "a": "The 100-byte key is longer than b, so it is replaced by H(K) = 32 bytes, then zero-padded on the right to 64 bytes. That 64-byte value is XORed with ipad for the inner hash and with opad for the outer hash."
+  },
+  {
+   "level": "apply",
+   "q": "Using the toy hash hᵢ = (hᵢ₋₁ + Xᵢ) mod 16 with K = 9, ipad = 6, opad = 12 and message blocks 2, 5, find the HMAC tag.",
+   "marks": 4,
+   "a": "Inner key 9 ⊕ 6 = 15; inner digest 0 + 15 = 15, 15 + 2 = 17 → 1, 1 + 5 = 6. Outer key 9 ⊕ 12 = 5; tag 0 + 5 = 5, 5 + 6 = 11. Tag = 11."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is T = H(K ‖ M) broken for SHA-256, while CBC-MAC over fixed-length messages is not?",
+   "marks": 5,
+   "a": "In a Merkle–Damgård hash the digest is the chaining state, so an attacker holding H(K ‖ M) can continue the chain and append blocks without K. In CBC-MAC the chaining value passes through E_K, which the attacker cannot compute without the key, so the state stays hidden; the price is that all messages must have one fixed length."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is encrypt-then-MAC preferred over MAC-then-encrypt?",
+   "marks": 5,
+   "a": "The receiver verifies the tag on the ciphertext before decrypting, so corrupted data is discarded and no decryption or padding oracle is exposed. The tag covers the whole ciphertext, so any bit flip is caught."
+  }
+ ],
+ "beyond": "Not for the exam. KMAC builds the same keyed-hash idea on SHA-3, and HKDF expands one shared secret into several independent keys by running HMAC with different labels. Most web traffic now uses AEAD ciphers such as AES-GCM and ChaCha20-Poly1305, where the tag is produced in the same pass as the ciphertext. Current work looks at misuse resistance: repeated nonces, and one key reused across two protocols. Libraries such as OpenSSL and libsodium implement all of this with constant-time comparison and careful key handling."
+}

@@ -1,0 +1,265 @@
+{
+ "lead": "ElGamal encryption turns the Diffie–Hellman exchange into a way to send a message. The receiver publishes y = g^x mod p and keeps x. The sender picks a fresh random k and sends two numbers: g^k mod p, and the message multiplied by y^k mod p. Only the holder of x can rebuild that mask and divide it out. Email tools such as GnuPG use it to protect short values, mostly the symmetric key that then encrypts the actual file. Taher ElGamal published the scheme in 1985.",
+ "prereq": "You need: <a href=\"#diffie-hellman-key-exchange\">4.3</a> for the Diffie–Hellman mask, <a href=\"#public-key-cryptosystems-and-trapdoor-one-way-functions\">4.1</a> for the one-way idea, and Unit 2 for modular inverses and fast exponentiation.",
+ "sections": [
+  {
+   "h3": "Key generation: two numbers public, one secret",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Diffie–Hellman lets two parties build a shared number g^(xy) mod p without ever sending it. ElGamal asks the next question: what if you want to send an actual message to someone whose public value you already have, with no back-and-forth? The answer is to let the sender play the second party, using a throwaway secret k."
+    },
+    {
+     "type": "p",
+     "text": "A generator g modulo p is a number whose powers g¹, g², …, g^(p−1) mod p pass through every value 1 to p−1 exactly once."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Choose a large prime p and a generator g of the numbers 1 to p−1 modulo p. Both are public and shared by everyone.",
+      "Choose the private key x, a random integer with 1 ≤ x ≤ p−2. Keep it secret.",
+      "Compute y = g^x mod p. This is the public key.",
+      "Publish (p, g, y). Anyone who wants to write to you uses these three numbers."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "y = g^x mod p",
+     "where": "p is the prime modulus; g is the generator; x is the private key, an integer from 1 to p−2; y is the public key."
+    },
+    {
+     "type": "p",
+     "text": "The public key hides x behind a discrete logarithm. Anyone holding p, g and y would need to find x with g^x ≡ y, and no fast method is known for a large p. That is the same hard problem that protects <a href=\"#diffie-hellman-key-exchange\">the Diffie–Hellman exchange</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Encryption and decryption",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The message is first encoded as an integer m with 1 ≤ m ≤ p−1. Text is cut into blocks small enough for that, and each block is encrypted on its own."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sender: pick a fresh random k with 1 ≤ k ≤ p−2.",
+      "Compute C1 = g^k mod p, a one-time public value.",
+      "Compute the mask s = y^k mod p.",
+      "Compute C2 = m × s mod p.",
+      "Send the pair (C1, C2)."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "C1 = g^k mod p,  C2 = m × y^k mod p",
+     "where": "k is the sender's random secret for this message; m is the message as an integer; y is the receiver's public key; (C1, C2) is the ciphertext, two numbers modulo p."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Receiver: compute s = C1^x mod p with the private key x.",
+      "Find s⁻¹ mod p, the inverse of s modulo p, using the extended Euclidean algorithm (Unit 2).",
+      "Recover m = C2 × s⁻¹ mod p."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "m = C2 × (C1^x)⁻¹ mod p",
+     "where": "C1 and C2 are the ciphertext numbers; x is the private key; the power minus one means the modular inverse."
+    },
+    {
+     "type": "p",
+     "text": "Two lines prove it correct. Raising C1 to x gives (g^k)^x = g^(kx), and the sender's mask y^k equals (g^x)^k = g^(xk). The two masks are the same number, so multiplying C2 by its inverse leaves exactly m."
+    }
+   ]
+  },
+  {
+   "h3": "The random k: fresh, secret, never reused",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "Fresh: a new random k for every message, from a good random source.",
+      "Secret: k sits inside C1 = g^k, and recovering it from C1 is again a discrete logarithm.",
+      "Reuse breaks everything. If one k encrypts m₁ and m₂, both ciphertexts share C1 and the same mask s, so C2₁/C2₂ ≡ m₁/m₂ mod p. The attacker learns the ratio; if one message is guessable, a known header or a yes/no answer, the other falls out at once.",
+      "A leaked k also breaks its message: from k anyone computes s = y^k and then m = C2 × s⁻¹."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The ciphertext holds two numbers modulo p, so it is twice the size of the message, and encryption costs two exponentiations against RSA's one. That is why ElGamal encrypts keys and short values, never bulk data: a hybrid scheme encrypts a session key with ElGamal and the file with AES (Unit 5)."
+    },
+    {
+     "type": "p",
+     "text": "The scheme is multiplicative. If (C1, C2) hides m and (C1′, C2′) hides m′, then (C1C1′ mod p, C2C2′ mod p) decrypts to m × m′ mod p. Useful as a property, dangerous in practice: an attacker can alter a ciphertext predictably without the key, a chosen-ciphertext attack. Padding the message, or wrapping ElGamal in a hybrid construction with an integrity check, blocks this."
+    }
+   ]
+  },
+  {
+   "h3": "ElGamal, RSA and the signature scheme",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Against <a href=\"#rsa-cryptosystem\">RSA</a>, the difference is randomness. Encrypting m twice with two different k values gives two unrelated ciphertexts, so an eavesdropper cannot tell the same message was sent twice. RSA without padding is deterministic and leaks exactly that. Raw ElGamal needs no padding to hide the message, though it needs padding or a hybrid wrapper to stop the tampering above. Its price is speed and size."
+    },
+    {
+     "type": "p",
+     "text": "ElGamal also published a signature scheme in the same paper, and it is a different construction: it signs a hash of the message using a per-signature random value. Do not mix the two. That family, including DSA, is in <a href=\"#digital-signatures-and-rsa-signatures\">4.8 Digital signatures and RSA signatures</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The public y comes from the private x; the sender's fresh k produces both halves of the ciphertext, and decryption rebuilds the same mask from C1.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "aria": "Key generation makes the public y; encryption draws a random k and outputs two numbers C1 and C2; decryption rebuilds the mask from C1 and the private x.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "p = 23, g = 5, x = 6",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "y = 5⁶ mod 23 = 8",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "k = 15",
+     "note": "fresh per message",
+     "style": "next"
+    },
+    {
+     "id": "d",
+     "label": "C1 = 5¹⁵ mod 23 = 19",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "C2 = 7 × 8¹⁵ mod 23 = 14",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "s = 19⁶ = 2",
+     "note": "m = 14 × 12 = 7",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "e",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An ElGamal system uses the domain parameters p = 23 and g = 5. The receiver's private key is x = 6. (a) Compute the public key y. (b) Encrypt the message m = 7 with the random value k = 15. (c) Decrypt the ciphertext and show that m returns.",
+   "steps": [
+    "y = 5⁶ mod 23. Square and multiply: 5² = 25 ≡ 2, 5⁴ ≡ 2² = 4, so 5⁶ = 5⁴ × 5² ≡ 4 × 2 = 8. Public key y = 8; private key x = 6.",
+    "C1 = 5¹⁵ mod 23. Write 15 = 8 + 4 + 2 + 1, so 5¹⁵ = 5⁸ × 5⁴ × 5² × 5. Powers: 5² ≡ 2, 5⁴ ≡ 4, 5⁸ ≡ 16. Product = 16 × 4 × 2 × 5 = 640 ≡ 640 − 621 = 19, since 23 × 27 = 621. C1 = 19.",
+    "Sender's mask: 8¹⁵ mod 23. Powers of 8: 8² = 64 ≡ 18, 8⁴ ≡ 18² = 324 ≡ 2 (23 × 14 = 322), 8⁸ ≡ 2² = 4. Product = 4 × 2 × 18 × 8 = 1152 ≡ 1152 − 1150 = 2, since 23 × 50 = 1150. Mask s = 2.",
+    "C2 = m × s mod 23 = 7 × 2 = 14. The ciphertext is (C1, C2) = (19, 14).",
+    "Decrypt: C1^x = 19⁶ mod 23. Use 19 ≡ −4: (−4)² = 16, (−4)⁴ = 256 ≡ 3 (23 × 11 = 253), so (−4)⁶ = 3 × 16 = 48 ≡ 2. The mask is 2, the same number the sender used.",
+    "Inverse: 2 × 12 = 24 ≡ 1 mod 23, so 2⁻¹ = 12.",
+    "m = C2 × s⁻¹ = 14 × 12 = 168 ≡ 168 − 161 = 7, since 23 × 7 = 161. The original message returns."
+   ],
+   "answer": "The public key is y = 8, the ciphertext is (C1, C2) = (19, 14), and decryption gives back m = 7.",
+   "check": "p, g, x = 23, 5, 6\ny = pow(g, x, p)\nk, m = 15, 7\nC1 = pow(g, k, p)\nC2 = m * pow(y, k, p) % p\ns = pow(C1, x, p)\ninv = pow(s, -1, p)\nm2 = C2 * inv % p\nprint(y)\nprint(C1)\nprint(C2)\nprint(s)\nprint(inv)\nprint(m2)",
+   "values": [
+    8,
+    19,
+    14,
+    2,
+    12,
+    7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Decrypting with C2 alone. The mask must be rebuilt from C1: m = C2 × (C1^x)⁻¹, never C2 × y⁻¹ or C2 × x⁻¹.",
+  "Reusing k. Two messages under the same k give the same C1 and leak m₁/m₂ mod p; with one guessable message the other is exposed.",
+  "Calling C2 the ciphertext. The ciphertext is the pair, and C1 must be sent and stored with C2.",
+  "Mixing the two ElGamal schemes. Encryption and signature are different constructions; a signature question answered with C1 and C2 scores zero.",
+  "Forgetting the range. m must be encoded as an integer with 1 ≤ m ≤ p−1; longer blocks are split, and m = 0 encrypts to 0 and hides nothing."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the public and private key in ElGamal.",
+   "marks": 2,
+   "a": "Public key (p, g, y) with y = g^x mod p; private key x, a random integer with 1 ≤ x ≤ p−2."
+  },
+  {
+   "level": "understand",
+   "q": "Prove in two lines that ElGamal decryption returns m.",
+   "marks": 3,
+   "a": "C1^x = (g^k)^x = g^(kx) and y^k = (g^x)^k = g^(xk), the same mask s. Then C2 × (C1^x)⁻¹ = m × s × s⁻¹ = m mod p."
+  },
+  {
+   "level": "apply",
+   "q": "With p = 23, g = 5 and y = 8, encrypt m = 3 using k = 4. Give the ciphertext.",
+   "marks": 4,
+   "a": "C1 = 5⁴ = 625 ≡ 4 mod 23; mask 8⁴ ≡ 2; C2 = 3 × 2 = 6. Ciphertext (4, 6)."
+  },
+  {
+   "level": "analyze",
+   "q": "Two ciphertexts (19, 14) and (19, 6) arrive under the same p, g and y. What went wrong, and what does an attacker learn?",
+   "marks": 5,
+   "a": "Same C1 means the same k was reused, so the masks are equal. The attacker gets C2/C2′ ≡ m/m′ mod 23; 6⁻¹ = 4 since 24 ≡ 1, so the ratio is 14 × 4 = 56 ≡ 10. With one message known or guessable, the other is recovered."
+  },
+  {
+   "level": "understand",
+   "q": "Why is an ElGamal ciphertext twice as long as the message, and where is that acceptable?",
+   "marks": 3,
+   "a": "It carries two numbers modulo p, C1 and C2, each the size of p. Acceptable for session keys and short data; bulk data goes to a hybrid scheme with AES (Unit 5)."
+  },
+  {
+   "level": "apply",
+   "q": "Show that the product of two ciphertexts decrypts to the product of the messages.",
+   "marks": 4,
+   "a": "Let C1 = g^k, C2 = m·y^k and C1′ = g^k′, C2′ = m′·y^k′. Then (C1C1′)^x = g^(x(k+k′)) = y^k·y^k′, and C2C2′ = m·m′·y^k·y^k′. Multiplying by the inverse leaves m·m′ mod p."
+  },
+  {
+   "level": "analyze",
+   "q": "Give one advantage and one disadvantage of ElGamal over RSA.",
+   "marks": 5,
+   "a": "Advantage: randomised, so two encryptions of the same message differ, while raw RSA is deterministic. Disadvantage: the ciphertext is twice as long and encryption needs two exponentiations."
+  }
+ ],
+ "beyond": "Not for the exam. ElGamal's shape, a random ephemeral value plus a mask, is the template for modern hybrid encryption: a key-encapsulation mechanism hands a fresh key to a symmetric cipher. The Cramer–Shoup construction is a chosen-ciphertext-secure ElGamal variant with a proof. Its elliptic-curve form, EC-ElGamal, appears inside ECIES and in smart-card and messaging libraries because the numbers can be far shorter. The signature side of the same 1985 paper grew into DSA and ECDSA. Search next for Cramer–Shoup, KEM-DEM and ECIES."
+}

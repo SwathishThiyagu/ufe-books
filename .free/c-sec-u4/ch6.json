@@ -1,0 +1,272 @@
+{
+ "lead": "A cryptographic hash takes a message of any length and returns a short fixed-length string called the digest. The same message always gives the same digest, but the digest cannot be turned back into the message, and nobody can find two messages that share a digest. Software downloads, Git commits, payment logs and TLS certificates all lean on this fingerprint. This chapter defines the hash, gives its three security properties, explains the birthday bound and the construction used inside SHA-1 and SHA-256, and lists where hashes are used.",
+ "prereq": "You need: the one-way idea from <a href=\"#public-key-cryptosystems-and-trapdoor-one-way-functions\">4.1</a>, block-by-block processing from Unit 3, and basic probability for the birthday bound.",
+ "sections": [
+  {
+   "h3": "A hash squeezes any message into n bits",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A cryptographic hash function is a map H: {0,1}* → {0,1}ⁿ. The star means the input can be any bit string, of any length. The n means the output always has the same fixed length. We write H(m) = h, where m is the message, H is the hash function, and h is the digest — also called the hash value or the fingerprint."
+    },
+    {
+     "type": "p",
+     "text": "Three properties define a cryptographic hash:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Preimage resistance: given h, finding any m with H(m) = h takes about 2ⁿ hashes. This is what makes the hash one-way.",
+      "Second preimage resistance: given one message m, finding a different m′ with H(m′) = H(m) also takes about 2ⁿ hashes. This protects a message you already hold.",
+      "Collision resistance: finding any two different messages with the same digest takes about 2^(n/2) hashes, not 2ⁿ. The next section shows why."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The properties form a chain: collision resistance implies second preimage resistance, and second preimage resistance implies preimage resistance. Collision resistance is the strongest requirement and the one attackers try first. A usable hash must also be fast, and must avalanche: changing one input bit should change about half of the output bits, so a near-miss message gives a completely different digest."
+    }
+   ]
+  },
+  {
+   "h3": "The birthday bound halves the security",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Suppose a room has 23 people. The chance that two of them share a birthday is above one half, which surprises people because 23 is far below 365. The reason is that we compare pairs, and 23 people form 253 pairs. A hash behaves the same way. To hit a chosen digest you need about 2ⁿ hashes, but you only need about 2^(n/2) hashes before two of your own digests match each other."
+    },
+    {
+     "type": "formula",
+     "text": "P(collision) ≈ 1 − e^(−k²/2^(n+1))",
+     "where": "k is the number of hashes computed, n is the digest length in bits, and P is the chance that at least two of the k digests are equal. Setting P = 0.5 gives k ≈ 2^(n/2)."
+    },
+    {
+     "type": "p",
+     "text": "So a 256-bit digest gives only 128 bits of collision security, and a 128-bit digest gives 64 bits. A fast GPU computes billions of hashes per second. That makes 2^64 a real risk for a well-funded attacker, while 2^128 stays out of reach. Short digests are one reason MD5 and SHA-1 failed; the other is that their compression functions were also found to be weak."
+    }
+   ]
+  },
+  {
+   "h3": "Merkle–Damgård: pad, split, compress",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A hash must accept any length, but the internal mixing function works on fixed sizes. The Merkle–Damgård construction bridges the two."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Pad the message: append a 1 bit, then zeros, then the original message length as a fixed-size number, so the total becomes an exact multiple of the block size (512 bits for SHA-256).",
+      "Split the padded message into blocks B₁, B₂, …, B_k.",
+      "Start from a fixed chaining value h₀, called the initialisation vector (IV). SHA-256 uses eight fixed 32-bit words.",
+      "For i = 1 to k compute hᵢ = f(hᵢ₋₁, Bᵢ). The compression function f takes the previous chaining value plus one block, and returns a new chaining value of the same size.",
+      "The digest is the final chaining value h_k: 256 bits for SHA-256, which is 64 hex characters."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The gain is reuse. The function f only ever sees 512 + 256 bits, so the same code hashes a two-line email or a 2 GB video. If f is collision resistant and the padding is unambiguous, H is collision resistant too. MD5, SHA-1 and SHA-2 all use this design. SHA-3 uses a different one, the sponge: the message is absorbed into a wide state of b bits (rate r plus capacity c), and the digest is squeezed out at the end. There is no chaining value to restart, which matters for the flaw in the next section."
+    }
+   ]
+  },
+  {
+   "h3": "Families, uses and the length extension flaw",
+   "blocks": [
+    {
+     "type": "table",
+     "head": [
+      "Family",
+      "Digest (bits)",
+      "Status"
+     ],
+     "rows": [
+      [
+       "MD5",
+       "128",
+       "broken, collisions are cheap"
+      ],
+      [
+       "SHA-1",
+       "160",
+       "collisions demonstrated, do not use"
+      ],
+      [
+       "SHA-256",
+       "256",
+       "standard, in wide use"
+      ],
+      [
+       "SHA-512",
+       "512",
+       "standard, faster on 64-bit CPUs"
+      ],
+      [
+       "SHA3-256",
+       "256",
+       "sponge design, newer standard"
+      ]
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "File integrity: a download page lists the SHA-256 of the file; you hash what you received and compare.",
+      "Password storage: keep salt and H(salt ‖ password), never the password itself. Salting defeats precomputed tables (see Unit 5).",
+      "Hash-then-sign: a signature over a long message is really a signature over its digest (<a href=\"#digital-signatures-and-rsa-signatures\">4.8</a>).",
+      "MAC building: a keyed hash authenticates a message (<a href=\"#message-authentication-codes-and-hmac\">4.7</a>).",
+      "Hash tables and deduplication: the digest indexes a bucket, or names a file so identical files are stored once.",
+      "Proof of work: a miner repeatedly hashes a block header with a changing nonce until the digest falls below a target."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "One weakness follows directly from the design. In Merkle–Damgård the digest is the last chaining value, so anyone who knows H(m) and the length of m can continue the compression from that value and compute H(m ‖ pad ‖ X) for any suffix X, without knowing m. This breaks the naive MAC H(secret ‖ message). HMAC, in 4.7, is built to avoid exactly this."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The message is padded and cut into blocks; each block is mixed with the running chaining value, and the final chaining value is the digest. Notice the dashed edge: the same compression step repeats for every block.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Merkle–Damgård hashing",
+   "aria": "The message is padded and split into fixed blocks; each block is compressed with the running chaining value, and the last chaining value becomes the fixed-length digest.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Message M",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Split into blocks",
+     "note": "after padding",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Compress f",
+     "note": "with chaining value",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Chaining h₁, h₂, …",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "Final digest",
+     "note": "fixed length",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "c",
+     "label": "next block",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A toy iterated hash uses 4-bit values: h₀ = 2 and hᵢ = (hᵢ₋₁ + Bᵢ) mod 16, where Bᵢ is the i-th message block, a number from 0 to 15. (a) Compute the digest of the blocks 3, 7, 5. (b) Recompute for the blocks 3, 7, 6. (c) Find a different three-block message with the same digest as part (a). (d) For a real 256-bit hash, state the brute-force cost of a preimage attack and of a collision attack.",
+   "steps": [
+    "State the toy hash: h₀ = 2, and each block adds to the running value modulo 16.",
+    "Block 3: h₁ = (2 + 3) mod 16 = 5.",
+    "Block 7: h₂ = (5 + 7) mod 16 = 12.",
+    "Block 5: h₃ = (12 + 5) mod 16 = 17 mod 16 = 1. Digest = 1.",
+    "Part (b), last block changed to 6: h₁ = 5, h₂ = 12, h₃ = (12 + 6) mod 16 = 18 mod 16 = 2. Digest = 2. One changed block changed the digest.",
+    "Part (c), try blocks 4, 6, 5: h₁ = (2 + 4) mod 16 = 6; h₂ = (6 + 6) mod 16 = 12; h₃ = (12 + 5) mod 16 = 17 mod 16 = 1. Same digest 1, so the messages (3, 7, 5) and (4, 6, 5) collide.",
+    "Part (d): a preimage attack needs about 2^256 hashes for n = 256. A collision attack needs about 2^(256/2) = 2^128 hashes, by the birthday bound.",
+    "Comment: the toy only adds, so collisions are trivial to build. A real compression function mixes and shifts, but the birthday bound still applies."
+   ],
+   "answer": "Digests are 1 for blocks 3, 7, 5 and 2 for blocks 3, 7, 6; the message 4, 6, 5 also hashes to 1; and for a 256-bit hash a preimage costs about 2^256 hashes while a collision costs about 2^128.",
+   "check": "def toy(blocks):\n    h = 2\n    for b in blocks:\n        h = (h + b) % 16\n    return h\n\nprint(toy([3, 7, 5]))\nprint(toy([3, 7, 6]))\nprint(toy([4, 6, 5]))\nn = 256\nprint(n)\nprint(n // 2)\n",
+   "values": [
+    1,
+    2,
+    1,
+    256,
+    128
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Hashing is not encryption. There is no key and no inverse operation; calling it encryption loses marks.",
+  "Collision resistance costs about 2^(n/2) operations because of the birthday attack, not 2ⁿ. Many answers lose marks here.",
+  "Read the question carefully: breaking a preimage, a second preimage and a collision are three different attacks on three different properties.",
+  "A salt is stored openly with the hash and is not a secret key. Its job is to make precomputed tables useless.",
+  "H(secret ‖ message) is not a safe MAC for Merkle–Damgård hashes, because of length extension. Use HMAC."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a cryptographic hash function and state the digest size of SHA-256 in bits and in hex characters.",
+   "marks": 2,
+   "a": "H: {0,1}* → {0,1}ⁿ maps any bit string to a fixed-length digest. SHA-256 has n = 256 bits, which is 64 hex characters."
+  },
+  {
+   "level": "understand",
+   "q": "Why does collision resistance imply second preimage resistance?",
+   "marks": 3,
+   "a": "A second preimage is a collision between the given message m and a new message m′. Anyone who can find collisions in general can find one involving m, so breaking second preimage resistance breaks collision resistance too."
+  },
+  {
+   "level": "apply",
+   "q": "A hash has a 160-bit digest. How many hashes does a collision attack need, and how many does a preimage attack need? Give both in exponent form.",
+   "marks": 4,
+   "a": "Collision: about 2^(160/2) = 2^80 hashes. Preimage: about 2^160 hashes."
+  },
+  {
+   "level": "apply",
+   "q": "Using h₀ = 5 and hᵢ = (hᵢ₋₁ + Bᵢ) mod 16, find the digest of blocks 2, 9, 4.",
+   "marks": 3,
+   "a": "h₁ = (5 + 2) mod 16 = 7; h₂ = (7 + 9) mod 16 = 16 mod 16 = 0; h₃ = (0 + 4) mod 16 = 4. Digest = 4."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the Merkle–Damgård padding include the message length and not just zeros?",
+   "marks": 5,
+   "a": "The length makes the padding injective: two different messages cannot pad to the same block sequence, so a collision in the padded input would be a genuine collision. Without the length, messages differing only by added zeros could pad identically."
+  },
+  {
+   "level": "analyze",
+   "q": "An application computes MAC = SHA-256(secret ‖ message). Explain the length extension attack on it and give the fix.",
+   "marks": 5,
+   "a": "The attacker sees the 256-bit digest, which equals the final chaining value. Knowing the length of secret ‖ message, they restart compression from that value with a forged suffix and produce a valid digest for secret ‖ message ‖ pad ‖ suffix, without knowing the secret. The fix is HMAC, which hashes the key in two nested passes."
+  },
+  {
+   "level": "understand",
+   "q": "Give two applications of hash functions other than integrity checking, and say what each uses the digest for.",
+   "marks": 3,
+   "a": "Password storage keeps salt plus H(salt ‖ password) so the real password is never stored; hash tables and content-addressed storage use the digest as a lookup index or a file name."
+  }
+ ],
+ "beyond": "Not for the exam. Beyond the classroom, SHA-2 and SHA-3 remain safe for integrity and signatures, while BLAKE2 and BLAKE3 are faster alternatives built on different cores. Password storage has moved to deliberately slow, memory-hard functions such as Argon2, because fast hashes make guessing cheap. Research keeps probing reduced-round versions of SHA-2 and the sponge, and standard bodies publish test vectors so implementations agree bit for bit. Search next for the FIPS 180-4 and FIPS 202 standards, and for the birthday attack with its probability derivation."
+}
