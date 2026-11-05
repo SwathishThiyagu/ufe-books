@@ -29,7 +29,8 @@ FIGURES = """FIGURE TYPES. Pick the one type that best shows the chapter's mecha
 - stack: layers and hierarchies (OSI model, memory hierarchy, OS structure, protocol stack). {"type":"stack","pyramid":false,"items":[{"label":"Application","note":"HTTP, DNS","style":"normal"}],"side":{"top":"faster","bottom":"slower"}}. 2-9 items, top first; "side" is optional.
 - sets: nested classes or a Venn diagram. {"type":"sets","mode":"nested|venn","sets":[{"label":"NP","items":["SAT"]}],"overlap":["shared item"]}. nested: outermost first, 2-4 sets. venn: 2 or 3 sets; "overlap" only for 2 sets.
 - sequence: messages between parties over time (protocols, client-server, IPC). {"type":"sequence","actors":["Client","Server"],"messages":[{"from":"Client","to":"Server","label":"SYN, seq = x","dashed":false}]}. 2-5 actors, at most 12 messages.
-Styles pick things out: accent (blue), live (orange), next (green), muted (grey). Use them for the one or two things the caption tells the reader to notice."""
+Styles pick things out: accent (blue), live (orange), next (green), muted (grey). Use them for the one or two things the caption tells the reader to notice.
+Figure rules: the figure must use exactly the same values and order as the text or the worked example (recompute them). Schedules and timelines are always a gantt. Captions describe the content ("the shaded box is the running process"); never write the words accent, live, next, muted or style in a caption."""
 
 
 CHAPTER_SHAPE = """{
