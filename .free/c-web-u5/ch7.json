@@ -1,0 +1,252 @@
+{
+ "lead": "A progressive web app (PWA) is an ordinary website that also installs on a phone and opens offline. It adds two files: a web app manifest that supplies the name and icon, and a service worker that stores files in the browser cache. Server-side rendering (SSR) solves a different first-screen problem. A single-page app often sends an almost empty index.html, so the user waits for JavaScript before seeing content. SSR sends finished HTML from the server, then React hydrates it. Shops use PWAs for repeat visits on slow networks; news and product pages use SSR for fast first paint and search engines.",
+ "prereq": "You need HTTP requests, responses and HTTPS (see Unit 1) and single-page apps from <a href=\"#client-side-routing-with-react-router-and-angular-router\">5.4</a>.",
+ "sections": [
+  {
+   "h3": "What makes a site installable",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A PWA must be served over HTTPS. It needs a web app manifest, a JSON file linked from the page. The manifest gives <code>name</code>, <code>icons</code>, <code>start_url</code> and <code>display</code> (for example <code>standalone</code>). Display says how the installed app appears: <code>standalone</code> hides the browser address bar. The browser uses these values for the home-screen icon and splash screen. Older Lighthouse audits checked HTTPS, the manifest and the service worker; current browsers decide installability with their own criteria, so check the actual install prompt on a real phone."
+    },
+    {
+     "type": "p",
+     "text": "A PWA also needs a service worker. This is a JavaScript file that runs in its own thread, so it has no DOM access and cannot touch <code>window</code> or <code>document</code>. It sits between the page and the network and can answer fetches from a cache. When the criteria pass, the browser may show an install prompt. The user can also choose Add to Home Screen. The app then opens in its own window without the address bar."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "<b>install</b>: the browser downloads the worker and fires <code>install</code>; the app shell is stored with <code>cache.addAll</code>.",
+      "<b>activate</b>: runs after install; old caches are deleted here. The worker controls pages opened after it activates. Pages already open stay with the old worker until they reload, unless the worker calls <code>skipWaiting</code> and <code>clients.claim</code>.",
+      "<b>fetch</b>: the worker hears each request and chooses cache or network."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Caching strategies and the offline fallback",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>cache.addAll([...])</code> fetches each URL and stores the response. If one URL fails, the whole call fails, so the app shell list must be correct. A cache-first rule checks Cache Storage first and goes to the network only on a miss; it is good for versioned static files. A network-first rule tries the network and falls back to cache; it is good for fresh data. Stale-while-revalidate serves the cached copy at once, then fetches a new copy in the background and stores it."
+    },
+    {
+     "type": "p",
+     "text": "Use a versioned cache name such as <code>shell-v2</code>. On <code>activate</code>, delete caches whose names are not in the current list. Without this, a deploy leaves an old <code>index.html</code> in the cache and users keep the old app."
+    },
+    {
+     "type": "p",
+     "text": "An offline fallback page is a cached HTML page shown when the network fails and the requested URL is not cached. For API calls, show the last stored value with a clear label; do not pretend it is live."
+    }
+   ]
+  },
+  {
+   "h3": "Server-side rendering and hydration",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A single-page app sends one <code>index.html</code> that is nearly empty, plus a large JavaScript bundle. The browser must download, parse and run the bundle before the first meaningful paint. Until then the user sees a blank screen. A crawler that does not run JavaScript sees almost nothing."
+    },
+    {
+     "type": "p",
+     "text": "SSR runs the React tree on the server. The server calls <code>ReactDOMServer.renderToString</code> on the app element and gets an HTML string. The server sends that string, so the first paint shows real content. The same JavaScript bundle then loads, and <code>hydrateRoot</code> attaches event handlers to the existing DOM instead of rebuilding it."
+    },
+    {
+     "type": "p",
+     "text": "CSR is client-side rendering, SSR is server-side rendering and SSG is static site generation. They differ in when the HTML is made."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Mode",
+      "First paint",
+      "SEO",
+      "Server load"
+     ],
+     "rows": [
+      [
+       "CSR",
+       "after JS runs",
+       "weak if crawler skips JS",
+       "low"
+      ],
+      [
+       "SSR",
+       "on first response",
+       "strong",
+       "high per request"
+      ],
+      [
+       "SSG",
+       "on first response",
+       "strong",
+       "none at request time"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "<code>getServerSideProps</code> runs on each request; <code>getStaticProps</code> runs at build time. Next.js gives routing plus server rendering out of the box, so it is a common example of SSR and SSG. Angular Universal renders an Angular app to HTML on the server for the first request, then the client app takes over."
+    },
+    {
+     "type": "p",
+     "text": "A hydration mismatch happens when server HTML and the first client render differ. React warns and may discard the server HTML. Keep both renders identical, or render changing values only after hydration."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The page first reloads /index.html and the service worker answers from the cache with the 4 KB HTML, so it opens offline. The later /api/price request misses the cache, so the worker fetches it; the server returns ₹42, the worker serves that fresh response to the page and stores it for the next offline visit. If the fetch had failed, the worker would show the offline fallback instead.",
+  "spec": {
+   "type": "sequence",
+   "aria": "Sequence showing a page asking a service worker for /index.html, getting a 4 KB cache hit, then asking for /api/price, missing the cache, reaching the server, serving the fresh ₹42 response and storing it for the next offline visit.",
+   "actors": [
+    "Page",
+    "Service worker",
+    "Cache",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Page",
+     "to": "Service worker",
+     "label": "reload /index.html",
+     "dashed": false
+    },
+    {
+     "from": "Service worker",
+     "to": "Cache",
+     "label": "match /index.html",
+     "dashed": false
+    },
+    {
+     "from": "Cache",
+     "to": "Service worker",
+     "label": "hit 4 KB",
+     "dashed": true
+    },
+    {
+     "from": "Service worker",
+     "to": "Page",
+     "label": "serve offline",
+     "dashed": true
+    },
+    {
+     "from": "Page",
+     "to": "Service worker",
+     "label": "GET /api/price",
+     "dashed": false
+    },
+    {
+     "from": "Service worker",
+     "to": "Cache",
+     "label": "match /api/price",
+     "dashed": false
+    },
+    {
+     "from": "Cache",
+     "to": "Service worker",
+     "label": "miss",
+     "dashed": true
+    },
+    {
+     "from": "Service worker",
+     "to": "Server",
+     "label": "fetch /api/price",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Service worker",
+     "label": "price ₹42",
+     "dashed": true
+    },
+    {
+     "from": "Service worker",
+     "to": "Cache",
+     "label": "put /api/price",
+     "dashed": false
+    },
+    {
+     "from": "Service worker",
+     "to": "Page",
+     "label": "serve ₹42 (fresh response)",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A news app shell is index.html 4 KB, app.js 120 KB and style.css 8 KB. On the first online visit its service worker calls cache.addAll on these three files. (a) How many kilobytes does the cache hold? (b) How many files are stored? (c) In airplane mode a reload of /index.html is a cache hit, so what is served? (d) A request for /api/price is a cache miss, the network fails, and the fallback shows the last stored price of ₹42. State the cached shell size and the fallback price.",
+   "steps": [
+    "Add the three file sizes: 4 KB + 120 KB + 8 KB = 132 KB.",
+    "Count the files: index.html, app.js and style.css, so 3 files.",
+    "The offline reload of /index.html is a cache hit, so the service worker returns the cached index.html and the app opens; linked shell files are also served from the cache.",
+    "The previous visit stored ₹42 under a last-price key; this request misses the /api/price cache entry, the network fetch fails, so the fallback shows that stored ₹42.",
+    "The cached shell is 132 KB in 3 files, and the API fallback price is ₹42."
+   ],
+   "answer": "The cache stores 132 KB in 3 files; the offline reload of the shell is served from cache; the API fallback shows the last stored price of ₹42.",
+   "check": "index_kb = 4\napp_kb = 120\nstyle_kb = 8\ntotal_kb = index_kb + app_kb + style_kb\nfiles = 3\nlast_price = 42\nprint(total_kb)\nprint(files)\nprint(last_price)",
+   "values": [
+    132,
+    3,
+    42
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A service worker cannot control the very first page load. It needs one visit to install and a reload before it takes over.",
+  "Caching index.html forever serves an old app after a deploy unless the cache name is versioned and old caches are deleted on activate.",
+  "A manifest alone does not make the app work offline. You still need a service worker and a cache.",
+  "Cache-first on an API hides stale data. Use network-first or stale-while-revalidate for live values.",
+  "SSR with different server and first client markup gives a hydration mismatch warning; the two renders must match."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the three PWA criteria.",
+   "marks": 2,
+   "a": "HTTPS, a web app manifest, and a service worker."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three service worker lifecycle events.",
+   "marks": 2,
+   "a": "install, activate, fetch."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a service worker have no DOM access?",
+   "marks": 3,
+   "a": "It runs in its own thread, separate from the page, so it cannot touch window or document; it handles network and cache events."
+  },
+  {
+   "level": "understand",
+   "q": "Why does client-side rendering delay first paint?",
+   "marks": 3,
+   "a": "index.html is nearly empty; the browser must download, parse and run JavaScript before content appears."
+  },
+  {
+   "level": "apply",
+   "q": "An app shell is 10 KB + 90 KB + 6 KB. cache.addAll stores all three files. Find the total cache size and file count.",
+   "marks": 4,
+   "a": "10 + 90 + 6 = 106 KB. File count is 3."
+  },
+  {
+   "level": "apply",
+   "q": "A cache-first rule serves /api/price. A user sees an old price. Explain the cause and the fix.",
+   "marks": 4,
+   "a": "Cache-first returns the stored API response without asking the network. Use network-first or stale-while-revalidate for the API; keep cache-first for versioned static files."
+  },
+  {
+   "level": "analyze",
+   "q": "An SSR page sends ₹40 in server HTML. The first client render shows ₹42. What warning appears, and why?",
+   "marks": 5,
+   "a": "A hydration mismatch warning appears because server HTML and first client render differ. React may discard the server HTML. Fix by using the same data on both sides or rendering the price only after hydration."
+  }
+ ],
+ "beyond": "Not for the exam. Modern frameworks stream SSR HTML in pieces and use partial hydration to ship less JavaScript. Edge rendering moves the server close to the user, which cuts time to first byte. PWA install rules change across browsers, so test on real phones. Service workers now support background sync and push, beyond caching. Search for streaming SSR, partial hydration, Workbox and web app manifest."
+}

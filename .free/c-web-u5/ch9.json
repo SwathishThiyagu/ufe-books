@@ -1,0 +1,227 @@
+{
+ "lead": "A component should display data, not fetch it. Angular puts fetching and shared logic into a service: a plain class marked @Injectable that the injector builds once and hands to every component that asks for it in its constructor. The service calls Angular's HttpClient, which returns an RxJS Observable rather than a Promise. The Observable stays silent until someone subscribes, then emits the JSON from your REST API, possibly many times. Every Angular app that talks to a backend uses this split. It keeps components thin and puts the HTTP logic in one testable place.",
+ "prereq": "You need: <a href=\"#angular-components-templates-directives-and-data-binding\">Chapter 5.6</a> for Angular components and constructors, <a href=\"#typescript-fundamentals\">Chapter 5.5</a> for generics like Observable&lt;Product[]&gt;, and Unit 6 for REST endpoints and JSON.",
+ "sections": [
+  {
+   "h3": "A service is one shared class the injector hands out",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two components often need the same data: the product list on the home page and the same list inside the cart. If each writes its own fetch, the URL and the JSON type appear twice, and a change means two edits. A service moves that code into one class that both components call."
+    },
+    {
+     "type": "p",
+     "text": "A service is a TypeScript class marked with the @Injectable() decorator. The decorator makes the class available to Angular's injector, the part of the framework that creates objects and passes them to whoever asks. Writing @Injectable({providedIn: 'root'}) registers it with the root injector. Here providedIn is the metadata key and 'root' is its value: Angular builds one instance the first time a class needs it, keeps it, and hands that same instance to everyone afterwards. One instance is what lets the service hold a cached list that every screen sees."
+    },
+    {
+     "type": "p",
+     "text": "A component receives the service by constructor injection: constructor(private productService: ProductService) {}. The private keyword declares a class field and assigns the argument into it, so the rest of the component writes this.productService.getProducts(). You never write new ProductService(); the injector reads the parameter type, creates the object and passes it in."
+    },
+    {
+     "type": "p",
+     "text": "Every component also has an injector. If a component lists providers: [ProductService] in its @Component metadata, that component and its children get a fresh instance instead of the root one. That is the hierarchical injector in one line, and it explains why a service can be app-wide or per-screen. In a unit test you pass the component a fake service object, so no HTTP runs."
+    }
+   ]
+  },
+  {
+   "h3": "HttpClient turns a REST call into an Observable",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "HttpClient is Angular's wrapper over the browser's HTTP machinery. A standalone app enables it with provideHttpClient() in the providers of app.config.ts; an NgModule app imports HttpClientModule. Then inject it with constructor(private http: HttpClient) {}."
+    },
+    {
+     "type": "p",
+     "text": "get&lt;T&gt;(url) returns an Observable&lt;T&gt;, where T describes the JSON the server sends, such as Product[]. post(url, body), put(url, body) and delete(url) each return an Observable too. The Observable is cold: no request leaves until something subscribes. subscribe(next, error) takes two callbacks; error receives an HttpErrorResponse whose status is 404 or 500, or 0 when the network itself failed."
+    },
+    {
+     "type": "p",
+     "text": "In a template the async pipe subscribes for you: with products$ | async, the subscription starts when the view appears and ends when the component is destroyed."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "@Injectable({ providedIn: 'root' })\nexport class ProductService {\n  url = '/api/products';\n  constructor(private http: HttpClient) {}\n  getAll(): Observable<Product[]> { return this.http.get<Product[]>(this.url); }\n  add(p: Product): Observable<Product> { return this.http.post<Product>(this.url, p); }\n}\n\n// inside the component\nngOnInit(): void {\n  this.svc.getAll().subscribe({\n    next: d => this.products = d,\n    error: e => this.error = 'status ' + e.status\n  });\n}",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "An interceptor is a function placed in front of every HttpClient call; it can add a header, log the URL or retry centrally instead of in each service."
+    }
+   ]
+  },
+  {
+   "h3": "RxJS operators shape the stream",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A Promise and an Observable both deliver asynchronous data, but they differ in three ways. A Promise starts at once and holds one value. An Observable is lazy, may emit many values over time, and can be cancelled by unsubscribing. That suits a search box, a chat feed or a stream of clicks."
+    },
+    {
+     "type": "p",
+     "text": "Operators go inside .pipe(), and each takes an Observable and returns a new one. map(x =&gt; ...) transforms each value, filter drops values, tap runs a side effect such as console.log, and retry(2) resubscribes up to two more times after an error, giving three attempts in total."
+    },
+    {
+     "type": "p",
+     "text": "catchError handles failure: catchError(() =&gt; of([])) replaces the error with an Observable that emits an empty array. The subscriber's next callback receives [] and the error callback never runs, so a 500 leaves an empty list instead of a crash."
+    },
+    {
+     "type": "p",
+     "text": "A search box may call search(term) on every keystroke. debounceTime(300) waits for 300 ms of silence. switchMap cancels the previous request and subscribes the new one, so a slow old reply cannot overwrite a fresh one."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "this.searchControl.valueChanges.pipe(\n  debounceTime(300),\n  switchMap(term => this.svc.search(term)),\n  catchError(() => of([]))\n).subscribe(list => this.results = list);",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "For shared state, a Subject is a multicast channel that replays nothing: subscribers get only values emitted after they subscribe. A BehaviorSubject needs an initial value and replays the latest value to each new subscriber, which suits a current-user or current-filter store."
+    },
+    {
+     "type": "p",
+     "text": "To stop a subscription when the component dies, keep a Subject named destroy$, emit in ngOnDestroy, and add takeUntil(this.destroy$) to the pipe. The async pipe does the same job automatically."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The request leaves only at the subscribe, and the three products arrive in the component's next callback; without subscribing, the last five messages never happen.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A component calls getProducts() on ProductService, the service returns an Observable, the component subscribes, the service calls HttpClient.get with the API URL, the REST API answers 200 with three items, and the values travel back to the component's next callback.",
+   "actors": [
+    "Component",
+    "ProductService",
+    "HttpClient",
+    "REST API"
+   ],
+   "messages": [
+    {
+     "from": "Component",
+     "to": "ProductService",
+     "label": "getProducts()",
+     "dashed": false
+    },
+    {
+     "from": "ProductService",
+     "to": "Component",
+     "label": "Observable returned",
+     "dashed": true
+    },
+    {
+     "from": "Component",
+     "to": "ProductService",
+     "label": "subscribe(next, error)",
+     "dashed": false
+    },
+    {
+     "from": "ProductService",
+     "to": "HttpClient",
+     "label": "get<Product[]>(url)",
+     "dashed": false
+    },
+    {
+     "from": "HttpClient",
+     "to": "REST API",
+     "label": "GET /api/products",
+     "dashed": false
+    },
+    {
+     "from": "REST API",
+     "to": "HttpClient",
+     "label": "200 OK, 3 items",
+     "dashed": true
+    },
+    {
+     "from": "HttpClient",
+     "to": "ProductService",
+     "label": "emits Product[]",
+     "dashed": true
+    },
+    {
+     "from": "ProductService",
+     "to": "Component",
+     "label": "next(data) runs",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A product search box is wired as searchControl.valueChanges.pipe(debounceTime(300), switchMap(t => svc.search(t))). A user types dosa with keystrokes at 0 ms, 120 ms, 250 ms and 400 ms. (a) How many GET requests go out with no operators at all? (b) With debounceTime(300) alone, how many GETs go out and when does the last one fire? (c) With switchMap but no debounceTime, how many GETs go out and how many are cancelled? (d) The final GET returns 500 and the pipe has catchError(() => of([])). How many items does the list hold?",
+   "steps": [
+    "Count the keystrokes: four letters, so four values pass through valueChanges: d, do, dos, dosa. Without operators, each value triggers a request at once, so 4 GETs go out: q=d, q=do, q=dos, q=dosa.",
+    "Gaps between keystrokes: 120 - 0 = 120 ms, 250 - 120 = 130 ms, 400 - 250 = 150 ms. All three gaps are below 300 ms, so each new letter restarts the debounce timer before it can fire.",
+    "With debounceTime(300) the timer runs from the last letter only, at 400 ms. It fires at 400 + 300 = 700 ms with q=dosa. Total: 1 GET.",
+    "switchMap alone does not wait. All 4 GETs still go out. Assuming each response takes longer than the gap to the next keystroke, 3 inner requests are still in flight and are cancelled; otherwise fewer are cancelled. The GET for q=dosa is the one that completes.",
+    "A 500 reaches catchError, which returns of([]). The next callback runs with an empty array, so the list holds len([]) = 0 items and no error is shown."
+   ],
+   "answer": "4 GETs with no operators; 1 GET fired at 700 ms with debounceTime(300); 4 GETs under switchMap alone, with 3 cancellations assuming each response takes longer than the gap to the next keystroke (otherwise fewer are cancelled); and 0 items listed after the 500.",
+   "check": "times = [0, 120, 250, 400]\ndelay = 300\ngaps = [times[i + 1] - times[i] for i in range(len(times) - 1)]\nassert all(g < delay for g in gaps)\nwithout_operators = len(times)\nwith_debounce = 1\nfire_time = times[-1] + delay\nwith_switchmap = len(times)\ncancelled = len(times) - 1\nitems_after_500 = len([])\nprint(without_operators)\nprint(with_debounce)\nprint(fire_time)\nprint(cancelled)\nprint(items_after_500)\n",
+   "values": [
+    4,
+    1,
+    700,
+    3,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "An Observable does nothing until it is subscribed. Writing this.svc.getProducts(); and stopping there sends no request and fills no list; the GET happens inside subscribe or behind the async pipe.",
+  "A subscription started in ngOnInit keeps running after the component is destroyed. Opening that screen five times leaves five live subscriptions holding dead components: unsubscribe, add takeUntil(this.destroy$), or use the async pipe.",
+  "catchError must return an Observable, so write of([]) and not []. Returning a bare array is a type error, and catchError catches errors thrown by operators above it in the pipe, not below it, so it usually goes last.",
+  "debounceTime alone does not stop an old slow response from arriving last and overwriting the new one. switchMap cancels the previous inner request; mergeMap and concatMap keep it alive.",
+  "Each subscribe on an HttpClient Observable sends a new request. Two components subscribing to the same getProducts() return 2 GETs, not 1, unless the service shares the stream."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does @Injectable({providedIn: 'root'}) tell Angular?",
+   "marks": 2,
+   "a": "It registers the class with the root injector, which creates one shared instance lazily, the first time some class asks for it."
+  },
+  {
+   "level": "understand",
+   "q": "Why does calling a service's getProducts() method fill nothing until you subscribe?",
+   "marks": 3,
+   "a": "HttpClient returns a cold Observable. The method only builds the description of a request; the GET is sent when a subscriber attaches, so subscribe or the async pipe is required."
+  },
+  {
+   "level": "apply",
+   "q": "A pipe is .pipe(retry(2), catchError(() => of([]))). The server returns 500 every time. How many HTTP attempts are made, and what does the subscriber receive?",
+   "marks": 4,
+   "a": "retry(2) resubscribes after each failure, giving 1 + 2 = 3 attempts. After the third failure catchError runs and returns of([]), so next receives an empty array and the error callback is skipped."
+  },
+  {
+   "level": "apply",
+   "q": "A component subscribes in ngOnInit to a service Observable that never completes, and it does not unsubscribe. The user navigates to that screen 4 times. How many subscriptions stay alive, and what is the fix?",
+   "marks": 4,
+   "a": "4 subscriptions stay alive, each holding a callback and its destroyed component. Fix: add takeUntil(this.destroy$) with an emit in ngOnDestroy, or use the async pipe, which unsubscribes on destroy."
+  },
+  {
+   "level": "analyze",
+   "q": "Two components each call this.svc.getAll().subscribe(...) on the same service method. How many GET requests reach the server, and how would you make it one?",
+   "marks": 5,
+   "a": "Two, because the Observable from HttpClient is cold and every subscribe starts a fresh request. Share it in the service with a multicasting operator such as shareReplay(1), so both subscribers read one response."
+  },
+  {
+   "level": "analyze",
+   "q": "In the search pipe, why is switchMap preferred over mergeMap, and what goes wrong with debounceTime alone during a slow network?",
+   "marks": 5,
+   "a": "mergeMap keeps every inner request alive, so a slow reply for q=dos can land after the reply for q=dosa and overwrite the correct results. switchMap cancels the previous inner request. debounceTime only cuts the number of requests; it does not cancel one already in flight, so an old response can still arrive last."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between Subject and BehaviorSubject.",
+   "marks": 2,
+   "a": "A BehaviorSubject needs an initial value and replays the latest value to each new subscriber; a Subject replays nothing, so a late subscriber waits for the next emission."
+  }
+ ],
+ "beyond": "Not for the exam. In real projects every REST resource gets its own service, components never touch HttpClient directly, and interceptors carry auth headers, retries and loading flags in one place. Recent Angular versions add signals and signal-based helpers that load data without an explicit subscribe, and the same Observable operators still sit underneath. RxJS knowledge also transfers to Node.js streams and to other frameworks' reactive layers. Search next for 'Angular provideHttpClient standalone', 'switchMap vs mergeMap', 'shareReplay caching in a service' and 'Angular signals resource'."
+}
