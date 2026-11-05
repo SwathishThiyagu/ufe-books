@@ -1,0 +1,246 @@
+{
+ "lead": "Bluetooth is a short-range radio that replaces cables. Classic Bluetooth streams audio and moves files between a phone and a headset or car kit. Bluetooth Low Energy (BLE) sends small data now and then from a coin cell, which suits IoT sensors. This chapter covers the classic piconet, then BLE: channels, GAP roles, advertising, connection interval, GATT, BLE 5 PHYs, and a comparison.",
+ "prereq": "You need: <a href=\"#iot-protocols-and-their-standardization\">Chapter 3.1</a> for the idea of a layered protocol and <a href=\"#ieee-802-15-4-low-power-wireless-standard\">Chapter 3.2</a> for the low-power radio comparison.",
+ "sections": [
+  {
+   "h3": "Classic Bluetooth: one master, seven slaves",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Classic Bluetooth uses the 2.4 GHz ISM band, the same unlicensed band as Wi-Fi. It divides the band into 79 channels of 1 MHz and hops 1600 times per second. Hopping defends against interference: a microwave or Wi-Fi access point spoils only the hops that land on its frequencies. Basic Rate carries 1 Mbps; Enhanced Data Rate (EDR) raises this to 2 or 3 Mbps."
+    },
+    {
+     "type": "p",
+     "text": "The network is a <b>piconet</b>: one master and up to seven active slaves. Seven is fixed by the 3-bit address the master uses to tag each slave's packets. The master owns the clock and hopping sequence; each slave synchronises to it. Time is cut into 625 µs slots, and the master polls one slave per slot. Slaves never talk directly; every packet passes through the master."
+    },
+    {
+     "type": "p",
+     "text": "Two piconets sharing one device form a <b>scatternet</b>. The shared device time-shares its radio, so throughput falls. The standard allows it; real deployments are rare."
+    },
+    {
+     "type": "p",
+     "text": "A <b>profile</b> fixes what a device implements for one use case: SPP for serial cable, A2DP for stereo audio, HFP for hands-free calls, HID for a keyboard. Devices interoperate only if both support the same profile. Classic Bluetooth carries audio, file transfer and car kits. A sensor reporting every few seconds needs BLE, which builds links differently."
+    }
+   ]
+  },
+  {
+   "h3": "Bluetooth Low Energy: advertise, scan, connect",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BLE is a separate radio design, not classic Bluetooth running slowly. It uses 40 channels of 2 MHz. Three are advertising channels at 2402, 2426 and 2480 MHz, placed between common Wi-Fi channels so advertisements survive; the other 37 carry data."
+    },
+    {
+     "type": "p",
+     "text": "The Generic Access Profile (GAP) defines four roles."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Broadcaster</b>: sends advertisements only, never connects. A battery beacon is one.",
+      "<b>Observer</b>: only listens to advertisements.",
+      "<b>Peripheral</b>: advertises, then accepts a connection. A temperature sensor is one.",
+      "<b>Central</b>: scans and starts connections. A phone or gateway is one."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The peripheral repeats an ADV_IND packet every advertising interval, from 20 ms to 10.24 s. A legacy advertisement holds up to 31 bytes, enough for a sensor reading or short name. A central wanting more sends SCAN_REQ and gets SCAN_RSP."
+    },
+    {
+     "type": "p",
+     "text": "To open a link, the central sends CONNECT_REQ. It carries the connection parameters: connection interval, slave latency, channel map, hop increment and CRC initial value. The two ends then meet in a <b>connection event</b> once per connection interval. The interval runs from 7.5 ms to 4 s in steps of 1.25 ms. The central sends the first packet; the two alternate until neither has data or the event's time is used. <b>Slave latency</b> lets the peripheral skip up to 499 events when it has nothing to send, so a sensor reporting once a minute sleeps through hundreds of chances to talk."
+    },
+    {
+     "type": "p",
+     "text": "The data unit is small. The ATT MTU defaults to 23 bytes; 3 are header, leaving 20 bytes of application data per packet. Either side can negotiate a larger MTU."
+    }
+   ]
+  },
+  {
+   "h3": "GATT, BLE 5 and how to choose",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "GATT (Generic Attribute Profile) says how data is arranged. A <b>service</b> groups related values; a <b>characteristic</b> is one value with a UUID and properties: read, write, notify, indicate. A heart-rate sensor exposes the Heart Rate Service (UUID 0x180D) with a Heart Rate Measurement characteristic that supports notify. The peripheral pushes a value only when the reading changes, so the central never polls. Phone BLE APIs and Matter use this model."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>LE 2M PHY</b>: 2 Mbps instead of 1 Mbps. Same data takes half the airtime, so less energy per bit.",
+      "<b>LE Coded PHY</b>: forward error correction. S=2 roughly doubles range at 500 kbps; S=8 roughly quadruples range at 125 kbps.",
+      "<b>Extended advertising</b>: payloads up to 255 bytes per packet, chained for more, with packets on data channels."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "Throughput = N × B × 8 ÷ T_ci",
+     "where": "N is the number of packets exchanged in one connection event, B is the application bytes carried by each packet, T_ci is the connection interval in seconds, and the result is in bits per second."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "Classic Bluetooth",
+      "BLE"
+     ],
+     "rows": [
+      [
+       "Channels",
+       "79 × 1 MHz",
+       "40 × 2 MHz, 3 for advertising"
+      ],
+      [
+       "Data rate",
+       "1 Mbps Basic Rate, 2 or 3 Mbps with EDR",
+       "1 Mbps, 2 Mbps with LE 2M, 125/500 kbps with LE Coded"
+      ],
+      [
+       "Latency",
+       "connection setup typically hundreds of ms to seconds (inquiry plus paging)",
+       "connection set up in a few ms once an advertisement is heard; data latency is set by the connection interval, as low as 7.5 ms"
+      ],
+      [
+       "Power",
+       "tens of mW",
+       "a few mW; years on a coin cell"
+      ],
+      [
+       "Topology",
+       "piconet, scatternet",
+       "star around one central, plus broadcast"
+      ],
+      [
+       "Typical use",
+       "audio, car kit, file transfer",
+       "wearables, sensors, locks, tags"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "How a BLE link is built: the peripheral advertises, the central may run an active scan for more, and CONNECT_REQ fixes the connection interval for later data events. A central may connect directly from ADV_IND without SCAN_REQ.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Peripheral",
+    "Central"
+   ],
+   "messages": [
+    {
+     "from": "Peripheral",
+     "to": "Central",
+     "label": "ADV_IND",
+     "dashed": false
+    },
+    {
+     "from": "Central",
+     "to": "Peripheral",
+     "label": "SCAN_REQ (optional)",
+     "dashed": true
+    },
+    {
+     "from": "Peripheral",
+     "to": "Central",
+     "label": "SCAN_RSP (optional)",
+     "dashed": true
+    },
+    {
+     "from": "Central",
+     "to": "Peripheral",
+     "label": "CONNECT_REQ",
+     "dashed": false
+    },
+    {
+     "from": "Peripheral",
+     "to": "Central",
+     "label": "Data event",
+     "dashed": false
+    }
+   ],
+   "aria": "A BLE connection setup: the peripheral advertises, the central may optionally send SCAN_REQ, the peripheral may optionally respond with SCAN_RSP, the central connects with CONNECT_REQ, and data events follow at the connection interval. The central may connect directly from ADV_IND."
+  }
+ },
+ "examples": [
+  {
+   "question": "A BLE link runs with a connection interval of 50 ms. In each connection event the central and the peripheral exchange 4 packets in total, and each packet carries 20 bytes of application data. Find the maximum application throughput in kbps.",
+   "steps": [
+    "Application bits in one packet: 20 bytes × 8 bits per byte = 160 bits.",
+    "Application bits per connection event: 4 packets × 160 bits = 640 bits.",
+    "Number of connection events per second: 1 ÷ 0.050 s = 20 events per second.",
+    "Throughput in bits per second: 640 bits × 20 events/s = 12800 bps.",
+    "Convert to kbps: 12800 ÷ 1000 = 12.8 kbps."
+   ],
+   "answer": "The maximum application throughput is 12.8 kbps, that is 12800 bps.",
+   "check": "ci = 0.050\nn = 4\nb = 20\nbits_per_event = n * b * 8\nevents_per_s = 1 / ci\nbps = bits_per_event * events_per_s\nprint(bits_per_event)\nprint(events_per_s)\nprint(bps)\nprint(bps / 1000)",
+   "values": [
+    640,
+    20.0,
+    12800.0,
+    12.8
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "BLE is not classic Bluetooth at a lower duty cycle. It has its own link layer: 40 × 2 MHz channels, advertising channels, connection events. 'BLE is Bluetooth switched off most of the time' loses marks.",
+  "Classic Bluetooth: 79 × 1 MHz; BLE: 40 × 2 MHz, three for advertising. Mixing these numbers is the commonest slip.",
+  "Short connection interval lowers latency and raises power. Use slave latency and a long interval for a sensor reporting once a minute.",
+  "Throughput counts application bytes. Default 23-byte ATT MTU leaves 20 data bytes, not 23; 3 header bytes are overhead.",
+  "A piconet has one master and at most seven active slaves; slaves do not send to each other. Only the master polls."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many active slaves can one classic Bluetooth piconet have, and what fixes that number?",
+   "marks": 2,
+   "a": "Seven active slaves. The master tags packets with a 3-bit address; 2³ − 1 = 7 usable addresses."
+  },
+  {
+   "level": "remember",
+   "q": "State the number and width of BLE channels, and how many are advertising channels.",
+   "marks": 2,
+   "a": "40 channels, each 2 MHz; 3 advertising, 37 data."
+  },
+  {
+   "level": "understand",
+   "q": "Why does BLE place its three advertising channels at 2402, 2426 and 2480 MHz?",
+   "marks": 3,
+   "a": "Those frequencies sit between widely used Wi-Fi channels, so advertisements are less likely lost to Wi-Fi. A broadcaster can still be discovered in a busy 2.4 GHz environment."
+  },
+  {
+   "level": "understand",
+   "q": "Explain a connection event and slave latency.",
+   "marks": 4,
+   "a": "A connection event is the meeting of central and peripheral once per connection interval. The central sends first, then the two alternate until data runs out or the event ends. Slave latency lets the peripheral skip up to 499 events when it has no data, saving power without losing the link."
+  },
+  {
+   "level": "apply",
+   "q": "A BLE link has a connection interval of 100 ms. Each connection event exchanges 6 packets of 20 bytes of application data. Find the application throughput in kbps.",
+   "marks": 5,
+   "a": "Bits per event = 6 × 20 × 8 = 960 bits. Events per second = 1 ÷ 0.100 = 10. Throughput = 960 × 10 = 9600 bps = 9.6 kbps."
+  },
+  {
+   "level": "apply",
+   "q": "A BLE link uses the minimum connection interval of 7.5 ms and exchanges 2 packets of 27 application bytes per event. Find the application throughput in kbps.",
+   "marks": 4,
+   "a": "Bits per event = 2 × 27 × 8 = 432 bits. Events/s = 1 ÷ 0.0075 = 133.33. Throughput = 432 × 133.33 = 57600 bps = 57.6 kbps."
+  },
+  {
+   "level": "analyze",
+   "q": "A soil-moisture sensor sends one 20-byte reading every minute. Compare a 7.5 ms connection interval with a 1 s interval plus slave latency for battery life.",
+   "marks": 5,
+   "a": "At 7.5 ms the radio wakes 8000 times per minute; at 1 s it wakes 60 times. The fast interval buys latency the sensor cannot use and costs about 133 times more wake-ups. A long interval with slave latency keeps the link alive and saves the coin cell."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can BLE reach years of battery life where classic Bluetooth cannot, even when both send the same number of bytes?",
+   "marks": 6,
+   "a": "BLE has a different link layer. It sleeps between short connection events, uses 2 MHz channels and short packets, and lets the peripheral skip events through slave latency. Discovery uses short advertisements, not a long inquiry. Classic Bluetooth holds a slot-based hopping link with a fixed clock, so its radio is busy far more of the time."
+  }
+ ],
+ "beyond": "Not for the exam. BLE direction finding uses angle of arrival or departure for indoor positioning. LE Audio replaces classic A2DP with low-power isochronous channels and broadcasts to many earbuds. Bluetooth Mesh builds many-to-many networking on BLE advertising and competes with ZigBee in lighting. Matter commissions over BLE then hands to Wi-Fi or Thread. Search Bluetooth Core Specification, GATT supplement, LE Audio for details."
+}

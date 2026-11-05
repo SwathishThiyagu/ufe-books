@@ -1,0 +1,233 @@
+{
+ "lead": "Plug a laptop and a printer into the same Wi-Fi router. Nobody typed the printer's IP address anywhere, yet the laptop lists the printer and printing works. Service discovery is the set of protocols that makes this happen: a device announces, or answers questions about, the services it offers on the local network, and clients find those services by name instead of by address. This chapter covers three ways to do it — mDNS, DNS-SD built on mDNS, and UPnP — used in home routers, printers, media streamers and industrial gateways.",
+ "prereq": "You need: <a href=\"#iot-protocols-and-their-standardization\">Chapter 3.1</a> for what a protocol is, plus the idea of IP addresses, ports and multicast from a networking course; IPv6 addressing is at <a href=\"#6lowpan-and-iot-routing-protocols\">Chapter 3.5</a>.",
+ "sections": [
+  {
+   "h3": "mDNS: the same DNS packets, sent to a group",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Normal DNS assumes a server address is configured, usually handed out by DHCP. A home LAN or a small factory network may have no DNS server at all, yet its devices still need to find each other. mDNS (multicast DNS) removes the server. The DNS question and answer messages keep their standard format, but hosts send them to a multicast group that every device on the link has joined. Names in this space end in .local."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "IPv4 group 224.0.0.251; IPv6 group ff02::fb.",
+      "UDP port 5353 for queries and responses.",
+      "Domain suffix .local, for example printer.local.",
+      "No server address to configure: every host answers for its own names."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A client multicasts a query holding one question, say the address of printer.local. The host that owns the name answers with a response holding the matching record. The responder usually multicasts the answer so every listener can cache it, and may answer by unicast when asked to. Each record carries a TTL (time to live) in seconds; 120 s is typical for records that carry host addresses, and 4500 s (75 minutes) for other records. When the TTL runs out the entry is deleted and the name is queried again."
+    },
+    {
+     "type": "p",
+     "text": "Two hosts can pick the same name. Before using a name, a host sends probe queries for it. If another host answers, the name is taken and the newcomer picks another, often by appending -2. After a short run of unanswered probes the name is treated as free and announced."
+    }
+   ]
+  },
+  {
+   "h3": "DNS-SD: PTR, SRV and TXT",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "DNS-SD (DNS-Based Service Discovery) adds no new packets. It defines how service information is written as ordinary DNS records, so a client can list services and choose one by name instead of by address. mDNS usually carries these records, but a normal unicast DNS server can hold them too. Instances are named Instance.Service.Domain, such as MyPrinter._ipp._tcp.local: _ipp is Internet Printing Protocol, _tcp is the transport (the alternative is _udp), and local is the mDNS domain."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Record",
+      "Owner name",
+      "Content",
+      "What the client learns"
+     ],
+     "rows": [
+      [
+       "PTR",
+       "_ipp._tcp.local",
+       "MyPrinter._ipp._tcp.local",
+       "one service instance name"
+      ],
+      [
+       "SRV",
+       "MyPrinter._ipp._tcp.local",
+       "port 631, target printer.local",
+       "port and host to connect to"
+      ],
+      [
+       "TXT",
+       "MyPrinter._ipp._tcp.local",
+       "txtvers=1, key=value pairs",
+       "metadata such as paper sizes"
+      ],
+      [
+       "A/AAAA",
+       "printer.local",
+       "192.168.1.20",
+       "the IP address"
+      ]
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Send a PTR query for _ipp._tcp.local; every answer is one service instance.",
+      "For the chosen instance, query SRV for the port and target host, and TXT for metadata.",
+      "Resolve the target host to an address with an A or AAAA query.",
+      "Open a TCP connection to that address and the SRV port, then speak the service protocol."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A TXT record must exist even when it is empty. Browsing means asking PTR questions; you only ask SRV and TXT once you care about a particular instance."
+    }
+   ]
+  },
+  {
+   "h3": "UPnP: SSDP discovery, then description, control and events",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "UPnP is a bigger stack than mDNS: it covers addressing, discovery, description, control, eventing and presentation. Discovery uses SSDP (Simple Service Discovery Protocol), which sends HTTP-style messages over UDP to the multicast group 239.255.255.250, port 1900 (IPv6 group ff02::c). A device announces itself with a NOTIFY ssdp:alive message when it joins, and ssdp:byebye when it leaves. A client, called a control point, multicasts an M-SEARCH with a search target header; the device replies by unicast with 200 OK, carrying a LOCATION: URL and a unique service name."
+    },
+    {
+     "type": "p",
+     "text": "The client then fetches that URL over HTTP. The description XML gives the device type, a friendly name, and a list of services. Each service has a service type such as urn:schemas-upnp-org:service:WANIPConnection:1, plus a controlURL and an eventSubURL. Control is SOAP over HTTP POST to the controlURL, with an action name and arguments; the reply is a SOAP envelope. Eventing uses GENA: the client SUBSCRIBEs to the eventSubURL, gets a subscription ID and a timeout, and the device then sends NOTIFY messages when state changes."
+    },
+    {
+     "type": "p",
+     "text": "Home routers use UPnP for port forwarding, media servers and smart TVs use it for streaming, and NAS boxes expose services with it. Exposing a control URL beyond the LAN is a known security risk, because many control actions need no authentication."
+    }
+   ]
+  },
+  {
+   "h3": "Implementations you will meet",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "Avahi: the mDNS/DNS-SD daemon on most Linux systems; avahi-browse -a lists services on the link.",
+      "Bonjour: Apple's implementation of mDNS and DNS-SD; some syllabi call the whole idea Bonjour.",
+      "Android's NSD API and Apple's network frameworks expose discovery to apps.",
+      "miniupnpd and libupnp are common UPnP stacks in routers and NAS boxes.",
+      "Windows uses WS-Discovery for many printers, which is a different protocol."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "One multicast question, three answers: PTR names the service instance, SRV gives port 631 and the host target, and TXT carries metadata.",
+  "spec": {
+   "type": "sequence",
+   "aria": "mDNS query and response: client asks for IPP printers, printer returns PTR, SRV and TXT records.",
+   "actors": [
+    "Client",
+    "Printer"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Printer",
+     "label": "Query _ipp._tcp.local",
+     "dashed": false
+    },
+    {
+     "from": "Printer",
+     "to": "Client",
+     "label": "PTR record",
+     "dashed": false
+    },
+    {
+     "from": "Printer",
+     "to": "Client",
+     "label": "SRV record",
+     "dashed": false
+    },
+    {
+     "from": "Printer",
+     "to": "Client",
+     "label": "TXT record",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A laptop browses for printers with an mDNS query for _ipp._tcp.local. At time t = 0 the printer answers with three records: a PTR record naming MyPrinter._ipp._tcp.local with TTL 4500 s, an SRV record giving port 631 and target printer.local with TTL 120 s, and a TXT record with txtvers=1 and TTL 4500 s. (a) State what each record gives the client. (b) At t = 200 s the laptop still holds all three in cache. Which are valid, and how many seconds remain on each?",
+   "steps": [
+    "PTR record: maps the service type to the instance name MyPrinter._ipp._tcp.local. This is what browsing returns.",
+    "SRV record: gives port 631 and target host printer.local (with priority and weight for choosing among copies).",
+    "TXT record: gives metadata as key=value pairs, here txtvers=1.",
+    "Remaining lifetime = TTL − elapsed time, in seconds. PTR: 4500 s − 200 s = 4300 s left.",
+    "SRV: 120 s − 200 s = −80 s, so it expired 80 s ago. TXT: 4500 s − 200 s = 4300 s left.",
+    "The client may use the cached instance name and metadata, but must re-query SRV before connecting.",
+    "Connect to printer.local on port 631 once the SRV and the host address are resolved."
+   ],
+   "answer": "PTR gives the instance name, SRV gives port 631 and target printer.local, TXT gives metadata; after 200 s the PTR and TXT have 4300 s left and the SRV expired 80 s ago.",
+   "check": "ttl_ptr = 4500\nttl_srv = 120\nttl_txt = 4500\nt = 200\nprint(ttl_ptr - t)\nprint(ttl_srv - t)\nprint(ttl_txt - t)",
+   "values": [
+    4300,
+    -80,
+    4300
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "mDNS is only a transport for DNS-format messages; the service listing comes from the DNS-SD record convention. A host that answers mDNS queries is not automatically browseable as a service.",
+  "UPnP discovery uses SSDP over UDP port 1900 to 239.255.255.250, not mDNS on port 5353. Writing 'UPnP uses mDNS' loses marks.",
+  "Multicast stays on the link. The group 224.0.0.251 is not forwarded by routers unless configured, so devices on two subnets cannot discover each other.",
+  "SRV gives a port and a target host name, not an IP address; the A or AAAA record is still needed for the target.",
+  "TTL is a countdown in seconds, not a timestamp. A record cached with TTL 120 s at t = 0 is stale at t = 120 s, and a negative remaining time means expired."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which multicast addresses, UDP port and domain suffix does mDNS use?",
+   "marks": 2,
+   "a": "IPv4 group 224.0.0.251, IPv6 group ff02::fb, UDP port 5353, suffix .local."
+  },
+  {
+   "level": "remember",
+   "q": "Which multicast address and port does SSDP use for UPnP discovery?",
+   "marks": 2,
+   "a": "239.255.255.250, UDP port 1900 (IPv6 group ff02::c)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does DNS-SD browsing use a PTR query instead of starting with SRV?",
+   "marks": 3,
+   "a": "The client does not know any instance names yet. PTR maps the service type to every instance name on the link; SRV can only be asked once an instance name is known."
+  },
+  {
+   "level": "apply",
+   "q": "A PTR record with TTL 4500 s is cached at t = 0. How many seconds remain at t = 600 s, and what does the client do at t = 4500 s?",
+   "marks": 4,
+   "a": "4500 − 600 = 3900 s remain. At t = 4500 s the record is stale and the client sends a new query (a refresh) rather than trusting the cache."
+  },
+  {
+   "level": "apply",
+   "q": "List, in order, the queries a client sends to go from no knowledge to a TCP connection to a printer speaking IPP.",
+   "marks": 4,
+   "a": "PTR for _ipp._tcp.local to get the instance, SRV and TXT for that instance, A or AAAA for printer.local, then TCP to port 631."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does mDNS need probe queries before a host claims a name?",
+   "marks": 5,
+   "a": "Names are chosen by the device itself, so two devices can pick the same name and answers would clash. Probing tests the name first; a reply means it is taken, so the newcomer renames (often with -2) and the cache stays unambiguous."
+  },
+  {
+   "level": "analyze",
+   "q": "A control point receives 200 OK with a LOCATION URL after an M-SEARCH. What does it fetch next, and which two URLs does it need for control and events?",
+   "marks": 5,
+   "a": "It fetches the description XML over HTTP. From the matching service entry it takes controlURL for SOAP actions and eventSubURL for GENA SUBSCRIBE."
+  }
+ ],
+ "beyond": "Not for the exam. Thread and Matter reuse mDNS with DNS-SD over IPv6 for operational discovery in smart homes, which is why the same PTR, SRV and TXT records appear in consumer IoT certification tests. Data centres run unicast DNS-SD, the same records on a normal DNS server, as a lightweight service registry. Search for RFC 6762 (mDNS), RFC 6763 (DNS-SD) and the UPnP Device Architecture document to read the source specifications."
+}

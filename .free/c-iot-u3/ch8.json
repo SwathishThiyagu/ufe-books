@@ -1,0 +1,245 @@
+{
+ "lead": "A refinery control room, a shopping mall's air-conditioning, and a battery-powered pressure transmitter on a pipeline all need to send measurements and receive commands, but each works under different rules. SCADA is the architecture that supervises a whole plant from one screen. BACnet is the standard that lets one vendor's chiller talk to another vendor's controller inside a building. WirelessHART puts a HART field instrument on a radio mesh that never misses its scheduled timeslot. This chapter covers what each one is made of, how it moves data, and where it stops being the right tool.",
+ "prereq": "You need <a href=\"#ieee-802-15-4-low-power-wireless-standard\">Chapter 3.2</a> for the 802.15.4 radio that WirelessHART builds on, and <a href=\"#iot-protocols-and-their-standardization\">Chapter 3.1</a> for what a protocol standard is.",
+ "sections": [
+  {
+   "h3": "SCADA: supervision across a wide area",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SCADA means Supervisory Control and Data Acquisition. It is a system architecture, not one protocol. A water board with pumping stations spread across a district runs one SCADA system; the link from each pump house to the control room might be Modbus, DNP3 or a radio modem, and the architecture is still SCADA."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Field device: a sensor or actuator in the plant.",
+      "RTU (Remote Terminal Unit): a rugged box that reads inputs, drives outputs and talks to the master. A PLC (Programmable Logic Controller) does the same with a local control program for fast logic.",
+      "MTU (Master Terminal Unit) or SCADA server: polls the RTUs and holds the tag database.",
+      "HMI (Human Machine Interface): the operator's screen of mimics, trends and alarms.",
+      "Historian: a database that stores every value with a timestamp for trends and audits."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Data acquisition runs in cycles. The RTU scans its inputs, converts raw counts to engineering units (4 mA reads as 0 %, 20 mA as 100 %), stamps the value with time and stores it. The MTU polls each RTU on a schedule: a slow poll saves bandwidth, a fast poll catches fast trips."
+    },
+    {
+     "type": "p",
+     "text": "Control runs the other way. The operator types a setpoint on the HMI, the MTU writes it into an RTU register, and the RTU drives the output. Safety interlocks stay inside the PLC, so a lost communication link cannot create an unsafe state."
+    },
+    {
+     "type": "p",
+     "text": "Modbus is the usual example. Modbus RTU runs on RS-485 as a master-slave bus with up to 247 slave addresses and 16-bit registers. Function code 03 reads holding registers; 06 writes one register. Classic Modbus has no timestamp and no security, so the RTU or gateway adds both."
+    }
+   ]
+  },
+  {
+   "h3": "BACnet: objects and services for buildings",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BACnet (Building Automation and Control Networks, ASHRAE 135) is the vendor-neutral protocol for heating, ventilation, lighting and access control. Before it, each vendor's controller spoke only its own language, and a building was a set of islands."
+    },
+    {
+     "type": "p",
+     "text": "Everything in BACnet is an object with properties. An Analog Input object for a room sensor has Present_Value (23.5 °C), Units (°C), Object_Name and COV_Increment. Other types include Analog Output, Binary Input, Schedule and Device."
+    },
+    {
+     "type": "p",
+     "text": "Services are the verbs. ReadProperty and WriteProperty are confirmed: a reply is required. Who-Is and I-Am are unconfirmed broadcasts used for discovery. SubscribeCOV asks a device to report a value only when it moves by more than COV_Increment; the server then sends Change-of-Value notifications. This removes the polling traffic that would otherwise flood a slow bus."
+    },
+    {
+     "type": "p",
+     "text": "BACnet runs over several data links. BACnet/IP puts the same messages in UDP datagrams on port 47808, so it rides ordinary Ethernet and Wi-Fi. MS/TP (Master-Slave/Token-Passing) runs on RS-485 at 9.6 kbps to 76.8 kbps; a token passes around the masters and only the token holder transmits, which keeps the bus orderly."
+    }
+   ]
+  },
+  {
+   "h3": "WirelessHART: scheduled radio in the field",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "WirelessHART is the wireless form of HART, the Highway Addressable Remote Transducer protocol. Wired HART superimposes a digital signal on the 4-20 mA current loop. WirelessHART keeps the HART commands and device descriptions and replaces the cable with a radio mesh. Its standard number is IEC 62591."
+    },
+    {
+     "type": "p",
+     "text": "The radio is <a href=\"#ieee-802-15-4-low-power-wireless-standard\">IEEE 802.15.4</a> at 2.4 GHz: 250 kbps, O-QPSK, 16 channels numbered 11 to 26."
+    },
+    {
+     "type": "p",
+     "text": "Above the radio, WirelessHART replaces 802.15.4's CSMA/CA MAC with a TDMA data link. Time is cut into 10 ms timeslots. A superframe is a repeating pattern of timeslots. A device gets dedicated slots inside it; leftover slots are shared and used with contention. A dedicated slot is deterministic: the transmission happens at a known instant, so a control loop can rely on it."
+    },
+    {
+     "type": "p",
+     "text": "Each timeslot also hops to a different channel. A channel blacklist removes channels busy with Wi-Fi. Hopping gives frequency diversity; the mesh gives path diversity. A packet that fails on one channel or one neighbour is retried elsewhere."
+    },
+    {
+     "type": "p",
+     "text": "Devices form a mesh. A central Network Manager installs routes as graph routes or source routes, and a gateway bridges the mesh to the plant network. The Security Manager distributes keys; every frame is protected with AES-128 in CCM* mode and carries a message integrity code, so a forged frame is dropped at each hop."
+    },
+    {
+     "type": "formula",
+     "text": "T_sf = N × 10 ms        R = k × B × 8 ÷ T_sf",
+     "where": "T_sf is the superframe duration; N is timeslots per superframe; k is the device's dedicated slots per superframe; B is payload bytes carried in one slot; R is the device's effective data rate in bits per second."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "SCADA",
+      "BACnet",
+      "WirelessHART"
+     ],
+     "rows": [
+      [
+       "What it is",
+       "supervisory architecture",
+       "building-automation standard",
+       "wireless field-network standard"
+      ],
+      [
+       "Timing",
+       "soft, poll-based",
+       "token on MS/TP",
+       "hard, scheduled TDMA"
+      ],
+      [
+       "Typical link",
+       "leased line, cellular",
+       "RS-485 or Ethernet",
+       "2.4 GHz mesh, 250 kbps"
+      ],
+      [
+       "Range",
+       "kilometres",
+       "one building",
+       "about 100 m per hop, meshed"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The WirelessHART stack. The data link is where the timing and the hopping live; the transport layer above it handles end-to-end reliability and retries; the PHY below is plain 802.15.4 at 2.4 GHz.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "Application",
+     "note": "HART commands",
+     "style": "normal"
+    },
+    {
+     "label": "Transport",
+     "note": "end-to-end reliability, retries",
+     "style": "normal"
+    },
+    {
+     "label": "Network",
+     "note": "mesh, graph routes",
+     "style": "normal"
+    },
+    {
+     "label": "Data link",
+     "note": "TDMA, 10 ms slots",
+     "style": "accent"
+    },
+    {
+     "label": "PHY",
+     "note": "802.15.4, 2.4 GHz",
+     "style": "normal"
+    }
+   ],
+   "aria": "WirelessHART stack with five layers: application for HART commands, transport for end-to-end reliability and retries, network for the mesh, data link for TDMA with 10 ms slots, and 802.15.4 PHY at 2.4 GHz."
+  }
+ },
+ "examples": [
+  {
+   "question": "A WirelessHART network uses a 10 ms timeslot. One superframe contains 100 timeslots. A particular field device is given 3 dedicated timeslots per superframe, and each timeslot carries 80 bytes of payload. Find the superframe duration and the device's effective data rate.",
+   "steps": [
+    "Superframe duration: T_sf = N × 10 ms = 100 × 10 ms = 1000 ms = 1 s.",
+    "Payload per superframe: k × B = 3 × 80 = 240 bytes.",
+    "Convert to bits: 240 × 8 = 1920 bits.",
+    "Effective rate: R = 1920 bits ÷ 1 s = 1920 bps.",
+    "The 802.15.4 radio itself runs at 250 kbps; this device owns only 3 of 100 slots, so its share is 1.92 kbps."
+   ],
+   "answer": "The superframe lasts 1000 ms (1 s) and the device's effective rate is 1920 bps, that is 1.92 kbps.",
+   "check": "N = 100\nslot_ms = 10\nk = 3\nB = 80\nT_ms = N * slot_ms\npayload = k * B\nrate = payload * 8 / (T_ms / 1000)\nprint(T_ms)\nprint(payload)\nprint(rate)",
+   "values": [
+    1000,
+    240,
+    1920.0
+   ],
+   "output": ""
+  },
+  {
+   "question": "A second device on the same 10 ms timeslot network gets 2 slots per superframe, each carrying 60 bytes, and the superframe has 50 timeslots. Find its effective rate.",
+   "steps": [
+    "T_sf = 50 × 10 ms = 500 ms = 0.5 s.",
+    "Payload = 2 × 60 = 120 bytes = 960 bits.",
+    "R = 960 ÷ 0.5 = 1920 bps."
+   ],
+   "answer": "The device's effective rate is 1920 bps.",
+   "check": "print((2*60*8)/(50*10/1000))",
+   "values": [
+    1920.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "SCADA is an architecture, not a protocol. Saying 'the SCADA protocol' loses marks; name Modbus, DNP3 or IEC 60870 as the protocol.",
+  "BACnet is for building automation. It is not a general IoT application protocol like MQTT.",
+  "WirelessHART does not use CSMA/CA for its scheduled traffic. The 802.15.4 MAC has CSMA/CA, but WirelessHART puts TDMA and channel hopping above the PHY.",
+  "Do not confuse the 250 kbps radio rate with the device's throughput. A device with 3 of 100 slots gets 1.92 kbps, not 250 kbps.",
+  "HART at 4-20 mA is the wired version. WirelessHART has no current loop; it is a mesh radio."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Expand SCADA and name its five main components.",
+   "marks": 2,
+   "a": "Supervisory Control and Data Acquisition. Components: field device, RTU or PLC, MTU/SCADA server, HMI and historian, joined by a communication link."
+  },
+  {
+   "level": "remember",
+   "q": "Which transport and port does BACnet/IP use, and what is MS/TP?",
+   "marks": 2,
+   "a": "BACnet/IP uses UDP on port 47808 over Ethernet or Wi-Fi. MS/TP is Master-Slave/Token-Passing on RS-485 at 9.6 to 76.8 kbps."
+  },
+  {
+   "level": "understand",
+   "q": "Why does BACnet offer Change-of-Value notification instead of pure polling?",
+   "marks": 3,
+   "a": "Polling every object wastes bandwidth, especially on a 9.6 kbps MS/TP bus. With SubscribeCOV the server sends a notification only when Present_Value moves by more than COV_Increment, so traffic follows actual change."
+  },
+  {
+   "level": "apply",
+   "q": "A BACnet Analog Input has COV_Increment = 0.5 °C and the last reported value was 22.0 °C. Readings arrive at 22.3, 22.4, 22.6, 23.2 °C. Which readings trigger a notification?",
+   "marks": 4,
+   "a": "The reported value is 22.0. 22.3 and 22.4 differ by less than 0.5, so no notification. 22.6 differs by 0.6, which is more than the increment, so it triggers and becomes the new reported value. 23.2 differs from 22.6 by 0.6, so it also triggers. Notifications at 22.6 and 23.2 °C."
+  },
+  {
+   "level": "apply",
+   "q": "A WirelessHART superframe has 80 timeslots of 10 ms. A device holds 4 slots of 100 bytes each. Find the superframe duration and the device's effective rate.",
+   "marks": 4,
+   "a": "T_sf = 80 × 10 ms = 800 ms = 0.8 s. Payload = 4 × 100 = 400 bytes = 3200 bits. R = 3200 ÷ 0.8 = 4000 bps = 4 kbps."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain how channel hopping and mesh routing give WirelessHART two independent kinds of diversity.",
+   "marks": 5,
+   "a": "Hopping changes the frequency every 10 ms timeslot, so a burst of Wi-Fi interference on one channel hits only some slots; the retry goes out on another channel. The mesh gives several paths to the gateway, so a blocked or failed node is bypassed by a neighbour. One defends against frequency-selective interference, the other against path failure, and together they raise delivery ratio without raising power."
+  },
+  {
+   "level": "analyze",
+   "q": "A plant replaces wired 4-20 mA HART with WirelessHART. Give two gains and two new risks.",
+   "marks": 5,
+   "a": "Gains: no cable cost and easy addition of a measurement point; battery life of years and access to points that are physically hard to wire. Risks: the radio shares 2.4 GHz with Wi-Fi, so channel planning and blacklisting are needed; batteries and mesh routing add new failure modes, and the security keys must be managed, because an attacker within radio range is now a threat."
+  }
+ ],
+ "beyond": "Not for the exam. In practice these protocols converge at the edge: a WirelessHART gateway often exposes data as MQTT or OPC UA to a cloud platform, so Unit 5 topics sit directly on top of this chapter. Deterministic Ethernet (TSN) is now competing with fieldbus for the same job that TDMA does here. Industrial security standards for these networks fall under IEC 62443. Search for 'WirelessHART Network Manager', 'BACnet COV' and 'OPC UA PubSub' to go further."
+}

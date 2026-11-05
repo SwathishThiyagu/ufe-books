@@ -1,0 +1,209 @@
+{
+ "lead": "MQTT is a publish-subscribe messaging protocol for IoT. A publisher client sends a message to a broker, not to a subscriber directly. The broker routes the message by topic to every client that subscribed to that topic. This decouples senders and receivers in time, address and network. A small temperature sensor can publish once, and a phone, a dashboard and a controller can all receive the value. MQTT runs over TCP, usually on port 1883, or port 8883 with TLS. Some syllabi call MQTT Message Queuing Telemetry Transport.",
+ "prereq": "You need: <a href=\"#iot-protocols-and-their-standardization\">Chapter 3.1</a> for application-layer protocols and <a href=\"#6lowpan-and-iot-routing-protocols\">Chapter 3.5</a> for constrained IPv6 transport.",
+ "sections": [
+  {
+   "h3": "Broker, clients and topics",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "MQTT has clients and one broker. A client can publish, subscribe, or both. The broker is the server: it accepts connections, stores subscriptions and forwards messages. A topic is a UTF-8 string with levels separated by /. For example, <code>home/room1/temp</code> has three levels. A publisher does not know which subscribers exist. It only names a topic, and the broker finds matching subscriptions."
+    },
+    {
+     "type": "p",
+     "text": "A subscription can use wildcards. The plus sign + matches exactly one topic level. The hash sign # matches all remaining levels and must be the last character. <code>home/+/temp</code> matches <code>home/room1/temp</code> and <code>home/kitchen/temp</code>, but not <code>home/room1/floor1/temp</code>. <code>home/#</code> matches <code>home/room1/temp</code> and <code>home/room1/floor1/temp</code>. <code>home/room1/+</code> matches <code>home/room1/temp</code>, but not <code>home/room1</code>. Topic names are case-sensitive."
+    },
+    {
+     "type": "p",
+     "text": "The broker decouples publisher and subscriber. Many publishers can write to one topic, and the broker sends each message to every matching subscriber. One subscriber can hold many subscriptions. A clean session flag controls stored state. Clean session true discards subscriptions and queued messages at disconnect; false keeps them for the next connection. Plain MQTT uses TCP port 1883; MQTT over TLS uses port 8883."
+    }
+   ]
+  },
+  {
+   "h3": "QoS levels and message flow",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "QoS is the delivery guarantee for a PUBLISH between one client and the broker. The publisher requests a QoS, and the broker may lower it to the subscription's QoS. The packet names are: PUBACK is publish acknowledgement, PUBREC is publish received, PUBREL is publish release, and PUBCOMP is publish complete."
+    },
+    {
+     "type": "table",
+     "head": [
+      "QoS",
+      "Name",
+      "Packets",
+      "Result"
+     ],
+     "rows": [
+      [
+       "0",
+       "At most once",
+       "PUBLISH only",
+       "May be lost; no duplicate"
+      ],
+      [
+       "1",
+       "At least once",
+       "PUBLISH, PUBACK",
+       "Arrives; duplicate possible"
+      ],
+      [
+       "2",
+       "Exactly once",
+       "PUBLISH, PUBREC, PUBREL, PUBCOMP",
+       "No duplicate between that client and broker"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "In QoS 1, the publisher sends PUBLISH with a packet identifier. The broker replies PUBACK. The broker then sends PUBLISH to each subscriber and each subscriber replies PUBACK. If a PUBACK is lost, the sender retransmits with the DUP flag, so a duplicate can arrive. The broker may deliver to a subscriber at a lower QoS."
+    },
+    {
+     "type": "p",
+     "text": "In QoS 2, four packets complete the handshake: PUBLISH, PUBREC, PUBREL and PUBCOMP. PUBREC means the broker received the message; PUBREL releases it; PUBCOMP completes it. This gives exactly once between the publisher and the broker. The guarantee is not automatically end-to-end to every subscriber."
+    }
+   ]
+  },
+  {
+   "h3": "Retained messages, last will, keepalive and MQTT-SN",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A retained message is stored by the broker as the last known value on a topic. When a new client subscribes, the broker sends that stored message immediately. The broker keeps one retained message per topic, not a history of all messages. Sending a retained message with an empty payload deletes the stored value."
+    },
+    {
+     "type": "p",
+     "text": "The last will is a message a client registers at connect time. If the connection closes abnormally, the broker publishes the will. A clean disconnect does not publish it. Keepalive is a timer. If the client has nothing to send, it sends PINGREQ; the broker replies PINGRESP. If no traffic arrives within about 1.5 times the keepalive period, the broker closes the connection. Keepalive detects dead links; it is not a QoS."
+    },
+    {
+     "type": "p",
+     "text": "Clean session true starts fresh and discards subscriptions and queued state. Clean session false resumes stored state. Port 1883 carries plain MQTT; port 8883 carries MQTT inside TLS, which encrypts and authenticates the connection. Security is covered in Unit 5, IoT security and privacy."
+    },
+    {
+     "type": "p",
+     "text": "MQTT-SN is MQTT for Sensor Networks. It runs over UDP, not TCP. It uses short two-byte topic IDs, smaller messages, sleeping nodes and a gateway that translates to a normal MQTT broker. This suits constrained nodes on <a href=\"#6lowpan-and-iot-routing-protocols\">6LoWPAN</a> links."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "QoS 1 flow with one publisher, a broker and one subscriber. Notice that the publisher gets PUBACK before the broker forwards the message, and the subscriber also acknowledges.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Publisher",
+    "Broker",
+    "Subscriber"
+   ],
+   "messages": [
+    {
+     "from": "Publisher",
+     "to": "Broker",
+     "label": "PUBLISH QoS 1",
+     "dashed": false
+    },
+    {
+     "from": "Broker",
+     "to": "Publisher",
+     "label": "PUBACK",
+     "dashed": false
+    },
+    {
+     "from": "Broker",
+     "to": "Subscriber",
+     "label": "PUBLISH QoS 1",
+     "dashed": false
+    },
+    {
+     "from": "Subscriber",
+     "to": "Broker",
+     "label": "PUBACK",
+     "dashed": false
+    }
+   ],
+   "aria": "QoS 1 MQTT flow: publisher sends PUBLISH to broker, broker acknowledges, broker forwards to subscriber, subscriber acknowledges."
+  }
+ },
+ "examples": [
+  {
+   "question": "A sensor publishes a 20-byte payload to topic home/room1/temp every 10 s with QoS 1. The MQTT fixed header is 2 bytes. The broker forwards each message to 3 subscribers. How many bytes per hour does the broker send to all subscribers? Ignore acknowledgements and ignore topic-name bytes.",
+   "steps": [
+    "One PUBLISH to one subscriber carries the 20-byte payload plus the 2-byte fixed header: 20 + 2 = 22 B.",
+    "The broker sends the same message to 3 subscribers: 3 × 22 = 66 B per message.",
+    "The sensor sends one message every 10 s. Messages per hour = 3600 s ÷ 10 s = 360 messages.",
+    "Bytes per hour to all subscribers = 360 × 66 = 23760 B.",
+    "Convert to kilobytes using 1 kB = 1000 B: 23760 ÷ 1000 = 23.76 kB per hour."
+   ],
+   "answer": "The broker sends 23760 B per hour, which is 23.76 kB per hour, to all 3 subscribers.",
+   "check": "payload = 20\nheader = 2\nper_sub = payload + header\nsubs = 3\nper_msg = per_sub * subs\ninterval_s = 10\nmsgs_per_hour = 3600 // interval_s\ntotal_b = msgs_per_hour * per_msg\ntotal_kb = total_b / 1000\nprint(per_sub)\nprint(per_msg)\nprint(msgs_per_hour)\nprint(total_b)\nprint(total_kb)",
+   "values": [
+    22,
+    66,
+    360,
+    23760,
+    23.76
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "QoS 2 is exactly once between one client and the broker, not automatically end-to-end to every subscriber. The broker may deliver to a subscriber at a lower QoS.",
+  "A retained message is stored by the broker as the last value on a topic. It is not a queue of every past message sent to every future client forever.",
+  "Wildcard rules: + matches exactly one level, # matches all remaining levels and must be last. Topic names are case-sensitive, and a leading / adds an empty first level.",
+  "Clean session controls stored subscriptions and queued state. Keepalive detects a dead connection. Last will is published only on an abnormal disconnect, not a clean one.",
+  "Plain MQTT uses TCP port 1883; MQTT over TLS uses port 8883. MQTT-SN is the UDP variant for constrained nodes, not MQTT over TCP."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Expand MQTT and name its usual transport and two standard ports.",
+   "marks": 2,
+   "a": "MQTT is Message Queuing Telemetry Transport. It runs over TCP. Port 1883 is plain MQTT; port 8883 is MQTT over TLS."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a broker decouple a publisher from its subscribers?",
+   "marks": 3,
+   "a": "The publisher sends only to the broker and names a topic. It does not know subscriber addresses or how many exist. The broker stores subscriptions and forwards each message to matching subscribers, so either side can change without the other knowing."
+  },
+  {
+   "level": "apply",
+   "q": "Which topics match the subscription home/+/temp: home/room1/temp, home/kitchen/temp, home/room1/floor1/temp, home/temp?",
+   "marks": 3,
+   "a": "home/room1/temp and home/kitchen/temp match because + fills exactly one level. home/room1/floor1/temp has two levels where + allows one, so it does not match. home/temp has no middle level, so it does not match."
+  },
+  {
+   "level": "analyze",
+   "q": "A publisher uses QoS 1. Explain how a subscriber can receive the same message twice.",
+   "marks": 4,
+   "a": "The publisher sends PUBLISH and waits for PUBACK. If PUBACK is lost, the publisher retransmits with the DUP flag because it cannot know the broker received the first copy. The broker may already have forwarded the first copy, so the subscriber can see a duplicate. QoS 1 is at least once, not exactly once."
+  },
+  {
+   "level": "remember",
+   "q": "What is a retained message?",
+   "marks": 2,
+   "a": "It is the last message stored by the broker on a topic because its publisher set the retain flag. A new subscriber to that topic receives it immediately."
+  },
+  {
+   "level": "understand",
+   "q": "How do keepalive and last will differ?",
+   "marks": 3,
+   "a": "Keepalive is a timer with PINGREQ and PINGRESP that detects a dead connection. Last will is a message stored at connect time and published by the broker if the connection closes abnormally. Keepalive can trigger the will by letting the broker detect the failure."
+  },
+  {
+   "level": "apply",
+   "q": "A sensor sends a 30-byte payload with a 2-byte fixed header every 5 s to 5 subscribers. Ignoring acknowledgements and topic-name bytes, how many bytes per hour do all subscribers receive?",
+   "marks": 4,
+   "a": "Per subscriber per message: 30 + 2 = 32 B. For 5 subscribers: 5 × 32 = 160 B per message. Messages per hour: 3600 ÷ 5 = 720. Total: 720 × 160 = 115200 B per hour = 115.2 kB per hour."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does MQTT-SN use UDP and short topic IDs on constrained nodes?",
+   "marks": 4,
+   "a": "Constrained nodes have small frames, limited energy and sometimes sleep for long periods. TCP needs a persistent connection and more overhead. MQTT-SN uses UDP, short two-byte topic IDs and smaller messages, with a gateway translating to a normal MQTT broker. This reduces header bytes and energy use."
+  }
+ ],
+ "beyond": "Not for the exam. MQTT 5 adds reason codes, message expiry, shared subscriptions and user properties, which help large deployments and debugging. Brokers are often bridged across sites, and TLS client certificates are common in production. Search for MQTT 5 shared subscriptions, MQTT-SN gateway, broker bridging, and MQTT TLS client certificates."
+}
