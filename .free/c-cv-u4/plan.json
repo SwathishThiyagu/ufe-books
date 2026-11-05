@@ -1,0 +1,713 @@
+{
+ "lead": "This unit is about cutting an image into the parts that matter and then writing those parts down as numbers. After it you can choose an edge detector for a blurry or noisy photo, threshold a scanned page, separate touching objects with a watershed, and describe any region by its chain code, Euler number or texture.",
+ "about": "The unit turns a grey-level image into labelled regions, and then into numbers a classifier can use. 4.1 finds points, lines and edges with small masks. 4.2 builds real edge detectors: gradient, Marr-Hildreth and Canny. 4.3 joins broken edges into boundaries using the Hough transform. 4.4 splits the image by thresholding and picks the threshold automatically with Otsu's method. 4.5 and 4.6 group pixels by growing and merging regions and by flooding a gradient with the watershed. 4.7 fits a closed contour with an energy-minimising snake. 4.8 and 4.9 describe the result: chain codes and boundary descriptors, then regional, topological and texture numbers. Each chapter feeds the next, because every segmentation method ends with a boundary that still has to be represented.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "An isolated point, a thin line and an edge each leave a different pattern in a 3×3 mask response, so three tiny masks can tell them apart.",
+   "depth": "Second-derivative (Laplacian) mask for isolated points, and the four 3×3 line masks for horizontal, vertical, +45° and −45° lines. Define the mask response R = Σ w<sub>i</sub> z<sub>i</sub> over the 9 neighbours and the rule: mark the pixel if |R| > T. Define the three edge models — step, ramp, roof — and show how the first derivative peaks and the second derivative crosses zero on each. Point out that the weights of every one of these masks sum to zero, so a flat region gives R = 0. Some syllabi title this 'point, line and edge detection' and open the unit here.",
+   "figure": {
+    "type": "array",
+    "title": "The four 3×3 detection masks",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "Point",
+      "cells": [
+       "-1",
+       "-1",
+       "-1",
+       "-1",
+       "8",
+       "-1",
+       "-1",
+       "-1",
+       "-1"
+      ],
+      "marks": {
+       "4": "accent"
+      }
+     },
+     {
+      "label": "Horizontal",
+      "cells": [
+       "-1",
+       "-1",
+       "-1",
+       "2",
+       "2",
+       "2",
+       "-1",
+       "-1",
+       "-1"
+      ],
+      "marks": {
+       "4": "live"
+      }
+     },
+     {
+      "label": "Vertical",
+      "cells": [
+       "-1",
+       "2",
+       "-1",
+       "-1",
+       "2",
+       "-1",
+       "-1",
+       "2",
+       "-1"
+      ],
+      "marks": {
+       "4": "live"
+      }
+     },
+     {
+      "label": "Diagonal 45°",
+      "cells": [
+       "2",
+       "-1",
+       "-1",
+       "-1",
+       "2",
+       "-1",
+       "-1",
+       "-1",
+       "2"
+      ],
+      "marks": {
+       "4": "live"
+      }
+     }
+    ],
+    "aria": "Four rows of nine numbers, each row a 3×3 mask read left to right, with the centre weight marked in every row."
+   },
+   "example": "Question: a 3×3 neighbourhood reads, top row first, 0 0 0 / 3 3 3 / 0 0 0. Find the response of the horizontal mask [−1 −1 −1; 2 2 2; −1 −1 −1] and of the vertical mask [−1 2 −1; −1 2 −1; −1 2 −1]. Answer: horizontal R = (2×3 + 2×3 + 2×3) − (0 + 0 + 0) = 18. Vertical R = 0 in every row: (−1×3 + 2×3 − 1×3) = 0, so R = 0. With T = 10 the pixel is marked as a horizontal line pixel. Second part: a centre value 5 with all eight neighbours 0 gives the Laplacian response 8×5 − 0 = 40, so with T = 20 it is an isolated point.",
+   "trap": "A mask whose weights do not sum to zero gives a large response on any bright flat area. Always sum the weights first, and take |R| before comparing with T.",
+   "prereq": "Unit 1 (pixel neighbourhoods, connectivity) and Unit 2 (correlation and convolution, how a mask is slid over an image).",
+   "leave": "Full gradient operators such as Sobel go to 4.2; corner detection goes to Unit 5."
+  },
+  {
+   "k": 2,
+   "idea": "An edge is a place where brightness changes fast, so an edge detector measures the derivative — or the second derivative — and keeps only the strong, well-placed responses.",
+   "depth": "Gradient ∇f = [G<sub>x</sub>, G<sub>y</sub>], magnitude |G| = √(G<sub>x</sub>² + G<sub>y</sub>²) and direction θ = tan<sup>−1</sup>(G<sub>y</sub>/G<sub>x</sub>). Roberts 2×2, Prewitt and Sobel 3×3 masks, with the reason Sobel puts weight 2 in the middle row and column (a smoothing action that reduces noise). Thresholding the magnitude. Laplacian, the Laplacian of Gaussian (LoG) and the Marr-Hildreth detector: blur, apply ∇², then mark a pixel as an edge only where the sign changes and the local response is above a threshold; the choice of σ sets the smallest detail found. Canny: the three aims (good detection, good localisation, one response per edge) and the five steps — Gaussian smoothing, gradient, non-maximum suppression along the gradient direction, double threshold with T<sub>high</sub> and T<sub>low</sub>, then hysteresis. Some syllabi call Marr-Hildreth the 'Mexican hat' operator.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Canny edge detection",
+    "nodes": [
+     {
+      "id": "in",
+      "label": "Input image",
+      "note": "f(x, y)",
+      "style": "normal"
+     },
+     {
+      "id": "gs",
+      "label": "Gaussian blur",
+      "note": "remove fine noise",
+      "style": "normal"
+     },
+     {
+      "id": "gr",
+      "label": "Gradient G, θ",
+      "note": "Sobel 3×3",
+      "style": "normal"
+     },
+     {
+      "id": "nm",
+      "label": "Non-max suppression",
+      "note": "thin to one pixel",
+      "style": "accent"
+     },
+     {
+      "id": "dt",
+      "label": "Double threshold",
+      "note": "T low, T high",
+      "style": "normal"
+     },
+     {
+      "id": "hy",
+      "label": "Hysteresis",
+      "note": "follow 8-connected chains",
+      "style": "live"
+     },
+     {
+      "id": "out",
+      "label": "Edge map",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "in",
+      "to": "gs",
+      "style": "solid"
+     },
+     {
+      "from": "gs",
+      "to": "gr",
+      "style": "solid"
+     },
+     {
+      "from": "gr",
+      "to": "nm",
+      "style": "solid"
+     },
+     {
+      "from": "nm",
+      "to": "dt",
+      "style": "solid"
+     },
+     {
+      "from": "dt",
+      "to": "hy",
+      "style": "solid"
+     },
+     {
+      "from": "hy",
+      "to": "out",
+      "style": "solid"
+     }
+    ],
+    "aria": "A six-step downward pipeline from the input image through Gaussian blur, gradient, non-maximum suppression, double thresholding and hysteresis to the final edge map."
+   },
+   "example": "Question: a 3×3 patch reads 10 10 50 / 10 10 50 / 10 10 50. Use the Sobel masks (right column minus left column for G<sub>x</sub>, bottom row minus top row for G<sub>y</sub>). Find |G|, θ, and decide the pixel with T<sub>low</sub> = 50, T<sub>high</sub> = 150. Answer: G<sub>x</sub> = (50 + 2×50 + 50) − (10 + 2×10 + 10) = 200 − 40 = 160. G<sub>y</sub> = (10 + 20 + 10) − (10 + 20 + 10) = 0. |G| = 160 grey levels per pixel, θ = tan<sup>−1</sup>(0/160) = 0°, so the gradient points along +x and the edge itself runs vertically. 160 > 150, so the pixel is strong and hysteresis keeps it.",
+   "trap": "The gradient direction is across the edge, not along it; the edge direction is θ + 90°. Non-maximum suppression must compare each pixel with its two neighbours along the gradient direction, not along x and y.",
+   "prereq": "4.1 for second-derivative masks, Unit 2 for Gaussian smoothing and derivatives.",
+   "leave": "Joining the final edge map into boundaries goes to 4.3; the Hough transform is also introduced there."
+  },
+  {
+   "k": 3,
+   "idea": "A raw edge map is broken into fragments, so boundaries have to be built either locally, by agreeing neighbours, or globally, by voting every edge pixel into a parameter space.",
+   "depth": "Local edge linking: two edge pixels join when their positions are close, their gradient magnitudes are similar and their gradient directions differ by less than a small angle. Global linking by the Hough transform for lines: the normal form ρ = x cos θ + y sin θ, where ρ is the perpendicular distance from the origin in pixels and θ is the angle of that perpendicular in degrees. Each edge point votes for every (ρ, θ) pair that passes through it; the accumulator A(ρ, θ) is then searched for peaks. Quantisation of ρ and θ, the ranges (θ from 0° to 180°, ρ from −D to +D where D is the image diagonal), and the fact that the peak is a spread of cells, not one cell. One line on the circle version with the 3-D accumulator (a, b, r). Boundary detection: order the linked pixels into a closed path. Some syllabi put 'motion in segmentation' in this unit.",
+   "figure": {
+    "type": "array",
+    "title": "Accumulator for two edge points",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "ρ = 0",
+      "cells": [
+       "0",
+       "0",
+       "0",
+       "2"
+      ],
+      "marks": {
+       "3": "accent"
+      }
+     },
+     {
+      "label": "ρ = 1",
+      "cells": [
+       "1",
+       "0",
+       "1",
+       "0"
+      ]
+     },
+     {
+      "label": "ρ = 1.41",
+      "cells": [
+       "0",
+       "1",
+       "0",
+       "0"
+      ]
+     },
+     {
+      "label": "ρ = 2",
+      "cells": [
+       "1",
+       "0",
+       "1",
+       "0"
+      ]
+     },
+     {
+      "label": "ρ = 2.83",
+      "cells": [
+       "0",
+       "1",
+       "0",
+       "0"
+      ]
+     }
+    ],
+    "aria": "A five-row accumulator table whose columns are θ equal to 0, 45, 90 and 135 degrees; one cell holds two votes and is marked."
+   },
+   "example": "Question: two edge points lie at (1, 1) and (2, 2). Using ρ = x cos θ + y sin θ at θ = 0°, 45°, 90°, 135°, fill the accumulator and find the line. Answer: for (1, 1), ρ = 1, 1.41, 1, 0. For (2, 2), ρ = 2, 2.83, 2, 0. The only cell with two votes is (ρ = 0, θ = 135°). That cell means −0.707x + 0.707y = 0, i.e. the line y = x, which indeed passes through both points.",
+   "trap": "(ρ, θ) and (−ρ, θ + 180°) describe the same line, so θ is always kept in [0°, 180°). Also, a spread of accumulator cells around the peak is normal, and you must pick the centre of that spread.",
+   "prereq": "4.2 for gradient magnitude and direction, which give the edge points and their angles.",
+   "leave": "Motion-based segmentation is left to Unit 5, which covers optical flow and motion estimation."
+  },
+  {
+   "k": 4,
+   "idea": "If the objects are brighter than the background, one grey level can separate them — and Otsu's method chooses that level by maximising the variance between the two classes.",
+   "depth": "Thresholding foundation: the model g(x, y) = 1 if f(x, y) > T else 0; the role of illumination and reflectance, which is why a single global T fails under uneven light. Basic global thresholding as an iterative algorithm: start with T = the mean grey level, split the image, recompute T as the average of the two class means, repeat until T stops changing. Otsu's method: for every possible k, compute w<sub>0</sub>(k) and w<sub>1</sub>(k) (the fractions of pixels in each class), μ<sub>0</sub>(k) and μ<sub>1</sub>(k) (their means), then σ<sub>B</sub>²(k) = w<sub>0</sub>(k) w<sub>1</sub>(k) [μ<sub>0</sub>(k) − μ<sub>1</sub>(k)]²; the best k maximises σ<sub>B</sub>². State the equivalent within-class form (minimising σ<sub>W</sub>² gives the same k) and that the whole search runs on the histogram, not the image. One line on variable thresholding by dividing the image into blocks.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "grey level",
+     "min": 0,
+     "max": 3
+    },
+    "y": {
+     "label": "pixel count",
+     "min": 0,
+     "max": 8
+    },
+    "series": [
+     {
+      "name": "histogram h(i)",
+      "points": [
+       [
+        0,
+        4
+       ],
+       [
+        1,
+        6
+       ],
+       [
+        2,
+        6
+       ],
+       [
+        3,
+        4
+       ]
+      ],
+      "style": "accent"
+     }
+    ]
+   },
+   "example": "Question: a 20-pixel image has counts h(0) = 4, h(1) = 6, h(2) = 6, h(3) = 4. Find the Otsu threshold. Answer: the probabilities are 0.2, 0.3, 0.3, 0.2 and the overall mean is μ<sub>T</sub> = 1.5. For k = 0: w<sub>0</sub> = 0.2, μ<sub>0</sub> = 0, w<sub>1</sub> = 0.8, μ<sub>1</sub> = 1.875, so σ<sub>B</sub>² = 0.2 × 0.8 × 1.875² = 0.5625. For k = 1: w<sub>0</sub> = 0.5, μ<sub>0</sub> = 0.6, μ<sub>1</sub> = 2.4, so σ<sub>B</sub>² = 0.25 × 1.8² = 0.81. For k = 2: σ<sub>B</sub>² = 0.16 × 1.875² = 0.5625. The largest value is at k = 1, so T = 1: grey levels 0 and 1 become class 0, levels 2 and 3 become class 1.",
+   "trap": "Otsu's method maximises the between-class variance, not the within-class one; if you use within-class you must minimise it. Also write clearly which side of the split k belongs to — the usual rule is '≤ k is class 0'.",
+   "prereq": "Unit 1 (histograms) and Unit 2 (histogram processing).",
+   "leave": "Local and adaptive thresholding by block partitioning is only named here; the detailed adaptive filters are in Unit 3."
+  },
+  {
+   "k": 5,
+   "idea": "Instead of one global grey-level cut, group neighbouring pixels that look alike — grow regions from seeds upwards, or split the image into quadrants and merge the pieces back.",
+   "depth": "Region growing: a seed pixel, a predicate P such as |f(x, y) − f(seed)| ≤ 1, and 4- or 8-connectivity; pixels are added only if they touch the current region and satisfy P. State that the result depends on seed choice and on the order of visiting pixels. Region splitting and merging with a predicate Q (for example, 'all pixels in R have the same grey level'): split a region into four quadrants while Q is false, then merge any two adjacent regions whose union satisfies Q, and stop when no split or merge is possible. The quadtree of the splits, the fact that merging is allowed only for adjacent regions, and the use of a mean and standard-deviation predicate for natural images.",
+   "figure": {
+    "type": "array",
+    "title": "Region growing from a seed",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "row 0",
+      "cells": [
+       "5",
+       "5",
+       "4",
+       "4"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "live",
+       "2": "live",
+       "3": "live"
+      }
+     },
+     {
+      "label": "row 1",
+      "cells": [
+       "5",
+       "6",
+       "4",
+       "9"
+      ],
+      "marks": {
+       "0": "live",
+       "1": "live",
+       "2": "live"
+      }
+     },
+     {
+      "label": "row 2",
+      "cells": [
+       "4",
+       "4",
+       "5",
+       "9"
+      ],
+      "marks": {
+       "0": "live",
+       "1": "live",
+       "2": "live"
+      }
+     },
+     {
+      "label": "row 3",
+      "cells": [
+       "3",
+       "3",
+       "3",
+       "9"
+      ],
+      "marks": {}
+     }
+    ],
+    "aria": "A 4 by 4 grid of grey values in which the seed pixel and the nine pixels grown from it are shaded, and the four 3s and three 9s are left plain."
+   },
+   "example": "Question: the 4×4 image above has seed (0, 0) with value 5 and the predicate |f − 5| ≤ 1, using 4-connectivity. Which pixels form the region? Answer: accepted values are 4, 5 and 6. From (0, 0) the growth reaches (0, 1) = 5, (1, 0) = 5, then (0, 2) = 4, (1, 1) = 6, (2, 0) = 4, then (0, 3) = 4, (1, 2) = 4, (2, 1) = 4, (2, 2) = 5. The 9s at (1, 3), (2, 3) and the 3s in row 3 are rejected because |9 − 5| = 4 and |3 − 5| = 2. The region has 10 pixels.",
+   "trap": "Region growing gives a different answer if you start from another seed or visit neighbours in another order — say so in the answer. In split-and-merge, two regions may be merged only if they are adjacent and Q of the union is true.",
+   "prereq": "Unit 1 (4- and 8-connectivity) and 4.4 (why a single global threshold fails).",
+   "leave": "Clustering methods such as k-means for segmentation belong with the classifiers in Unit 6."
+  },
+  {
+   "k": 6,
+   "idea": "Treat the grey levels as a landscape: flood it from the bottom and every valley fills into a basin, and where two basins meet you draw the watershed line.",
+   "depth": "The topographic model: grey level as height, regional minima as the bottom of the valleys, catchment basins as the flooded valleys, watershed lines as the ridges where basins touch. The input must be a gradient image, not the raw image, so flat object interiors give low values and edges give ridges. Flooding from every regional minimum, and why noise creates extra minima and over-segmentation. Marker-controlled watershed: find internal markers with h-minima or by a morphological opening, find external markers on the watershed of the gradient, then flood only from the markers. Using the distance transform as the flooding surface to separate touching objects. Some syllabi call this the 'watershed transformation' and use the Meyer flooding algorithm with morphological dilation.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "position x",
+     "min": 0,
+     "max": 10
+    },
+    "y": {
+     "label": "grey level",
+     "min": 0,
+     "max": 10
+    },
+    "series": [
+     {
+      "name": "profile f(x)",
+      "points": [
+       [
+        1,
+        9
+       ],
+       [
+        2,
+        7
+       ],
+       [
+        3,
+        3
+       ],
+       [
+        4,
+        7
+       ],
+       [
+        5,
+        9
+       ],
+       [
+        6,
+        8
+       ],
+       [
+        7,
+        3
+       ],
+       [
+        8,
+        7
+       ],
+       [
+        9,
+        9
+       ]
+      ],
+      "style": "accent"
+     }
+    ]
+   },
+   "example": "Question: a 1-D grey profile has values 9, 7, 3, 7, 9, 8, 3, 7, 9 at x = 1 to 9. Show the flooding levels, the two basins and the watershed line. Answer: the regional minima are at x = 3 and x = 7, both of value 3. At level 7 the left basin holds {2, 3, 4} and the right basin holds {6, 7, 8}. At level 8 nothing new is added, because neighbours of both basins are 9. At level 9 both basins reach x = 5, so they meet there. Basin A = {1, 2, 3, 4}, basin B = {6, 7, 8, 9}, and x = 5 is the watershed line.",
+   "trap": "Running the watershed on the original image floods from every small noise dip and produces hundreds of regions. The flooding surface must be the gradient magnitude, and marker control is what prevents over-segmentation.",
+   "prereq": "4.2 for the gradient image, Unit 2 and Unit 3 for the morphological opening and closing used to build markers.",
+   "leave": "Deep morphological theory (structuring elements, opening by reconstruction) is not repeated here; only the operations needed for the markers are used."
+  },
+  {
+   "k": 7,
+   "idea": "A snake is a closed curve that slides under forces until its own bending energy and the image edges balance, so it finds a smooth boundary even where the edge map has gaps.",
+   "depth": "The parametric contour v(s) = (x(s), y(s)) with s from 0 to 1, and the energy E = ∫ (E<sub>int</sub> + E<sub>ext</sub>) ds. Internal energy E<sub>int</sub> = (α |v′(s)|² + β |v″(s)|²) / 2, where α discourages stretching and β discourages bending; external energy E<sub>ext</sub> = −|∇f(x, y)|², whose minus sign means a strong edge gives a low energy. The iterative update: at each point, move to the neighbour that lowers the total energy, add a balloon or pressure weight γ to push the curve outwards, and stop when the energy change is small. Sensitivity to the starting contour, and one line on gradient vector flow as the usual fix. Only a few universities go further into level-set and geometric active contours. Some syllabi call these 'deformable contours'.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Snake iteration",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Initial contour",
+      "note": "placed near object",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Internal force",
+      "note": "α stretch, β bend",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "External force",
+      "note": "minus gradient energy",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Move points",
+      "note": "lowest nearby energy",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Energy settled?",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Final boundary",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "a",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "d",
+      "label": "no",
+      "style": "dashed"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "label": "yes",
+      "style": "solid"
+     }
+    ],
+    "aria": "A flowchart in which an initial contour is pulled by internal and external forces, the points are moved, and the loop repeats until the energy settles."
+   },
+   "example": "Question: a closed snake has four points v1 = (0, 0), v2 = (2, 0), v3 = (2, 2), v4 = (0, 2), with α = 1 and β = 0. Find the internal energy, then decide whether moving v2 to (3, 0) is accepted. Answer: E<sub>int</sub> = Σ |v<sub>i+1</sub> − v<sub>i</sub>|² with v5 = v1, so 4 + 4 + 4 + 4 = 16. After the move the four side lengths are 3, √5 = 2.236, 2, 2, so E<sub>int</sub> = 9 + 5 + 4 + 4 = 22. The move adds 6 to the internal energy, so it is accepted only if the external energy falls by more than 6.",
+   "trap": "The external energy is negative, −|∇f|², because the curve minimises energy; using +|∇f|² makes the snake run away from edges. A snake also shrinks on its own when β is too large and the edge is weak.",
+   "prereq": "4.2 for the gradient image that supplies the external energy, and Unit 2 for Gaussian smoothing before the gradient.",
+   "leave": "Level sets and region-based (Chan-Vese) active contours are touched on only in one line; they are beyond most syllabi."
+  },
+  {
+   "k": 8,
+   "idea": "Once the boundary is known, it can be written as a short string of direction numbers, and that string can be made independent of where you started and how the object is rotated.",
+   "depth": "Boundary following of a segmented region. Chain codes: 4-directional (0 = east, 1 = north, 2 = west, 3 = south) and 8-directional with the Freeman convention 0 = E, 1 = NE, 2 = N, 3 = NW, 4 = W, 5 = SW, 6 = S, 7 = SE, all measured in image coordinates with the y axis pointing down. Normalising the start point, resampling on a coarser grid, the first difference d<sub>i</sub> = (a<sub>i</sub> − a<sub>i−1</sub>) mod 8 with a<sub>−1</sub> = a<sub>n−1</sub>, and the shape number as the smallest circular rotation of the first difference. Boundary length from the code: L = N<sub>e</sub> + √2 N<sub>o</sub>, where N<sub>e</sub> counts codes 0, 2, 4, 6 and N<sub>o</sub> counts 1, 3, 5, 7. Boundary descriptors: diameter, eccentricity, curvature, and Fourier descriptors built from z(k) = x(k) + j y(k); keep the first few DFT coefficients, whose magnitudes are unchanged by translation, rotation, scale and starting point. Skeletons are mentioned and handled in 4.9.",
+   "figure": {
+    "type": "array",
+    "title": "Chain code of a 3×3 ring",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Chain code",
+      "cells": [
+       "0",
+       "0",
+       "6",
+       "6",
+       "4",
+       "4",
+       "2",
+       "2"
+      ],
+      "marks": {}
+     },
+     {
+      "label": "First difference",
+      "cells": [
+       "6",
+       "0",
+       "6",
+       "0",
+       "6",
+       "0",
+       "6",
+       "0"
+      ],
+      "marks": {}
+     },
+     {
+      "label": "Shape number",
+      "cells": [
+       "0",
+       "6",
+       "0",
+       "6",
+       "0",
+       "6",
+       "0",
+       "6"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     }
+    ],
+    "aria": "Three rows of eight digits: the chain code of the ring, its first difference, and the shape number obtained by rotating the difference once."
+   },
+   "example": "Question: a 3×3 square region has all pixels on except the centre. Trace its outer boundary clockwise from the top-left pixel and find the chain code, the first difference and the shape number. Answer: the path visits (0,0), (0,1), (0,2), (1,2), (2,2), (2,1), (2,0), (1,0) and returns to (0,0), giving directions E, E, S, S, W, W, N, N, so the chain code is 0 0 6 6 4 4 2 2. The first differences, each taken mod 8 from the previous code with the last code 2 before the first element, are 6 0 6 0 6 0 6 0. Rotating this sequence once gives 0 6 0 6 0 6 0 6, which is the smallest rotation, so the shape number is 06060606.",
+   "trap": "The first difference must be taken mod 8. Writing −2 instead of 6 for a step from 4 to 2 breaks the whole descriptor. Also state your starting point and direction, because the raw code depends on both.",
+   "prereq": "4.3 for linking edge pixels into an ordered boundary, and Unit 1 for connectivity.",
+   "leave": "Skeletons and medial axes are described in 4.9 as a regional descriptor; texture descriptors are also there."
+  },
+  {
+   "k": 9,
+   "idea": "A whole region can be summarised by numbers — its size and shape, how many holes it has, and how its grey levels are arranged.",
+   "depth": "Regional descriptors: area, perimeter, compactness P²/A (4π for a perfect circle), eccentricity from the principal axis of the second moments, mean and variance of the grey level inside the region, and the skeleton or medial axis as a thin summary of the shape. Topological descriptors: the number of connected components C, the number of holes H, and the Euler number E = C − H, with a warning that C and H depend on whether you use 4- or 8-connectivity (use 8 for the object and 4 for the background, or the reverse). Texture: statistical moments of the grey-level histogram — mean, variance, smoothness R = 1 − 1/(1 + σ²), third moment, uniformity Σ p<sub>i</sub>², entropy −Σ p<sub>i</sub> log<sub>2</sub> p<sub>i</sub> in bits — and the grey-level co-occurrence matrix P(i, j | d, θ) with its contrast, correlation, energy and homogeneity. Only a few universities teach moment invariants in this unit. LBP and HOG are named and left to Unit 5.",
+   "figure": {
+    "type": "array",
+    "title": "Counting components and holes",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "row 0",
+      "cells": [
+       "1",
+       "1",
+       "1",
+       "0",
+       "0"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent",
+       "2": "accent"
+      }
+     },
+     {
+      "label": "row 1",
+      "cells": [
+       "1",
+       "0",
+       "1",
+       "0",
+       "1"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "muted",
+       "2": "accent",
+       "4": "live"
+      }
+     },
+     {
+      "label": "row 2",
+      "cells": [
+       "1",
+       "1",
+       "1",
+       "0",
+       "1"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent",
+       "2": "accent",
+       "4": "live"
+      }
+     },
+     {
+      "label": "row 3",
+      "cells": [
+       "0",
+       "0",
+       "0",
+       "0",
+       "0"
+      ],
+      "marks": {}
+     },
+     {
+      "label": "row 4",
+      "cells": [
+       "1",
+       "1",
+       "0",
+       "0",
+       "0"
+      ],
+      "marks": {
+       "0": "next",
+       "1": "next"
+      }
+     }
+    ],
+    "aria": "A 5 by 5 binary image with three separate groups of 1s, one of which surrounds a single 0 hole."
+   },
+   "example": "Question (a): for the 5×5 binary image above, find C, H and the Euler number. Answer: with 8-connectivity for the object there are three groups of 1s — the ring in the top left (rows 0 to 2, columns 0 to 2), the pair at (1,4) and (2,4), and the pair at (4,0) and (4,1) — so C = 3. Only the ring encloses a background pixel, at (1,1), so H = 1 and E = C − H = 3 − 1 = 2. Question (b): a region has grey-level probabilities 0.50, 0.25, 0.15 and 0.10 at levels 0, 1, 2, 3. Find the mean, variance, uniformity and entropy. Answer: mean = 0.85, second moment = 1.75, variance = 1.75 − 0.85² = 1.0275, uniformity = 0.25 + 0.0625 + 0.0225 + 0.01 = 0.345, entropy = 0.5 + 0.5 + 0.4106 + 0.3322 = 1.74 bits.",
+   "trap": "The Euler number is C − H, not C + H. Entropy must use log<sub>2</sub> to be in bits, and a region with one dominant grey level has high uniformity but low entropy.",
+   "prereq": "4.5, 4.6 and 4.7 for getting the regions, and 4.8 for the boundary numbers that regional descriptors extend.",
+   "leave": "LBP, HOG and moment invariants as feature vectors for recognition go to Unit 5; classifiers go to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "point and line masks grow into full gradient operators"
+  ],
+  [
+   2,
+   3,
+   "an edge map is broken, so the fragments must be linked and voted on"
+  ],
+  [
+   2,
+   7,
+   "the snake's external energy is the same gradient magnitude"
+  ],
+  [
+   4,
+   5,
+   "one global threshold fails under uneven light, so grow regions instead"
+  ],
+  [
+   5,
+   6,
+   "region grouping plus morphology gives the marker-controlled watershed"
+  ],
+  [
+   6,
+   7,
+   "watershed lines are blocky, and a snake refines them"
+  ],
+  [
+   7,
+   8,
+   "a finished boundary must be coded and described"
+  ],
+  [
+   8,
+   9,
+   "from boundary numbers to whole-region numbers"
+  ]
+ ]
+}

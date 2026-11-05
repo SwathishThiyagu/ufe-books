@@ -1,0 +1,252 @@
+{
+ "lead": "Many images hold two things: something bright and something dark. Thresholding turns such an image into black and white by comparing every pixel with a single grey level T. It is the cheapest segmentation method — one comparison per pixel — and the first thing to try on scanned documents, parts on an inspection line, cells on a slide and CT slices. The hard part is choosing T. Otsu's method searches the histogram for the split that pushes the two classes farthest apart.",
+ "prereq": "Unit 1 histograms and Unit 2 histogram processing; Otsu's search runs on the histogram alone.",
+ "sections": [
+  {
+   "h3": "From grey image to binary image",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Thresholding compares every pixel with one number T, the threshold, and outputs a binary image. Pixels above T become 1 (foreground), the rest 0. It is a point operation: it never looks at a neighbour."
+    },
+    {
+     "type": "formula",
+     "text": "g(x, y) = 1 if f(x, y) > T, else g(x, y) = 0",
+     "where": "f(x, y) is the input grey level (0 to 255 for 8-bit); T is a grey level, not a pixel count; g(x, y) is the binary output."
+    },
+    {
+     "type": "p",
+     "text": "The method exists because many scenes contain exactly two materials. On the histogram such an image is bimodal: one peak for the background, one for the object, and a valley between them. The valley is the natural T."
+    },
+    {
+     "type": "p",
+     "text": "Light is the hidden assumption. A camera records f(x, y) = i(x, y) · r(x, y), where i is illumination and r is reflectance (0 to 1). Illumination does not change the object, but it shifts grey levels: a page lit from one corner is darker at the far corner, and one global T cuts paper as ink or loses part of a letter."
+    },
+    {
+     "type": "p",
+     "text": "Uses: document binarisation before OCR, defect checks on a conveyor, counting stained cells, separating bone from soft tissue in a CT slice, and producing a mask for later steps such as <a href=\"#region-growing-region-splitting-and-merging\">region growing</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Basic global thresholding: iterate on the mean",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When the valley is not obvious, an older iterative procedure finds T from the two class means."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set T to the mean grey level of the whole image.",
+      "Split with T: pixels with f ≤ T go to G1, pixels with f > T go to G2.",
+      "Compute μ1 and μ2, the means of G1 and G2.",
+      "Set the new T = (μ1 + μ2) / 2.",
+      "Repeat steps 2 to 4 until T changes by less than ΔT, often 1 grey level or 0."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Each pass pulls T towards the midpoint between the class means, roughly the valley. A clean bimodal image settles in a few passes. It is a heuristic, not an optimum: three peaks can lock it onto the wrong valley, and it still uses one T for the whole image."
+    }
+   ]
+  },
+  {
+   "h3": "Otsu's method: maximise the between-class variance",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Otsu asks: which k makes the two classes cleanest? Build the normalised histogram p(i) = h(i)/(MN), where h(i) counts pixels at grey level i and MN is the pixel count. For candidate k, class 0 is levels 0 to k and class 1 is levels k+1 to L−1, with L = 256."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "w0(k) = Σ p(i) for i = 0 to k, the fraction of pixels in class 0; w1(k) = 1 − w0(k).",
+      "μ0(k) = [Σ i · p(i) for i = 0 to k] / w0(k), the mean grey level of class 0; μ1(k) is the same sum over levels k+1 to L−1 divided by w1(k)."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "σB²(k) = w0(k) · w1(k) · [μ0(k) − μ1(k)]²",
+     "where": "σB²(k) is the between-class variance in grey levels squared; w0, w1 are class fractions; μ0, μ1 are class means. The best threshold k* maximises σB²(k)."
+    },
+    {
+     "type": "p",
+     "text": "Search k from 0 to L−2, keep the largest σB², and set T = k*. Pixels with f ≤ k* become 0; pixels with f > k* become 1. The split rule matters: writing level k on the wrong side changes the binary image even when σB² is the same."
+    },
+    {
+     "type": "p",
+     "text": "Within-class form: σW² = w0σ0² + w1σ1², and σT² = σW² + σB². σT² is fixed for a histogram, so minimising σW² gives the same k. One pass over L = 256 bins costs O(L) time and memory; after the histogram is built, the image is never touched again."
+    }
+   ]
+  },
+  {
+   "h3": "When one T is not enough",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Otsu is global: it assumes a bimodal histogram and two classes of comparable size. Three common failures: one class covers a tiny part of the image, so the split barely changes w0 and w1; the histogram is unimodal, so the best split falls in a tail; illumination varies, so the same material gives two grey levels in two places."
+    },
+    {
+     "type": "p",
+     "text": "The cheap fix is variable thresholding: split the image into blocks, say 32 × 32, run Otsu inside each, and interpolate the per-block thresholds across boundaries. A shadow is then handled locally instead of dragging the whole threshold with it."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Between-class variance for the worked example. The peak at k = 1 is the Otsu threshold: levels 0 and 1 form class 0, levels 2 and 3 form class 1.",
+  "spec": {
+   "type": "plot",
+   "aria": "Between-class variance against grey level k: 0.5625 at k = 0, a peak of 0.81 at k = 1, and 0.5625 at k = 2.",
+   "x": {
+    "label": "grey level k",
+    "min": 0,
+    "max": 3
+   },
+   "y": {
+    "label": "σB²(k)",
+    "min": 0,
+    "max": 1
+   },
+   "series": [
+    {
+     "name": "between-class variance",
+     "points": [
+      [
+       0,
+       0.5625
+      ],
+      [
+       1,
+       0.81
+      ],
+      [
+       2,
+       0.5625
+      ]
+     ],
+     "style": "accent",
+     "_pts": [
+      [
+       0.0,
+       0.5625
+      ],
+      [
+       1.0,
+       0.81
+      ],
+      [
+       2.0,
+       0.5625
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A 20-pixel image has four grey levels with histogram counts h(0) = 4, h(1) = 6, h(2) = 6, h(3) = 4. Use Otsu's method to find the threshold, and state which grey levels fall in each class.",
+   "steps": [
+    "Normalise: p(i) = h(i)/20 gives p(0) = 0.2, p(1) = 0.3, p(2) = 0.3, p(3) = 0.2. Overall mean μT = 0(0.2) + 1(0.3) + 2(0.3) + 3(0.2) = 1.5.",
+    "k = 0: w0 = 0.2, w1 = 0.8; μ0 = 0; μ1 = 1.5/0.8 = 1.875. σB² = 0.16 × 1.875² = 0.5625.",
+    "k = 1: w0 = 0.5, w1 = 0.5; μ0 = 0.3/0.5 = 0.6; μ1 = 1.2/0.5 = 2.4. σB² = 0.25 × 1.8² = 0.81.",
+    "k = 2: w0 = 0.8, w1 = 0.2; μ0 = 0.9/0.8 = 1.125; μ1 = 0.6/0.2 = 3.0. σB² = 0.16 × 1.875² = 0.5625.",
+    "The largest value is 0.81 at k = 1, so T = 1. Class 0 holds levels 0 and 1 (10 pixels); class 1 holds levels 2 and 3 (10 pixels)."
+   ],
+   "answer": "The Otsu threshold is T = 1: grey levels 0 and 1 become 0, and grey levels 2 and 3 become 1.",
+   "check": "h = [4, 6, 6, 4]\nN = sum(h)\np = [c / N for c in h]\nprint(round(sum(i * p[i] for i in range(4)), 4))\nsb = []\nfor k in range(3):\n    w0 = sum(p[:k + 1])\n    w1 = 1 - w0\n    m0 = sum(i * p[i] for i in range(k + 1)) / w0\n    m1 = sum(i * p[i] for i in range(k + 1, 4)) / w1\n    v = w0 * w1 * (m0 - m1) ** 2\n    sb.append(v)\n    print(round(v, 4))\nprint(sb.index(max(sb)))",
+   "values": [
+    1.5,
+    0.5625,
+    0.81,
+    0.5625,
+    1
+   ],
+   "dry_run": {
+    "head": [
+     "k",
+     "w0",
+     "w1",
+     "μ0",
+     "μ1",
+     "σB²"
+    ],
+    "rows": [
+     [
+      "0",
+      "0.2",
+      "0.8",
+      "0",
+      "1.875",
+      "0.5625"
+     ],
+     [
+      "1",
+      "0.5",
+      "0.5",
+      "0.6",
+      "2.4",
+      "0.81"
+     ],
+     [
+      "2",
+      "0.8",
+      "0.2",
+      "1.125",
+      "3.0",
+      "0.5625"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Otsu maximises σB². If you work with σW² you must minimise it; writing maximise σW² loses marks.",
+  "Fix the split rule and say it: level ≤ k is class 0. If two k values tie at the maximum σB², pick one by your rule, keep it fixed and state it. In the worked example there is no tie: 0.81 at k = 1 beats 0.5625 at k = 0 and k = 2.",
+  "Otsu is an exhaustive search over k on the histogram, not an iterative mean-splitting loop. That loop is a different, older method.",
+  "Thresholding cannot remove noise, because it ignores neighbours. A single bright noisy pixel above T becomes foreground; filter first, then threshold."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the thresholding rule for g(x, y) in terms of f(x, y) and T, and define each symbol.",
+   "marks": 2,
+   "a": "g(x, y) = 1 if f(x, y) > T, else 0. f is the input grey level, T is the chosen grey-level threshold, g is the binary output."
+  },
+  {
+   "level": "understand",
+   "q": "Why does uneven illumination break a single global threshold?",
+   "marks": 3,
+   "a": "The camera records f = i · r, so illumination multiplies reflectance. The same surface then gives different grey levels in lit and shaded parts; one T is correct in one region and wrong in the other."
+  },
+  {
+   "level": "apply",
+   "q": "A 10-pixel image has histogram counts h = [2, 2, 4, 2] on levels 0 to 3. Compute σB² for k = 0, 1, 2 and give the Otsu threshold.",
+   "marks": 4,
+   "a": "p = 0.2, 0.2, 0.4, 0.2. k = 0: w0 = 0.2, w1 = 0.8, μ0 = 0, μ1 = 2.0, σB² = 0.16 × 4 = 0.64. k = 1: w0 = 0.4, w1 = 0.6, μ0 = 0.5, μ1 ≈ 2.333, σB² ≈ 0.24 × 3.361 ≈ 0.807. k = 2: w0 = 0.8, w1 = 0.2, μ0 = 1.25, μ1 = 3.0, σB² = 0.16 × 3.0625 = 0.49. 0.807 is largest, so T = 1."
+  },
+  {
+   "level": "analyze",
+   "q": "A histogram has one tall peak at grey level 40 and a long flat tail up to 255, and Otsu returns k = 120. Explain why this threshold may be poor.",
+   "marks": 5,
+   "a": "The histogram is not bimodal. Otsu maximises σB² = w0w1(μ0 − μ1)², so it rewards two well separated, compact, balanced classes. A single tall peak with a long tail has no second compact cluster, so the best k slides into the tail: every tail pixel above k = 120 becomes foreground, so noise and edge pixels become objects, while a real object near the peak is lost into the background."
+  },
+  {
+   "level": "understand",
+   "q": "Show that maximising σB² is the same as minimising σW².",
+   "marks": 3,
+   "a": "σT² = σW² + σB², and σT² is the variance of the whole image, fixed for a given histogram. So the largest σB² occurs exactly where σW² is smallest."
+  },
+  {
+   "level": "remember",
+   "q": "What do w0(k) and μ0(k) mean in Otsu's formula?",
+   "marks": 2,
+   "a": "w0(k) is the fraction of pixels whose grey level is at most k (class 0); μ0(k) is the mean grey level of those pixels."
+  }
+ ],
+ "beyond": "Not for the exam. Otsu ships in every vision library (OpenCV's THRESH_OTSU, scikit-image's threshold_otsu) and remains the first pass in industrial inspection. Two-dimensional Otsu builds a joint histogram of grey level and neighbourhood mean to resist noise. Multi-level Otsu extends the between-class variance to three or more classes with a search over two thresholds. Local methods such as Sauvola and Niblack compute a fresh T from each pixel's neighbourhood. Search for 2D Otsu, multi-level Otsu and Sauvola thresholding to go further."
+}

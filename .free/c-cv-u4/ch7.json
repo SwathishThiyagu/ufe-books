@@ -1,0 +1,279 @@
+{
+ "lead": "An active contour, or snake, is a closed curve placed near an object that slides and stretches itself until it settles on the boundary. It exists because edge maps are broken: gaps, noise and texture stop a raw edge detector from giving a clean outline, and the snake bridges those gaps by preferring to stay smooth. Medical imaging uses it to outline a tumour in an MRI slice, traffic software traces a lane, and a phone app uses it to cut a person out of a photo. This chapter builds the energy that drives the slide and the loop that minimises it.",
+ "prereq": "You need: <a href=\"#edge-detectors-gradient-marr-hildreth-and-canny\">4.2</a> for the gradient image that supplies the external energy, and Unit 2 for Gaussian smoothing before the gradient.",
+ "sections": [
+  {
+   "h3": "A curve with an energy",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An edge detector gives you pixels where brightness changes fast (see <a href=\"#edge-detectors-gradient-marr-hildreth-and-canny\">4.2</a>). That set is not a boundary. It has gaps where the edge is faint and extra pixels where texture fires. A boundary is a different object: a closed, ordered curve that separates inside from outside."
+    },
+    {
+     "type": "p",
+     "text": "A snake makes that curve explicit and then moves it. Write the curve as a parametric contour v(s) = (x(s), y(s)) with s from 0 to 1. Here v(s) is a point on the curve, x(s) and y(s) are its column and row, and s is not time but a label that runs along the curve. Because the contour is closed, v(0) = v(1). On a computer you store n sample points v₁ … vₙ, and the last joins back to the first."
+    },
+    {
+     "type": "p",
+     "text": "The curve carries an energy. Low energy means a good curve, so the snake's whole job is to slide its points until the total energy is as small as it can get."
+    },
+    {
+     "type": "formula",
+     "text": "E = ∫₀¹ [ E_int(v(s)) + E_ext(v(s)) ] ds",
+     "where": "E is the total snake energy; E_int is the internal energy, a cost for stretching and bending; E_ext is the external energy, a reward for lying on edges; ds is an infinitesimal piece of the parameter range."
+    },
+    {
+     "type": "p",
+     "text": "Two desires pull against each other. The internal term wants a short, smooth loop. The external term wants it on the edges. The snake settles where the two costs balance. That balance explains why it can span a gap in the edge map: crossing the gap costs a little external energy, while detouring to chase noise would cost bending energy."
+    }
+   ]
+  },
+  {
+   "h3": "Internal and external energy",
+   "blocks": [
+    {
+     "type": "formula",
+     "text": "E_int = ½ ( α |v′(s)|² + β |v″(s)|² )",
+     "where": "α (alpha, ≥ 0) is the elasticity weight and discourages stretching; β (beta, ≥ 0) is the rigidity weight and discourages bending; v′ = dv/ds is the tangent, whose size says how fast the curve runs; v″ = d²v/ds² is the curvature term; the ½ is a convention."
+    },
+    {
+     "type": "p",
+     "text": "On sampled points the same idea becomes a sum over the n points, with indices wrapping around so that v₀ means vₙ."
+    },
+    {
+     "type": "formula",
+     "text": "E_int ≈ Σᵢ [ α |vᵢ₊₁ − vᵢ|² + β |vᵢ₊₁ − 2vᵢ + vᵢ₋₁|² ]",
+     "where": "|vᵢ₊₁ − vᵢ| is the length of side i; the second difference vᵢ₊₁ − 2vᵢ + vᵢ₋₁ is large exactly where the curve bends sharply; the sum runs over all i."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Large α: the snake refuses to stretch, so it cuts corners and may ignore a dented boundary.",
+      "Large β: the snake refuses to bend, so it flattens and can shrink away from a weak edge.",
+      "Some textbooks halve the discrete sum. Halving every term does not change which curve has the least energy."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "E_ext(x, y) = − |∇f(x, y)|²",
+     "where": "f is the smoothed grey-level image; ∇f is its gradient, computed as in 4.2; |∇f| is edge strength; the minus sign means a strong edge gives a very negative, that is low, energy."
+    },
+    {
+     "type": "p",
+     "text": "Smooth first with a Gaussian (Unit 2). On a raw image, sensor noise produces large gradients everywhere and the snake locks onto the noise instead of the object."
+    }
+   ]
+  },
+  {
+   "h3": "The iterative update",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Minimising E exactly needs the calculus of variations. In practice you use a greedy loop that only ever accepts a move if the total energy falls."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Smooth the image, then compute |∇f|² for every pixel.",
+      "Place an initial closed contour near the object, by hand or from a coarse threshold (see <a href=\"#thresholding-global-thresholding-and-otsu-s-method\">4.4</a>).",
+      "For each contour point, test small candidate moves: its 8 neighbours, or a 5×5 window if you expect fast motion.",
+      "Evaluate E_int + E_ext for each candidate and move the point to the candidate with the lowest energy.",
+      "Add a balloon weight γ (gamma): each point also takes one step along its outward unit normal when γ > 0, or inward when γ < 0. This constant pressure lets the curve cross faint edges and small gaps.",
+      "Repeat whole passes until the total energy changes by less than a small threshold, or a fixed number of passes ends."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The result is a local minimum, not the global one. A snake started inside the object, started outside it, or started near the wrong edge gives different final curves. Gradient vector flow (GVF) is the usual fix: it diffuses the gradient over the whole image into a smooth vector field, so a point far from any edge still feels a weak pull towards it. Region-based models such as Chan-Vese push this further and use grey-level averages instead of gradients."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The contour begins near the object, feels stretch and bend from inside and edge pull from the image, then its points move to lower energy and the loop repeats until nothing changes.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Snake iteration",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Initial contour",
+     "note": "placed near object",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Internal force",
+     "note": "α stretch, β bend",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "External force",
+     "note": "minus gradient energy",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Move points",
+     "note": "lowest nearby energy",
+     "style": "accent"
+    },
+    {
+     "id": "e",
+     "label": "Energy settled?",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "Final boundary",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "a",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "d",
+     "label": "no",
+     "style": "dashed"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "label": "yes",
+     "style": "solid"
+    }
+   ],
+   "aria": "A flowchart in which an initial contour is pulled by internal and external forces, the points are moved, and the loop repeats until the energy settles."
+  }
+ },
+ "examples": [
+  {
+   "question": "A closed snake has four points v₁ = (0, 0), v₂ = (2, 0), v₃ = (2, 2), v₄ = (0, 2), with α = 1 and β = 0. Find the internal energy. Then decide whether moving v₂ to (3, 0) is accepted.",
+   "steps": [
+    "With β = 0 only the stretch term remains, so E_int = Σ |vᵢ₊₁ − vᵢ|², with v₅ taken as v₁.",
+    "Side 1→2 has length 2, squared 4. Side 2→3 has length 2, squared 4. Side 3→4 has length 2, squared 4. Side 4→1 has length 2, squared 4.",
+    "E_int = 4 + 4 + 4 + 4 = 16.",
+    "After the move v₂ = (3, 0). Side 1→2 has length 3, squared 9. Side 2→3 has length √((3−2)² + (0−2)²) = √5 = 2.236, squared 5. Side 3→4 has length 2, squared 4. Side 4→1 has length 2, squared 4.",
+    "New E_int = 9 + 5 + 4 + 4 = 22. The change is 22 − 16 = 6.",
+    "The internal energy alone has risen, so the move is accepted only if the external energy falls by more than 6 at the new position, which is what a strong edge nearby would supply."
+   ],
+   "answer": "The internal energy rises from 16 to 22, so the move adds 6 and is accepted only if the external energy drops by more than 6.",
+   "check": "import math\npts = [(0,0),(2,0),(2,2),(0,2)]\ndef E(p):\n    n = len(p)\n    return sum((p[(i+1)%n][0]-p[i][0])**2 + (p[(i+1)%n][1]-p[i][1])**2 for i in range(n))\ne0 = E(pts)\nmoved = list(pts)\nmoved[1] = (3,0)\ne1 = E(moved)\nprint(e0)\nprint(e1)\nprint(e1-e0)",
+   "values": [
+    16,
+    22,
+    6
+   ],
+   "dry_run": {
+    "head": [
+     "side",
+     "length",
+     "length²"
+    ],
+    "rows": [
+     [
+      "1→2",
+      "2",
+      "4"
+     ],
+     [
+      "2→3",
+      "2",
+      "4"
+     ],
+     [
+      "3→4",
+      "2",
+      "4"
+     ],
+     [
+      "4→1",
+      "2",
+      "4"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The external energy is negative, −|∇f|², because the snake minimises energy. Writing +|∇f|² makes the snake run away from edges and stop in flat dark regions.",
+  "A large β with a weak edge makes the snake shrink on its own; a small β on a noisy image makes it wrap around noise blobs.",
+  "The greedy update gives a local minimum. Two different starting contours on the same picture can give two different answers, and both look reasonable.",
+  "The symbol s is arc-like parameter, not arc length and not time. Confusing it with arc length changes the meaning of α and β.",
+  "Examiners often ask for the discrete internal energy of a given polygon: square every side length, do not take square roots at the last step."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define an active contour and write its parametric form.",
+   "marks": 2,
+   "a": "A closed curve that minimises an energy and settles on object boundaries. v(s) = (x(s), y(s)), s from 0 to 1, with v(0) = v(1), stored as n ordered sample points."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the external energy written with a minus sign?",
+   "marks": 3,
+   "a": "The curve minimises total energy. A strong edge has large |∇f|², and the minus sign turns that into a very low, very negative energy, so moving onto the edge lowers the energy. With a plus sign the snake would be pushed away from edges."
+  },
+  {
+   "level": "understand",
+   "q": "What happens if α is made very large and β very small?",
+   "marks": 3,
+   "a": "Large α punishes stretching, so the curve keeps near-equal spacing and cuts across concave dents. Small β barely punishes bending, so the contour becomes wiggly and follows noise and small spurious edges."
+  },
+  {
+   "level": "apply",
+   "q": "A closed snake has points (0, 0), (3, 0), (3, 4), with α = 1 and β = 0. Find the internal energy.",
+   "marks": 4,
+   "a": "Sides are 3, 4 and 5. Squares are 9, 16, 25. E_int = 9 + 16 + 25 = 50."
+  },
+  {
+   "level": "apply",
+   "q": "For the square snake of the worked example, a candidate move raises E_int by 4. The external energy at the new point is −9 and at the old point is −12. Is the move accepted?",
+   "marks": 4,
+   "a": "Total change = +4 + (−9 − (−12)) = 4 + 3 = 7, which is positive, so the total energy rises and the move is rejected."
+  },
+  {
+   "level": "analyze",
+   "q": "A snake started far from the object fails to find it. Give one reason and one standard remedy.",
+   "marks": 5,
+   "a": "The external energy −|∇f|² is near zero in flat regions, so there is no pull and the curve stays put; the greedy loop only reaches a local minimum near its start. The remedy is gradient vector flow, which diffuses the gradient into flat areas so distant points feel a weak pull towards the edges."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain how a snake can produce a closed boundary from an edge map that has gaps.",
+   "marks": 5,
+   "a": "The internal energy charges for length and bending. Crossing a small gap costs little external energy, while routing the curve around the gap to follow stray edge pixels costs extra length and bending. The minimising curve therefore bridges the gap and stays closed and smooth."
+  }
+ ],
+ "beyond": "Not for the exam. Modern practice usually replaces the sample points with a level set: an implicit function φ(x, y) whose zero crossing is the curve, which splits and merges automatically. Chan-Vese drops the gradient entirely and fits regions by grey-level averages, so it handles blurred edges where a gradient snake fails. Learned versions such as deep snakes predict the contour directly from the image. Search for gradient vector flow, level-set segmentation and Chan-Vese if you meet these in a project."
+}
