@@ -1,0 +1,199 @@
+{
+ "lead": "Authentication answers one question: who is this user? A session keeps the answer on the server and gives the browser only a random session id in a cookie. A JWT keeps the answer in a signed token that the client sends back. Passwords are stored as bcrypt hashes, never as plain text. XSS is the opposite problem: attacker script runs inside your page and acts as the user. Every login on IRCTC, a UPI app or a college portal depends on these ideas.",
+ "prereq": "You need: Express middleware and the request chain (<a href=\"#express-js-routing-middleware-and-static-files\">6.4</a>); user records from MySQL or MongoDB (<a href=\"#mysql-database-connectivity-and-queries\">6.6</a>, <a href=\"#mongodb-and-nosql-documents-collections-queries\">6.7</a>); and HTTP headers (Unit 1, HTTP and HTTPS).",
+ "sections": [
+  {
+   "h3": "Passwords and server-side sessions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Never store a password as plain text. Store a slow hash made by bcrypt. bcrypt adds a random salt and repeats the work for a cost factor, usually 10 to 12 rounds. The salt is stored inside the hash string, so no separate salt column is needed. On login, fetch the stored hash and call <code>bcrypt.compare(enteredPassword, storedHash)</code>. It returns true or false. The cost makes one check cheap for the server and millions of guesses expensive for an attacker."
+    },
+    {
+     "type": "p",
+     "text": "A session keeps the login proof on the server. <code>express-session</code> creates a session object, gives it a random id, and sends that id in a cookie. Session data lives in a store: memory for a demo, a database or Redis for production. Each later request carries the cookie; middleware finds the session and sets <code>req.session.user</code>. Logout calls <code>req.session.destroy()</code>, so the same cookie stops working."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Look up the user row by email or username.",
+      "Compare the entered password with the stored bcrypt hash.",
+      "Create the session and set the session cookie.",
+      "On each later request, load the session from the cookie."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Cookie flags matter. HttpOnly stops JavaScript from reading the cookie, so an XSS bug cannot steal the session id. Secure sends the cookie only over HTTPS. SameSite=Lax or Strict stops another site from making the browser send the cookie on a cross-site request, which reduces CSRF. Use sessions for a browser app on one domain: the server can revoke access at once, and the cookie is small. A session id is a random key to server state, so use at least 32 random bytes and rotate the id after login."
+    }
+   ]
+  },
+  {
+   "h3": "JWT: three parts, signed not encrypted",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A JWT has three parts separated by dots: header.payload.signature. The header and payload are base64url-encoded JSON. Base64url is encoding, not encryption: anyone who copies the token can decode and read the payload. The signature is computed with a secret key known only to the server. The server checks the signature and the exp claim on every request; if either fails, it returns 401 Unauthorized."
+    },
+    {
+     "type": "formula",
+     "text": "token = base64url(header) + '.' + base64url(payload) + '.' + base64url(HMAC-SHA256(secret, base64url(header) + '.' + base64url(payload)))",
+     "where": "header names the signing algorithm; payload carries claims such as sub, iat and exp; secret is the server key; HMAC-SHA256 is the signing function; base64url is URL-safe base64 encoding, not encryption."
+    },
+    {
+     "type": "p",
+     "text": "Standard claims are sub (user id), iat (issued at, seconds since 1970-01-01T00:00:00Z) and exp (expiry, same clock). The client sends the token as <code>Authorization: Bearer &lt;token&gt;</code>. Middleware verifies it and sets <code>req.user</code>. Services can verify a token without a shared session store, so JWT suits mobile apps and several APIs. Logout is weaker: the client drops the token, but a copied token works until exp. A server-side blacklist of token ids (jti) or short-lived tokens with refresh tokens limits that. Do not store a JWT in localStorage: any XSS script can read it. Keep it in memory or in an HttpOnly cookie."
+    },
+    {
+     "type": "p",
+     "text": "Choose sessions for a browser app on one domain; choose JWT for mobile clients and multiple services. Neither replaces HTTPS: a token or cookie on plain HTTP can be copied in transit."
+    }
+   ]
+  },
+  {
+   "h3": "XSS and the wider security net",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "XSS (cross-site scripting) happens when attacker-controlled script runs inside your page origin. The script can read the DOM, call your APIs as the user, and steal anything JavaScript can reach. There are three common types. Stored XSS saves the script in your database, for example in a comment, and serves it to every reader. Reflected XSS puts the script in the current request and echoes it back in the response. DOM XSS happens when your own client code writes user text into the page, such as <code>element.innerHTML = userText</code>."
+    },
+    {
+     "type": "p",
+     "text": "Defend on output. Escape text for the context where it appears, or use <code>textContent</code> instead of <code>innerHTML</code>. Never build HTML by joining user strings. Add a Content-Security-Policy header, for example <code>default-src 'self'</code>, so injected inline script is blocked. Validate input on the server as well; client checks can be skipped. The helmet middleware sets several security headers, but it is not a substitute for escaping."
+    },
+    {
+     "type": "p",
+     "text": "Other attacks are easy to mix up. SQL injection changes a query through unescaped input; use ? placeholders (see <a href=\"#mysql-database-connectivity-and-queries\">6.6</a>). CSRF tricks the browser into sending an authenticated request to your site; SameSite cookies and a CSRF token reduce it. HTTPS encrypts the whole exchange, and Secure cookies refuse to travel on HTTP. XSS runs code in your origin; CSRF sends a request from another origin with your cookie."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The browser proves identity once; later requests carry the cookie or token. The server checks the database hash only at login, then verifies the session or token on every request.",
+  "spec": {
+   "type": "sequence",
+   "aria": "The browser posts a login, the server checks the stored hash in the database, answers with a session cookie or a token, and the next request carries that cookie or token to prove the user.",
+   "actors": [
+    "Browser",
+    "Express server",
+    "Database"
+   ],
+   "messages": [
+    {
+     "from": "Browser",
+     "to": "Express server",
+     "label": "POST /login",
+     "dashed": false
+    },
+    {
+     "from": "Express server",
+     "to": "Database",
+     "label": "SELECT password_hash",
+     "dashed": false
+    },
+    {
+     "from": "Database",
+     "to": "Express server",
+     "label": "bcrypt hash",
+     "dashed": true
+    },
+    {
+     "from": "Express server",
+     "to": "Browser",
+     "label": "200 + cookie/JWT",
+     "dashed": true
+    },
+    {
+     "from": "Browser",
+     "to": "Express server",
+     "label": "GET /me + cookie",
+     "dashed": false
+    },
+    {
+     "from": "Express server",
+     "to": "Browser",
+     "label": "200 user or 401",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A JWT is issued with iat = 1700000000 and exp = 1700003600. (a) Find its lifetime in seconds and in minutes. (b) A request arrives at 1700004200. How many seconds after expiry is it, and what should the server return?",
+   "steps": [
+    "Lifetime = exp − iat = 1700003600 − 1700000000 = 3600 s.",
+    "In minutes: 3600 ÷ 60 = 60 min.",
+    "The token is valid only while now < exp. At now = 1700004200, now − exp = 1700004200 − 1700003600 = 600 s.",
+    "600 s = 10 min past expiry, so the server must reject the token with 401 Unauthorized."
+   ],
+   "answer": "Lifetime 3600 s (60 min); the request is 600 s after expiry, so the server returns 401 Unauthorized.",
+   "check": "iat = 1700000000\nexp = 1700003600\nlife = exp - iat\nprint(life)\nprint(life / 60)\nreq = 1700004200\nprint(req - exp)\n",
+   "values": [
+    3600,
+    60.0,
+    600
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A JWT is signed, not encrypted; base64url decodes to readable JSON, so never put secrets in the payload.",
+  "Storing a JWT in localStorage exposes it to any XSS script; keep it in memory or an HttpOnly cookie.",
+  "A server must check both the signature and exp; decoding the payload alone proves nothing.",
+  "XSS injects script into your page origin; CSRF makes the browser send a request from another site with your cookie.",
+  "bcrypt cost 10-12 is not the salt; the salt is inside the hash and is not secret."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does bcrypt.compare(entered, storedHash) return?",
+   "marks": 2,
+   "a": "true if the entered password matches the hashed password, false otherwise."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three dot-separated parts of a JWT.",
+   "marks": 2,
+   "a": "header, payload, signature."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a user read a JWT payload but not forge a new signature?",
+   "marks": 3,
+   "a": "The payload is base64url encoded, not encrypted. The signature needs the secret key with HMAC-SHA256, so changing the payload breaks the signature."
+  },
+  {
+   "level": "apply",
+   "q": "A token has iat = 1000 and exp = 1600. A request arrives at 1700. How many seconds late is it, and what status should the server return?",
+   "marks": 4,
+   "a": "1700 − 1600 = 100 s late. The exp time has passed, so return 401 Unauthorized."
+  },
+  {
+   "level": "analyze",
+   "q": "A session cookie has HttpOnly but not SameSite. Which attack does HttpOnly stop, and which remains?",
+   "marks": 4,
+   "a": "HttpOnly stops XSS from reading the cookie. CSRF can still send the cookie on a cross-site request unless SameSite or a CSRF token is used."
+  },
+  {
+   "level": "understand",
+   "q": "Give the difference between stored XSS and reflected XSS.",
+   "marks": 3,
+   "a": "Stored XSS saves the script in the database and serves it to many users; reflected XSS comes in one request and is echoed in that response."
+  },
+  {
+   "level": "apply",
+   "q": "Which cookie flags should an HTTPS-only browser session set?",
+   "marks": 3,
+   "a": "HttpOnly, Secure, and SameSite=Lax or Strict."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is bcrypt cost 4 a bad choice even though it is faster?",
+   "marks": 6,
+   "a": "Low cost makes offline password guessing cheap. Cost 10-12 makes each guess slow, while one login check stays acceptable for the server."
+  }
+ ],
+ "beyond": "Not for the exam. Industry adds OAuth 2.0 and OpenID Connect so a user can log in through Google or a bank identity provider without sharing a password. Passkeys (WebAuthn) replace passwords with public-key cryptography. Refresh-token rotation and short access tokens reduce the damage of a stolen JWT. Search for OWASP Top 10, Content-Security-Policy, and WebAuthn to go deeper."
+}

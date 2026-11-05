@@ -1,0 +1,275 @@
+{
+ "lead": "A Docker image packs your Express app, Node runtime and exact dependencies into one file. A container runs that image the same way on your laptop and on a cloud server. CI/CD turns a git push into install, test, build, push and deploy steps without a human copying files. This chapter shows the Dockerfile order that keeps builds fast, how secrets arrive as environment variables, the main cloud hosting choices, and a pipeline you can trace from push to a container listening on port 3000.",
+ "prereq": "You need: <a href=\"#express-js-routing-middleware-and-static-files\">6.4</a> for the Express app being shipped and <a href=\"#npm-and-package-management\">6.2</a> for package.json, npm ci and scripts.",
+ "sections": [
+  {
+   "h3": "Image, container and Dockerfile order",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An image is a frozen file system plus a start command. A container is that image running as a process. The image is the recipe; the container is the cooked dish. One image can start many containers, like one class can create many objects. The same image behaves the same on a laptop and a cloud server because it carries Node and the exact packages from package-lock.json."
+    },
+    {
+     "type": "p",
+     "text": "A Dockerfile lists instructions in order. Each instruction creates a layer, and Docker caches a layer until its inputs change. Read this file from top to bottom:"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "FROM picks node:20-alpine as the base. WORKDIR /app makes /app the working directory. The first COPY brings only package.json and package-lock.json, so RUN npm ci is cached until those two files change. The second COPY brings your source code; editing server.js does not reinstall packages. EXPOSE 3000 documents the intended port. CMD is the foreground process that keeps the container alive. A .dockerignore file keeps node_modules, .git, .env and logs out of the image."
+    },
+    {
+     "type": "p",
+     "text": "<code>docker build -t shop .</code> builds an image named shop from the current directory. <code>docker run -p 8080:3000 shop</code> maps host port 8080 to container port 3000. Host port comes first. Open http://localhost:8080; the app still listens on 3000 inside."
+    }
+   ]
+  },
+  {
+   "h3": "Configuration, Compose and hosting",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Passwords and database URLs are configuration, not code. Put them in environment variables at run time: <code>docker run -e DATABASE_URL=... shop</code>, or an env_file in Compose. Never write them in the Dockerfile or an ENV line; layers keep old values and anyone who pulls the image can read them."
+    },
+    {
+     "type": "p",
+     "text": "Docker Compose describes several services in one YAML file. A typical file has app and db services: app builds from ., starts after db, and gets DATABASE_URL pointing at the service name db. Compose starts db before app, but does not wait for the database to be ready; add a health check with a depends_on condition, or make the app retry the connection. db uses a named volume so data survives a container restart. Compose creates one private network, so app reaches db by name, not by localhost."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "IaaS: a VPS with root access; you install Docker and manage updates.",
+      "PaaS: a platform builds from your Git push and runs the container for you.",
+      "Managed database: the provider runs MySQL or MongoDB with backups and failover.",
+      "SaaS: ready software you use, not a place to deploy your code."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "In production a reverse proxy such as Nginx listens on ports 80 and 443 and forwards requests to 127.0.0.1:3000. Keep port 3000 off the public internet. Logs go to three places: <code>docker logs</code> for app stdout/stderr, Nginx access.log and error.log for requests, and your cloud log viewer if the platform collects them."
+    }
+   ]
+  },
+  {
+   "h3": "The CI/CD pipeline",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CI/CD is one automatic path from commit to live container. A CI runner starts on every push."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Checkout the commit and run <code>npm ci</code>; it installs exactly package-lock.json, the same as local.",
+      "Run <code>npm test</code>. A failing test stops the pipeline before any image is built.",
+      "Build the image and tag it with the commit SHA: <code>docker build -t registry.example.com/shop:${SHA} .</code>.",
+      "Push that tag to a registry.",
+      "On the deploy host, pull the tag, inject environment variables, stop the old container, start the new one on port 3000, and check /health.",
+      "Keep the previous tag. If the health check fails, redeploy the previous tag: that is the rollback."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A tag like latest is not a version; the commit SHA is. A registry stores images (public or private), not source commits like a Git repository. One run takes install 40 s, test 25 s, build 30 s and deploy 15 s. A manual copy-and-restart can take 20 min."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "A push moves through install and test; only a passing test builds an image that is stored, deployed and run. Notice that environment variables are injected on the deploy host, not stored in the image.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "From push to running container",
+   "aria": "A git push triggers CI to install and test, then builds and tags a Docker image, pushes it to a registry, and deploys it so the container listens on port 3000.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "git push",
+     "note": "developer",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "CI: npm ci",
+     "note": "same lock file",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "npm test",
+     "note": "fail stops here",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "docker build",
+     "note": "tag with commit",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "registry",
+     "note": "image stored",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "deploy host",
+     "note": "env vars injected",
+     "style": "live"
+    },
+    {
+     "id": "g",
+     "label": "container :3000",
+     "note": "app live",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "green",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "label": "docker push",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "label": "docker pull",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "g",
+     "label": "docker run",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A shop API listens on port 3000 inside its container. Give the Dockerfile instruction order and the build and run commands to serve it on host port 8080. A CI run takes install 40 s, test 25 s, image build 30 s and deploy 15 s; manual deployment takes 20 min. Find total CI seconds and seconds saved.",
+   "steps": [
+    "Dockerfile order: FROM node:20-alpine, WORKDIR /app, COPY package*.json ./, RUN npm ci, COPY . ., EXPOSE 3000, CMD [\"node\", \"server.js\"].",
+    "Build: docker build -t shop .",
+    "Run: docker run -p 8080:3000 shop. Host port 8080 comes first, container port 3000 second.",
+    "CI total = 40 + 25 + 30 + 15 = 110 s.",
+    "Manual time = 20 min × 60 s/min = 1200 s.",
+    "Saving = 1200 − 110 = 1090 s."
+   ],
+   "answer": "Total CI time is 110 s, and the saving is 1090 s (about 18 min 10 s).",
+   "check": "total = 40 + 25 + 30 + 15\nmanual = 20 * 60\nprint(total)\nprint(manual - total)",
+   "values": [
+    110,
+    1090
+   ],
+   "code": {
+    "lang": "python",
+    "code": "total = 40 + 25 + 30 + 15\nmanual = 20 * 60\nprint(total)\nprint(manual - total)",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "stage",
+     "seconds"
+    ],
+    "rows": [
+     [
+      "install",
+      "40"
+     ],
+     [
+      "test",
+      "25"
+     ],
+     [
+      "build",
+      "30"
+     ],
+     [
+      "deploy",
+      "15"
+     ]
+    ]
+   },
+   "output": "110\n1090"
+  }
+ ],
+ "traps": [
+  "Writing COPY . . before RUN npm ci throws away the layer cache on every code change and reinstalls everything.",
+  "Reversing the port mapping: -p 3000:8080 is wrong when the app listens on 3000 and you want host 8080; use -p 8080:3000.",
+  "Putting passwords in the Dockerfile or an ENV line; they stay inside image layers even if a later line deletes them.",
+  "Thinking EXPOSE publishes the port. EXPOSE only documents it; docker run -p or Compose ports is needed.",
+  "Running a daemon in CMD such as a background process; when PID 1 exits, the container stops."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define image and container. Which one is running?",
+   "marks": 2,
+   "a": "An image is a frozen file system plus a start command. A container is that image running as a process."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the Dockerfile copy package*.json before the source code?",
+   "marks": 3,
+   "a": "So RUN npm ci is cached until package.json or package-lock.json changes. Source edits then reuse the installed node_modules layer."
+  },
+  {
+   "level": "apply",
+   "q": "An app listens on container port 3000. Write the command to expose it on host port 8080.",
+   "marks": 2,
+   "a": "docker run -p 8080:3000 shop. Host port 8080 comes first; container port 3000 comes second."
+  },
+  {
+   "level": "analyze",
+   "q": "npm test fails in the CI pipeline. What happens next, and why is that useful?",
+   "marks": 3,
+   "a": "The pipeline stops before docker build and push. A broken commit never reaches the registry or deploy host, so production keeps the previous working tag."
+  },
+  {
+   "level": "apply",
+   "q": "A CI run takes install 50 s, test 20 s, build 40 s and deploy 10 s. Find the total seconds.",
+   "marks": 2,
+   "a": "50 + 20 + 40 + 10 = 120 s."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is a secret in a Dockerfile dangerous even if the next line deletes the file?",
+   "marks": 4,
+   "a": "Each instruction is a layer. The secret remains in the earlier layer, and anyone who pulls the image can inspect layers and read it. Use run-time environment variables or a secret store."
+  },
+  {
+   "level": "understand",
+   "q": "What does Nginx do in front of an app on port 3000?",
+   "marks": 3,
+   "a": "It listens on 80 and 443, forwards requests to 127.0.0.1:3000, handles TLS, and keeps port 3000 off the public internet."
+  }
+ ],
+ "beyond": "Not for the exam. Production teams add health checks, blue-green and canary releases, image vulnerability scanning, and Kubernetes to schedule many containers. Search for Docker multi-stage builds, GitHub Actions OIDC to a cloud registry, and Kubernetes readiness probes."
+}

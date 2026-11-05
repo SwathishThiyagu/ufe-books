@@ -1,0 +1,286 @@
+{
+ "lead": "Node.js lets you run JavaScript outside the browser, on a server, using one thread for JavaScript and a helper thread pool behind it. The idea exists because waiting is slow: reading a file or calling a database can take milliseconds that one thread cannot afford to waste. So Node hands every slow job to the operating system and picks up the result later through the event loop. Every Express API, chat server and streaming service in this unit stands on this one mechanism.",
+ "prereq": "You need Unit 3's asynchronous JavaScript (callbacks, promises, async/await) and Unit 1's client-server and HTTP request/response picture; within this unit, <a href=\"#file-system-streams-and-event-emitter\">6.3</a> reuses the same file calls you see here.",
+ "sections": [
+  {
+   "h3": "V8 runs the code, libuv waits for the world",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Node.js is a C++ program that embeds V8, the JavaScript engine from Chrome. V8 compiles your JavaScript into machine code and executes it. Node adds a second library, libuv, which supplies the event loop and a small thread pool."
+    },
+    {
+     "type": "p",
+     "text": "Your JavaScript runs on one thread. A thread is the sequence of instructions the CPU is currently executing. Node keeps one <b>call stack</b>: the list of functions that are running right now. Only the function on top of the stack executes. When the running function calls another function, the new one is pushed on top. When it returns, it is popped and the function below resumes."
+    },
+    {
+     "type": "p",
+     "text": "Slow work does not sit on that stack. For <code>fs.readFile</code>, <code>dns.lookup</code> (the usual lookup behind HTTP requests), some crypto calls and timers, Node passes the job to libuv or to the operating system, attaches your callback, and returns at once. The stack is free for the next request. <code>dns.lookup</code> uses the libuv pool; <code>dns.resolve</code> uses the operating system resolver."
+    },
+    {
+     "type": "p",
+     "text": "When the job finishes, libuv puts the callback into a queue. The event loop checks that queue and pushes callbacks back onto the stack, but only when the stack is empty. That is the whole architecture: one stack, one queue, one loop."
+    }
+   ]
+  },
+  {
+   "h3": "The event loop: phases and microtasks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The event loop repeats a fixed order of phases. Each phase has its own queue of callbacks."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "<b>Timers</b>: run setTimeout and setInterval callbacks whose delay has expired.",
+      "<b>Pending callbacks</b>: run deferred system callbacks, such as a failed TCP connection.",
+      "<b>Poll</b>: wait for I/O and run its callbacks (a file read finished, socket data arrived).",
+      "<b>Check</b>: run setImmediate callbacks.",
+      "<b>Close</b>: run close handlers, such as socket.on('close').",
+      "After the close phase, the loop starts again at timers."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two queues cut in between the phases: the process.nextTick queue and the promise microtask queue. After every single callback, and before the loop moves to the next phase, Node empties both. NextTick callbacks run first, then promise microtasks; the process.nextTick queue is fully drained before the promise queue is touched. So a resolved promise's <code>.then</code> always runs before any timer, even a 0 ms timer."
+    },
+    {
+     "type": "p",
+     "text": "A blocking call keeps the thread busy until it finishes. <code>fs.readFileSync</code>, <code>crypto.pbkdf2Sync</code> and a long for loop are blocking. While they run, no other callback can start, so every user of your server waits. One 200 ms synchronous read on a busy evening makes every request behind it 200 ms late."
+    },
+    {
+     "type": "p",
+     "text": "To watch this live, run <code>node --inspect app.js</code> and open chrome://inspect in Chrome DevTools to set breakpoints on the running stack. Some syllabi call this the Node Inspector."
+    }
+   ]
+  },
+  {
+   "h3": "Modules: core, local and third-party",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A module is one file with its own scope. Nothing in it is visible to other files unless the file exports it. Node has three kinds."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Core modules</b> ship inside Node: <code>fs</code>, <code>path</code>, <code>os</code>, <code>http</code>, <code>events</code>. You load them by bare name, <code>const fs = require('fs')</code>, with nothing to install.",
+      "<b>Local modules</b> are your own files. In math.js write <code>module.exports = { add, PI }</code>; in app.js write <code>const m = require('./math')</code>. <code>require</code> returns whatever <code>module.exports</code> holds. Some syllabi call a local file an export module.",
+      "<b>Third-party modules</b> are packages installed into a node_modules folder, covered in <a href=\"#npm-and-package-management\">6.2</a>."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "require() resolves a string in a fixed order:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "If the string starts with <code>./</code>, <code>../</code> or <code>/</code>, it is a file path: check for that file, then that file with .js, .json, .node.",
+      "Otherwise the core module list is checked first, so <code>'fs'</code> always gives the built-in.",
+      "Otherwise node_modules folders are searched, starting beside the file and walking up to the disk root.",
+      "The result is cached by resolved path, so a second require of the same file returns the cached exports and does not run the file again."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Modern Node also supports ES modules: write <code>import { add } from './math.js'</code> and <code>export const PI = 3.14159</code>. Set <code>\"type\": \"module\"</code> in package.json, or name the file .mjs, and require() stops being available in that file."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Your synchronous code owns the call stack; file and dns.lookup jobs go out to the libuv pool and return as queued callbacks. Notice the dashed edge: the loop only pushes a callback back when the stack is empty.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One stack, one queue, one loop",
+   "aria": "Your code runs on the call stack, hands slow work to the libuv thread pool, and finished callbacks wait in a queue that the event loop pushes back onto the stack when the stack is empty.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "main.js",
+     "note": "your code",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Call stack",
+     "note": "one JavaScript thread",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "libuv thread pool",
+     "note": "files, dns.lookup, crypto",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Callback queue",
+     "note": "results waiting",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "Event loop",
+     "note": "poll phase checks queue",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "function call",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "fs.readFile",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "work done",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "b",
+     "label": "stack empty",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A file app.js contains the four lines below. Give the exact order in which A, B, C and D print, and give each letter its position number 1 to 4. Justify each position.\n\nconsole.log('A');\nsetTimeout(() => console.log('D'), 0);\nPromise.resolve().then(() => console.log('C'));\nconsole.log('B');",
+   "steps": [
+    "Node starts app.js by pushing the module function on the call stack. Order so far: empty.",
+    "Line 1, console.log('A'), is plain synchronous code. It runs at once: A prints, position 1.",
+    "Line 2 calls setTimeout with delay 0 ms. Node registers a timer inside libuv and returns. Nothing prints. The callback is a macrotask, so it is not run now; it waits for the timers phase of the next loop pass.",
+    "Line 3, Promise.resolve().then(...), creates an already-resolved promise. Its callback is placed in the microtask queue, not run. Nothing prints.",
+    "Line 4, console.log('B'), is synchronous: B prints, position 2.",
+    "The stack is now empty. Node drains the microtask queue before entering any phase of the loop, so the promise callback runs: C prints, position 3.",
+    "The loop enters the timers phase. The 0 ms timer has expired, so its callback runs: D prints, position 4. The delay being 0 ms only means 'as soon as timers are checked', which is after all microtasks."
+   ],
+   "answer": "Output order is A, B, C, D at positions 1, 2, 3, 4: two synchronous lines first, then the promise microtask C, then the 0 ms timer D.",
+   "check": "sync_lines = ['A', 'B']\nmicro_lines = ['C']\ntimer_lines = ['D']\norder = sync_lines + micro_lines + timer_lines\nfor ch in ['A', 'B', 'C', 'D']:\n    print(order.index(ch) + 1)",
+   "values": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "code": {
+    "lang": "text",
+    "code": "console.log('A');\nsetTimeout(() => console.log('D'), 0);\nPromise.resolve().then(() => console.log('C'));\nconsole.log('B');",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Waiting queues after step",
+     "Printed so far"
+    ],
+    "rows": [
+     [
+      "console.log('A')",
+      "empty",
+      "A"
+     ],
+     [
+      "setTimeout(..., 0)",
+      "timer: D",
+      "A"
+     ],
+     [
+      ".then(...)",
+      "microtask: C, timer: D",
+      "A"
+     ],
+     [
+      "console.log('B')",
+      "microtask: C, timer: D",
+      "A B"
+     ],
+     [
+      "drain microtasks",
+      "timer: D",
+      "A B C"
+     ],
+     [
+      "timers phase",
+      "empty",
+      "A B C D"
+     ]
+    ]
+   },
+   "output": "A\nB\nC\nD"
+  }
+ ],
+ "traps": [
+  "Writing that setTimeout(fn, 0) runs before Promise.then(). Microtasks always run before the loop enters the next phase, so the promise callback comes first.",
+  "Saying Node uses one thread for everything. Your JavaScript runs on one thread, but file, dns.lookup and crypto work runs on the libuv pool, 4 threads by default; dns.resolve uses the operating system resolver.",
+  "Confusing require('fs') with require('./fs'). The first is the built-in file system module; the second loads your own file named fs.js.",
+  "Forgetting the module cache: the second require of the same resolved path returns cached exports and does not re-run the file. A counter that never increases is usually cached.",
+  "Passing a call instead of a function: setTimeout(fn(), 0) calls fn immediately on the stack and passes its return value to the timer."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the two libraries inside Node.js and state one job of each.",
+   "marks": 2,
+   "a": "V8 compiles and runs the JavaScript. libuv provides the event loop and the thread pool that carries file, DNS and crypto work."
+  },
+  {
+   "level": "remember",
+   "q": "List the five phases of the event loop in order.",
+   "marks": 2,
+   "a": "Timers, pending callbacks, poll, check, close callbacks. Then the loop starts again at timers."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the callback of Promise.resolve().then(f) run before a setTimeout(f2, 0) callback, even though f2 has zero delay?",
+   "marks": 3,
+   "a": "The promise callback goes into the microtask queue. Node empties the microtask queue after every callback and before entering any phase of the loop. NextTick callbacks run first, then promise microtasks; the process.nextTick queue is fully drained before the promise queue is touched. The timer callback can only run in the timers phase, which comes later. So the promise callback always wins."
+  },
+  {
+   "level": "apply",
+   "q": "Predict the output order for: console.log(1); setTimeout(() => console.log(2), 0); Promise.resolve().then(() => console.log(3)); console.log(4);",
+   "marks": 4,
+   "a": "1 and 4 are synchronous, so they print first in that order. The promise callback is a microtask, so 3 comes next. The timer runs in the timers phase, so 2 is last. Output: 1, 4, 3, 2."
+  },
+  {
+   "level": "apply",
+   "q": "A handler calls fs.readFileSync on each request, and each read takes 50 ms. 40 requests arrive together. What is the total time before the last response, and how long does the last user wait?",
+   "marks": 4,
+   "a": "Synchronous reads run one after another on the single thread: 40 × 50 ms = 2000 ms = 2 s. The last user waits the full 2 s. With fs.readFile the reads are spread over the libuv pool of 4 threads: about 10 batches of 50 ms, so around 500 ms in total, and each user waits between roughly 50 ms and 500 ms instead of 2 s."
+  },
+  {
+   "level": "analyze",
+   "q": "A file app.js contains require('./config') and another file lib/app.js contains require('config'). Explain what each loads and why.",
+   "marks": 5,
+   "a": "require('./config') starts with './', so it is treated as a path and loads config.js from the current folder. require('config') has no path prefix, so Node checks the core module list first (there is no core config), then searches node_modules folders upward and loads the installed package named config. Same word, two different files."
+  },
+  {
+   "level": "understand",
+   "q": "What does module.exports do, and what does require() return?",
+   "marks": 3,
+   "a": "module.exports is the object a file offers to the outside world; anything not attached to it stays private to the file. require() loads the file once, caches it, and returns exactly that module.exports object."
+  }
+ ],
+ "beyond": "Not for the exam. When one JavaScript thread is not enough, worker_threads starts real extra threads that can run CPU-heavy code such as image resizing without freezing the loop, and each worker has its own event loop. For several CPU cores serving traffic, cluster or a process manager forks one Node process per core behind a shared port. Newer runtimes such as Deno and Bun keep the same event loop idea while adding TypeScript and a built-in package manager. Search for worker_threads, the cluster module, AsyncLocalStorage, and the libuv thread pool size (UV_THREADPOOL_SIZE) when you meet them at work."
+}

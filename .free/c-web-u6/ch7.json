@@ -1,0 +1,261 @@
+{
+ "lead": "MongoDB is a NoSQL database: JSON-like documents inside collections, with no fixed schema. You give it a filter document, and it returns matching documents. It suits data whose shape changes, such as catalogs, profiles, chat and logs. A Node back end uses the official driver.",
+ "prereq": "You need JSON objects and arrays from Unit 3, and the CRUD routes of <a href=\"#restful-apis-http-methods-json-and-crud\">6.5</a>. The routes stay the same; only storage changes.",
+ "sections": [
+  {
+   "h3": "NoSQL families and the MongoDB hierarchy",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "NoSQL means not only SQL. The common families are listed below."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Document store — MongoDB. The unit is a JSON-like document.",
+      "Key-value store — Redis. The unit is a key mapped to a value.",
+      "Column store — Cassandra. Rows have many sparse, wide columns.",
+      "Graph store — Neo4j. The unit is a node and its edges."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A server is one mongod process, default port 27017. Inside it sit databases, such as shop. Inside a database sit collections, such as books. Inside a collection sit documents. A collection is roughly a SQL table; a document is roughly a row."
+    },
+    {
+     "type": "p",
+     "text": "A document is a set of field-value pairs, written like a JSON object. It is stored as BSON, short for Binary JSON. BSON adds dates, integers, binary data and ObjectId."
+    },
+    {
+     "type": "p",
+     "text": "Every document has an _id field. It is unique in its collection and immutable. If you do not supply one, the driver creates an ObjectId. An ObjectId is 12 bytes: a timestamp, a random value and a counter, so it sorts roughly by creation time."
+    },
+    {
+     "type": "p",
+     "text": "There is no fixed schema. Only _id is compulsory. A catalog can hold one book with an isbn field and another without it."
+    }
+   ]
+  },
+  {
+   "h3": "CRUD with the official driver",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Install the driver with npm i mongodb, connect with a URL, then pick a database and a collection. The calls that talk to the server — connect, insertOne, insertMany, find, updateOne, deleteOne, countDocuments — return promises, so you await them inside an async function, as in <a href=\"#node-js-architecture-event-loop-and-modules\">6.1</a>. Picking the database and collection is synchronous."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "const { MongoClient } = require('mongodb');\nconst client = new MongoClient('mongodb://127.0.0.1:27017');\nawait client.connect();\nconst books = client.db('shop').collection('books');\n\nawait books.insertOne({ title: 'MongoDB Basics', price: 450 });\nconst res = await books.insertMany([\n  { title: 'Express Guide', price: 300 },\n  { title: 'Node in Action', price: 600 }\n]);\nres.insertedCount; // 2\n\nconst cursor = books.find({ price: { $gte: 400 } }, { title: 1, _id: 0 })\n  .sort({ price: -1 }).limit(5);\nconst docs = await cursor.toArray();\n\nfor await (const doc of books.find({ price: { $lt: 400 } })) {}\n\nawait books.updateOne({ title: 'Express Guide' }, { $set: { price: 350 } });\nawait books.updateOne({ title: 'Express Guide' }, { $inc: { price: 50 } });\nawait books.deleteOne({ title: 'MongoDB Basics' });\nconst n = await books.countDocuments({ price: { $gte: 400 } });",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "insertOne returns insertedId. insertMany takes an array and returns insertedCount."
+    },
+    {
+     "type": "p",
+     "text": "find(filter, projection) returns a cursor, not an array. A cursor fetches documents in batches. Use await cursor.toArray() to load everything, or for await (const doc of cursor) to process one at a time. findOne(filter) returns one document, or null."
+    },
+    {
+     "type": "p",
+     "text": "The filter is a document. A plain value means equality. Operators include $gt, $gte, $lt, $lte, $ne and $in. { marks: { $gte: 80 } } keeps marks 80 or more. Two fields are joined by AND; $or gives alternatives."
+    },
+    {
+     "type": "p",
+     "text": "A projection uses 1 to include and 0 to exclude; you cannot mix them except for _id. { name: 1, _id: 0 } returns names only. Chain .sort({ marks: -1 }) and .limit(2). updateOne returns matchedCount (documents the filter matched) and modifiedCount (documents actually changed). deleteOne returns deletedCount. deleteMany returns deletedCount too. The route in <a href=\"#express-js-routing-middleware-and-static-files\">6.4</a> can report these as JSON."
+    }
+   ]
+  },
+  {
+   "h3": "Update operators, shapes and choosing MongoDB",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The second argument of updateOne is usually an update document with operators. $set changes fields, $inc adds to a number, $unset removes a field, $push appends to an array."
+    },
+    {
+     "type": "p",
+     "text": "A plain document with no operator means replacement. updateOne({ name: 'Asha' }, { marks: 88 }) discards the other fields: only _id and marks remain. Write { $set: { marks: 88 } } to change one field."
+    },
+    {
+     "type": "p",
+     "text": "Embed when the child is small, always read with the parent, and bounded — an order holding line items in an array. Reference when the child is shared or large — store authorId in the book and keep authors separately. A reference costs a second query. MongoDB has no SQL join, only the $lookup stage of the aggregation pipeline."
+    },
+    {
+     "type": "p",
+     "text": "Mongoose adds schemas and models on top of the driver: defaults, validation, type casting. The database itself still has no schema; Mongoose enforces rules only in your Node process."
+    },
+    {
+     "type": "p",
+     "text": "Pick MySQL when columns are fixed, answers need joins across many tables, and money movement must be transactional across many tables and the team wants transactions on a single standalone server. That side is in <a href=\"#mysql-database-connectivity-and-queries\">6.6</a>. MongoDB also offers multi-document transactions on replica sets, but they cost more round trips and are used sparingly. Pick MongoDB when documents change shape and most reads fetch one document with its children."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One server holds the shop database, with books and orders collections. Each book document carries its own _id, and the two need not share fields.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "aria": "One mongod server holds the shop database, which holds a books collection with two documents and an orders collection beside it.",
+   "root": {
+    "label": "mongod server",
+    "style": "normal",
+    "children": [
+     {
+      "label": "shop",
+      "edge": "database",
+      "children": [
+       {
+        "label": "books",
+        "edge": "collection",
+        "children": [
+         {
+          "label": "{_id: 1, title}",
+          "edge": "document",
+          "_d": 3,
+          "children": [],
+          "_x": 198.77759999999995,
+          "_y": 264
+         },
+         {
+          "label": "{_id: 2, title}",
+          "edge": "document",
+          "_d": 3,
+          "children": [],
+          "_x": 360.0,
+          "_y": 264
+         }
+        ],
+        "_d": 2,
+        "_x": 279.38879999999995,
+        "_y": 190
+       },
+       {
+        "label": "orders",
+        "edge": "collection",
+        "_d": 2,
+        "children": [],
+        "_x": 521.2224000000001,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 400.3056,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 400.3056,
+    "_y": 42
+   }
+  }
+ },
+ "examples": [
+  {
+   "question": "A students collection holds {name:'Asha', marks:85}, {name:'Bala', marks:72} and {name:'Chandan', marks:90}. (a) How many match find({marks:{$gte:80}}), and which? (b) updateOne({name:'Asha'},{$set:{marks:88}}) reports matchedCount and modifiedCount as what? (c) find({}, {name:1, _id:0}) returns how many documents, with how many fields each?",
+   "steps": [
+    "The code below simulates these calls with Python lists; the real driver calls on the students collection behave the same.",
+    "(a) 85 and 90 pass; 72 fails. Two documents: Asha and Chandan.",
+    "(b) The filter matches Asha, so matchedCount = 1. marks changes from 85 to 88, so modifiedCount = 1. Setting 85 again would give modifiedCount = 0.",
+    "(c) {} matches all 3. The projection keeps name and drops _id, so 3 documents have 1 field each."
+   ],
+   "answer": "(a) 2 documents, Asha and Chandan. (b) matchedCount = 1, modifiedCount = 1. (c) 3 documents, 1 field each.",
+   "check": "students = [\n    {'name': 'Asha', 'marks': 85},\n    {'name': 'Bala', 'marks': 72},\n    {'name': 'Chandan', 'marks': 90},\n]\nfound = [s for s in students if s['marks'] >= 80]\nprint(len(found))\nmatched = sum(1 for s in students if s['name'] == 'Asha')\nprint(matched)\nmodified = sum(1 for s in students if s['name'] == 'Asha' and s['marks'] != 88)\nprint(modified)\nprint(len(students))\n",
+   "values": [
+    2,
+    1,
+    1,
+    3
+   ],
+   "code": {
+    "lang": "python",
+    "code": "students = [\n    {'name': 'Asha', 'marks': 85},\n    {'name': 'Bala', 'marks': 72},\n    {'name': 'Chandan', 'marks': 90},\n]\n\n# (a) find({ marks: { $gte: 80 } })\nfound = [s for s in students if s['marks'] >= 80]\nprint('find matches:', len(found), [s['name'] for s in found])\n\n# (b) updateOne({ name: 'Asha' }, { $set: { marks: 88 } })\nmatched = 0\nmodified = 0\nfor s in students:\n    if s['name'] == 'Asha':\n        matched += 1\n        if s['marks'] != 88:\n            s['marks'] = 88\n            modified += 1\nprint('matchedCount:', matched, 'modifiedCount:', modified)\n\n# (c) find({}, { name: 1, _id: 0 })\nproj = [{'name': s['name']} for s in students]\nprint('projection docs:', len(proj), proj)\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Document",
+     "marks",
+     "marks ≥ 80 ?",
+     "Kept ?"
+    ],
+    "rows": [
+     [
+      "Asha",
+      "85",
+      "true",
+      "yes"
+     ],
+     [
+      "Bala",
+      "72",
+      "false",
+      "no"
+     ],
+     [
+      "Chandan",
+      "90",
+      "true",
+      "yes"
+     ]
+    ]
+   },
+   "output": "find matches: 2 ['Asha', 'Chandan']\nmatchedCount: 1 modifiedCount: 1\nprojection docs: 3 [{'name': 'Asha'}, {'name': 'Bala'}, {'name': 'Chandan'}]"
+  }
+ ],
+ "traps": [
+  "Calling updateOne with a plain object instead of an update operator replaces the whole document and wipes every other field; only _id survives.",
+  "Trying to change _id. It is immutable. Insert a new document instead.",
+  "Treating find() as an array. It returns a cursor, so .length does not exist. cursor.map() exists but hands back another cursor, not an array. For .map, .filter or .length, call toArray() first.",
+  "Mixing 1 and 0 in one projection. { name: 1, marks: 0 } is an error; only _id may be excluded from an inclusive projection.",
+  "Assuming MongoDB enforces a schema. It does not; two documents in one collection can differ completely. Applications add Mongoose schemas on top."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the _id field, and can its value be changed after insert?",
+   "marks": 2,
+   "a": "It is the mandatory field that uniquely identifies a document in its collection. It is created as an ObjectId when you do not supply one. It is immutable."
+  },
+  {
+   "level": "remember",
+   "q": "Name the four NoSQL families and one database for each.",
+   "marks": 3,
+   "a": "Document store (MongoDB), key-value store (Redis), column store (Cassandra), graph store (Neo4j)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does find() return a cursor rather than an array of all matching documents?",
+   "marks": 3,
+   "a": "A collection may hold more matching documents than fit in memory. The cursor fetches them in batches; toArray() loads everything, while for await processes one at a time."
+  },
+  {
+   "level": "apply",
+   "q": "The students collection is {Asha, 85}, {Bala, 72}, {Chandan, 90}. Write the filter for marks from 70 to 85 inclusive, and state how many documents match.",
+   "marks": 4,
+   "a": "Filter: { marks: { $gte: 70, $lte: 85 } }. Asha 85 passes, Bala 72 passes, Chandan 90 fails. So 2 documents match."
+  },
+  {
+   "level": "apply",
+   "q": "Using the same collection, what does updateOne({ name: 'Bala' }, { marks: 75 }) do, and why is { $set: { marks: 75 } } the safer form?",
+   "marks": 4,
+   "a": "The call matches 1 document and replaces it entirely with { _id: <the existing ObjectId, unchanged>, marks: 75 }, so the name field is lost. matchedCount = 1, modifiedCount = 1. With $set only marks changes to 75 and name is preserved."
+  },
+  {
+   "level": "analyze",
+   "q": "An app stores orders and their line items. Argue for embedding or referencing, giving one condition that decides it.",
+   "marks": 5,
+   "a": "Embed line items as an array inside the order when they are always read with the order and their count is bounded. Referencing costs an extra query, and MongoDB has no join except $lookup. If line items are shared across orders or grow without limit, reference them."
+  },
+  {
+   "level": "analyze",
+   "q": "A team must move money between two accounts in one all-or-nothing step, and later report with joins over six tables. Should they use MongoDB or MySQL, and why?",
+   "marks": 5,
+   "a": "MySQL. It supports strict multi-statement transactions on one standalone server, so debit and credit both apply or neither does. It also joins six tables in one query. MongoDB also offers multi-document transactions on replica sets, but they cost more round trips and are used sparingly; it also needs a chain of $lookup stages instead of a SQL join. MongoDB suits evolving document shapes and single-document reads, not this case."
+  }
+ ],
+ "beyond": "Not for the exam. The aggregation pipeline replaces WHERE, GROUP BY and JOIN with $match, $group and $lookup. Indexes decide whether a filter scans a collection or jumps to matches; compound index order matters. Replica sets copy writes; sharding splits a collection by a shard key. Atlas, change streams and Mongoose middleware are common next stops. Search for MongoDB aggregation pipeline, compound index and replica set."
+}

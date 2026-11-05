@@ -1,0 +1,649 @@
+{
+ "lead": "Node.js lets you run JavaScript outside the browser, Express turns that JavaScript into a web server, and a database gives the server memory. This unit takes you from the event loop to a deployed, password-protected REST API. After it you can build a CRUD backend, connect it to MySQL or MongoDB, secure it with sessions or JWT, and ship it in a Docker container.",
+ "about": "Unit 6 turns JavaScript into a server language. Chapter 6.1 shows how Node runs your code on one thread around an event loop, and 6.2 adds packages from npm. Chapter 6.3 covers files, streams and the event emitter. Chapter 6.4 puts Express in front of the http server with routes, middleware and static files, and 6.5 shapes those routes into a REST API that speaks JSON. Storage comes next: 6.6 keeps rows in MySQL, 6.7 keeps documents in MongoDB. Chapter 6.8 adds login, sessions, JWT and XSS defence. Chapter 6.9 ships the app in a Docker container through a CI/CD pipeline. Each chapter uses the one before it, so you finish with a small full-stack app that runs on a server.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Node runs your JavaScript on a single thread and hands every slow job (file, network, timer) to the operating system, then picks up the result through the event loop.",
+   "depth": "What V8 does (compiles and runs JavaScript) and what libuv does (thread pool plus event queue). Single-threaded event loop and its phases: timers, pending callbacks, poll, check, close. Blocking vs non-blocking calls and why a blocking call freezes every user. Microtasks (promises) run before the loop moves to the next phase. Modules: core modules (fs, path, os, http), local modules written with module.exports and require, and third-party modules. require() resolution order: core name first, then node_modules, then a relative path. ES modules with import/export and 'type': 'module' in package.json. Some syllabi call local modules export modules. Mention node --inspect with Chrome DevTools, which some syllabi call Node Inspector. Only a few universities teach worker_threads; one line is enough.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "aria": "Your code runs on the call stack, hands slow work to the libuv thread pool, and finished callbacks wait in a queue that the event loop pushes back onto the stack when the stack is empty.",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "main.js",
+      "note": "your code",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Call stack",
+      "note": "one JavaScript thread",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "libuv thread pool",
+      "note": "files, DNS, crypto",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Callback queue",
+      "note": "results waiting",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Event loop",
+      "note": "poll phase checks queue",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "label": "function call",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "label": "fs.readFile",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "work done",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "b",
+      "label": "stack empty",
+      "style": "dashed"
+     }
+    ]
+   },
+   "example": "Predict the output order of this file: console.log('A'); setTimeout(() => console.log('D'), 0); Promise.resolve().then(() => console.log('C')); console.log('B'). Answer: A, B, C, D. A and B are plain synchronous lines, so they run first on the call stack. The promise callback is a microtask and runs as soon as the stack is empty, so C comes next. The timer is a macrotask and runs in the timers phase of the next loop pass, so D is last, even though the delay is 0 ms.",
+   "trap": "Writing that setTimeout(fn, 0) runs before Promise.then(). Microtasks always run before the next event loop phase. The second trap is saying Node uses one thread for everything; the JavaScript runs on one thread, but file and DNS work happens on the libuv pool.",
+   "prereq": "Unit 3 (callbacks, promises, async/await) and Unit 1 (client-server, HTTP request and response).",
+   "leave": "Package installation to 6.2, streams to 6.3, routing to 6.4, the http module's request object details to 6.4."
+  },
+  {
+   "k": 2,
+   "idea": "npm is a registry plus a command-line tool: package.json records which packages you want as version ranges, and package-lock.json records the exact versions you actually got.",
+   "depth": "npm init -y and the fields of package.json: name, version, main, scripts, dependencies, devDependencies. Semantic versioning MAJOR.MINOR.PATCH and the two ranges exams ask about: ^4.18.0 means at least 4.18.0 but below 5.0.0, and ~1.2.3 means at least 1.2.3 but below 1.3.0. Why the lock file exists and why it is committed. node_modules is generated, never edited, usually not committed. npm install, npm ci (clean, lock-file exact, used in CI), npx (runs a package without installing it globally), global vs local install and the -g flag. npm scripts run with npm run. One line: some syllabi group npm with task runners such as Grunt and Gulp; those are front-end build tools covered with the front-end unit. Keep the depth at what a project needs, not the full npm CLI.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "aria": "A project folder holds package.json, package-lock.json and node_modules; the lock file and node_modules carry the exact versions that the ranges inside package.json allow.",
+    "root": {
+     "label": "myapp/",
+     "style": "normal",
+     "children": [
+      {
+       "label": "package.json",
+       "edge": "declares",
+       "children": [
+        {
+         "label": "express ^4.18.0",
+         "edge": "dependencies"
+        },
+        {
+         "label": "nodemon ^3.0.0",
+         "edge": "devDependencies"
+        }
+       ]
+      },
+      {
+       "label": "package-lock.json",
+       "edge": "pins",
+       "note": "exact versions"
+      },
+      {
+       "label": "node_modules/",
+       "edge": "holds",
+       "children": [
+        {
+         "label": "express 4.18.2"
+        },
+        {
+         "label": "nodemon 3.0.1"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "package.json says \"express\": \"^4.18.2\". Which installed versions are allowed: 4.17.1, 4.18.2, 4.19.0, 5.0.0? The caret range means 4.18.2 ≤ version < 5.0.0, so 4.18.2 is allowed and 4.19.0 is allowed, while 4.17.1 is too old and 5.0.0 is a breaking major change. Now the tilde: \"~1.2.3\" means 1.2.3 ≤ version < 1.3.0, so 1.2.9 is allowed and 1.3.0 is not.",
+   "trap": "Swapping ^ and ~. Caret locks the major number, tilde locks the minor number. Also: deleting the lock file breaks repeatable installs, and npm install on a server can quietly change versions where npm ci cannot.",
+   "prereq": "6.1 (require() looks inside node_modules) and Unit 3 (ES modules).",
+   "leave": "Docker build steps to 6.9, browser build tools to the front-end unit, publishing to the public registry is not needed for the exam."
+  },
+  {
+   "k": 3,
+   "idea": "fs reads and writes files, streams move that data in small chunks instead of all at once, and EventEmitter is the on/emit pattern that both of them use.",
+   "depth": "fs.readFile, writeFile, appendFile, unlink, mkdir, readdir, stat in three flavours: callback, synchronous (readFileSync), and promises (fs/promises, or require('fs').promises). Use path.join instead of string concatenation for file paths. Streams: Readable, Writable, Duplex and Transform; createReadStream with highWaterMark (chunk size); createWriteStream; pipe() and its error handling; backpressure, meaning a fast reader is paused until a slow writer catches up; why streaming a large file beats readFile for memory. Events: require('events'), class extending EventEmitter, on(), emit(), once(), and the special 'error' event that crashes the process if nothing listens. One line: an unhandled stream error closes the process, so always attach an error handler.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "aria": "A 1 GB file is read in 64 KB chunks by a read stream, passed through a buffer to a write stream, so only one chunk sits in memory at a time.",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "1 GB file",
+      "note": "on disk",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "read stream",
+      "note": "64 KB chunks",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "buffer",
+      "note": "one chunk in memory",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "write stream",
+      "note": "waits if full",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "copy on disk",
+      "note": "same bytes",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "label": "open",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "label": "chunk",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "pipe()",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "label": "write",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "Copy a 1 GB file. (a) With fs.readFile, the whole file is held in memory: 1 GB = 1024 MB, so about 1024 MB of RAM. (b) With createReadStream at 64 KB chunks, memory per step is about 64 KB, and the number of chunks is 1 GB ÷ 64 KB = 1,048,576 KB ÷ 64 KB = 16,384 chunks. (c) If the destination disk fills up halfway, the write stream emits 'error', and with no listener the process exits.",
+   "trap": "Saying fs.readFile blocks the whole server. It is asynchronous, but it buffers the entire file, which is the memory problem. The exam trap is also mixing up 'error' with 'close' and forgetting that an unhandled 'error' on an emitter throws.",
+   "prereq": "6.1 (callbacks, event loop, microtasks) and Unit 3 (arrow functions, promises).",
+   "leave": "Serving static files with express.static to 6.4, HTTP response streaming to 6.4, file uploads are outside this unit."
+  },
+  {
+   "k": 4,
+   "idea": "Express wraps Node's http server so that every request walks down an ordered chain of middleware functions until one of them sends a response.",
+   "depth": "Creating an app: const app = express(), app.listen(3000). Routes: app.get, post, put, patch, delete; the callback is the handler function with (req, res). Route parameters /users/:id read as req.params.id; query strings read as req.query. Middleware: app.use(fn), signature (req, res, next), calling next() to pass control, order of registration deciding the result, mount paths app.use('/api', router), express.Router() for splitting files. Body parsing with express.json() and express.urlencoded({ extended: true }). Serving static resource files with express.static('public'). Response helpers res.send, res.json, res.status, res.redirect. Error middleware takes four arguments (err, req, res, next). One line: frameworks for Node.js include Express, Fastify, Koa and NestJS; Express is the one exams use.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "aria": "A GET request for user 42 enters a logger, then the JSON body parser, then an auth check, then the route handler that reads the id from the URL and sends JSON back.",
+    "nodes": [
+     {
+      "id": "r",
+      "label": "GET /users/42",
+      "note": "incoming request",
+      "style": "normal"
+     },
+     {
+      "id": "m1",
+      "label": "logger",
+      "note": "next() called",
+      "style": "normal"
+     },
+     {
+      "id": "m2",
+      "label": "express.json()",
+      "note": "parses body",
+      "style": "normal"
+     },
+     {
+      "id": "m3",
+      "label": "checkAuth",
+      "note": "401 if no token",
+      "style": "accent"
+     },
+     {
+      "id": "h",
+      "label": "route handler",
+      "note": "req.params.id = 42",
+      "style": "live"
+     },
+     {
+      "id": "s",
+      "label": "res.json(user)",
+      "note": "200 response",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "r",
+      "to": "m1",
+      "style": "solid"
+     },
+     {
+      "from": "m1",
+      "to": "m2",
+      "label": "next()",
+      "style": "solid"
+     },
+     {
+      "from": "m2",
+      "to": "m3",
+      "label": "next()",
+      "style": "solid"
+     },
+     {
+      "from": "m3",
+      "to": "h",
+      "label": "next()",
+      "style": "solid"
+     },
+     {
+      "from": "h",
+      "to": "s",
+      "label": "match",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "An app registers, in this order: app.use(logger); app.use(express.json()); app.get('/users/:id', handler); app.use(errorHandler). A client sends GET /users/42?lang=en. State req.params.id, req.query.lang, and whether express.json() runs before the handler. Answer: req.params.id is the string '42', req.query.lang is 'en', and yes, express.json() runs first because app.use() was registered above the route, so every request passes through it before reaching the handler.",
+   "trap": "Forgetting next() inside a middleware, which leaves the request hanging with no response. The second trap is order: move express.json() below the route and req.body becomes undefined. The third is an error handler written with three arguments, which Express treats as ordinary middleware and never calls for errors.",
+   "prereq": "6.1 (the http module and callbacks) and Unit 1 (HTTP methods, URLs, status codes).",
+   "leave": "REST design and status-code choices to 6.5, sessions and tokens to 6.8, database calls inside handlers to 6.6 and 6.7."
+  },
+  {
+   "k": 5,
+   "idea": "REST names things with URLs and names actions with HTTP methods, so POST /books creates a book, GET /books/7 reads book 7, and JSON carries the data both ways.",
+   "depth": "Resource-based URLs with plural nouns, no verbs in the path. Methods as actions: GET (read, safe), POST (create), PUT (replace whole resource), PATCH (partial update), DELETE (remove). Safe vs idempotent: GET, PUT and DELETE can be repeated with the same final state, POST cannot. Status codes: 200 OK, 201 Created with a Location header, 204 No Content, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 500 Internal Server Error. JSON request and response bodies with Content-Type: application/json and Accept. Collections vs single items, filtering and paging with query strings, API versioning such as /api/v1. Statelessness: the request must carry everything the server needs.",
+   "figure": {
+    "type": "sequence",
+    "aria": "A client posts JSON to create a book, the API inserts a row, the database returns the new id 7, the API answers 201, and a later GET returns the book with 200.",
+    "actors": [
+     "Client",
+     "Express API",
+     "Database"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "Express API",
+      "label": "POST /books {json}",
+      "dashed": false
+     },
+     {
+      "from": "Express API",
+      "to": "Database",
+      "label": "INSERT row",
+      "dashed": false
+     },
+     {
+      "from": "Database",
+      "to": "Express API",
+      "label": "insertId = 7",
+      "dashed": true
+     },
+     {
+      "from": "Express API",
+      "to": "Client",
+      "label": "201 + Location /books/7",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Express API",
+      "label": "GET /books/7",
+      "dashed": false
+     },
+     {
+      "from": "Express API",
+      "to": "Database",
+      "label": "SELECT WHERE id = 7",
+      "dashed": false
+     },
+     {
+      "from": "Database",
+      "to": "Express API",
+      "label": "1 row",
+      "dashed": true
+     },
+     {
+      "from": "Express API",
+      "to": "Client",
+      "label": "200 + book JSON",
+      "dashed": true
+     }
+    ]
+   },
+   "example": "Design CRUD routes for books and state the success status for each. Create: POST /books, returns 201 with the new book and a Location header. List all: GET /books, returns 200 with an array. Read one: GET /books/7, returns 200, or 404 if missing. Replace: PUT /books/7 with the full JSON object, returns 200. Delete: DELETE /books/7, returns 204 with no body. Safe and idempotent: GET, PUT and DELETE. POST is neither, because sending it twice creates two books with ids 7 and 8.",
+   "trap": "Using PUT for a partial update; that is PATCH. Also writing verbs into the URL such as /getBooks, returning 200 instead of 201 on create, and putting the id in the body instead of the path.",
+   "prereq": "6.4 (routing and handlers) and Unit 1 (HTTP methods and status codes).",
+   "leave": "The SQL itself to 6.6, the document queries to 6.7, protecting the routes to 6.8."
+  },
+  {
+   "k": 6,
+   "idea": "Node reaches MySQL through a pool of connections, sends SQL with ? placeholders so values are bound safely, and receives rows as plain JavaScript objects.",
+   "depth": "Installing the mysql2 package and requiring it. createConnection vs createPool and why a server uses a pool. Connecting with host, user, password, database kept in environment variables. The callback style and the promise style (mysql2/promise, await pool.query). Placeholders: db.query('SELECT * FROM students WHERE id = ?', [id]) and why string concatenation invites SQL injection. The result: rows for SELECT, and affectedRows, changedRows, insertId for INSERT and UPDATE. CRUD statements in SQL: INSERT INTO ... VALUES ?, SELECT ... WHERE ?, UPDATE ... SET ... WHERE ?, DELETE FROM ... WHERE ?. connection.release() in a pool, pool.end() on shutdown. Transactions in one line: beginTransaction, commit, rollback. Some syllabi print this as Program 9 and Program 10 style exercises; keep the code short and complete.",
+   "figure": {
+    "type": "sequence",
+    "aria": "The Node app asks the pool to run a query with a bound parameter, the pool sends it to MySQL, MySQL returns rows and the count of affected rows, and the connection goes back to the pool.",
+    "actors": [
+     "Node app",
+     "mysql2 pool",
+     "MySQL server"
+    ],
+    "messages": [
+     {
+      "from": "Node app",
+      "to": "mysql2 pool",
+      "label": "query(sql, [id])",
+      "dashed": false
+     },
+     {
+      "from": "mysql2 pool",
+      "to": "MySQL server",
+      "label": "execute, ? bound",
+      "dashed": false
+     },
+     {
+      "from": "MySQL server",
+      "to": "mysql2 pool",
+      "label": "rows or affectedRows",
+      "dashed": true
+     },
+     {
+      "from": "mysql2 pool",
+      "to": "Node app",
+      "label": "await resolves",
+      "dashed": true
+     },
+     {
+      "from": "mysql2 pool",
+      "to": "mysql2 pool",
+      "label": "connection returned",
+      "dashed": true
+     }
+    ]
+   },
+   "example": "Table students(id, name, marks). Run one INSERT with an array of arrays for three students: ['Asha', 85], ['Bala', 72], ['Chandan', 90]. The result gives affectedRows = 3 and insertId = 11, so the ids are 11, 12 and 13. Next, SELECT name FROM students WHERE marks >= 80 returns 2 rows (Asha, Chandan). Then UPDATE students SET marks = marks + 5 WHERE id = 11 gives affectedRows = 1 and changedRows = 1.",
+   "trap": "Building SQL with '+' and a user value, which allows SQL injection. Also confusing affectedRows (matched) with changedRows, and forgetting that insertId is the first id of a multi-row insert, not the last.",
+   "prereq": "Unit 4 (basic SQL and MySQL tables) and 6.5 (CRUD routes that call this code).",
+   "leave": "Installing MySQL or XAMPP to Unit 4, password hashing to 6.8, the NoSQL alternative to 6.7."
+  },
+  {
+   "k": 7,
+   "idea": "MongoDB stores JSON-like documents inside collections with no fixed schema, and you query a collection by passing a filter document that each candidate must match.",
+   "depth": "NoSQL families in one line: document, key-value, column, graph. Hierarchy: server, database, collection, document. BSON and the _id field, which is unique and immutable and usually an ObjectId. CRUD with the official driver: insertOne, insertMany, find(filter, projection), findOne, updateOne, updateMany, deleteOne, countDocuments; the find result is a cursor, so use toArray() or for await. Query operators $gt, $gte, $lt, $in, $and; projection {name: 1, _id: 0}; sort and limit. Update operators $set and $inc, and why updateOne without $set replaces the whole document. Embedding vs referencing for related data. One line on Mongoose schemas and why an app adds them on top of the driver. When MySQL is the better choice: fixed columns, joins, strict transactions.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "aria": "One MongoDB server holds the shop database, which holds a books collection with two documents and an orders collection beside it.",
+    "root": {
+     "label": "mongod server",
+     "style": "normal",
+     "children": [
+      {
+       "label": "shop (db)",
+       "edge": "database",
+       "children": [
+        {
+         "label": "books (collection)",
+         "edge": "collection",
+         "children": [
+          {
+           "label": "{_id: 1, title}",
+           "edge": "document"
+          },
+          {
+           "label": "{_id: 2, title}",
+           "edge": "document"
+          }
+         ]
+        },
+        {
+         "label": "orders (collection)",
+         "edge": "collection"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "Collection students holds {name: 'Asha', marks: 85}, {name: 'Bala', marks: 72} and {name: 'Chandan', marks: 90}. Run find({ marks: { $gte: 80 } }) — it returns 2 documents, Asha and Chandan, because each document is tested against the filter. Then updateOne({ name: 'Asha' }, { $set: { marks: 88 } }) reports matchedCount = 1 and modifiedCount = 1. Finally find({}, { name: 1, _id: 0 }) returns only the name field of all three documents.",
+   "trap": "Calling updateOne with a plain object instead of $set, which replaces the whole document and wipes the other fields. Also trying to change _id, and treating find() as an array in the driver.",
+   "prereq": "Unit 3 (JSON objects) and 6.5 (the same CRUD routes, different store).",
+   "leave": "SQL joins and transactions to 6.6, indexing and sharding are outside this unit, auth to 6.8."
+  },
+  {
+   "k": 8,
+   "idea": "Authentication proves who the user is; a session keeps that proof on the server behind a cookie id, a JWT keeps it in a signed token on the client, and XSS is what happens when attacker script runs inside your page.",
+   "depth": "Storing passwords: never plain text, use bcrypt with a salt and 10-12 rounds, compare with bcrypt.compare. Sessions: express-session, a session id in a cookie, session data in memory or a store, cookie flags HttpOnly, Secure and SameSite. JWT: three base64url parts header.payload.signature, signed with HMAC and a secret, so it is signed but not encrypted; claims sub, iat, exp; server verifies signature and expiry on every request; the Authorization: Bearer header. Logout: delete the session on the server vs the client dropping a token, and the blacklist workaround. When to use which: sessions for a browser app, tokens for mobile and multiple services. XSS: stored, reflected and DOM types; escape output, never inject user text with innerHTML, set Content-Security-Policy; input validation on the server. One line each on SQL injection (see 6.6), CSRF and SameSite cookies, HTTPS and the helmet middleware.",
+   "figure": {
+    "type": "sequence",
+    "aria": "The browser posts a login, the server checks the stored hash in the database, answers with a session cookie or a token, and the next request carries that cookie or token to prove the user.",
+    "actors": [
+     "Browser",
+     "Express server",
+     "Database"
+    ],
+    "messages": [
+     {
+      "from": "Browser",
+      "to": "Express server",
+      "label": "POST /login {user, pass}",
+      "dashed": false
+     },
+     {
+      "from": "Express server",
+      "to": "Database",
+      "label": "SELECT password_hash",
+      "dashed": false
+     },
+     {
+      "from": "Database",
+      "to": "Express server",
+      "label": "bcrypt hash",
+      "dashed": true
+     },
+     {
+      "from": "Express server",
+      "to": "Browser",
+      "label": "200 + cookie sid or JWT",
+      "dashed": true
+     },
+     {
+      "from": "Browser",
+      "to": "Express server",
+      "label": "GET /me with cookie or Bearer",
+      "dashed": false
+     },
+     {
+      "from": "Express server",
+      "to": "Browser",
+      "label": "200 user JSON, or 401",
+      "dashed": true
+     }
+    ]
+   },
+   "example": "Asha logs in at 10:00 and the server issues a JWT with iat = 1700000000 and exp = 1700003600. The lifetime is 1700003600 − 1700000000 = 3600 s = 60 min, so the token is valid until 11:00 and a request at 11:05 gets 401 Unauthorized. Anyone who copies the token can read the payload, because base64url is encoding, not encryption; they still cannot forge a new one without the secret. With sessions instead, the cookie holds a random 32-byte id, the user row is fetched from the server store, and logout deletes the entry so the same cookie stops working.",
+   "trap": "Saying a JWT is encrypted, or storing it in localStorage where any XSS script can read it. The other traps are forgetting to check exp and the signature, and mixing up XSS (script injected into your page) with CSRF (your browser tricked into sending a request).",
+   "prereq": "6.4 (middleware) and 6.6 or 6.7 (the user lookup).",
+   "leave": "SQL injection placeholders to 6.6, HTTPS handshake details to Unit 1, the login form HTML to Unit 2."
+  },
+  {
+   "k": 9,
+   "idea": "Docker packs the app and its exact dependencies into an image so the container behaves the same on your laptop and on the server, and CI/CD runs install, test, build and deploy automatically on every push.",
+   "depth": "Image vs container: a class vs an object, or a recipe vs the cooked dish. Dockerfile instructions in order: FROM node:20-alpine, WORKDIR /app, COPY package*.json ./, RUN npm ci, COPY . ., EXPOSE 3000, CMD ['node', 'server.js']. Why the two COPY lines protect the layer cache, and what .dockerignore keeps out. docker build -t myapp ., docker run -p 3000:3000 myapp, and the host-port : container-port order. Environment variables for database URLs and secrets, never baked into the image. docker compose for app plus database. Cloud hosting choices in one line each: a PaaS that builds from Git, a VPS where you install Docker yourself, managed databases. A reverse proxy such as Nginx in front of port 3000, and where the logs go. CI/CD pipeline: push, install, test, build image, push to a registry, deploy, restart, keep a rollback tag. Only a few universities teach Docker and CI/CD; keep the depth at the Dockerfile and the pipeline stages.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "aria": "A git push triggers CI to install and test, then builds and tags a Docker image, pushes it to a registry, and deploys it so the container listens on port 3000.",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "git push",
+      "note": "developer",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "CI: npm ci",
+      "note": "same lock file",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "npm test",
+      "note": "fail stops here",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "docker build",
+      "note": "tag with commit",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "registry",
+      "note": "image stored",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "deploy host",
+      "note": "env vars injected",
+      "style": "live"
+     },
+     {
+      "id": "g",
+      "label": "container :3000",
+      "note": "app live",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "green",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "label": "docker push",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "label": "docker pull",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "label": "docker run",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A Dockerfile runs, in order: FROM node:20-alpine, WORKDIR /app, COPY package*.json ./, RUN npm ci, COPY . ., EXPOSE 3000, CMD ['node', 'server.js']. Build and run it with docker build -t shop . and docker run -p 8080:3000 shop. The app listens on port 3000 inside the container, and you open it at http://localhost:8080 because the host port comes first. One CI run takes install 40 s, test 25 s, image build 30 s and deploy 15 s: total 40 + 25 + 30 + 15 = 110 s, against about 20 minutes of manual work.",
+   "trap": "Writing COPY . . before npm ci, which throws away the cache on every code change and reinstalls everything. The second trap is reversing -p 3000:8080, and the third is putting passwords in the Dockerfile instead of environment variables, where they stay inside the image for anyone to read.",
+   "prereq": "6.4 (the app being shipped) and 6.2 (package.json, npm ci and scripts).",
+   "leave": "Operating-system container internals are outside this unit, cloud service pricing is not needed, HTTPS certificate setup belongs with Unit 1 HTTP."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "require() searches node_modules, which npm fills"
+  ],
+  [
+   2,
+   4,
+   "npm install express puts the framework in the project"
+  ],
+  [
+   3,
+   4,
+   "express.static sends files through streams"
+  ],
+  [
+   4,
+   5,
+   "each route becomes one REST endpoint"
+  ],
+  [
+   5,
+   6,
+   "CRUD handlers run SQL with bound values"
+  ],
+  [
+   5,
+   7,
+   "the same handlers can store documents instead"
+  ],
+  [
+   4,
+   8,
+   "login is just another middleware in the chain"
+  ],
+  [
+   6,
+   8,
+   "placeholders stop the SQL injection XSS chapter warns about"
+  ],
+  [
+   4,
+   9,
+   "the Express app is what the container runs"
+  ]
+ ]
+}

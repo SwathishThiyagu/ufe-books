@@ -1,0 +1,263 @@
+{
+ "lead": "Three Node tools sit between your code and the disk. The <b>fs</b> module opens, reads, writes and deletes files. A <b>stream</b> carries the same bytes in small chunks, so a 1 GB file never has to sit in RAM. <b>EventEmitter</b> is the base pattern both rely on: an object emits a named event, and the functions listening for that name run. You meet all three in a log-writing server, a file-upload handler, a backup script, or anywhere a program moves data bigger than its memory.",
+ "prereq": "You need callbacks, the event loop and microtasks from <a href=\"#node-js-architecture-event-loop-and-modules\">6.1</a>, plus arrow functions and promises from Unit 3.",
+ "sections": [
+  {
+   "h3": "The fs module: three flavours of the same call",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every file operation in Node lives in <code>fs</code>. The same job is offered in three shapes, and you pick one per call site."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Callback: <code>fs.readFile(path, cb)</code>. The last argument is <code>(err, data)</code> and it runs later, after the disk answers.",
+      "Synchronous: the name ends in <code>Sync</code>, as in <code>fs.readFileSync(path, 'utf8')</code>. It returns the value directly, throws on failure, and stops the single thread until the disk is done.",
+      "Promises: <code>require('fs/promises')</code>, or <code>require('fs').promises</code>, gives the same functions returning promises, so <code>const text = await fs.readFile(p, 'utf8')</code> works."
+     ]
+    },
+    {
+     "type": "table",
+     "head": [
+      "Call",
+      "What it does"
+     ],
+     "rows": [
+      [
+       "readFile, writeFile",
+       "whole file in, whole file out"
+      ],
+      [
+       "appendFile",
+       "adds bytes to the end"
+      ],
+      [
+       "unlink",
+       "deletes a file"
+      ],
+      [
+       "mkdir",
+       "creates a folder; {recursive:true} makes parents"
+      ],
+      [
+       "readdir",
+       "lists names inside a folder"
+      ],
+      [
+       "stat",
+       "size, mtime, isDirectory()"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "<code>readFile</code> returns a Buffer unless you pass an encoding. Pass <code>'utf8'</code> for text; keep the Buffer for images and video."
+    },
+    {
+     "type": "p",
+     "text": "Join paths with <code>path.join('data','logs','app.txt')</code>. It picks the right separator for the operating system and collapses duplicate slashes. String concatenation with <code>'/'</code> breaks on Windows and happily produces <code>data//logs</code>."
+    }
+   ]
+  },
+  {
+   "h3": "Streams: move the file in chunks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A stream pushes data through in pieces instead of one big value. There are four kinds."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Readable</b>: a source, such as <code>fs.createReadStream</code>.",
+      "<b>Writable</b>: a sink, such as <code>fs.createWriteStream</code>.",
+      "<b>Duplex</b>: both at once, such as a TCP socket.",
+      "<b>Transform</b>: a duplex that changes the bytes, such as gzip."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "<code>fs.createReadStream('big.mp4', {highWaterMark: 64 * 1024})</code> opens the file and emits a <code>'data'</code> event per chunk. <code>highWaterMark</code> is the chunk size in bytes; the default is 64 KB = 65536 bytes."
+    },
+    {
+     "type": "p",
+     "text": "<code>read.pipe(write)</code> wires the two together: each chunk is written to the destination, and the end of the source closes the destination. pipe returns the destination, so calls chain."
+    },
+    {
+     "type": "p",
+     "text": "Backpressure makes this safe. When the write stream's internal buffer is full, <code>write()</code> returns false and pipe pauses the read stream until the writer emits <code>'drain'</code>. A fast disk never floods a slow disk or a slow network; the reader simply waits."
+    },
+    {
+     "type": "p",
+     "text": "pipe does not forward errors. Attach handlers yourself, or use <code>stream.pipeline(read, write, cb)</code>, which destroys both sides and calls back once with the error."
+    }
+   ]
+  },
+  {
+   "h3": "EventEmitter: on, emit, once",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>require('events')</code> gives the EventEmitter class. Streams, http servers and sockets are all EventEmitters underneath."
+    },
+    {
+     "type": "p",
+     "text": "<code>emitter.on('name', fn)</code> registers a listener. <code>emitter.emit('name', arg)</code> calls every listener for that name at once, in registration order, passing arg. <code>once('name', fn)</code> runs the listener a single time and then removes it."
+    },
+    {
+     "type": "p",
+     "text": "To build your own, extend the class. <code>class Job extends EventEmitter {}</code>, then <code>const j = new Job(); j.on('done', n => console.log(n)); j.emit('done', 42);</code> prints 42."
+    },
+    {
+     "type": "p",
+     "text": "<code>'error'</code> is special. If you <code>emit('error', err)</code> and nobody is listening, Node throws err as an uncaught exception and the process exits. A stream that hits a disk failure emits <code>'error'</code>; with no handler, your server dies."
+    },
+    {
+     "type": "p",
+     "text": "<code>'close'</code> is not <code>'error'</code>. It only means the file handle was released, and it can arrive after a clean end or after a failure. Never treat <code>'close'</code> as proof of success."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "One gigabyte moves through the program 64 KB at a time: the read stream fills a single buffer, pipe() hands that chunk on, and the reader waits whenever the writer is full. Peak memory stays near 64 KB instead of 1024 MB.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "aria": "A 1 GB file is read in 64 KB chunks by a read stream and passed through a buffer to a write stream, so only one chunk sits in memory at a time before the copy is written to disk.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "1 GB file",
+     "note": "on disk",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "read stream",
+     "note": "64 KB chunks",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "buffer",
+     "note": "one chunk in memory",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "write stream",
+     "note": "waits if full",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "copy on disk",
+     "note": "same bytes",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "open",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "chunk",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "pipe()",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "label": "write",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A Node script copies a 1 GB video file to a backup disk. (a) How much RAM does <code>fs.readFile</code> need for this copy? (b) With <code>createReadStream</code> at <code>highWaterMark: 64 * 1024</code>, how many chunks are read and how much memory is live per step? (c) The backup disk fills up halfway. What happens if no 'error' listener is attached?",
+   "steps": [
+    "1 GB = 1024 MB, the binary unit that <code>stat</code> and file sizes use.",
+    "readFile must hold the whole file before the write starts, so memory ≈ 1024 MB.",
+    "Convert to kilobytes: 1024 MB × 1024 KB/MB = 1,048,576 KB.",
+    "Chunks = 1,048,576 KB ÷ 64 KB = 16,384 chunks.",
+    "Memory live per step ≈ 64 KB = 0.0625 MB. Check the ratio: 1024 MB ÷ 0.0625 MB = 16,384, the same number of chunks.",
+    "(c) The write stream emits 'error'. With zero listeners on that event, Node throws it as an uncaught exception and the process exits, leaving a half-written copy."
+   ],
+   "answer": "readFile needs about 1024 MB of RAM; the stream reads 16,384 chunks of 64 KB and keeps about 64 KB live at a time; a missing 'error' listener ends the process.",
+   "check": "total_mb = 1024\nchunk_kb = 64\ntotal_kb = total_mb * 1024\nchunks = total_kb // chunk_kb\nprint(total_mb)\nprint(total_kb)\nprint(chunks)",
+   "values": [
+    1024,
+    1048576,
+    16384
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "<b>readFile is asynchronous</b>, so it does not block the event loop. Its problem is memory: the whole file is buffered. readFileSync is the one that blocks.",
+  "<b>pipe() does not carry errors.</b> If the destination disk fails, only the write stream's 'error' reports it. Listen on it, or use stream.pipeline.",
+  "<b>'error' is not 'close'.</b> 'close' only means the handle was released, and an unhandled 'error' throws and kills the process.",
+  "<b>Missing encoding.</b> readFile without 'utf8' returns a Buffer, so logging text shows hexadecimal bytes.",
+  "<b>on() when you meant once().</b> A completion handler registered with on() fires again the next time that same emitter emits the event."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three flavours of an fs call and one difference between them.",
+   "marks": 2,
+   "a": "Callback (gets (err, data) later), Sync (returns the value, throws on error, blocks the thread), and promises (returns a promise, used with await)."
+  },
+  {
+   "level": "remember",
+   "q": "What does highWaterMark control, and what is its default?",
+   "marks": 2,
+   "a": "The chunk size in bytes for a stream. Default 64 KB = 65536 bytes."
+  },
+  {
+   "level": "understand",
+   "q": "Why does piping a 1 GB file use far less memory than readFile?",
+   "marks": 3,
+   "a": "readFile buffers the entire file (about 1024 MB). A stream keeps roughly one chunk (about 64 KB) live and pauses while the writer's buffer is full, which is backpressure."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the 'error' event special on an EventEmitter?",
+   "marks": 3,
+   "a": "With no listener registered, emit('error', e) throws e as an uncaught exception, and the process exits instead of continuing silently."
+  },
+  {
+   "level": "apply",
+   "q": "A 512 MB file is read with highWaterMark set to 64 KB. How many chunks?",
+   "marks": 4,
+   "a": "512 × 1024 = 524,288 KB; 524,288 ÷ 64 = 8,192 chunks."
+  },
+  {
+   "level": "apply",
+   "q": "With <code>const fs = require('fs/promises')</code>, write the call that appends 'ok' to log.txt and the call that reads it back as text.",
+   "marks": 4,
+   "a": "await fs.appendFile('log.txt', 'ok'); then const t = await fs.readFile('log.txt', 'utf8'); — the 'utf8' argument makes t a string, not a Buffer."
+  },
+  {
+   "level": "analyze",
+   "q": "Four requests each run readFile on a 2 GB file at the same moment. Estimate the memory and say what you would change.",
+   "marks": 5,
+   "a": "4 × 2048 MB = 8192 MB ≈ 8 GB of RAM, which usually ends in an out-of-memory crash. Replace readFile with createReadStream and pipe the chunks to the response, so each request holds about 64 KB at a time."
+  }
+ ],
+ "beyond": "Not for the exam. Real code uses <code>stream.pipeline</code> and <code>stream/promises</code> instead of hand-wired pipe plus listeners, because they destroy both sides on failure. Node streams are async iterables, so <code>for await (const chunk of readStream)</code> works and reads like a loop. The WHATWG web streams standard now carries the same idea into browsers, Deno and Node, so a Transform written for one can often run in the others. Search for 'Node stream backpressure' and 'web streams TransformStream' next. Sending files over HTTP with streams belongs to <a href=\"#express-js-routing-middleware-and-static-files\">6.4</a>."
+}
