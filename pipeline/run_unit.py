@@ -260,6 +260,20 @@ def main():
                     else:
                         flag(f'chapter {k}: the reviewer found {len(high)} serious problem(s) and the revision did not pass the checks; read the review in the state folder')
                 S.put(f'review{k}', issues); S.put(key + '.reviewed', True)
+        def quiz_ok(ch):
+            qz = [q for q in (ch.get('quiz') or []) if isinstance(q, dict) and q.get('q') and q.get('a')]
+            return len(qz) >= 5 and set(R.LEVELS) <= {str(q.get('level', '')).lower() for q in qz}
+        def fix_quiz(k):
+            ch = S.get(f'ch{k}')
+            if not ch or quiz_ok(ch): return
+            def chk(d):
+                qz = d.get('quiz') if isinstance(d, dict) else None
+                return [] if isinstance(qz, list) and quiz_ok({'quiz': qz}) else ['give 6 to 8 quiz objects covering remember, understand, apply and analyze']
+            d = ask.json(f'quiz{k}', PR.SYSTEM, PR.quiz(P, k, R.plain_text(P, k, ch)), check=chk)
+            if not chk(d):
+                ch['quiz'] = d['quiz']; S.put(f'ch{k}', ch); log(f'  quiz {N}.{k} rewritten')
+            else:
+                flag(f'chapter {k}: the quiz could not be rewritten')
         workers = max(1, int(os.environ.get('PARALLEL', '1')))
         if workers == 1:
             for k in range(1, len(subs) + 1): do_chapter(k)
@@ -267,6 +281,7 @@ def main():
             from concurrent.futures import ThreadPoolExecutor
             with ThreadPoolExecutor(workers) as pool:
                 for f in [pool.submit(do_chapter, k) for k in range(1, len(subs) + 1)]: f.result()
+        for k in range(1, len(subs) + 1): fix_quiz(k)
         us = S.get('unit')
         if us is None:
             brief = []
