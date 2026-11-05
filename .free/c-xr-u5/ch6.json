@@ -1,0 +1,208 @@
+{
+ "lead": "A C# script is code attached to a scene object in Unity; C# is the language Unity uses for behaviour. The script reads input, decides what should happen, and asks the physics engine to move objects under rules. Animation alone repeats a fixed path. Scripts react to the user and to collisions, so a virtual ball can be thrown, a door can open, or a controller can buzz when a tool hits a wall. The physics engine owns mass, force and collision; the script owns intent. This chapter explains that loop and the units that keep it correct.",
+ "prereq": "You need: <a href=\"#game-engines-unity-and-unreal-engine\">Chapter 5.5</a> on Unity, and Unit 4 kinematics on force, mass and collisions.",
+ "sections": [
+  {
+   "h3": "Lifecycle and input: when code runs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Unity calls methods on a MonoBehaviour script in a known order. Awake runs once when the object is loaded, before Start; use it to cache references. Start runs once before the first frame. Update runs once per rendered frame; read input and move non-physics visuals there. FixedUpdate runs on a fixed physics step, 0.02 s by default (50 Hz); apply forces there. OnTriggerEnter runs when another collider enters a trigger. A collider is the shape used for contact; a trigger is a collider that reports overlap without blocking."
+    },
+    {
+     "type": "p",
+     "text": "Input polling reads a device every frame: <code>Input.GetButtonDown(\"Fire1\")</code> is true on the frame the button goes down. Events invert this: one script raises a C# event or UnityEvent, and listeners react without checking every frame. A coroutine is a method that can pause: <code>yield return null</code> waits one frame, <code>yield return new WaitForSeconds(0.1f)</code> waits 0.1 s. A raycast tests a line against colliders; <code>Physics.Raycast(origin, direction, out hit, distance, layerMask)</code> returns the first hit. A layer mask includes only chosen layers, so a controller ray can ignore the user's hands or a menu. Selection and travel use these tools; see <a href=\"#3d-manipulation-tasks-and-techniques\">3D manipulation</a> and <a href=\"#travel-and-wayfinding-techniques\">travel</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Physics: mass, force and collision",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A Rigidbody is the component that lets the physics engine move an object. It stores mass in kg, velocity in m/s and drag. A collider gives the body a shape for contact: box, sphere, capsule or mesh. A trigger collider reports overlap but applies no push. A joint connects two bodies, for example a hinge for a door or a fixed joint for a grabbed tool."
+    },
+    {
+     "type": "p",
+     "text": "Force changes momentum. For a constant force over a short contact time, impulse is J = F Δt. For a body of mass m starting at rest, J = m v, so v = J/m. Unit check: 1 N·s = 1 kg·m/s. The engine detects contacts in FixedUpdate, computes contact impulses from mass and material properties, then updates positions. Call AddForce in FixedUpdate; AddForce in Update gives different motion at different frame rates. Use ForceMode.Impulse for a kick and ForceMode.Force for a steady push."
+    },
+    {
+     "type": "formula",
+     "text": "J = F Δt = m Δv",
+     "where": "J is impulse in N·s; F is force in N; Δt is contact time in s; m is mass in kg; Δv is change in velocity in m/s."
+    }
+   ]
+  },
+  {
+   "h3": "A small interaction script",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Small script, clear jobs. The script reads the trigger, applies one impulse, and fires haptics on contact. It does not set position every frame, because that fights the physics engine."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "using UnityEngine;\n\npublic class PushCube : MonoBehaviour\n{\n    public float impulse = 1.6f;\n    Rigidbody rb;\n    bool fire;\n\n    void Start()\n    {\n        rb = GetComponent<Rigidbody>();\n    }\n\n    void Update()\n    {\n        if (Input.GetButtonDown(\"Fire1\"))\n            fire = true;\n    }\n\n    void FixedUpdate()\n    {\n        if (fire)\n        {\n            rb.AddForce(Vector3.forward * impulse, ForceMode.Impulse);\n            fire = false;\n        }\n    }\n\n    void OnTriggerEnter(Collider other)\n    {\n        if (other.CompareTag(\"Wall\"))\n        {\n            // call the toolkit's haptic pulse here\n        }\n    }\n}",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "Start caches the Rigidbody. Update sets a flag when Fire1 is pressed. FixedUpdate applies the 1.6 N·s kick once and clears the flag, so the force is applied in physics time, not frame time. OnTriggerEnter checks the tag and calls haptics. For a repeated buzz, start a coroutine that sends a pulse, waits, then sends zero. Keep haptic calls short; long vibration hides other feedback and drains the controller. Some syllabi call this VR programming; the pattern is input, script, physics, display."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Input starts the chain; the script applies an impulse of 1.6 N·s to a 0.8 kg body, so the body moves at 2.0 m/s, and a collision event returns to the script before the display updates.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Input",
+    "Script",
+    "Physics",
+    "Display"
+   ],
+   "messages": [
+    {
+     "from": "Input",
+     "to": "Script",
+     "label": "button down",
+     "dashed": false
+    },
+    {
+     "from": "Script",
+     "to": "Physics",
+     "label": "AddForce",
+     "dashed": false
+    },
+    {
+     "from": "Physics",
+     "to": "Script",
+     "label": "collision hit",
+     "dashed": false
+    },
+    {
+     "from": "Script",
+     "to": "Display",
+     "label": "move object",
+     "dashed": false
+    }
+   ],
+   "aria": "A sequence where input sends a button event to the script, the script calls AddForce on physics, physics returns a collision hit, and the script updates the display."
+  }
+ },
+ "examples": [
+  {
+   "question": "A Rigidbody cube of mass 0.8 kg starts from rest. A horizontal impulse of 1.6 N·s is applied. Find its speed just after the impulse and the distance it travels in the next 0.5 s with no friction.",
+   "steps": [
+    "Given: mass m = 0.8 kg, impulse J = 1.6 N·s, initial speed u = 0 m/s, time t = 0.5 s.",
+    "Impulse changes momentum: J = m(v − u). With u = 0, J = m v.",
+    "Solve for speed: v = J / m = 1.6 / 0.8 = 2.0 m/s.",
+    "After the impulse there is no horizontal force and no friction, so speed stays 2.0 m/s.",
+    "Distance at constant speed: s = v t = 2.0 × 0.5 = 1.0 m."
+   ],
+   "answer": "The cube moves at 2.0 m/s just after the impulse and travels 1.0 m in the next 0.5 s.",
+   "check": "m = 0.8\nJ = 1.6\nt = 0.5\nv = J / m\ns = v * t\nprint(v)\nprint(s)",
+   "values": [
+    2.0,
+    1.0
+   ],
+   "code": {
+    "lang": "text",
+    "code": "",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "quantity",
+     "value",
+     "unit"
+    ],
+    "rows": [
+     [
+      "m",
+      "0.8",
+      "kg"
+     ],
+     [
+      "J",
+      "1.6",
+      "N·s"
+     ],
+     [
+      "v",
+      "2.0",
+      "m/s"
+     ],
+     [
+      "s",
+      "1.0",
+      "m"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Impulse is force × time, not force. Its unit is N·s, and 1 N·s = 1 kg·m/s.",
+  "Use FixedUpdate for AddForce. Applying the same force in Update gives different motion when the frame rate changes.",
+  "A trigger collider reports overlap but does not block motion. Use a non-trigger collider when you need collision response.",
+  "Mass is not weight. Mass is in kg; weight is m g in N, with g ≈ 9.81 m/s².",
+  "A raycast layer mask can silently exclude the target layer. If the ray misses, check the mask before changing the ray."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which MonoBehaviour method runs at the fixed physics step and is the correct place to apply forces?",
+   "marks": 2,
+   "a": "FixedUpdate."
+  },
+  {
+   "level": "understand",
+   "q": "Why is AddForce usually called in FixedUpdate rather than Update?",
+   "marks": 3,
+   "a": "FixedUpdate runs at a fixed time step, so a force acts for a consistent physical time. Update runs once per frame, and the frame rate varies, so the same call can produce different motion."
+  },
+  {
+   "level": "apply",
+   "q": "A 2 kg body at rest receives an impulse of 6 N·s. Find its speed just after the impulse.",
+   "marks": 4,
+   "a": "J = m Δv, so Δv = J/m = 6/2 = 3 m/s. Starting from rest, the speed is 3 m/s."
+  },
+  {
+   "level": "analyze",
+   "q": "A collider has Is Trigger switched on. What happens on contact, and where should haptic feedback be fired?",
+   "marks": 4,
+   "a": "The trigger reports overlap through OnTriggerEnter or OnTriggerExit but applies no physical push. Fire the haptic pulse in that callback, after checking the tag or layer."
+  },
+  {
+   "level": "remember",
+   "q": "Name two collider shapes and one joint type used in Unity physics.",
+   "marks": 2,
+   "a": "Box and sphere colliders; a hinge joint."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between Update and FixedUpdate?",
+   "marks": 3,
+   "a": "Update runs once per rendered frame, so its timing follows the display frame rate. FixedUpdate runs on a fixed physics interval, so forces and rigid-body steps are consistent."
+  },
+  {
+   "level": "apply",
+   "q": "A 0.5 kg object moving at 4 m/s is stopped by an impulse. Find the impulse magnitude.",
+   "marks": 4,
+   "a": "J = m Δv = 0.5 × 4 = 2 N·s. The impulse magnitude is 2 N·s."
+  },
+  {
+   "level": "analyze",
+   "q": "A controller raycast misses a distant UI panel. Give one layer-mask cause and one fix.",
+   "marks": 4,
+   "a": "Cause: the panel's layer is not included in the raycast layer mask. Fix: add that layer to the mask, or change the raycast call to use a mask that includes it."
+  }
+ ],
+ "beyond": "Not for the exam. Production VR uses physics engines with deterministic fixed steps for networked play, and job systems such as Unity's DOTS/Burst to move many bodies. OpenXR gives a cross-vendor haptics call, while XR Interaction Toolkit wraps raycasts and grab logic. Search terms: Unity FixedUpdate, ForceMode.Impulse, Physics.Raycast layer mask, OpenXR haptic feedback. Research moves toward physics-based hands and neural haptics."
+}
