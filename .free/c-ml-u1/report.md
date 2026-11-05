@@ -1,15 +1,14 @@
 # c-ml-u1: free-model run
 
 - Book: `books/cse/c-ml/c-ml-u1.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 20 (68,148 tokens in, 66,879 out), 3.7 minutes
 
 ## Checker
 
 ```
-c-ml-u1.html: 7 chapters, 9604 words, 8 figures, 120 KB
-PROBLEMS:
- - page is wider than the screen at 390px (414>390): a table, figure or long word overflows
+c-ml-u1.html: 7 chapters, 9765 words, 8 figures, 121 KB
+OK
 ```
 
 ## For the reviewer
@@ -17,7 +16,6 @@ PROBLEMS:
 - chapter 1: a c program's shown output was replaced by its real output; check the text around it
 - chapter 7: a python program's shown output was replaced by its real output; check the text around it
 - chapter 6: a python program's shown output was replaced by its real output; check the text around it
-- checker: page is wider than the screen at 390px (414>390): a table, figure or long word overflows
 
 ## Reviewer notes (after any revision)
 
