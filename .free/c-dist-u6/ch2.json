@@ -1,0 +1,226 @@
+{
+ "lead": "A distributed query is one SQL statement whose tables sit at different sites. The optimiser rewrites it into relational algebra, replaces each table by its fragments, and chooses the join order and the site where each step runs. The winning plan is not the one with the least CPU work; it is the one that pushes the fewest bytes over the slowest link. The rule: move the query to the data, not the data to the query.",
+ "prereq": "You need relational algebra and SQL (selection σ, projection π, join ⋈) from your database course, plus message cost and latency from Unit 4, Distributed System Models and Logical Time.",
+ "sections": [
+  {
+   "h3": "Decomposition and data localization",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SQL states which rows you want, not how to build them. The optimiser rewrites it as relational algebra over σ (select), π (project), × (product) and ⋈ (join). It normalises WHERE into conjunctive form, an AND of small conditions, so each can be moved and tested alone, then deletes always-true conditions and branches that can never yield a row."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Rewrite the SQL into relational algebra.",
+      "Normalise predicates into an AND of small conditions.",
+      "Simplify by deleting always-true and always-false parts.",
+      "Replace each global relation by the union of its fragments — data localization.",
+      "Apply reduction rules that cut joins and unions which cannot contribute rows."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A horizontal fragment holds a subset of rows, for example customers split by state. A vertical fragment holds a subset of columns and must carry the primary key so a full row can be rebuilt. A mixed fragment is both."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "If two horizontally fragmented relations are joined on the fragment attribute under the same predicate, only matching fragment pairs can produce rows; the rest are removed.",
+      "A union of all fragments of one relation collapses back to the relation.",
+      "If a query touches only the columns of one vertical fragment, the join that would rebuild the other columns is dropped."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Costing a plan: CPU, disk, network",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every candidate plan gets a number, a weighted sum of CPU, disk and network terms."
+    },
+    {
+     "type": "formula",
+     "text": "C = c_cpu × cpu_ops + c_io × pages + c_msg × messages + c_byte × bytes",
+     "where": "c_cpu is cost per instruction and cpu_ops the instruction count; c_io is cost per disk page and pages the pages read; c_msg is cost per message and messages the number sent; c_byte is cost per byte and bytes the total bytes sent."
+    },
+    {
+     "type": "p",
+     "text": "CPU and disk are local and paid once per site. Communication is paid on every hop and grows with data volume. On a wide-area link one byte can cost thousands of times a local disk byte, so a plan that rereads a page ten times can beat a plan that ships it once. For one message, elapsed time is latency plus bytes divided by bandwidth; latency dominates small messages, bandwidth large transfers."
+    }
+   ]
+  },
+  {
+   "h3": "Join strategies across sites",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "With R at site A and S at site B, four standard arrangements exist."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Ship the whole relation: send all of R to B and join there. Cheapest when R is small.",
+      "Ship the fragment: project only the needed columns of R at A before sending.",
+      "Semi-join: B sends π_sid(S) to A; A keeps only matching tuples of R and ships the reduced R′ to B, where the join runs. Pays off when the join filters out most of R.",
+      "Bloom join: B sends a bit-array hash filter of its keys instead of the key list. No false negatives, so no match is lost; a few false positives slip through and are removed by the final join."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Predicate push-down belongs to the same family: any selection that mentions only R is applied at A before shipping. Shrink, filter and project where the data sits, and send upstream only what the next step needs. The best plan moves the fewest bytes, not runs the fewest instructions."
+    }
+   ]
+  },
+  {
+   "h3": "Searching for the cheapest plan",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Optimisation is a search. Each plan is a tree whose leaves are fragments and whose internal nodes are operations. The optimiser enumerates trees, for example all join orders up to a size bound, and scores each with the cost function above. The space grows exponentially with the number of joins, so systems prune with heuristics such as left-deep trees and greedy join ordering."
+    },
+    {
+     "type": "p",
+     "text": "A static plan is fixed before execution from statistics. A dynamic or adaptive plan re-optimises while running: if the first result is smaller than estimated, the next join switches to a semi-join. Adaptive plans cost bookkeeping but save bytes when statistics are stale."
+    },
+    {
+     "type": "p",
+     "text": "Group-by parallelises easily. Each site computes SUM, COUNT, MIN or MAX on its fragment and ships one partial per group; a coordinator combines them. AVG does not split, so it is rewritten as SUM divided by COUNT. MapReduce and Spark SQL run this same decomposition, localisation and cost-based search at larger scale; scaling is in <a href=\"#scalability-and-elasticity-in-the-cloud\">6.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The list of join keys travels from B to A in 2 KB; the reduced relation R′ of 10,000 tuples (1 MB) comes back to B, where the final join with the 500 tuples of S runs. Shipping all of R instead would cost 10 MB.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "Join on sid",
+    "note": "runs at B",
+    "style": "accent",
+    "children": [
+     {
+      "label": "R′ = 10,000",
+      "note": "1 MB A to B",
+      "style": "live",
+      "children": [
+       {
+        "label": "R at A",
+        "note": "100,000 tuples, 10 MB",
+        "_d": 2,
+        "children": [],
+        "_x": 218.95999999999998,
+        "_y": 170
+       },
+       {
+        "label": "proj sid(S)",
+        "note": "2 KB B to A",
+        "style": "next",
+        "_d": 2,
+        "children": [],
+        "_x": 360.0,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 289.48,
+      "_y": 106
+     },
+     {
+      "label": "S at B",
+      "note": "500 tuples, 30 KB",
+      "_d": 1,
+      "children": [],
+      "_x": 501.03999999999996,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 395.26,
+    "_y": 42
+   },
+   "aria": "A query plan tree where a 2 KB list of sid values goes from site B to site A, the reduced relation R′ of 1 MB comes back to B, and the final join with S runs at B."
+  }
+ },
+ "examples": [
+  {
+   "question": "Relation R sits at site A with 100,000 tuples of 100 bytes. Relation S sits at site B with 500 tuples of 60 bytes. The query R ⋈ S on sid produces 10,000 tuples of 160 bytes, and the result must be delivered at B. The link carries 125 KB/s, with 1 KB = 1000 bytes and 1 MB = 10⁶ bytes. Compare three plans: (a) ship R to B and join there; (b) ship S to A, join at A, send the result to B; (c) semi-join — send π_sid(S) to A, ship the reduced R′ to B, join with S at B. For each, give bytes moved and elapsed time.",
+   "steps": [
+    "R = 100,000 × 100 B = 10,000,000 B = 10 MB.",
+    "S = 500 × 60 B = 30,000 B = 30 KB.",
+    "Result = 10,000 × 160 B = 1,600,000 B = 1.6 MB.",
+    "Link = 125 KB/s = 125,000 B/s.",
+    "Plan (a): 10,000,000 B ÷ 125,000 = 80 s.",
+    "Plan (b): S to A = 30,000 B = 0.24 s; result to B = 1,600,000 B = 12.8 s. Total 1,630,000 B, 13.04 s.",
+    "Plan (c): π_sid(S) = 500 × 4 B = 2,000 B = 0.016 s. R′ = 10,000 × 100 B = 1,000,000 B = 1 MB = 8.0 s. Total 1,002,000 B, 8.016 s.",
+    "Selectivity = 10,000 ÷ 100,000 = 10%, so 90% of R never crosses the link."
+   ],
+   "answer": "Plan (c), the semi-join, moves 1,002,000 bytes and takes 8.016 s, against 10,000,000 bytes and 80 s for plan (a) and 1,630,000 bytes and 13.04 s for plan (b).",
+   "check": "R_tuples, R_row = 100_000, 100\nS_tuples, S_row = 500, 60\nres_tuples, res_row = 10_000, 160\nlink = 125_000\n\nR_bytes = R_tuples * R_row\nS_bytes = S_tuples * S_row\nres_bytes = res_tuples * res_row\nsid_bytes = S_tuples * 4\nRprime_bytes = res_tuples * R_row\n\na_bytes = R_bytes\na_time = a_bytes / link\nb_bytes = S_bytes + res_bytes\nb_time = b_bytes / link\nc_bytes = sid_bytes + Rprime_bytes\nc_time = c_bytes / link\n\nprint(a_bytes)\nprint(round(a_time, 2))\nprint(b_bytes)\nprint(round(b_time, 2))\nprint(c_bytes)\nprint(round(c_time, 3))",
+   "values": [
+    10000000,
+    80.0,
+    1630000,
+    13.04,
+    1002000,
+    8.016
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Costing CPU and disk carefully and forgetting communication, usually the largest term.",
+  "Using a semi-join when the join is not selective: if 90% of R matches, you ship the key list on top of nearly all of R.",
+  "Dropping the cost of delivering the final result, which changes the ranking in plan (b).",
+  "Mixing MB and Mb, or binary and decimal units. Fix the convention before dividing.",
+  "Believing a Bloom join can lose a match. It has only false positives, no false negatives."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a semi-join between R at A and S at B?",
+   "marks": 2,
+   "a": "B sends the projection of S's join key to A. A keeps only matching tuples of R and ships the reduced R′ to B, where the final join runs."
+  },
+  {
+   "level": "understand",
+   "q": "Why does communication usually dominate a distributed plan's cost?",
+   "marks": 3,
+   "a": "CPU and disk are paid once, locally, at hardware speed. A link byte costs far more, is paid on every hop, and grows with data volume. Small messages also pay a fixed latency per step."
+  },
+  {
+   "level": "apply",
+   "q": "R at A has 40,000 tuples of 200 bytes. S at B has 1,000 tuples; its sid is 8 bytes. The result has 2,000 tuples of 300 bytes and stays at B. The link is 100 KB/s. Find the bytes moved and time for (a) shipping R to B and (b) a semi-join on sid.",
+   "marks": 4,
+   "a": "(a) 40,000 × 200 = 8,000,000 B = 8 MB; 8,000,000 ÷ 100,000 = 80 s. (b) π_sid(S) = 1,000 × 8 = 8,000 B = 0.08 s; R′ = 2,000 × 200 = 400,000 B = 4 s. Total 408,000 B, 4.08 s. The semi-join is about 20 times faster."
+  },
+  {
+   "level": "apply",
+   "q": "Customers are horizontally fragmented by state, and a query joins Customers and Orders on cust_id with the predicate state = 'TN' on both relations. Which fragment pairs must be joined?",
+   "marks": 3,
+   "a": "Only the TN fragment of Customers with the TN fragment of Orders. All other state pairs can produce no row under the predicate, so the reduction rule deletes them from the fragment tree."
+  },
+  {
+   "level": "analyze",
+   "q": "A Bloom join is chosen over a semi-join for a join on a 32-byte text key with 200,000 keys at B. Explain the trade-off and what happens to false positives.",
+   "marks": 4,
+   "a": "Sending 200,000 keys of 32 bytes is 6.4 MB; a bit-array filter of a few hundred kilobytes conveys the same membership information. The filter has no false negatives, so no match is lost at A. False positives let a few non-matching tuples of R through; they travel to B and are removed by the final join, costing a little extra bandwidth."
+  },
+  {
+   "level": "analyze",
+   "q": "A plan is estimated to ship 1 MB, but at run time only 20 KB arrives. What does an adaptive optimiser do, and why is a static plan worse here?",
+   "marks": 4,
+   "a": "The adaptive optimiser reads the actual cardinality, sees the intermediate result is far smaller than estimated, and switches the next step to a nested-loop or broadcast plan instead of the pre-computed hash join, saving a data reshuffle. The static plan trusts stale statistics and ships more bytes than needed."
+  },
+  {
+   "level": "understand",
+   "q": "Why must AVG be rewritten as SUM divided by COUNT before a parallel group-by?",
+   "marks": 3,
+   "a": "An average of averages is wrong unless the group sizes are equal. SUM and COUNT each split into partials that combine by addition, so each site sends one SUM and one COUNT per group and the coordinator divides the totals."
+  }
+ ],
+ "beyond": "Not for the exam. Real engines split this work: Apache Calcite does the algebra rewrite, Trino and Presto plan across connectors, and Spark's Catalyst optimiser applies the same rules before code generation. Research has moved toward learned and adaptive optimisers that correct cardinality estimates from actual run-time rows, because bad estimates, not bad search, cause most slow distributed plans. The ideas in this chapter reappear whenever data is too big to move, which is the normal case in cloud warehouses."
+}

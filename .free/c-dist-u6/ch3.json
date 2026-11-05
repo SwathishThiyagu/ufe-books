@@ -1,0 +1,186 @@
+{
+ "lead": "A distributed transaction must finish at every site or at none. That all-or-nothing rule is atomicity, and it is hard when sites crash and messages are lost. Two-phase commit (2PC) gives one coordinator the power to decide and makes every participant wait for that decision. Three-phase commit (3PC) adds a pre-commit step to avoid blocking under site failures, though it still blocks under network partitions. Underneath, each site still needs concurrency control so concurrent transactions do not corrupt shared data. Banks, ticket booking and order systems use these ideas when one purchase touches several databases.",
+ "prereq": "You need: Unit 4 for logical clocks that stamp transactions, and Unit 5 for deadlock detection and consensus; <a href=\"#distributed-query-processing-and-optimization\">6.2</a> shows why a site can be busy with a long report.",
+ "sections": [
+  {
+   "h3": "One transaction, many sites",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A transaction is a unit of work that must satisfy ACID: atomicity (all or nothing), consistency (moves one valid state to another), isolation (concurrent transactions do not see each other's partial work), and durability (a committed result survives a crash). A distributed transaction runs at several sites. A flat transaction has no internal structure; a nested transaction is a tree of subtransactions. A parent may commit only after all children have completed. A child abort does not automatically abort the parent, but the child's effects are undone. One site acts as coordinator: it starts the protocol and keeps the decision. Every other site that holds data is a participant. Each participant keeps either a private workspace or an undo log. In a workspace model, new values stay private and are not written to the database until the decision arrives. In an undo-log model, the participant writes new values locally but does not make them visible or commit them, and it logs old values so it can roll back. If the transaction aborts, the participant discards the workspace or applies the undo log. If it commits, it makes the changes visible. These mechanisms are why a site can still say no after doing work."
+    }
+   ]
+  },
+  {
+   "h3": "Two-phase commit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two-phase commit (2PC) has two phases. In the prepare phase the coordinator sends a prepare message to every participant. Each participant does the work, writes a prepare record and its undo data to stable storage, and votes. A yes vote is a promise: this site can commit if told. A no vote means it cannot. The participant then waits; it may not change its vote. In the decision phase the coordinator collects votes. If every vote is yes, it appends <code>COMMIT</code> to its log and forces the log to disk before sending commit. If any vote is no, or a timeout occurs, it may send abort without forcing an abort record; writing <code>ABORT</code> is optional and only for cleanup. Only the COMMIT decision must be forced before the commit message leaves. After a crash the coordinator reads its log and knows the decision; a missing commit record means abort. It then sends commit or abort to all participants. Each participant applies or undoes its work, releases locks, and sends an ack. If the coordinator dies after a yes vote but before the decision is logged, participants that voted yes hold locks and block. That is 2PC's blocking problem. Presumed abort reduces log writes: if the coordinator has no commit record on recovery, it presumes abort. A participant that voted yes and has a prepare record must still wait or query the coordinator; it must not abort just because it has no local commit record. Presumed commit is the mirror choice and needs more careful recovery."
+    },
+    {
+     "type": "formula",
+     "text": "M = 4n",
+     "where": "M is the total number of messages in a 2PC run with n participants when every participant votes yes and every participant acknowledges; n is the number of participants."
+    }
+   ]
+  },
+  {
+   "h3": "Three-phase commit and distributed concurrency control",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Three-phase commit (3PC) adds a pre-commit phase between prepare and commit. After all sites vote yes, the coordinator writes pre-commit and tells them. A site that has pre-committed knows every site can commit. If the coordinator now fails, the sites can finish without waiting forever. 3PC is non-blocking for site failures. It still blocks under a network partition: one group may have pre-committed while the other has not, and neither can safely decide alone. Consensus under partition is the subject of Unit 5. Concurrency control still runs at each site. Strict two-phase locking (2PL) means a transaction acquires locks before reading or writing and holds every lock until commit or abort. At each site this gives a strict local schedule; with 2PC's single commit point, the global schedule is conflict serializable and no cascading aborts occur. Timestamp ordering gives each transaction a unique timestamp from a logical clock (Unit 4). Each data item stores the largest read and write timestamps; an operation that arrives too late is rejected and the transaction restarts. This guarantees serializability in timestamp order. Optimistic validation lets transactions run freely, then checks at commit that no concurrent transaction wrote a value they read; a failed check aborts and retries. Distributed deadlock detection and consensus are covered in Unit 5; here the key point is that atomic commit sits on top of local concurrency control, not instead of it."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Three sites prepare; C votes no; the coordinator sends abort (an abort log record is optional). A, B and C then roll back and acknowledge.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Coordinator",
+    "Site A",
+    "Site B",
+    "Site C"
+   ],
+   "messages": [
+    {
+     "from": "Coordinator",
+     "to": "Site A",
+     "label": "prepare"
+    },
+    {
+     "from": "Coordinator",
+     "to": "Site B",
+     "label": "prepare"
+    },
+    {
+     "from": "Coordinator",
+     "to": "Site C",
+     "label": "prepare"
+    },
+    {
+     "from": "Site A",
+     "to": "Coordinator",
+     "label": "vote yes"
+    },
+    {
+     "from": "Site B",
+     "to": "Coordinator",
+     "label": "vote yes"
+    },
+    {
+     "from": "Site C",
+     "to": "Coordinator",
+     "label": "vote no"
+    },
+    {
+     "from": "Coordinator",
+     "to": "Site A",
+     "label": "abort"
+    },
+    {
+     "from": "Coordinator",
+     "to": "Site B",
+     "label": "abort"
+    },
+    {
+     "from": "Coordinator",
+     "to": "Site C",
+     "label": "abort"
+    },
+    {
+     "from": "Site A",
+     "to": "Coordinator",
+     "label": "ack"
+    },
+    {
+     "from": "Site B",
+     "to": "Coordinator",
+     "label": "ack"
+    },
+    {
+     "from": "Site C",
+     "to": "Coordinator",
+     "label": "ack"
+    }
+   ],
+   "aria": "A two-phase commit trace: the coordinator sends prepare to three sites, A and B vote yes while C votes no, the coordinator sends abort to all (an abort log record is optional), then each site acknowledges."
+  }
+ },
+ "examples": [
+  {
+   "question": "A transfer T debits ₹5,000 at site A, credits ₹5,000 at site B, and writes an audit row at site C. Site C's participant finds the audit table locked by a long report and votes no. (a) Write the message sequence with the coordinator's log write in the right place. (b) Count the messages. (c) Say what each site does after the decision.",
+   "steps": [
+    "Coordinator sends prepare to A, B, C.",
+    "A debits ₹5,000 in its private workspace, writes a prepare record, and votes yes. B credits ₹5,000 in its private workspace, writes a prepare record, and votes yes. C cannot get the audit lock and votes no.",
+    "Coordinator receives yes, yes, no. It need not force an abort record; it may write ABORT for cleanup, but a missing commit record already means abort.",
+    "Coordinator sends abort to A, B, C.",
+    "A discards the debit, B discards the credit, C discards nothing; all release locks and send ack.",
+    "Messages: 3 prepare + 3 votes + 3 abort + 3 ack = 12. Net money movement = 5000 − 5000 = ₹0."
+   ],
+   "answer": "Only a COMMIT decision must be forced before the commit message; an abort needs no forced record. The run costs 12 messages, and the net movement is ₹0.",
+   "check": "n = 3\nprepare = n\nvotes = n\ndecision = n\nacks = n\ntotal = prepare + votes + decision + acks\nnet = 5000 - 5000\nprint(total)\nprint(net)",
+   "values": [
+    12,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Writing COMMIT to the coordinator log after sending it. The log write must come first, or recovery cannot know the decision.",
+  "Saying 3PC never blocks. It avoids waiting on a dead coordinator in some failure cases, but a network partition can still split the sites.",
+  "Treating a yes vote as a commit. A yes vote only promises to commit if the coordinator says so; the participant must wait.",
+  "Forgetting that a participant's undo log must be forced before the yes vote. Otherwise it cannot roll back after a crash.",
+  "Treating presumed abort as a rule for any participant. Presumed abort is a coordinator recovery rule for a missing commit record; a prepared participant still waits or queries the coordinator."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In 2PC, which site keeps the commit decision, and what is every other site called?",
+   "marks": 2,
+   "a": "The coordinator keeps the decision; every other site is a participant."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the coordinator force its COMMIT record before sending the commit message?",
+   "marks": 3,
+   "a": "After a crash it reads the log to learn whether it committed. If the commit message went first and the coordinator crashed, it could not know whether it had committed."
+  },
+  {
+   "level": "apply",
+   "q": "A 2PC run has 5 participants and all vote yes. Count the messages.",
+   "marks": 3,
+   "a": "Use M = 4n with n = 5. Messages = 5 prepare + 5 votes + 5 commit + 5 ack = 20."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is 3PC still blocking under a network partition?",
+   "marks": 4,
+   "a": "The partition can leave one group pre-committed and another group not. Neither group can know the other group's votes, so neither can safely commit or abort alone."
+  },
+  {
+   "level": "understand",
+   "q": "What does presumed abort do?",
+   "marks": 2,
+   "a": "If the coordinator has no commit record on recovery, it presumes abort. A prepared participant still waits or queries the coordinator; it does not abort just because it lacks a local commit record. This saves an abort log write."
+  },
+  {
+   "level": "apply",
+   "q": "A transaction reads x at site A and writes y at site B under strict 2PL. When can it release the lock on x?",
+   "marks": 4,
+   "a": "Only after the global commit or abort. Strict 2PL holds all locks until the transaction finishes, so it cannot release x early."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is atomic commit needed if each site already runs strict 2PL?",
+   "marks": 5,
+   "a": "Strict 2PL gives a serial order at each site. Without atomic commit, one site could commit while another aborts, so the global result would be partial. 2PC gives one commit point for all sites."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems often keep 2PC inside one database or message broker and avoid it across microservices, because a blocked coordinator holds locks. Some large systems place a consensus layer below the commit decision so a partition cannot split the decision. Search for 'presumed abort', 'three-phase commit', and 'distributed serializability'."
+}

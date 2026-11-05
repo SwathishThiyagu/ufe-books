@@ -1,0 +1,447 @@
+{
+ "lead": "This unit is about data that lives on more than one machine, and the cloud that rents you those machines. You will learn how a name finds data, how a query is split and moved, how a transaction commits everywhere or nowhere, and how virtualization, auto-scaling and caching keep a service fast under load. After it you can size and cost a replicated web service and answer exam questions on 2PC, hypervisors and cache freshness.",
+ "about": "The unit moves from data spread over many machines to the cloud that rents you those machines. 6.1 and 6.2 deal with where data sits: names and distributed file systems, then query plans that move as few bytes as possible. 6.3 keeps that data correct when one transaction touches several sites. 6.4 and 6.5 turn to the cloud: service and deployment models, then virtualization, the trick that turns a machine into a copyable file. 6.6 covers scaling, load balancing, replication and monitoring, the machinery that holds a service up under load. 6.7 compares grids, the older shared-resource model. 6.8 ends with web systems, where caching and replication decide what the user actually sees.",
+ "chapters": [
+  {
+   "id": "naming-and-distributed-file-systems",
+   "title": "Naming and distributed file systems",
+   "k": 1,
+   "idea": "A name is resolved step by step to an address, and a distributed file system makes a remote file look local by choosing where to cache it and how to keep the copies fresh.",
+   "depth": "Only a few universities teach this chapter, so keep it short. Distinguish name, identifier and address, and show resolution as the map from name to address. Flat naming: broadcast, forwarding pointers, home-based, and the distributed hash table with consistent hashing. Structured naming: the name space as a labelled graph, mount points, closure, hard and soft links, absolute versus relative resolution, and NFS resolving a path one component at a time while caching a file handle per component. Attribute-based naming in one line. Distributed file systems: remote access model versus upload/download model, whole-file versus block caching, cache location (client disk, client memory, server memory), and the sharing semantics that decide when a write becomes visible: Unix, session, immutable, transaction. Name NFS v3 as a stateless server with idempotent operations, AFS as whole-file caching, HDFS as fixed-size blocks with a single NameNode.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "/ local root",
+     "style": "normal",
+     "children": [
+      {
+       "label": "home",
+       "children": [
+        {
+         "label": "ravi",
+         "children": [
+          {
+           "label": "remote",
+           "note": "mount point",
+           "style": "accent",
+           "children": [
+            {
+             "label": "notes.txt",
+             "note": "lives on server S",
+             "style": "live"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "label": "usr",
+       "children": [
+        {
+         "label": "local",
+         "children": [
+          {
+           "label": "bin"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A naming tree rooted at the local root, where the directory remote is a mount point that splices server S's exported directory under ravi, so notes.txt looks local but is stored on S."
+   },
+   "example": "A client opens /home/ravi/remote/notes.txt. The directory /home/ravi/remote is a mount point for the export /export/ravi on server S. (a) List the lookups the client performs, and say which ones go to S. (b) How many round trips to S are needed on the first open, and how many on the second open of the same file if the client caches the file handle of remote and of notes.txt? Answer: the client resolves / , home, ravi locally (3 lookups), then crosses the mount point and asks S for notes.txt inside /export/ravi (1 RPC to S, which returns the file handle). First open: 1 round trip to S. Second open, with the handle cached and the file unchanged: 0 round trips to S. The closure of the name is the set {/, home, ravi, S:/export/ravi, S:/export/ravi/notes.txt}.",
+   "trap": "Treating the mount point as the remote root, and forgetting that an NFS v3 server keeps no per-client state, so every retry must be safe to repeat.",
+   "prereq": "Unit 4 for remote procedure call and message cost; Unit 5 for consistency models.",
+   "leave": "Replication consistency models to Unit 5, RPC mechanics to Unit 4, block placement and replica counts to 6.6."
+  },
+  {
+   "id": "distributed-query-processing-and-optimization",
+   "title": "Distributed query processing and optimization",
+   "k": 2,
+   "idea": "A distributed query is decomposed into fragments that run where the data already sits, and the cheapest plan is the one that moves the fewest bytes over the network.",
+   "depth": "Query decomposition: replace the calculus query by relational algebra, normalise, and simplify. Data localization: horizontal, vertical and mixed fragmentation, and the reduction rules that remove useless joins and unions from the fragment tree. Cost model with three parts: CPU, disk I/O, and communication (bytes times per-byte cost plus per-message latency); show why communication dominates. Join strategies: ship the whole relation, ship the fragments, semi-join, and the bloom-join filter. Optimisation as search over plan trees with a cost function, static versus dynamic (adaptive) plans, and predicate push-down. Parallel aggregation for distributed group-by. Mention MapReduce and Spark SQL in one line as the same idea at larger scale, and defer their scaling to 6.6.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Join on sid at B",
+     "note": "1.6 MB result",
+     "style": "accent",
+     "children": [
+      {
+       "label": "R' = 10,000 tuples",
+       "note": "1 MB shipped A to B",
+       "style": "live",
+       "children": [
+        {
+         "label": "R at A",
+         "note": "100,000 tuples, 10 MB"
+        },
+        {
+         "label": "projection of sid(S)",
+         "note": "2 KB shipped B to A",
+         "style": "next"
+        }
+       ]
+      },
+      {
+       "label": "S at B",
+       "note": "500 tuples, 30 KB"
+      }
+     ]
+    },
+    "aria": "A query plan tree where a 2 KB list of sids goes from site B to site A, the reduced relation R' of 1 MB comes back to B, and the final join with S runs at B."
+   },
+   "example": "R sits at site A with 100,000 tuples of 100 bytes (10 MB). S sits at site B with 500 tuples of 60 bytes (30 KB). The query R join S on sid produces 10,000 tuples of 160 bytes and the result must be delivered to B. The link carries 125 KB/s. Compare three plans: (a) ship R to B and join there; (b) ship S to A, join at A, then send the result to B; (c) semi-join: send the projection of sid(S) = 500 × 4 bytes = 2 KB to A, join at A to get R' = 10,000 tuples = 1 MB, send R' to B and join with S there. Give bytes moved and elapsed time for each. Answers: (a) 10 MB, 80 s. (b) 30 KB + 1.6 MB = 1.63 MB, 13.0 s. (c) 2 KB + 1 MB = 1.002 MB, 8.0 s. The semi-join wins because the join is selective.",
+   "trap": "Optimising for CPU and disk only, and forgetting that the semi-join pays off only when the join filters most of the shipped relation.",
+   "prereq": "Unit 4 for message cost and latency; relational algebra and SQL from the database course.",
+   "leave": "Atomicity of the plan across sites to 6.3; large-scale parallel execution to 6.6."
+  },
+  {
+   "id": "distributed-transactions-and-concurrency-control",
+   "title": "Distributed transactions and concurrency control",
+   "k": 3,
+   "idea": "A distributed transaction must commit at every site or at none, so an atomic commit protocol sits on top of each site's local concurrency control.",
+   "depth": "ACID on many sites, flat versus nested transactions, the coordinator and participant roles, and the private workspace or undo log. Two-phase commit: prepare and vote, then commit or abort, coordinator log written before the decision is sent, blocking when the coordinator dies, presumed abort and presumed commit optimisations. Three-phase commit: the extra pre-commit phase, why it is non-blocking for site failures but still blocks on a network partition. Distributed concurrency control: strict two-phase locking across sites, timestamp ordering, optimistic validation, and the serializability each guarantees. Distributed deadlock detection in one line with a pointer to Unit 5. Distributed commitment under partition in one line with a pointer to consensus in Unit 5.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Coordinator",
+     "Site A",
+     "Site B",
+     "Site C"
+    ],
+    "messages": [
+     {
+      "from": "Coordinator",
+      "to": "Site A",
+      "label": "prepare"
+     },
+     {
+      "from": "Coordinator",
+      "to": "Site B",
+      "label": "prepare"
+     },
+     {
+      "from": "Coordinator",
+      "to": "Site C",
+      "label": "prepare"
+     },
+     {
+      "from": "Site A",
+      "to": "Coordinator",
+      "label": "vote yes"
+     },
+     {
+      "from": "Site B",
+      "to": "Coordinator",
+      "label": "vote yes"
+     },
+     {
+      "from": "Site C",
+      "to": "Coordinator",
+      "label": "vote no"
+     },
+     {
+      "from": "Coordinator",
+      "to": "Site A",
+      "label": "abort"
+     },
+     {
+      "from": "Coordinator",
+      "to": "Site B",
+      "label": "abort"
+     },
+     {
+      "from": "Coordinator",
+      "to": "Site C",
+      "label": "abort"
+     },
+     {
+      "from": "Site A",
+      "to": "Coordinator",
+      "label": "ack"
+     }
+    ],
+    "aria": "A two-phase commit message trace where three sites are asked to prepare, two vote yes and one votes no, so the coordinator writes abort to its log and tells all three sites to abort."
+   },
+   "example": "A transfer T debits ₹5,000 at site A, credits ₹5,000 at site B, and writes an audit row at site C. Site C's participant finds the audit table locked by a long report and votes no. (a) Write the message sequence with the coordinator's log write in the right place. (b) Count the messages. (c) Say what each site does after the decision. Answers: (a) coordinator sends prepare to A, B, C; A and B vote yes, C votes no; coordinator appends ABORT to its log and forces it to disk; then sends abort to A, B, C; each site undoes its provisional work from the undo log and releases locks. (b) 3 prepare + 3 votes + 3 abort + 3 ack = 12 messages. (c) A and B roll back the debit and credit, C rolls back nothing, all three release locks, and the ₹5,000 never moves.",
+   "trap": "Sending the commit before writing it to the coordinator log, and claiming 3PC never blocks, which is false under network partitions.",
+   "prereq": "Unit 5 for consensus, checkpointing and replication; Unit 4 for logical clocks that stamp transactions.",
+   "leave": "Mutual exclusion and deadlock detection algorithms to Unit 5; consensus proofs to Unit 5."
+  },
+  {
+   "id": "cloud-computing-service-and-deployment-models",
+   "title": "Cloud computing: service and deployment models",
+   "k": 4,
+   "idea": "Cloud computing sells computing as a metered utility, and the service model you pick fixes how much of the stack the provider manages instead of you.",
+   "depth": "The standard definition and the five essential characteristics: on-demand self-service, broad network access, resource pooling, rapid elasticity, measured service. Deployment models: public, private, community, hybrid, with the ownership and tenancy of each. Service models IaaS, PaaS, SaaS, plus the newer serverless or function-as-a-service and database-as-a-service in one line each, drawn as a split of who manages the OS, the runtime and the application. Driving factors: capital cost becomes operating cost, speed of provisioning, global reach, elastic capacity for exam-week peaks. Challenges: vendor lock-in, data security and privacy, compliance and data residency, downtime, latency, network dependence, and surprise bills. Name the big platforms and mention government cloud initiatives in one line.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "SaaS",
+      "note": "you use it: mail, CRM",
+      "style": "normal"
+     },
+     {
+      "label": "PaaS",
+      "note": "you deploy only code",
+      "style": "normal"
+     },
+     {
+      "label": "IaaS",
+      "note": "you run the OS up",
+      "style": "accent"
+     }
+    ],
+    "side": {
+     "top": "less control",
+     "bottom": "more control"
+    },
+    "aria": "A three-layer stack of cloud service models, from SaaS at the top where the user only consumes the application, down to IaaS where the user manages the operating system and everything above it."
+   },
+   "example": "A startup in Pune runs an exam-practice app. Compare the monthly bill of two options. Option 1, IaaS: one VM of 2 vCPU and 4 GB at ₹2.5 per hour, running 24×7. Option 2, PaaS: ₹1,500 base per month plus ₹0.9 per 1,000 requests, with 3 million requests per month. Use 730 hours in a month. Answers: IaaS = 2.5 × 730 = ₹1,825 per month. PaaS = 1,500 + (3,000,000 ÷ 1,000) × 0.9 = 1,500 + 2,700 = ₹4,200 per month. IaaS is cheaper in money but the team also pays for patching the OS, which PaaS does for them.",
+   "trap": "Calling any data centre you own a private cloud, which needs self-service and pooling; and mixing PaaS up with SaaS.",
+   "prereq": "Unit 4 for the characteristics and design challenges of distributed systems.",
+   "leave": "Hypervisors and containers to 6.5; auto-scaling and load balancing to 6.6; grid versus cloud to 6.7."
+  },
+  {
+   "id": "virtualization-for-cloud-computing",
+   "title": "Virtualization for cloud computing",
+   "k": 5,
+   "idea": "A hypervisor runs many virtual machines on one physical machine by trapping privileged instructions and emulating them, which turns a server into a file you can copy and move.",
+   "depth": "Why virtualize: consolidation, isolation, snapshots, cloning, migration. The virtual machine monitor and the guest. Type 1 hypervisors (bare metal) versus type 2 (hosted on an OS), with the layer diagram for each. Full virtualization with binary translation versus paravirtualization with a modified guest and hypercalls; hardware assistance with VT-x and AMD-V. CPU, memory and I/O virtualization: privileged instruction trap, shadow page tables versus nested page tables, and virtio drivers. Containers: shared host kernel, namespaces for isolation and cgroups for limits, and the VM-versus-container comparison on start time, density and isolation. VM images and templates. Live migration by pre-copy: iterative dirty-page copy, the convergence condition, stop-and-copy at the end, and the downtime it causes. When virtualization overhead makes it a bad idea.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "App",
+      "note": "guest VM 1",
+      "style": "normal"
+     },
+     {
+      "label": "Guest OS",
+      "note": "unmodified kernel",
+      "style": "normal"
+     },
+     {
+      "label": "Hypervisor",
+      "note": "type 1, bare metal",
+      "style": "accent"
+     },
+     {
+      "label": "Hardware",
+      "note": "VT-x or AMD-V",
+      "style": "normal"
+     }
+    ],
+    "side": {
+     "top": "software",
+     "bottom": "physical"
+    },
+    "aria": "A layer stack showing an application on a guest operating system, sitting on a bare-metal type 1 hypervisor that runs directly on hardware with virtualization support."
+   },
+   "example": "A 4 GB VM runs on host H1 and dirties memory at 40 MB/s. The migration link carries 100 MB/s. Pre-copy stops when the dirty set left is below 64 MB. Find the number of pre-copy rounds, the total bytes copied, the total time, and the downtime. Work: round 1 copies 4096 MB in 40.96 s and 1638.4 MB gets dirty; round 2 copies 1638.4 MB in 16.38 s, 655.4 MB dirty; round 3 copies 655.4 MB in 6.55 s, 262.2 MB dirty; round 4 copies 262.2 MB in 2.62 s, 104.9 MB dirty; round 5 copies 104.9 MB in 1.05 s and leaves 41.9 MB, which is below 64 MB, so pre-copy ends. Answers: 5 rounds, total bytes 4096 + 1638.4 + 655.4 + 262.2 + 104.9 + 41.9 = 6798.8 MB, total time about 68 s, and downtime for the final 41.9 MB is 0.42 s.",
+   "trap": "Calling a container a light virtual machine, and forgetting that a type 2 hypervisor needs a host operating system underneath.",
+   "prereq": "Unit 1 for machine organisation; 6.4 for the cloud service models that sit on these VMs.",
+   "leave": "Auto-scaling rules to 6.6; billing arithmetic to 6.4; network virtualization details to the networking course."
+  },
+  {
+   "id": "scalability-and-elasticity-in-the-cloud",
+   "title": "Scalability and elasticity in the cloud",
+   "k": 6,
+   "idea": "Scalability is the headroom a design allows; elasticity is buying that headroom automatically for the minutes you need it and giving it back after.",
+   "depth": "Vertical scaling (bigger machine) versus horizontal scaling (more machines), and the serial-fraction limit on speedup from Unit 1. Stateless tiers versus stateful tiers, and what has to move out of the server (session state to a shared store) before you can scale out. Load balancing: round robin, weighted round robin, least connections, IP hash, and consistent hashing for cache affinity; health checks and sticky sessions. Replication: primary-replica, multi-primary, read replicas, and the quorum rule R + W > N for consistent reads. Sharding and partitioning. Auto-scaling: metric choice (CPU, queue length, requests per second), threshold, cool-down to stop thrashing, reactive versus scheduled versus predictive. Monitoring: metrics, logs and traces; SLI, SLO and SLA, and downtime implied by nines. Capacity planning and the cost of over-provisioning.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "servers",
+     "min": 1,
+     "max": 16
+    },
+    "y": {
+     "label": "throughput (req/s)",
+     "min": 0,
+     "max": 1700
+    },
+    "series": [
+     {
+      "name": "ideal, 100 per server",
+      "expr": "100*x",
+      "style": "muted"
+     },
+     {
+      "name": "20% serial part",
+      "expr": "100/(0.2+0.8/x)",
+      "style": "accent"
+     }
+    ],
+    "aria": "A plot of throughput against number of servers: the straight line is perfect scaling at 100 requests per second per server, and the flattening curve is the same system with a 20 percent serial part, reaching only 400 at 16 servers."
+   },
+   "example": "An app must serve 2,000 requests per second at peak. Each request needs 50 ms of CPU on one core and a server has 8 cores. You size servers to run at 70% utilisation. The app needs 1 server off peak and full capacity for 4 hours a day, 30 days a month, at ₹6 per server-hour. (a) How many servers at peak? (b) What does elastic scaling cost per month? (c) What would 18 fixed servers cost? Answers: one core serves 1 ÷ 0.05 = 20 requests per second, a server serves 160, at 70% that is 112, so 2000 ÷ 112 = 17.86, round up to 18 servers. Peak hours = 4 × 30 = 120 h, off peak = 720 − 120 = 600 h. (b) 600 × 1 × 6 = ₹3,600 plus 120 × 18 × 6 = ₹12,960, total ₹16,560. (c) 720 × 18 × 6 = ₹77,760, so elasticity saves ₹61,200.",
+   "trap": "Using scalability and elasticity as synonyms, and scaling out a server that still holds the user's session in its own memory.",
+   "prereq": "6.4 for service models; Unit 1 for speedup and load balancing; Unit 5 for replication consistency models.",
+   "leave": "VM and container mechanics to 6.5; web caching to 6.8; scheduling inside a grid to 6.7."
+  },
+  {
+   "id": "grid-computing",
+   "title": "Grid computing",
+   "k": 7,
+   "idea": "A grid pools computers owned by different organisations into one virtual supercomputer through shared standard protocols, while each site keeps its own policy and its own machines.",
+   "depth": "Only a few universities teach this chapter, so keep it short. Definition as coordinated resource sharing without central control, and the virtual organisation as the set of users allowed to share. Grid versus cluster versus cloud in a small table: ownership, scale, protocol, payment. The layered architecture: fabric, connectivity, resource, collective, application, and the hourglass shape where the small neck is connectivity plus resource. Job submission through a resource broker, and the matchmaking of job requirements to free capacity. Data grids and file transfer tools in one line. Security with X.509 certificates and delegation, named only. National and international grid projects mentioned as examples, not described.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "Application",
+      "note": "user jobs",
+      "style": "normal"
+     },
+     {
+      "label": "Collective",
+      "note": "brokers, allocation",
+      "style": "normal"
+     },
+     {
+      "label": "Resource",
+      "note": "per-site policy",
+      "style": "normal"
+     },
+     {
+      "label": "Connectivity",
+      "note": "auth, transfer",
+      "style": "accent"
+     },
+     {
+      "label": "Fabric",
+      "note": "machines, storage",
+      "style": "normal"
+     }
+    ],
+    "side": {
+     "top": "user facing",
+     "bottom": "physical resources"
+    },
+    "aria": "The five-layer grid architecture from application and collective layers at the top, through the narrow resource and connectivity layers that every job must pass, down to the fabric of machines and storage."
+   },
+   "example": "A grid has three sites: A offers 40 free CPUs for 8 hours, B offers 100 free CPUs for 4 hours, C offers 20 free CPUs for 12 hours. A job needs 800 CPU-hours and must finish within 12 hours. (a) What is the total free capacity in CPU-hours? (b) Give a schedule and its finish time. Answers: (a) A = 40 × 8 = 320, B = 100 × 4 = 400, C = 20 × 12 = 240, total 960 CPU-hours, so the job fits. (b) Run all 160 CPUs for the first 4 hours, which gives 640 CPU-hours; B then leaves. The remaining 160 CPU-hours run on A and C with 60 CPUs, taking 160 ÷ 60 = 2.67 hours, so the job finishes at 4 + 2.67 = 6.67 hours, inside the 12-hour deadline.",
+   "trap": "Treating a grid as one administrative domain, and confusing it with a cluster that one owner controls or a cloud that is rented on demand.",
+   "prereq": "6.4 for the cloud comparison; Unit 4 for the design challenges of distributed systems.",
+   "leave": "Load balancing algorithms to 6.6 and Unit 1; consensus and fault tolerance to Unit 5."
+  },
+  {
+   "id": "web-data-management-and-web-based-systems",
+   "title": "Web data management and web-based systems",
+   "k": 8,
+   "idea": "A web system keeps data close to the user and cheap to read by caching, replicating and indexing it, which is exactly why it must live with stale reads.",
+   "depth": "The web as a data store: stateless HTTP, cookies for sessions, resources and REST methods, and idempotency of GET and PUT. Caching at the browser, the proxy and the edge: freshness by max-age, validation by ETag and If-None-Match, 304 responses, invalidation and purge, and the hit ratio as the number that decides cost. Content delivery networks: DNS redirection to a nearby edge, origin shielding. Web-scale data: the inverted index, sharding, replication, simple ranking, and key-value and document stores as the NoSQL family. State the CAP trade-off and BASE versus ACID in one line each. Web services: SOAP and WSDL in one line, REST and JSON as the default. Fault tolerance on the web: redundancy, timeouts, retries that respect idempotency, circuit breakers. Web security: TLS and HTTPS, authentication versus authorisation, injection and script-injection risks in one line each. Social computing in one line: social graphs and feeds served with eventual consistency.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Browser",
+     "Cache",
+     "Origin"
+    ],
+    "messages": [
+     {
+      "from": "Browser",
+      "to": "Cache",
+      "label": "GET /page"
+     },
+     {
+      "from": "Cache",
+      "to": "Origin",
+      "label": "GET /page (miss)"
+     },
+     {
+      "from": "Origin",
+      "to": "Cache",
+      "label": "200 OK, ETag v7"
+     },
+     {
+      "from": "Cache",
+      "to": "Browser",
+      "label": "200 OK, ETag v7"
+     },
+     {
+      "from": "Browser",
+      "to": "Cache",
+      "label": "GET, If-None-Match v7"
+     },
+     {
+      "from": "Cache",
+      "to": "Origin",
+      "label": "GET, If-None-Match v7"
+     },
+     {
+      "from": "Origin",
+      "to": "Cache",
+      "label": "304 Not Modified"
+     },
+     {
+      "from": "Cache",
+      "to": "Browser",
+      "label": "304, use stored copy",
+      "dashed": true
+     }
+    ],
+    "aria": "An HTTP message trace where the first request misses the cache and reaches the origin, and the later request is validated with the stored ETag so the origin replies 304 and sends no page body."
+   },
+   "example": "A page is 300 KB. Edge caches serve 92% of requests and the rest go to the origin. Traffic is 1,000,000 requests per day. The edge round trip is 20 ms, the origin round trip is 120 ms, and the transfer rate is 2 MB/s. (a) How many bytes leave the origin per day? (b) What is the average latency per request, and how much does the cache save? Answers: transfer time = 300 KB ÷ 2 MB/s = 0.15 s = 150 ms. (a) Misses = 0.08 × 1,000,000 = 80,000, bytes = 80,000 × 300 KB = 24,000,000 KB = 24 GB. (b) Hit latency = 20 + 150 = 170 ms, miss latency = 120 + 150 = 270 ms, average = 0.92 × 170 + 0.08 × 270 = 156.4 + 21.6 = 178 ms. With no cache every request would cost 270 ms, so the cache saves 92 ms per request on average.",
+   "trap": "Assuming max-age keeps a copy consistent with the origin, and thinking a 304 response carries the page body.",
+   "prereq": "6.1 for file caching and sharing semantics; 6.6 for replication and load balancing; Unit 5 for consistency models.",
+   "leave": "Consensus and replication protocols to Unit 5; general security management and compliance to 6.4."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the name service tells the query planner where each fragment lives"
+  ],
+  [
+   2,
+   3,
+   "a distributed query runs as one transaction across the sites it touches"
+  ],
+  [
+   3,
+   4,
+   "commit rules and replication reappear as cloud guarantees"
+  ],
+  [
+   4,
+   5,
+   "the service models are delivered as virtual machines or containers"
+  ],
+  [
+   5,
+   6,
+   "cheap VM copies and live migration make auto-scaling fast"
+  ],
+  [
+   6,
+   8,
+   "replicas, caches and load balancers carry the web tier"
+  ],
+  [
+   1,
+   8,
+   "a file cache and a web cache face the same freshness question"
+  ],
+  [
+   6,
+   7,
+   "cloud elasticity is what grid scheduling tried to reach without central ownership"
+  ]
+ ]
+}

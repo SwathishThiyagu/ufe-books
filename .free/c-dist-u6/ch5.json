@@ -1,0 +1,193 @@
+{
+ "lead": "Virtualization makes one physical computer look like several. A hypervisor, or virtual machine monitor, runs guest operating systems side by side, each with virtual CPU, memory, disk and network. The point is to use idle hardware, isolate tenants, snapshot a machine state as a file, clone it, and move it to another host. Cloud infrastructure-as-a-service depends on this: when you rent a 4 GB server for an hour, you usually get a virtual machine, not a physical one. Containers are a lighter cousin that share one kernel.",
+ "prereq": "You need: Unit 1 for machine organisation, and <a href=\"#cloud-computing-service-and-deployment-models\">6.4</a> for the cloud service models that sit on these VMs.",
+ "sections": [
+  {
+   "h3": "Hypervisor, guest and host",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The hypervisor is the software that owns the real hardware and hands each virtual machine (VM) a slice. The operating system inside a VM is the guest. The guest has a virtual CPU, virtual memory and virtual devices, and its kernel believes it is running on real hardware. The machine underneath is the host."
+    },
+    {
+     "type": "p",
+     "text": "Why virtualize: <b>consolidation</b> packs ten lightly loaded servers onto one host; <b>isolation</b> keeps one tenant's crash or break-in away from another; <b>snapshots and cloning</b> turn a machine state into a file you can copy; <b>migration</b> moves a running VM to another host for repair or load balance. The guest OS is usually unmodified, so it runs its normal drivers on virtual devices."
+    },
+    {
+     "type": "p",
+     "text": "Type 1 hypervisor runs bare metal: hardware, hypervisor, guest OS, app. Type 2 is hosted: hardware, host OS, hypervisor, guest OS, app. Type 2 is convenient on a laptop but pays host-OS scheduling and driver overhead. A type 2 hypervisor still needs the host OS; it is not bare metal."
+    }
+   ]
+  },
+  {
+   "h3": "CPU, memory and I/O virtualization",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The guest kernel executes privileged instructions: loading page tables, masking interrupts, halting the CPU. On native hardware these run in the highest privilege ring. Under a hypervisor the guest runs with less privilege, so a privileged instruction <b>traps</b> to the hypervisor, which emulates the effect and resumes the guest. Early x86 did not trap cleanly, so full virtualization used <b>binary translation</b>: the hypervisor scans guest code and replaces awkward instructions with safe calls. Paravirtualization instead modifies the guest kernel to issue <b>hypercalls</b>, explicit calls to the hypervisor; it is fast but needs a modified guest. Hardware help (Intel VT-x, AMD-V) adds a root mode for the hypervisor and a non-root mode for guests, so privileged instructions cause a clean <b>VM exit</b>."
+    },
+    {
+     "type": "p",
+     "text": "Memory has two mappings: guest virtual to guest physical, and guest physical to machine physical. <b>Shadow page tables</b> make the hypervisor build one combined guest-virtual-to-machine-physical table and trap guest page-table writes; that is costly. <b>Nested page tables</b> (EPT on Intel, NPT on AMD) let hardware walk both tables, removing most traps. For I/O, emulated disks and network cards are slow; <b>virtio</b> uses shared memory rings and paravirtual drivers so guest and host batch requests, giving near-native disk and network throughput."
+    }
+   ]
+  },
+  {
+   "h3": "Containers, images and live migration",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Containers do not virtualize hardware. All containers share the host kernel. Linux <b>namespaces</b> give each container its own process IDs, network, mounts and hostname; <b>cgroups</b> cap CPU, memory and I/O. A container starts in milliseconds because no guest OS boots, and many containers fit on one host. Isolation is weaker: a kernel bug or a privileged container can affect the host. A VM carries its own kernel, so it isolates better and can run a different OS."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "VM",
+      "Container"
+     ],
+     "rows": [
+      [
+       "Start time",
+       "Seconds",
+       "Milliseconds"
+      ],
+      [
+       "Density",
+       "Tens per host",
+       "Hundreds per host"
+      ],
+      [
+       "Isolation",
+       "Strong, own kernel",
+       "Weaker, shared kernel"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A VM image is the disk plus configuration; a template is a read-only image you clone. Cloud providers launch many instances from one image. Containers use layered images instead."
+    },
+    {
+     "type": "p",
+     "text": "Live migration by pre-copy: copy all memory pages to the target while the source keeps running. The guest dirties pages during the copy, so copy the dirty set in rounds. Convergence needs dirty rate d less than link bandwidth B; if d ≥ B the copy never catches up. When the remaining dirty set is at or below a threshold, stop the guest, copy the last pages, resume on the target. Downtime is the last copy plus setup."
+    },
+    {
+     "type": "p",
+     "text": "When virtualization is bad: CPU-bound code with many privileged operations pays VM exits; latency-sensitive trading, GPU passthrough, nested virtualization and huge VMs with high dirty rates can be worse than bare metal or containers. Dense stateless services often run better in containers, but with weaker isolation."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The stack shows a guest application and its unmodified guest OS above a bare-metal type 1 hypervisor on hardware with virtualization support. The hypervisor is the layer that traps privileged instructions and owns the real devices.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "App",
+     "note": "guest VM 1",
+     "style": "normal"
+    },
+    {
+     "label": "Guest OS",
+     "note": "unmodified kernel",
+     "style": "normal"
+    },
+    {
+     "label": "Hypervisor",
+     "note": "type 1, bare metal",
+     "style": "accent"
+    },
+    {
+     "label": "Hardware",
+     "note": "VT-x or AMD-V",
+     "style": "normal"
+    }
+   ],
+   "side": {
+    "top": "software",
+    "bottom": "physical"
+   },
+   "aria": "A layer stack shows an application on a guest operating system, sitting on a bare-metal type 1 hypervisor that runs directly on hardware with virtualization support."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 4 GB VM (4096 MB of memory) runs on host H1 and dirties memory at 40 MB/s. The migration link carries 100 MB/s. Pre-copy stops when the dirty set left is below 64 MB. Find the number of pre-copy rounds, total bytes copied, total time, and downtime.",
+   "steps": [
+    "Round 1 copies 4096 MB; time = 4096 ÷ 100 = 40.96 s; new dirty = 40 × 40.96 = 1638.4 MB.",
+    "Round 2 copies 1638.4 MB; time = 16.384 s; new dirty = 655.36 MB.",
+    "Round 3 copies 655.36 MB; time = 6.5536 s; new dirty = 262.144 MB.",
+    "Round 4 copies 262.144 MB; time = 2.62144 s; new dirty = 104.8576 MB.",
+    "Round 5 copies 104.8576 MB; time = 1.048576 s; new dirty = 41.94304 MB, which is below 64 MB, so pre-copy ends.",
+    "Final stop-and-copy copies 41.94304 MB; downtime = 41.94304 ÷ 100 = 0.4194304 s.",
+    "Total bytes = 4096 + 1638.4 + 655.36 + 262.144 + 104.8576 + 41.94304 = 6798.70464 MB.",
+    "Total time = 40.96 + 16.384 + 6.5536 + 2.62144 + 1.048576 + 0.4194304 = 67.9870464 s."
+   ],
+   "answer": "5 pre-copy rounds, about 6798.70 MB copied in total, about 67.99 s total time, and about 0.42 s downtime.",
+   "check": "dirty = 4096.0\nrate = 40.0\nlink = 100.0\nlimit = 64.0\nrounds = 0\ntotal = 0.0\nttotal = 0.0\ncur = dirty\nwhile True:\n    rounds += 1\n    total += cur\n    t = cur / link\n    ttotal += t\n    cur = rate * t\n    if cur < limit:\n        break\ntotal += cur\ndt = cur / link\nttotal += dt\nprint(rounds)\nprint(round(total, 2))\nprint(round(ttotal, 2))\nprint(round(dt, 2))",
+   "values": [
+    5,
+    6798.7,
+    67.99,
+    0.42
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A container is not a light VM: it shares the host kernel and has no guest kernel.",
+  "A type 2 hypervisor sits on a host OS; drawing it directly on hardware is wrong.",
+  "Full virtualization with binary translation does not need a modified guest; paravirtualization does.",
+  "Pre-copy migration converges only when dirty rate is below link bandwidth; 'more rounds always finish' is false.",
+  "Shadow page tables are software-combined tables; nested page tables are hardware-walked."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What are a hypervisor, a guest and a host?",
+   "marks": 2,
+   "a": "The hypervisor is the layer that owns hardware and runs VMs; the guest is the OS inside a VM; the host is the physical machine."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a type 2 hypervisor add a scheduling layer that a type 1 does not?",
+   "marks": 3,
+   "a": "Type 2 runs above a host OS, so guest I/O and CPU time pass through the host scheduler and drivers; type 1 runs on hardware."
+  },
+  {
+   "level": "apply",
+   "q": "A 2048 MB VM is copied over a 120 MB/s link. Dirty rate is 30 MB/s. After the first full copy, how many MB are dirty, and is the dirty set below a 50 MB stop threshold?",
+   "marks": 4,
+   "a": "First copy time = 2048 ÷ 120 = 17.07 s; dirty = 30 × 17.07 = 512 MB; no, 512 > 50, so more pre-copy rounds are needed."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can pre-copy live migration never finish for a write-heavy VM? Give the condition and one example workload.",
+   "marks": 5,
+   "a": "If dirty rate d ≥ link bandwidth B, each round leaves at least as much new dirty data as it copies. A memory-bandwidth benchmark can do this."
+  },
+  {
+   "level": "understand",
+   "q": "Contrast shadow page tables with nested page tables.",
+   "marks": 3,
+   "a": "Shadow tables combine guest-virtual-to-machine-physical in software and trap guest table writes; nested tables let hardware walk guest and host tables, with fewer traps."
+  },
+  {
+   "level": "remember",
+   "q": "What do namespaces and cgroups do?",
+   "marks": 2,
+   "a": "Namespaces isolate what a container sees; cgroups limit and account CPU, memory and I/O."
+  },
+  {
+   "level": "analyze",
+   "q": "200 stateless web workers need millisecond starts on one host. Containers or VMs? Give one risk.",
+   "marks": 5,
+   "a": "Containers: shared kernel gives density and fast start; risk is weaker isolation, so a kernel bug or privileged container can affect the host."
+  }
+ ],
+ "beyond": "Not for the exam. Modern cloud hosts offload I/O with SR-IOV and use confidential computing (SEV, TDX) to encrypt guest memory from the hypervisor. Lightweight VM monitors such as Firecracker and Kata Containers mix VM isolation with container start times. Kubernetes moved live migration into scheduler and operator discussions. Search: SR-IOV, confidential VMs, Firecracker microVM, live migration convergence."
+}

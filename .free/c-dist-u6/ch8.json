@@ -1,0 +1,227 @@
+{
+ "lead": "A web system is a distributed data system whose clients are browsers. It keeps data close to the reader by caching and replicating it, and cheap to find by indexing it. HTTP carries requests for named resources; caches answer most of them without touching the origin server. This chapter explains how the web stores, finds and serves data at scale, why a cached copy can be stale, and how systems use validation, sharding, replication and retries to stay correct enough. Search engines, UPI dashboards, IRCTC pages and social feeds use these mechanisms.",
+ "prereq": "You need: <a href=\"#naming-and-distributed-file-systems\">6.1</a> for caching and sharing semantics, <a href=\"#scalability-and-elasticity-in-the-cloud\">6.6</a> for replication and load balancing, and Unit 5, Consistency models and replication, for consistency models.",
+ "sections": [
+  {
+   "h3": "HTTP resources, stateless requests and sessions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "HTTP is a request-response protocol. A client asks for a resource named by a URL; the server returns a representation, usually HTML or JSON. The protocol is stateless: between requests the server need not remember the client. Methods carry meaning. GET reads a resource, PUT replaces it, DELETE removes it, and POST asks the server to process data or create a subordinate resource."
+    },
+    {
+     "type": "p",
+     "text": "GET and PUT are idempotent. Repeating the same request leaves the server state as one request would; POST is not idempotent, so a retried payment can charge twice. Statelessness does not forbid sessions. A cookie is a small name-value pair that the server sets and the browser returns on later requests. The cookie often holds only a session id; session data sits in a shared store."
+    },
+    {
+     "type": "p",
+     "text": "REST is a design style: expose resources, use uniform methods, keep requests self-contained, and exchange representations such as JSON. It is the default for public web APIs."
+    }
+   ]
+  },
+  {
+   "h3": "Freshness, validation and edge caches",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Caching stores a response closer to the user. Freshness is set by Cache-Control: max-age=N. For N seconds a cache may reuse the copy without asking the origin. That is fast, but it is not a consistency guarantee: the origin may already have changed the page."
+    },
+    {
+     "type": "p",
+     "text": "After max-age expires, the cache validates. The origin's first response carried an ETag, an opaque version string such as v7. The cache sends If-None-Match: v7. A match returns 304 Not Modified with no page body; the stored copy is reused. A mismatch returns 200 OK with a new body and new ETag."
+    },
+    {
+     "type": "p",
+     "text": "A purge removes a cached object early. Push purge names the URL or tag; time-to-live is the fallback. The hit ratio decides cost."
+    },
+    {
+     "type": "formula",
+     "text": "H = h ÷ (h + m)",
+     "where": "H is the hit ratio, h is requests served by the cache, and m is requests sent to the origin; H is between 0 and 1."
+    },
+    {
+     "type": "p",
+     "text": "A CDN puts edge servers near users. DNS returns a nearby edge address; an origin shield funnels misses through one cache to protect the origin."
+    }
+   ]
+  },
+  {
+   "h3": "Web-scale data: indexes, shards and stores",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A search index is an inverted index: for each term t it stores a postings list of document ids and positions. A query intersects postings lists, then ranks documents. A simple score is tf × idf, where tf is term frequency in a document and idf = log₂(N ÷ df), N is number of documents and df is number containing the term."
+    },
+    {
+     "type": "p",
+     "text": "Web data is sharded and replicated. Sharding splits a key space across servers so each holds a slice; replication keeps copies for read scale and failure. A shard key that concentrates hot keys creates a hotspot."
+    },
+    {
+     "type": "p",
+     "text": "Key-value stores map a key to an opaque value. Document stores keep JSON-like documents and index selected fields. Both belong to NoSQL, a family that relaxes relational schemas. CAP says a distributed store facing a network partition must choose consistency or availability. BASE means basically available, soft state, eventual consistency; ACID means atomic, consistent, isolated, durable transactions."
+    }
+   ]
+  },
+  {
+   "h3": "Faults, services and safety on the web",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Web services expose data to other programs. SOAP is an XML messaging standard with a WSDL contract; REST with JSON is now common because it maps to HTTP methods and caches well."
+    },
+    {
+     "type": "p",
+     "text": "Fault tolerance uses redundancy, timeouts and retries. Retry only idempotent requests, or give each POST a unique idempotency key so the server can discard a duplicate. A circuit breaker opens after repeated failures and fails fast until a probe succeeds."
+    },
+    {
+     "type": "p",
+     "text": "HTTPS is HTTP over TLS. TLS encrypts the channel and authenticates the server certificate; it does not authorise the user. Authentication proves who you are; authorisation decides what you may do. Injection attacks occur when untrusted input becomes code: SQL injection in a query string, script injection when a page includes unescaped user content."
+    },
+    {
+     "type": "p",
+     "text": "Social systems store a social graph and build feeds. A feed is often assembled from many replicas, so a new post may appear after a short delay; eventual consistency is accepted. See <a href=\"#distributed-transactions-and-concurrency-control\">6.3</a> for strict transactions."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The first request misses and the origin returns ETag v7; the later request validates v7 and gets 304 with no body, so the browser reuses its copy.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Browser",
+    "Cache",
+    "Origin"
+   ],
+   "messages": [
+    {
+     "from": "Browser",
+     "to": "Cache",
+     "label": "GET /page"
+    },
+    {
+     "from": "Cache",
+     "to": "Origin",
+     "label": "GET /page (miss)"
+    },
+    {
+     "from": "Origin",
+     "to": "Cache",
+     "label": "200 OK, ETag v7"
+    },
+    {
+     "from": "Cache",
+     "to": "Browser",
+     "label": "200 OK, ETag v7"
+    },
+    {
+     "from": "Browser",
+     "to": "Cache",
+     "label": "GET, If-None-Match v7"
+    },
+    {
+     "from": "Cache",
+     "to": "Origin",
+     "label": "GET, If-None-Match v7"
+    },
+    {
+     "from": "Origin",
+     "to": "Cache",
+     "label": "304 Not Modified"
+    },
+    {
+     "from": "Cache",
+     "to": "Browser",
+     "label": "304, use stored copy",
+     "dashed": true
+    }
+   ],
+   "aria": "An HTTP message trace where the first request misses the cache and reaches the origin, and the later request is validated with the stored ETag so the origin replies 304 and sends no page body."
+  }
+ },
+ "examples": [
+  {
+   "question": "A page is 300 KB. Edge caches serve 92% of requests; the rest reach the origin. Traffic is 1,000,000 requests per day. Edge round trip is 20 ms, origin round trip is 120 ms, and transfer rate is 2 MB/s. Use 1 MB = 1000 KB. (a) How many bytes leave the origin per day? (b) What is the average latency per request, and how much does the cache save versus no cache?",
+   "steps": [
+    "Transfer time = 300 KB ÷ 2 MB/s = 300 KB ÷ 2000 KB/s = 0.15 s = 150 ms.",
+    "Miss rate = 1 − 0.92 = 0.08. Misses = 0.08 × 1,000,000 = 80,000 requests/day.",
+    "Origin bytes = 80,000 × 300 KB = 24,000,000 KB = 24,000 MB = 24 GB/day.",
+    "Hit latency = 20 ms + 150 ms = 170 ms.",
+    "Miss latency = 120 ms + 150 ms = 270 ms.",
+    "Average = 0.92×170 + 0.08×270 = 156.4 + 21.6 = 178 ms.",
+    "Saving = 270 − 178 = 92 ms per request."
+   ],
+   "answer": "(a) 24 GB leave the origin per day; (b) average latency is 178 ms, and the cache saves 92 ms per request compared with 270 ms with no cache.",
+   "check": "hits_ratio = 0.92\nrequests = 1_000_000\npage_kb = 300\nrate_mb_s = 2\nedge_rtt_ms = 20\norigin_rtt_ms = 120\ntransfer_ms = (page_kb / 1000) / rate_mb_s * 1000\nmisses = requests * (1 - hits_ratio)\norigin_kb = misses * page_kb\norigin_gb = origin_kb / 1_000_000\nhit_latency = edge_rtt_ms + transfer_ms\nmiss_latency = origin_rtt_ms + transfer_ms\naverage = hits_ratio * hit_latency + (1 - hits_ratio) * miss_latency\nsaving = miss_latency - average\nprint(f\"{transfer_ms:.1f}\")\nprint(int(misses))\nprint(f\"{origin_gb:.1f}\")\nprint(f\"{hit_latency:.1f}\")\nprint(f\"{miss_latency:.1f}\")\nprint(f\"{average:.1f}\")\nprint(f\"{saving:.1f}\")",
+   "values": [
+    150.0,
+    80000,
+    24.0,
+    170.0,
+    270.0,
+    178.0,
+    92.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "max-age does not keep a copy consistent with the origin; it only permits reuse for N seconds.",
+  "A 304 response has no page body; the client uses its stored copy.",
+  "GET and PUT are idempotent, but GET is also safe (read-only); POST retry can duplicate a charge.",
+  "Hit ratio counts requests, not bytes; a small hot object can raise request hit ratio without saving much bandwidth.",
+  "CAP is a trade-off during a partition, not a permanent choice of any two from three."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define an idempotent HTTP method and name one.",
+   "marks": 2,
+   "a": "A method is idempotent if repeating the same request has the same effect on server state as one request. GET (and PUT) is idempotent."
+  },
+  {
+   "level": "understand",
+   "q": "How do ETag and If-None-Match stop a page body being sent?",
+   "marks": 3,
+   "a": "The origin sends an ETag with the first response. The cache later sends If-None-Match with the stored ETag. If unchanged, the origin returns 304 with no body; the cache reuses the stored copy."
+  },
+  {
+   "level": "apply",
+   "q": "A cache serves 95% of 200,000 requests/day. A page needs 50 ms to transfer, edge RTT is 10 ms and origin RTT is 100 ms. Find average latency per request.",
+   "marks": 4,
+   "a": "Hit latency = 10 + 50 = 60 ms. Miss latency = 100 + 50 = 150 ms. Average = 0.95×60 + 0.05×150 = 57 + 7.5 = 64.5 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can Cache-Control: max-age=600 show stale data?",
+   "marks": 4,
+   "a": "The origin may change within 600 s, but the cache may reuse the old copy without contacting the origin. Validation only happens after expiry or an explicit purge."
+  },
+  {
+   "level": "remember",
+   "q": "Expand CAP and BASE.",
+   "marks": 2,
+   "a": "CAP: consistency, availability, partition tolerance. BASE: basically available, soft state, eventual consistency."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between authentication and authorisation.",
+   "marks": 2,
+   "a": "Authentication proves identity. Authorisation decides which actions that identity may perform."
+  },
+  {
+   "level": "apply",
+   "q": "A POST payment is retried after a timeout. How do you avoid a double charge?",
+   "marks": 3,
+   "a": "Use an idempotency key generated per payment. The server stores the key and returns the first result for a duplicate. Do not rely on plain retry for POST."
+  },
+  {
+   "level": "analyze",
+   "q": "What does a CDN DNS redirect achieve, and what is origin shielding?",
+   "marks": 3,
+   "a": "DNS returns a nearby edge IP so users fetch from a low-latency cache. Origin shielding sends all edge misses through one cache layer, reducing origin load and thundering herd."
+  }
+ ],
+ "beyond": "Not for the exam. Modern web systems push cache and code to the edge, run WebAssembly functions near users, and use HTTP/3 over QUIC to cut connection setup. Feeds and collaborative documents use conflict-free replicated data types (CRDTs) so replicas merge without a central lock. Search next for edge computing, CRDT, HTTP/3, and OpenTelemetry tracing."
+}

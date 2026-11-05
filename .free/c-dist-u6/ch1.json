@@ -1,0 +1,218 @@
+{
+ "lead": "A name is a handle people use; an address is where the thing sits. Naming resolves the first into the second, step by step. A distributed file system uses naming so a file on a remote server opens like a local path, then decides where to cache bytes and when a write becomes visible. NFS, AFS and HDFS all make this trade. Only a few universities teach this chapter, so keep the mechanism clear.",
+ "prereq": "You need Unit 4 for remote procedure call and message cost, and <a href=\"#distributed-transactions-and-concurrency-control\">Unit 5</a> for consistency models.",
+ "sections": [
+  {
+   "h3": "From names to addresses, flat and structured",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <b>name</b> is a string such as notes.txt. An <b>identifier</b> names at most one entity, such as an inode number. An <b>address</b> is where the entity is reached, such as server S plus a file handle. <b>Resolution</b> maps a name to an address. A flat name has no structure, so the system needs a search rule."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Broadcast asks every server; message cost grows with server count.",
+      "Forwarding pointer stays at the old address; long chains add lookups.",
+      "Home-based naming keeps one home address; the home becomes a hotspot.",
+      "DHT hashes the name to a key and stores the key on the node that owns it."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "owner(k) = first node clockwise from h(k)",
+     "where": "k is the key from the name; h(k) is its position on a 2^m ring of m bits; owner(k) is the node that stores k. Consistent hashing moves few keys when a node joins or leaves."
+    },
+    {
+     "type": "p",
+     "text": "A structured name is a path such as /home/ravi/notes.txt. The name space is a labelled graph: directories are internal nodes, files are leaves, edges carry component names. Resolution walks one component at a time; each component returns the next node. An <b>absolute</b> name starts at the root; a <b>relative</b> name starts at the current directory."
+    },
+    {
+     "type": "p",
+     "text": "A <b>mount point</b> is a local directory where a remote export is spliced in. /home/ravi/remote can represent server S's /export/ravi. The <b>closure</b> is the set of nodes visited. A <b>hard link</b> is another name for the same identifier; a <b>soft link</b> stores a path and breaks if the target moves."
+    }
+   ]
+  },
+  {
+   "h3": "Distributed file systems: caching and freshness",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A distributed file system has two access models. In the <b>remote access model</b>, each read or write goes to the server and the client keeps no local copy. In the <b>upload/download model</b>, the client downloads the whole file, works locally, and uploads it changed."
+    },
+    {
+     "type": "p",
+     "text": "Caching can hold a <b>whole file</b> or fixed-size <b>blocks</b>. The cache can sit on the client disk, in client memory, or in server memory. Client disk survives a crash but is slower; client memory is faster but lost on reboot; server memory helps repeated reads."
+    },
+    {
+     "type": "p",
+     "text": "Sharing semantics decide when a write becomes visible."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Unix semantics: a read after a write sees the write immediately, even from another client.",
+      "Session semantics: changes become visible when the file is closed.",
+      "Immutable files: a file never changes; a new version gets a new name.",
+      "Transaction semantics: reads and writes appear atomic, as in a database transaction."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "NFS v3 uses a stateless server: it keeps no per-client open or lock state, and every operation is idempotent, so a retry after a lost reply is safe. NFS resolves one path component per RPC and caches a file handle per component. AFS caches whole files on client disks and validates them on open. HDFS stores fixed-size blocks and keeps block locations in a single NameNode."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The directory remote is a mount point. notes.txt looks local under /home/ravi, but its file handle lives on server S.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "/ local root",
+    "style": "normal",
+    "children": [
+     {
+      "label": "home",
+      "children": [
+       {
+        "label": "ravi",
+        "children": [
+         {
+          "label": "remote",
+          "note": "mount point",
+          "style": "accent",
+          "children": [
+           {
+            "label": "notes.txt",
+            "note": "lives on server S",
+            "style": "live",
+            "_d": 4,
+            "children": [],
+            "_x": 291.5576,
+            "_y": 298
+           }
+          ],
+          "_d": 3,
+          "_x": 291.5576,
+          "_y": 234
+         }
+        ],
+        "_d": 2,
+        "_x": 291.5576,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 291.5576,
+      "_y": 106
+     },
+     {
+      "label": "usr",
+      "children": [
+       {
+        "label": "local",
+        "children": [
+         {
+          "label": "bin",
+          "_d": 3,
+          "children": [],
+          "_x": 428.4424,
+          "_y": 234
+         }
+        ],
+        "_d": 2,
+        "_x": 428.4424,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 428.4424,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "A local naming tree where remote is a mount point that splices server S's exported directory under ravi, so notes.txt looks local but is stored on S."
+  }
+ },
+ "examples": [
+  {
+   "question": "A client opens /home/ravi/remote/notes.txt. The directory /home/ravi/remote is a mount point for the export /export/ravi on server S. (a) List the lookups and say which go to S. (b) How many round trips to S are needed on the first open, and on the second open of the same file if the client caches the file handles of remote and notes.txt?",
+   "steps": [
+    "1. Resolve /, home, ravi locally: 3 local lookups.",
+    "2. remote is a mount point for S:/export/ravi; use its cached handle or one RPC if absent.",
+    "3. Ask S for notes.txt inside /export/ravi: 1 RPC to S, which returns its file handle.",
+    "4. First open: 1 round trip to S.",
+    "5. Second open with both handles cached and the file unchanged: 0 round trips to S.",
+    "6. Closure = {/, home, ravi, S:/export/ravi, S:/export/ravi/notes.txt}; size 5."
+   ],
+   "answer": "First open: 1 round trip to S; second open: 0 round trips; closure size: 5.",
+   "check": "local_lookups=3\nremote_rpcs=1\nfirst=remote_rpcs\nsecond=0\nclosure=5\nprint(local_lookups)\nprint(remote_rpcs)\nprint(first)\nprint(second)\nprint(closure)",
+   "values": [
+    3,
+    1,
+    1,
+    0,
+    5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A mount point is a local directory, not the remote root. The remote root here is /export/ravi.",
+  "NFS v3 keeps no per-client state; a retry must repeat safely, so operations are idempotent.",
+  "Whole-file caching fetches the full file; block caching fetches only needed blocks. Do not mix them.",
+  "Unix semantics makes a write visible immediately; session semantics waits for close.",
+  "A hard link names the same identifier; a soft link stores a path."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define name, identifier and address.",
+   "marks": 2,
+   "a": "A name is a string. An identifier names at most one entity. An address is where the entity is reached."
+  },
+  {
+   "level": "understand",
+   "q": "Why does consistent hashing move few keys when a node joins?",
+   "marks": 3,
+   "a": "Only keys between the new node and its predecessor change owner; other ring positions stay put."
+  },
+  {
+   "level": "apply",
+   "q": "A 16-slot ring has nodes at 2 and 9. h(k)=13. Which node owns k?",
+   "marks": 3,
+   "a": "Walk clockwise from 13: the next node is 2, so node 2 owns k."
+  },
+  {
+   "level": "analyze",
+   "q": "An NFS v3 reply is lost after a successful write. Why is a client retry safe?",
+   "marks": 4,
+   "a": "The server is stateless and the write is idempotent, so repeating it gives the same server state."
+  },
+  {
+   "level": "understand",
+   "q": "Compare remote access and upload/download models.",
+   "marks": 3,
+   "a": "Remote access sends each operation to the server. Upload/download moves the whole file to the client and back."
+  },
+  {
+   "level": "analyze",
+   "q": "Two clients share a file. When does the second client see the first client's write under Unix and session semantics?",
+   "marks": 4,
+   "a": "Unix semantics: immediately after the write. Session semantics: when the first client closes the file."
+  },
+  {
+   "level": "remember",
+   "q": "What does the HDFS NameNode hold?",
+   "marks": 2,
+   "a": "It holds the block locations for files; data blocks sit on DataNodes."
+  }
+ ],
+ "beyond": "Not for the exam. NFS v4 adds state, sessions and stronger security; SMB is its main rival. Object stores replace paths with flat keys and HTTP, and HDFS-style systems split metadata from blocks. Search terms: NFSv4, AFS callbacks, HDFS NameNode, object storage consistency, close-to-open consistency."
+}
