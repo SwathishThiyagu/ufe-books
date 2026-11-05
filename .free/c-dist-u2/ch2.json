@@ -1,0 +1,215 @@
+{
+ "lead": "A matrix product is a grid of dot products. Each output cell uses one row of A and one column of B, and no output cell needs another. That independence is why parallel machines are good at matrix work: hand each cell to a processor, or hand each product term to a processor, and the arithmetic spreads out. The same idea drives graphics transforms, training neural networks, solving linear equations, and ranking pages. This chapter counts the steps for three processor budgets and for the matrix-vector case.",
+ "prereq": "You need: <a href=\"#parallel-matrix-transpose\">Chapter 2.1</a> for column access to B, and Unit 1 for the PRAM cost model and the speedup definition.",
+ "sections": [
+  {
+   "h3": "A product is a grid of dot products",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For n×n matrices A and B, the product C = A×B is also n×n. Its entry in row i and column j is c[i][j] = Σ(k=0 to n−1) a[i][k]·b[k][j]. Here a[i][k] is the entry of A in row i, column k; b[k][j] is the entry of B in row k, column j; n is the number of rows and columns; and k is the dummy index that walks across the row and down the column."
+    },
+    {
+     "type": "formula",
+     "text": "c[i][j] = Σ(k=0 to n−1) a[i][k]·b[k][j]",
+     "where": "c[i][j] is the output cell in row i, column j; a[i][k] and b[k][j] are input entries; n is the matrix size."
+    },
+    {
+     "type": "p",
+     "text": "Read the formula as one dot product. Take row i of A and column j of B, multiply the first pair, the second pair, and so on, then add the n products. Each c[i][j] is independent of every other c. The processor for c₁₁ never waits for c₁₂. That is the whole source of parallelism: the output grid has n² cells, and each cell is a length-n job."
+    },
+    {
+     "type": "p",
+     "text": "Column access matters. A row of A is stored next to itself; a column of B is strided in row-major storage. Fetching b[k][j] for k=0,...,n−1 touches one element per row of B, so the memory system sees a stride of n elements. Parallel transpose in <a href=\"#parallel-matrix-transpose\">Chapter 2.1</a> rearranges B when repeated column reads cost too much."
+    }
+   ]
+  },
+  {
+   "h3": "Three processor budgets",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "With n³ processors, give one processor to each product term a[i][k]·b[k][j]. The n terms for a fixed output cell sit in a tree. Pairs multiply, then pairs of products add, and the fan-in finishes in log₂ n steps. The work is n³ multiplications plus n³−n² additions, but the parallel time is O(log n)."
+    },
+    {
+     "type": "p",
+     "text": "With n² processors, give one processor to each output cell. That processor reads a whole row of A and a whole column of B and runs the dot product itself. It does n multiplications and n−1 additions, so parallel time is O(n). This is the usual exam case because n² is practical for small n."
+    },
+    {
+     "type": "p",
+     "text": "With p processors, where p can be less than n², split the n² output cells over p processors. The total arithmetic is n³ multiplications, so the time is Θ(n³/p); uneven division adds at most one extra cell, that is n extra steps, which does not change the order when p ≤ n². Load balance matters for the constant factor. Better load balance comes from blocked storage (each processor owns a square submatrix of C) or striped storage (processor q owns output cells q, q+p, q+2p, ...)."
+    },
+    {
+     "type": "formula",
+     "text": "T_p = O(n³/p)",
+     "where": "T_p is parallel time with p processors; n is matrix size; p is processor count."
+    },
+    {
+     "type": "p",
+     "text": "On an n×n mesh, use broadcast instead of long dot products. In step k, send a[i][k] along row i and b[k][j] down column j. Cell (i,j) receives one pair, multiplies, and adds to its running c[i][j]. Every cell does one multiply-add per step, so n steps finish the product. Cannon's algorithm is a different mesh schedule, in which blocks are skewed at the start and then, in each of n rounds, every cell does one multiply-add and passes its A value one step left and its B value one step up."
+    }
+   ]
+  },
+  {
+   "h3": "Matrix-vector and the speedup limit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For y = A·x, the output is a vector, not a grid. Entry y[i] = Σ(j=0 to n−1) a[i][j]·x[j]. Here x is the input vector with entries x[j], and y[i] is the output entry for row i. There are only n output entries, so the natural processor count is n, one per y[i]."
+    },
+    {
+     "type": "p",
+     "text": "The vector x must be broadcast to every processor before the dot products start. A broadcast copies one value to all p processors in log p steps; <a href=\"#broadcasting-and-computing-prefix-sums\">Chapter 2.3</a> gives that procedure. After the broadcast, each y[i] needs a fan-in sum of log n steps if its n products are spread over n processors. With one processor per row, each row does n multiply-adds and the time is O(n), not O(log n)."
+    },
+    {
+     "type": "p",
+     "text": "A simple speedup model for the n²-processor matrix product adds the fan-in cost to the arithmetic cost: S = n³ / (n³/p + log p). The numerator n³ is the serial multiplication count; n³/p is the arithmetic time with p processors; log p is the fan-in or reduction overhead; S is speedup, the serial time divided by parallel time. Early on, n³/p dominates, so S grows almost linearly with p. S saturates when n³/p becomes comparable to log p; after that, more processors mostly add communication, and the curve flattens."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One row of A and the first column of B are multiplied pairwise and added to give c₁₁; the other entry in C row 1 comes from a different column of B.",
+  "spec": {
+   "type": "array",
+   "title": "c₁₁ = 2×5 + 1×7 = 17",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "A r1",
+     "cells": [
+      "2",
+      "1"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "B c1",
+     "cells": [
+      "5",
+      "7"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "prod",
+     "cells": [
+      "10",
+      "7"
+     ]
+    },
+    {
+     "label": "C r1",
+     "cells": [
+      "17",
+      "20"
+     ],
+     "marks": {
+      "0": "live"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 3,
+     "cell": 0,
+     "label": "c₁₁"
+    }
+   ],
+   "aria": "Four short rows showing one row of A, one column of B, their products, and the resulting row of C for a 2×2 matrix product."
+  }
+ },
+ "examples": [
+  {
+   "question": "Let A = [[2,1],[3,4]] and B = [[5,6],[7,8]]. Use four processors, one per output cell of C = A×B. (a) Compute all four entries of C. (b) State the number of multiplications and the parallel time in multiply-add steps. (c) For x = (2,3), compute y = A·x and state what must happen to x before the row dot products.",
+   "steps": [
+    "Matrix size n = 2 and processor count p = 4 = n², so each output cell gets one processor.",
+    "c₁₁ = row 1 of A · column 1 of B = 2×5 + 1×7 = 10 + 7 = 17.",
+    "c₁₂ = row 1 of A · column 2 of B = 2×6 + 1×8 = 12 + 8 = 20.",
+    "c₂₁ = row 2 of A · column 1 of B = 3×5 + 4×7 = 15 + 28 = 43.",
+    "c₂₂ = row 2 of A · column 2 of B = 3×6 + 4×8 = 18 + 32 = 50.",
+    "Each processor does n = 2 multiplications and n−1 = 1 addition. Parallel time is 2 multiply-add steps. Total work is 4 cells × 2 = 8 multiplications.",
+    "y₁ = 2×2 + 1×3 = 4 + 3 = 7.",
+    "y₂ = 3×2 + 4×3 = 6 + 12 = 18.",
+    "The vector y has n = 2 entries, so two processors, one per row of A, each need every entry of x; x is broadcast to those two before the row dot products start."
+   ],
+   "answer": "C = [[17,20],[43,50]], y = (7,18), with 8 multiplications and parallel time 2 multiply-add steps; x is broadcast first.",
+   "check": "A = [[2,1],[3,4]]\nB = [[5,6],[7,8]]\nn = len(A)\nC = [[sum(A[i][k]*B[k][j] for k in range(n)) for j in range(n)] for i in range(n)]\nx = [2,3]\ny = [sum(A[i][j]*x[j] for j in range(n)) for i in range(n)]\nfor row in C:\n    for val in row:\n        print(val)\nfor val in y:\n    print(val)\nprint(n**3)\nprint(n)",
+   "values": [
+    17,
+    20,
+    43,
+    50,
+    7,
+    18,
+    8,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Writing speedup S = n² (= p) when p = n², as if the dot products cost only their multiplications. The model S = n³/(n³/p + log p) gives S ≈ n³/(n + log n²), a little below n², because the reduction and vector-broadcast overhead sit in the denominator.",
+  "Using time n when p < n². If processors hold several output cells, time is n³/p, and uneven division lets the slowest processor set the time.",
+  "Mixing n³ and n². n³ is the number of product terms, one per multiplication; n² is the number of output cells, one per dot product.",
+  "Forgetting that B is read by column in the row-column method. Row-major storage makes that a strided access, not a contiguous one.",
+  "Treating the mesh broadcast as free. The mesh needs n rounds, and each cell adds one arriving product into a running value per round."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the formula for entry c[i][j] of C = A×B.",
+   "marks": 2,
+   "a": "c[i][j] = Σ(k=0 to n−1) a[i][k]·b[k][j], where n is the matrix size and k runs over the shared index."
+  },
+  {
+   "level": "understand",
+   "q": "Why can all n² output cells of C be computed at the same time?",
+   "marks": 3,
+   "a": "Each c[i][j] uses only row i of A and column j of B. No output cell reads another output cell, so the dot products have no dependence on each other."
+  },
+  {
+   "level": "apply",
+   "q": "For n = 4 and p = 16 processors, one per output cell, how many multiplications does each processor do, and what is the parallel time in multiply-add steps?",
+   "marks": 3,
+   "a": "Each processor does n = 4 multiplications and n−1 = 3 additions. Parallel time is 4 multiply-add steps."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is the speedup not exactly n² (= p) when p = n²?",
+   "marks": 4,
+   "a": "Each of the n² processors finishes its own length-n dot product, so the arithmetic alone gives speedup n²; the model denominator adds the broadcast and reduction overhead log p, so S stays a little below n² and flattens once that overhead is comparable to n³/p."
+  },
+  {
+   "level": "apply",
+   "q": "For n = 4 and p = 8, use T_p = O(n³/p). How many multiplication-equivalents per processor, and is the output-cell load even?",
+   "marks": 3,
+   "a": "n³ = 64, so 64/8 = 8 multiplication-equivalents per processor. There are n² = 16 output cells, and 16/8 = 2 cells per processor, so the cell load is even."
+  },
+  {
+   "level": "understand",
+   "q": "What does broadcast do in y = A·x, and why is it needed before the dot products?",
+   "marks": 3,
+   "a": "Broadcast copies the vector x, or its needed entries, to every processor. Each y[i] needs all x[j] values, so the copies must arrive before any row can finish its dot product."
+  },
+  {
+   "level": "analyze",
+   "q": "When does S = n³/(n³/p + log p) saturate, and what does saturation mean physically?",
+   "marks": 5,
+   "a": "It saturates when n³/p becomes comparable to log p. Before that, arithmetic dominates and adding processors helps; after that, fan-in and communication dominate, so extra processors give little extra speedup."
+  },
+  {
+   "level": "remember",
+   "q": "Name two storage layouts used to distribute C over p processors.",
+   "marks": 2,
+   "a": "Blocked storage gives each processor a square submatrix of C. Striped storage gives processor q cells q, q+p, q+2p, and so on."
+  }
+ ],
+ "beyond": "Not for the exam. In practice, matrix multiplication is not written as one processor per cell; libraries block the loops so a small tile of C stays in cache while tiles of A and B stream past. BLAS and LAPACK names such as dgemm are the routines to search. Strassen's algorithm reduces the multiplication count below n³ but changes the addition and memory pattern, so it pays only for very large matrices. Distributed systems split C into tiles and use collective broadcast and reduce operations; search for SUMMA and Cannon's algorithm. GPU tiling is covered in Unit 3, where shared memory makes the same reuse idea explicit."
+}

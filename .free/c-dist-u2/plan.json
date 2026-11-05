@@ -1,0 +1,519 @@
+{
+ "lead": "This unit takes the PRAM and network models from Unit 1 and uses them to build real parallel algorithms for matrices, searching, sorting, graphs and linear systems. After it you can state the parallel time, the total work and the processor count of each algorithm, name the machine it suits, and explain why speedup stops short of the processor count.",
+ "about": "Unit 2 turns the models of Unit 1 into working parallel algorithms. Chapter 2.1 transposes a matrix with one processor per element and shows why data movement is the real cost. Chapter 2.2 multiplies matrices and matrix-vector products by handing each output cell to one processor. Chapter 2.3 covers the two primitives the rest of the unit reuses: one-to-all broadcast and the prefix-sum scan. Chapter 2.4 uses them to select the k-th smallest key and to search a sorted array faster than binary search. Chapter 2.5 builds sorting networks and the mesh, enumeration and quicksort variants on top. Chapter 2.6 applies the matrix routines to linear equations and adds parallel root finding. Chapter 2.7 closes with connected components and minimum spanning trees. Every chapter states the parallel time, the total work and the processor count.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Transpose moves n² elements, so its parallel cost is set by data movement, not arithmetic: all n(n−1)/2 off-diagonal pairs can swap at the same time.",
+   "depth": "Define transpose for an n×n matrix: b[i][j] = a[j][i]. Sequential cost is O(n²) reads and writes, and there is no real arithmetic, so the whole problem is data movement. PRAM version with n² processors: one element per processor, only the pairs above the diagonal move, so parallel time is O(1) when routing is free. Mesh version with n² processors: each element walks to its place by row and column rotation in O(n) steps. Only a few universities teach the blocked hypercube version: cut the matrix into four n/2 blocks, swap the two off-diagonal blocks, repeat recursively, log n steps of block exchange. Total work stays n², so transpose is work-optimal at any p. Some syllabi call this matrix transposition or in-place transpose.",
+   "figure": {
+    "type": "array",
+    "title": "Transpose of a 3×3 matrix",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "A",
+      "cells": [
+       "1",
+       "2",
+       "3",
+       "4",
+       "5",
+       "6",
+       "7",
+       "8",
+       "9"
+      ],
+      "marks": {
+       "1": "accent",
+       "3": "accent"
+      }
+     },
+     {
+      "label": "Aᵀ",
+      "cells": [
+       "1",
+       "4",
+       "7",
+       "2",
+       "5",
+       "8",
+       "3",
+       "6",
+       "9"
+      ],
+      "marks": {
+       "1": "accent",
+       "3": "accent"
+      }
+     }
+    ],
+    "aria": "Two rows of nine cells, the input 3×3 matrix and its transpose, with the values 2 and 4 marked as the pair that swaps."
+   },
+   "example": "Transpose A = [[1,2,3],[4,5,6],[7,8,9]] on 9 processors, one per element. The pair (0,1) and (1,0) swaps 2 and 4. The pair (0,2) and (2,0) swaps 3 and 7. The pair (1,2) and (2,1) swaps 6 and 8. The diagonal elements 1, 5, 9 do not move. Three processors swap at the same instant, so the PRAM step count is 1. Total work is 6 reads and 6 writes, the same as the sequential version.",
+   "trap": "Quoting one parallel step while ignoring routing: on a mesh the same transpose costs O(n) steps. Also, each unordered pair must be handled by exactly one processor, and the diagonal must never be written twice.",
+   "prereq": "Unit 1 for the PRAM and mesh models; row-major storage of a 2-D array.",
+   "leave": "Actual SIMD and GPU memory shuffles to Unit 3."
+  },
+  {
+   "k": 2,
+   "idea": "Every output element of a matrix product is an independent dot product, so processors are handed one output cell each and the parallel time is the length of one dot product.",
+   "depth": "Define C = A×B for n×n matrices: c[i][j] = Σ(k=0 to n−1) a[i][k]·b[k][j]. Compare three processor counts. With n³ processors, one per product term, a tree fan-in finishes each dot product in log n steps. With n² processors, one per output cell, each does a length-n row-column product, so time is O(n). With p processors the time is O(n³/p), and the load only spreads evenly when n² is a multiple of p. On a mesh, broadcast a[i][k] along row i and b[k][j] down column j so each cell multiplies what arrives; some syllabi call the systolic mesh version Cannon's algorithm. For matrix-vector y = A·x, with y[i] = Σ a[i][j]·x[j], the vector x must be broadcast to every processor first and each y[i] needs a fan-in sum of log n steps. Give the speedup S = n³ / (n³/p + log p) and say when it saturates. Name blocked and striped storage.",
+   "figure": {
+    "type": "array",
+    "title": "c₁₁ = 2×5 + 1×7 = 17",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "A row 1",
+      "cells": [
+       "2",
+       "1"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "B col 1",
+      "cells": [
+       "5",
+       "7"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "products",
+      "cells": [
+       "10",
+       "7"
+      ]
+     },
+     {
+      "label": "C row 1",
+      "cells": [
+       "17",
+       "20"
+      ],
+      "marks": {
+       "0": "live"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 3,
+      "cell": 0,
+      "label": "c₁₁"
+     }
+    ],
+    "aria": "Four short rows showing one row of A, one column of B, their products, and the resulting row of C for a 2×2 matrix product."
+   },
+   "example": "A = [[2,1],[3,4]] and B = [[5,6],[7,8]] with 4 processors, one per output cell. c₁₁ = 2×5 + 1×7 = 17. c₁₂ = 2×6 + 1×8 = 20. c₂₁ = 3×5 + 4×7 = 43. c₂₂ = 3×6 + 4×8 = 50. Each processor does n = 2 multiplications and one addition, so the parallel time is 2 multiply steps and the work is 8 multiplies. Then y = A·x with x = (2,3): y₁ = 2×2 + 1×3 = 7 and y₂ = 3×2 + 4×3 = 18, with x broadcast to both processors.",
+   "trap": "Writing speedup = n³/n² = n and forgetting the fan-in and broadcast steps. Also, with p < n² some processors hold several output cells, so the time is n³/p, not n.",
+   "prereq": "Chapter 2.1 for column access to B; Unit 1 for the PRAM cost model and the speedup definition.",
+   "leave": "Cache blocking and BLAS tuning to a compilers course; GPU tiling to Unit 3."
+  },
+  {
+   "k": 3,
+   "idea": "Broadcast copies one value to all processors in log p steps, and prefix sums give every element the running total before it in log n steps, with a two-level version that stays work-optimal.",
+   "depth": "One-to-all broadcast: one processor holds datum d and every processor needs it; on a tree or hypercube each step doubles the number of holders, giving ⌈log₂ p⌉ steps, and the same doubling underlies all-to-all broadcast and recursive doubling. Prefix sums, also called scan or all-sums: given x₀…x_{n−1}, compute y_i = x₀ + x₁ + … + x_i. Sequential cost is n−1 additions. The doubling algorithm runs log₂ n steps; at step d each element adds the value d places to its left, with d = 1, 2, 4, … Because half the elements do nothing each step, total work is n·log₂ n additions, so it is not work-optimal. Give the two-level work-optimal variant: each processor scans its n/p block sequentially, the p block totals are prefix summed in log p steps, and each block adds its offset back, giving O(n/p + log p) time and O(n) work. Uses: ranking, stream compaction, counting, radix sort, load balancing.",
+   "figure": {
+    "type": "array",
+    "title": "Prefix sums by doubling on 8 elements",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "input",
+      "cells": [
+       "3",
+       "1",
+       "4",
+       "1",
+       "5",
+       "9",
+       "2",
+       "6"
+      ]
+     },
+     {
+      "label": "d = 1",
+      "cells": [
+       "3",
+       "4",
+       "5",
+       "5",
+       "6",
+       "14",
+       "11",
+       "8"
+      ]
+     },
+     {
+      "label": "d = 2",
+      "cells": [
+       "3",
+       "4",
+       "8",
+       "9",
+       "11",
+       "19",
+       "17",
+       "22"
+      ]
+     },
+     {
+      "label": "d = 4",
+      "cells": [
+       "3",
+       "4",
+       "8",
+       "9",
+       "14",
+       "23",
+       "25",
+       "31"
+      ],
+      "marks": {
+       "7": "live"
+      }
+     }
+    ],
+    "aria": "Four rows of eight numbers showing the input array and the three doubling passes of a prefix sum, ending in the total 31."
+   },
+   "example": "x = [3, 1, 4, 1, 5, 9, 2, 6] with 8 processors. Step d = 1: each element adds its left neighbour, giving [3, 4, 5, 5, 6, 14, 11, 8]. Step d = 2: each element adds the value two places left, giving [3, 4, 8, 9, 11, 19, 17, 22]. Step d = 4: each element adds the value four places left, giving [3, 4, 8, 9, 14, 23, 25, 31]. Check the last cell: total = 31. The parallel time is ⌈log₂ 8⌉ = 3 steps; the sequential version needs 7 additions, while the doubling version performs 24 additions in all.",
+   "trap": "Updating in place and then reading the new values: at step d every element must read the old value at i−d, so a barrier or double buffer is needed. Also, the doubling scan does n log₂ n work, so calling it work-optimal is wrong.",
+   "prereq": "Unit 1 for tree and hypercube networks; log₂ notation.",
+   "leave": "MPI_Bcast and MPI_Scan calls to Unit 3; group communication and message ordering to Unit 4."
+  },
+  {
+   "k": 4,
+   "idea": "Selection and searching both throw away part of the data at each step, so p processors can cut the range p times faster per step.",
+   "depth": "Selection: given n keys and an integer k, return the k-th smallest. Sequential quickselect pivots, partitions and recurses on one side only, expected O(n) and worst O(n²). Parallel version: each processor takes the median of its own n/p keys, the p medians are sorted and their median becomes the pivot, so the split stays balanced for any input; partition in parallel, discard one side, repeat. Deterministic time is O(log n) with n processors and O(n) total work. Randomised version: sample p pivots, sort them, bucket the keys, recurse. Searching: a sorted array of n keys. Binary search takes ⌈log₂ n⌉+1 comparisons. With p processors, either split the array into p blocks and binary search every block at once, O(log(n/p)) steps plus one step to see which block found the key, or run a p-ary search: at each step compare the key with p−1 evenly spaced probes at the same instant, which shrinks the range by a factor p and takes O(log n / log p) steps. Mention ranking by enumeration as a selection tool. Only a few universities teach this at exam depth.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "a[0..14]",
+     "note": "15 keys",
+     "style": "normal",
+     "children": [
+      {
+       "label": "a[0..3]",
+       "edge": "≤ 17",
+       "note": "below 17",
+       "style": "muted"
+      },
+      {
+       "label": "a[4..7]",
+       "edge": "≤ 34",
+       "note": "17 to 34",
+       "style": "muted"
+      },
+      {
+       "label": "a[8..10]",
+       "edge": "≤ 51",
+       "note": "34 to 51",
+       "style": "accent",
+       "children": [
+        {
+         "label": "38",
+         "edge": "a[8]",
+         "style": "normal"
+        },
+        {
+         "label": "42",
+         "edge": "a[9]",
+         "style": "live"
+        },
+        {
+         "label": "47",
+         "edge": "a[10]",
+         "style": "normal"
+        }
+       ]
+      },
+      {
+       "label": "a[11..14]",
+       "edge": "> 51",
+       "note": "above 51",
+       "style": "muted"
+      }
+     ]
+    },
+    "aria": "A decision tree for a 4-ary search over 15 sorted keys, with the path taken to find the key 42 marked."
+   },
+   "example": "Sorted array a = [3, 8, 12, 17, 21, 25, 29, 34, 38, 42, 47, 51, 55, 60, 66], n = 15, find the key 42 with p = 4 processors. Binary search compares with a[7] = 34, a[11] = 51, a[9] = 42 in 3 comparisons. 4-ary search compares with a[3] = 17, a[7] = 34, a[11] = 51 in one parallel step, keeps indices 8 to 10, then compares with a[8] = 38 and a[9] = 42 in a second step and finds 42 at index 9. Two steps against three. For selection, the same data with k = 5, each of the 4 processors finds the median of its block: 12, 25, 42, 55; the median of these is 25, between the medians, so the fifth smallest sits in the lower part and half the keys are dropped at once.",
+   "trap": "Reporting the parallel time without the total work, and mixing up selection (unsorted keys, k-th smallest) with searching (sorted keys, a given key).",
+   "prereq": "Unit 1 for the EREW and CRCW variants; Chapter 2.3 for broadcast of the probes.",
+   "leave": "The median-of-medians proof to a design and analysis of algorithms course.",
+   "added": ""
+  },
+  {
+   "k": 5,
+   "idea": "A sorting network is a fixed pattern of compare-exchange units; its depth, not its comparator count, is the parallel time, and bitonic and odd-even merge networks reach O(log² n) depth.",
+   "depth": "Define the comparator: two wires in, two wires out, the smaller key to the top wire for an ascending comparator. A sorting network is a fixed pattern of comparators, the same pattern whatever the input, which suits hardware and SIMD. Size is the number of comparators, depth is the longest chain from input to output, and depth is the parallel time. The 0-1 principle: a network sorts every input if and only if it sorts every input made of 0s and 1s. Then the algorithms the syllabi list. Odd-even transposition sort on a linear array: n phases alternating between odd and even neighbour pairs, O(n) time with n processors, the simplest mesh sort. Insertion sort on a linear array: O(n) phases with pipelining. Bitonic sort and odd-even merge sort: O(log² n) depth, O(n log² n) comparators. Enumeration sort: rank each key by counting smaller keys, n² comparisons, O(n) time with n² processors on a CRCW machine. Parallel quicksort and hyperquicksort: pivot, split into smaller and larger sets, recurse; hyperquicksort does it on a hypercube with a median pivot so the two halves are equal. Sorting on a mesh: snake-order the rows, sort rows, sort columns, O(n) for n² keys. Parallel merging on CREW and EREW: find each element's rank in the other list by binary search, then place it in one step, O(log n) per element. Only a few universities teach the networks in full, so give depth and size, not proofs.",
+   "figure": {
+    "type": "array",
+    "title": "4-input bitonic network, depth 3",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "input",
+      "cells": [
+       "3",
+       "1",
+       "4",
+       "2"
+      ]
+     },
+     {
+      "label": "stage 1",
+      "cells": [
+       "1",
+       "3",
+       "4",
+       "2"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent"
+      }
+     },
+     {
+      "label": "stage 2",
+      "cells": [
+       "1",
+       "2",
+       "4",
+       "3"
+      ],
+      "marks": {
+       "1": "live",
+       "3": "live"
+      }
+     },
+     {
+      "label": "stage 3",
+      "cells": [
+       "1",
+       "2",
+       "3",
+       "4"
+      ]
+     }
+    ],
+    "aria": "Four rows of four numbers showing the input and the three stages of a 4-input bitonic sorting network ending sorted."
+   },
+   "example": "Sort the keys [3, 1, 4, 2] with the 4-input bitonic network of 6 comparators and depth 3. Stage 1 compares wires (0,1) ascending and (2,3) descending: [3,1] becomes [1,3], and [4,2] becomes [4,2] because 4 is already on top. Array is now [1, 3, 4, 2]. Stage 2 compares (0,2) ascending and (1,3) ascending: 1 stays, 4 moves down, 2 moves up. Array is [1, 2, 4, 3]. Stage 3 compares (0,1) and (2,3) both ascending: [1, 2, 3, 4]. Parallel time is 3 steps. Odd-even transposition sort needs 4 phases and 8 comparators on the same input, so it is slower even though it uses more comparators.",
+   "trap": "Tracing one input through the network and calling it correct: the 0-1 principle requires all 2ⁿ inputs to work. And quoting the comparator count when the question asks for depth.",
+   "prereq": "Chapter 2.3 for prefix sums and broadcast; Chapter 2.4 for pivot selection in quicksort; Unit 1 for mesh and hypercube networks.",
+   "leave": "Lower bounds on comparison depth to an algorithms course; writing the same sort in OpenMP or CUDA to Unit 3."
+  },
+  {
+   "k": 6,
+   "idea": "Gaussian elimination is a chain of steps where every row below the pivot updates at once, and root finding goes parallel when many intervals or starting points are tested together.",
+   "depth": "Linear system A·x = b with A of order n. Gaussian elimination does n−1 steps; at step k the pivot row is fixed and every row i below it becomes row_i − m_ik·row_k with m_ik = a_ik / a_kk. All n−k rows update at the same instant, and that update is the matrix work of Chapter 2.2. Time is O(n) steps with O(n²) processors and total work O(n³), so the method stays work-optimal. The pivot row must be broadcast, which costs log n steps and caps speedup near n/log n unless every processor already holds the row. Partial pivoting for stability. Jacobi iteration is fully data-parallel: x_new = D⁻¹(b − (L+U)·x_old), one matrix-vector product per sweep. Root finding: bisection on many sub-intervals at once, keeping only the intervals where the sign of f changes; Newton's method can start from many points at once to reach different roots. Only a few universities teach this.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One column of parallel elimination",
+    "nodes": [
+     {
+      "id": "pivot",
+      "label": "Pivot column k",
+      "style": "normal"
+     },
+     {
+      "id": "bcast",
+      "label": "Broadcast pivot row",
+      "note": "log n steps",
+      "style": "accent"
+     },
+     {
+      "id": "update",
+      "label": "Update rows below",
+      "note": "all processors at once",
+      "style": "live"
+     },
+     {
+      "id": "inc",
+      "label": "k = k + 1",
+      "style": "normal"
+     },
+     {
+      "id": "back",
+      "label": "Back substitution",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "pivot",
+      "to": "bcast",
+      "style": "solid"
+     },
+     {
+      "from": "bcast",
+      "to": "update",
+      "style": "solid"
+     },
+     {
+      "from": "update",
+      "to": "inc",
+      "style": "solid"
+     },
+     {
+      "from": "inc",
+      "to": "pivot",
+      "label": "k < n",
+      "style": "dashed"
+     },
+     {
+      "from": "inc",
+      "to": "back",
+      "label": "k = n",
+      "style": "solid"
+     }
+    ],
+    "aria": "A loop diagram of parallel Gaussian elimination: pick the pivot column, broadcast the pivot row, update every row below at once, then back substitute."
+   },
+   "example": "Solve x + y + z = 6, 2x + y + 3z = 13, x + 4y + z = 12. Step 1: pivot row 1 with pivot 1. Multipliers m₂₁ = 2/1 = 2 and m₃₁ = 1/1 = 1. Both rows update at the same time: row 2 becomes (0, −1, 1 | 1) and row 3 becomes (0, 3, 0 | 6). Step 2: pivot −1 in row 2, multiplier m₃₂ = 3/(−1) = −3, row 3 becomes (0, 0, 3 | 9). Back substitution gives z = 3, then −y + 3 = 1 so y = 2, then x + 2 + 3 = 6 so x = 1. Two elimination steps, and step 1 uses two processors in parallel instead of one after the other.",
+   "trap": "Forgetting that the pivot broadcast is a step of its own, so the speedup is not n even though n−k rows work at once. Parallel elimination also changes rounding, so fix the pivoting rule before comparing answers.",
+   "prereq": "Chapter 2.2 for matrix-vector and matrix products; the speedup formula from Unit 1.",
+   "leave": "Convergence theory of iterative solvers and parallel eigenvalue problems to a numerical methods course."
+  },
+  {
+   "k": 7,
+   "idea": "Connectivity and spanning trees go parallel when every vertex or every component makes its own choice in the same round, and the choices are then merged.",
+   "depth": "Graph G = (V, E) with n vertices and m edges, stored as an adjacency matrix or adjacency list. Connected components by shortcutting: every vertex starts pointing at its lowest-numbered neighbour, then every vertex points to where its pointer points; pointer jumping halves the distance to the component root each round, so O(log n) rounds answer connectivity, with O(n²) work if the adjacency matrix is scanned every round. Spanning tree by Borůvka: in each round every component picks its minimum-weight outgoing edge, all picks happen at the same time, the chosen edges are added, and the components hook and contract. Each round at least halves the number of components, so O(log n) rounds, and the tree is a minimum spanning tree. Contrast with Prim and Kruskal, which add one edge at a time and are sequential. Mention a BFS tree from a root for unweighted graphs. Only a few universities teach this at exam depth.",
+   "figure": {
+    "type": "graph",
+    "directed": false,
+    "nodes": [
+     {
+      "id": "A",
+      "label": "A",
+      "x": 1,
+      "y": 3,
+      "style": "normal"
+     },
+     {
+      "id": "B",
+      "label": "B",
+      "x": 0,
+      "y": 2,
+      "style": "normal"
+     },
+     {
+      "id": "C",
+      "label": "C",
+      "x": 2,
+      "y": 2,
+      "style": "normal"
+     },
+     {
+      "id": "D",
+      "label": "D",
+      "x": 2,
+      "y": 0,
+      "style": "normal"
+     },
+     {
+      "id": "E",
+      "label": "E",
+      "x": 0,
+      "y": 0,
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "A",
+      "to": "B",
+      "label": "4",
+      "style": "accent"
+     },
+     {
+      "from": "A",
+      "to": "C",
+      "label": "8",
+      "style": "dashed"
+     },
+     {
+      "from": "B",
+      "to": "C",
+      "label": "11",
+      "style": "dashed"
+     },
+     {
+      "from": "C",
+      "to": "D",
+      "label": "7",
+      "style": "accent"
+     },
+     {
+      "from": "C",
+      "to": "E",
+      "label": "2",
+      "style": "accent"
+     },
+     {
+      "from": "D",
+      "to": "E",
+      "label": "9",
+      "style": "solid"
+     }
+    ],
+    "aria": "A five-vertex weighted graph with each vertex's cheapest edge marked for the first round of Borůvka's spanning tree algorithm."
+   },
+   "example": "Vertices A to E with edges A–B 4, A–C 8, B–C 11, C–D 7, C–E 2, D–E 9. Round 1: A picks A–B 4, B picks A–B 4, C picks C–E 2, D picks C–D 7, E picks C–E 2. Adding the distinct picks gives components {A, B} and {C, D, E}. Round 2: the edges between these two components are A–C 8 and B–C 11, so both components pick A–C 8 and hook. One component remains, so the graph is connected and the tree is {A–B 4, C–E 2, C–D 7, A–C 8} with total weight 21. Two rounds against a Kruskal run that examines all six edges one at a time.",
+   "trap": "In Borůvka, a component may have several vertices pick different edges; the real error is adding an edge whose two ends are already in the same component, which makes a cycle. Also, O(log n) rounds of O(n + m) work each is not O(log n) total work.",
+   "prereq": "Chapter 2.5 for sorting the edge list; Unit 1 for the network models the rounds run on.",
+   "leave": "Kruskal and Prim proofs to a data structures course; distributed graph processing to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "transposing B turns its columns into rows, so the product can read along rows"
+  ],
+  [
+   2,
+   3,
+   "each dot product needs a row and a column broadcast, then a fan-in sum"
+  ],
+  [
+   3,
+   4,
+   "broadcast spreads the probes of a p-ary search in one step"
+  ],
+  [
+   4,
+   5,
+   "selection picks and balances the pivot of parallel quicksort"
+  ],
+  [
+   3,
+   5,
+   "prefix sums give each key its rank in enumeration sort"
+  ],
+  [
+   2,
+   6,
+   "one matrix-vector product is one sweep of Jacobi iteration"
+  ],
+  [
+   3,
+   7,
+   "pointer jumping in connectivity uses the same doubling as prefix sums"
+  ]
+ ]
+}

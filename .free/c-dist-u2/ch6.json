@@ -1,0 +1,189 @@
+{
+ "lead": "Solving A·x = b, where A is an n×n coefficient matrix, x the unknown vector and b the known right side, appears in circuits, structures and graphics. Gaussian elimination clears one column at a time. At column k every row below the pivot changes by the same row operation, so all those rows update together. Root finding behaves similarly: many intervals or starting points can be tested at once. Only a few universities teach this parallel numerical material. The work is to find independent arithmetic and isolate the broadcast that joins it.",
+ "prereq": "You need: <a href=\"#parallel-matrix-and-matrix-vector-multiplication\">Chapter 2.2</a> for matrix-vector products and the speedup formula from Unit 1.",
+ "sections": [
+  {
+   "h3": "Elimination updates a whole column",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "At step k the entry a_kk is the pivot. For each row i below it, the multiplier is m_ik = a_ik / a_kk. The new row is row_i − m_ik·row_k. Every i = k+1, …, n uses the same old pivot row, so all these subtractions are independent. Each entry can be updated by its own processor; the inner work is the matrix row update from <a href=\"#parallel-matrix-and-matrix-vector-multiplication\">Chapter 2.2</a>."
+    },
+    {
+     "type": "formula",
+     "text": "row_i ← row_i − m_ik·row_k,   m_ik = a_ik / a_kk",
+     "where": "a_ik is the entry in row i, column k; a_kk is the pivot; row_k is the pivot row; m_ik is the multiplier that zeroes a_ik."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Choose pivot row k.",
+      "Compute all multipliers m_ik for i > k.",
+      "Broadcast row k to every processor holding a lower row.",
+      "Update all lower rows in parallel.",
+      "Repeat for k = 1 to n−1.",
+      "Back substitute from row n upward."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "After n−1 steps A is upper triangular. Back substitution then finds x_n, x_{n−1}, …, x_1 in that order."
+    }
+   ]
+  },
+  {
+   "h3": "Broadcast, pivoting and many starts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The broadcast is a separate step. Using <a href=\"#broadcasting-and-computing-prefix-sums\">broadcast</a>, it costs log n steps, so n−1 elimination steps plus communication give about n log n steps. With O(n²) processors the flop count is O(n³), the same as serial elimination. Counting only arithmetic, no work is wasted; but the total work including the log n broadcast per column is O(n³ log n), so the method is not work-optimal. The speedup is near n / log n unless each processor already holds the pivot row. Partial pivoting swaps in the row with the largest |a_ik| before dividing. This protects accuracy, but the swap rule must be fixed before comparing rounding."
+    },
+    {
+     "type": "p",
+     "text": "Jacobi iteration is fully data-parallel: x_new = D⁻¹(b − (L+U)·x_old), where D is the diagonal, L the strict lower and U the strict upper part of A. Each sweep is one matrix-vector product, so it maps to <a href=\"#parallel-matrix-and-matrix-vector-multiplication\">Chapter 2.2</a>. For f(x)=0, bisection can run on many sub-intervals at once; keep only intervals where f(a)·f(b) < 0. Newton's method can start from many points at once to reach different roots."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The pivot row is copied to every worker before the lower rows change; all lower rows then update in one parallel step. The loop ends after the last column and back substitution begins.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One column of parallel elimination",
+   "nodes": [
+    {
+     "id": "pivot",
+     "label": "Pivot column k",
+     "style": "normal"
+    },
+    {
+     "id": "bcast",
+     "label": "Broadcast pivot row",
+     "note": "log n steps",
+     "style": "accent"
+    },
+    {
+     "id": "update",
+     "label": "Update rows below",
+     "note": "all processors at once",
+     "style": "live"
+    },
+    {
+     "id": "inc",
+     "label": "k = k + 1",
+     "style": "normal"
+    },
+    {
+     "id": "back",
+     "label": "Back substitution",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "pivot",
+     "to": "bcast",
+     "style": "solid"
+    },
+    {
+     "from": "bcast",
+     "to": "update",
+     "style": "solid"
+    },
+    {
+     "from": "update",
+     "to": "inc",
+     "style": "solid"
+    },
+    {
+     "from": "inc",
+     "to": "pivot",
+     "label": "k < n",
+     "style": "dashed"
+    },
+    {
+     "from": "inc",
+     "to": "back",
+     "label": "k = n",
+     "style": "solid"
+    }
+   ],
+   "aria": "A loop diagram of parallel Gaussian elimination: pick the pivot column, broadcast the pivot row, update every row below at once, then back substitute."
+  }
+ },
+ "examples": [
+  {
+   "question": "Solve the system x + y + z = 6, 2x + y + 3z = 13, x + 4y + z = 12 by Gaussian elimination. Identify the two multipliers at step 1 and state which row updates can run in parallel.",
+   "steps": [
+    "Write the augmented matrix: row1 (1, 1, 1 | 6), row2 (2, 1, 3 | 13), row3 (1, 4, 1 | 12).",
+    "Step 1 pivot is a_11 = 1. Multipliers: m21 = 2/1 = 2 and m31 = 1/1 = 1.",
+    "Rows 2 and 3 update at the same time. row2 − 2·row1 = (0, −1, 1 | 1). row3 − 1·row1 = (0, 3, 0 | 6).",
+    "Step 2 pivot is a_22 = −1. Multiplier m32 = 3/(−1) = −3.",
+    "row3 − (−3)·row2 = row3 + 3·row2 = (0, 0, 3 | 9).",
+    "Back substitution: 3z = 9 gives z = 3. Then −y + z = 1 gives y = 2. Then x + y + z = 6 gives x = 1."
+   ],
+   "answer": "x = 1, y = 2, z = 3; at step 1 the two multipliers are 2 and 1, and rows 2 and 3 update in parallel.",
+   "check": "from fractions import Fraction\na = [[Fraction(1), Fraction(1), Fraction(1), Fraction(6)],\n     [Fraction(2), Fraction(1), Fraction(3), Fraction(13)],\n     [Fraction(1), Fraction(4), Fraction(1), Fraction(12)]]\nn = 3\nfor k in range(n - 1):\n    for i in range(k + 1, n):\n        m = a[i][k] / a[k][k]\n        for j in range(k, n + 1):\n            a[i][j] -= m * a[k][j]\nx = [Fraction(0)] * n\nfor i in range(n - 1, -1, -1):\n    s = a[i][n]\n    for j in range(i + 1, n):\n        s -= a[i][j] * x[j]\n    x[i] = s / a[i][i]\nfor v in x:\n    print(v)",
+   "values": [
+    1,
+    2,
+    3
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Counting the pivot broadcast as free; speedup is near n/log n, not n.",
+  "Dividing by a_kk = 0 without pivoting; partial pivoting swaps rows first.",
+  "Comparing two runs with different pivoting or rounding rules.",
+  "Assuming Jacobi always converges; it can diverge for some A.",
+  "Using bisection on an interval with two roots: f(a)·f(b) has no sign change, so the root is lost."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In parallel Gaussian elimination, what do all rows below the pivot share?",
+   "marks": 2,
+   "a": "They share the pivot row and update as row_i − m_ik·row_k at the same time."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the pivot broadcast cap speedup below n?",
+   "marks": 3,
+   "a": "The broadcast costs log n steps, so the parallel time is about n log n; the speedup is near n/log n."
+  },
+  {
+   "level": "apply",
+   "q": "For n = 100 at step k = 10, how many rows update in parallel below the pivot?",
+   "marks": 2,
+   "a": "n − k = 100 − 10 = 90 rows."
+  },
+  {
+   "level": "apply",
+   "q": "In the worked example, what are m21 and m31?",
+   "marks": 3,
+   "a": "m21 = 2/1 = 2 and m31 = 1/1 = 1."
+  },
+  {
+   "level": "analyze",
+   "q": "Parallel elimination uses O(n²) processors and its flop count is O(n³), the same as serial elimination. Is the method work-optimal? Explain.",
+   "marks": 4,
+   "a": "The flop count is O(n³), the same as serial elimination, so no arithmetic is wasted — every element update is useful work. But the parallel time is about n log n (broadcast included), so the processor-time product is O(n³ log n) and speedup is near n/log n. It is work-optimal only if you count arithmetic operations and ignore the log n broadcast cost; textbooks therefore call it not work-optimal."
+  },
+  {
+   "level": "understand",
+   "q": "Write the Jacobi update in words and say why it is data-parallel.",
+   "marks": 3,
+   "a": "Take the old guess x_old, keep only the diagonal part on the left, move the off-diagonal contribution (L+U)x_old to the right, and divide each equation by its diagonal entry. So x_new = D⁻¹(b − (L+U)x_old), one matrix-vector product per sweep; every component is independent, so the sweep is data-parallel."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can bisection test many intervals at once but still lose a root?",
+   "marks": 4,
+   "a": "Sign tests are independent, but an interval with two roots has no sign change and is discarded."
+  }
+ ],
+ "beyond": "Not for the exam. Production codes use sparse direct solvers and preconditioned Krylov methods, not dense elimination, because real matrices are mostly zeros. GPU libraries batch many small linear systems at once, and root finding is used in calibration and simulation. Search for sparse LU, preconditioned conjugate gradient, and batched linear solvers."
+}
