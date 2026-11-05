@@ -202,6 +202,15 @@ def main():
     else:
         ask = Gemini.from_env(log)
     flags = S.get('flags') or []
+    if os.environ.get('REDO_FLAGGED'):
+        # review again (with the current code) every chapter whose revision failed, and re-check the book
+        for f in list(flags):
+            m = re.match(r'chapter (\d+): the reviewer found', f)
+            if m and os.path.exists(S.path(f'ch{m.group(1)}.reviewed')): os.remove(S.path(f'ch{m.group(1)}.reviewed'))
+        flags = [f for f in flags if not re.match(r'chapter \d+: the reviewer found|checker: ', f)]
+        S.put('flags', flags)
+        for fn in os.listdir(S.d):
+            if re.match(r'(chfix|resize|spill)\d+', fn): os.remove(os.path.join(S.d, fn))
     def flag(m):
         with lock:
             if m not in flags: flags.append(m); S.put('flags', flags)
