@@ -1,15 +1,14 @@
 # c-os-u5: free-model run
 
 - Book: `books/cse/c-os/c-os-u5.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 33 (105,691 tokens in, 104,578 out), 4.3 minutes
 
 ## Checker
 
 ```
-c-os-u5.html: 9 chapters, 12306 words, 10 figures, 148 KB
-PROBLEMS:
- - page is wider than the screen at 390px (401>390): a table, figure or long word overflows
+c-os-u5.html: 9 chapters, 12306 words, 10 figures, 151 KB
+OK
 ```
 
 ## For the reviewer
@@ -19,7 +18,6 @@ PROBLEMS:
 - chapter 5: a c program's shown output was replaced by its real output; check the text around it
 - chapter 2: a c program's shown output was replaced by its real output; check the text around it
 - chapter 8: a c program's shown output was replaced by its real output; check the text around it
-- checker: page is wider than the screen at 390px (401>390): a table, figure or long word overflows
 
 ## Reviewer notes (after any revision)
 
