@@ -1,0 +1,255 @@
+{
+ "lead": "A hypervisor must run a guest operating system that was written for real hardware. Full virtualization hides the hypervisor completely: the guest runs unmodified, and every privileged instruction it executes is trapped and emulated. Para-virtualization takes the opposite deal — the guest OS is edited to call the hypervisor directly through hypercalls, which is faster but needs a modified guest. Both techniques let one physical machine host many isolated virtual machines. The choice between them decides how much compatibility you trade away for speed.",
+ "prereq": "You need: <a href=\"#hypervisors-and-virtual-machine-monitors\">3.3</a> for what a hypervisor does, and <a href=\"#taxonomy-and-implementation-levels-of-virtualization\">3.2</a> for where this choice sits in the taxonomy.",
+ "sections": [
+  {
+   "h3": "Full virtualization: the guest never knows",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Full virtualization runs a guest OS that has not been changed in any way. The guest believes it owns a real machine. Its kernel executes privileged instructions, writes control registers and programs devices exactly as it would on bare metal. The hypervisor, or VMM (<a href=\"#hypervisors-and-virtual-machine-monitors\">3.3</a>), hides itself and keeps the illusion alive."
+    },
+    {
+     "type": "p",
+     "text": "The difficulty is a class of instructions called <b>sensitive instructions</b>. A sensitive instruction is one whose result depends on the privilege state or the configuration of the machine — reading the interrupt flag, reloading the page-table base register, halting the CPU. The guest runs in a lower privilege ring, so the CPU will not let it perform these actions directly. The VMM must catch each one and apply its effect to the virtual CPU instead."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "<b>Trap and emulate.</b> The VMM runs the guest in a lower privilege ring. When the guest executes a privileged instruction the CPU raises a trap, control jumps to the VMM, and the VMM decodes the instruction and updates the virtual machine state.",
+      "Return to the guest at the instruction after the trapped one, so the guest never notices the interruption.",
+      "Use <b>binary translation</b> for instructions that do not trap cleanly. The VMM copies a block of guest code, scans it before running it, and replaces risky instructions with safe calls into the VMM. Translated blocks are cached and reused."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Why translation is needed at all: on some older x86 designs a handful of privileged instructions <i>failed silently</i> instead of trapping, so a pure trap-and-emulate design could not see them. Translation catches them before they execute."
+    },
+    {
+     "type": "formula",
+     "text": "sensitive ⊆ privileged",
+     "where": "sensitive is the set of instruction types whose behaviour depends on the privilege state of the machine; privileged is the set of instruction types the CPU allows only in the highest privilege ring. This is the Popek and Goldberg condition: if every sensitive instruction is also privileged, the machine can be virtualized with traps alone and the guest needs no change."
+    }
+   ]
+  },
+  {
+   "h3": "Para-virtualization: the guest cooperates",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Para-virtualization edits the guest OS source code. Instead of executing a privileged instruction and waiting to be trapped, the guest asks the hypervisor to do the work. That deliberate request is a <b>hypercall</b>."
+    },
+    {
+     "type": "p",
+     "text": "A hypercall is a software call from a para-virtualized guest kernel into the hypervisor. It carries a call number and arguments in agreed registers, like a system call but aimed at the VMM instead of at the OS kernel. The hypervisor publishes the interface: a list of hypercall numbers and their argument conventions. Some syllabi spell the term <i>paravirtualization</i>."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The guest kernel places the hypercall number in one fixed register and the arguments in others.",
+      "It executes the hypercall instruction that the interface defines.",
+      "The CPU switches to the hypervisor's privilege ring. The VMM reads the number and dispatches to the matching handler.",
+      "The handler performs the operation on the virtual machine's state, for example updating a shadow page table or masking an interrupt.",
+      "Control returns to the guest with a result code in a register."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The gain is small per call and large in total. A trap costs a ring switch plus the VMM's instruction decode. A hypercall costs a ring switch plus a table lookup, with no decode and no guesswork. Batch many operations into one hypercall and the saving grows further. The cost is portability: the guest kernel must be recompiled against the new interface, and that same binary will not boot on bare metal."
+    }
+   ]
+  },
+  {
+   "h3": "Trade-offs and hardware support",
+   "blocks": [
+    {
+     "type": "table",
+     "head": [
+      "Aspect",
+      "Full virtualization",
+      "Para-virtualization"
+     ],
+     "rows": [
+      [
+       "Guest OS",
+       "Unmodified binary",
+       "Modified and recompiled"
+      ],
+      [
+       "Privileged operation",
+       "Traps, then emulated or translated",
+       "Guest issues a hypercall"
+      ],
+      [
+       "Per-operation cost",
+       "Higher: trap plus decode",
+       "Lower: call plus lookup"
+      ],
+      [
+       "Runs any OS image",
+       "Yes",
+       "No, only a ported guest"
+      ],
+      [
+       "Typical cloud use",
+       "IaaS selling arbitrary images",
+       "Drivers and kernels the provider controls"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Modern CPUs add hardware-assisted virtualization: Intel VT-x and AMD-V add a new privilege mode for the hypervisor, so most privileged guest instructions now trap to the VMM by themselves. This makes unmodified guests fast and pushes binary translation out of the hot path. The mechanism details belong to <a href=\"#virtualization-of-cpu-memory-and-i-o-devices\">3.5</a>."
+    },
+    {
+     "type": "p",
+     "text": "In practice the two ideas mix. A public cloud sells full virtualization because a customer may upload any OS image. The same hypervisor still offers para-virtualized <i>drivers</i> inside that VM — network and disk drivers that talk to the host through a cooperative ring instead of pretending to be real hardware. That hybrid is what most production clouds actually run."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The top path is full virtualization: an unmodified guest trips over a privileged instruction and the VMM emulates it. The bottom path is para-virtualization: the edited guest calls the VMM on purpose, so no decode is needed.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Trap versus hypercall",
+   "aria": "Two flows: an unmodified guest traps to the VMM which emulates the instruction; a modified guest issues a hypercall that the VMM handles directly.",
+   "nodes": [
+    {
+     "id": "unmod",
+     "label": "Unmodified guest",
+     "style": "normal"
+    },
+    {
+     "id": "trap",
+     "label": "Trap to VMM",
+     "style": "accent"
+    },
+    {
+     "id": "emu",
+     "label": "Emulate instruction",
+     "style": "normal"
+    },
+    {
+     "id": "mod",
+     "label": "Modified guest",
+     "style": "normal"
+    },
+    {
+     "id": "hc",
+     "label": "Hypercall",
+     "style": "live"
+    },
+    {
+     "id": "vmmc",
+     "label": "VMM call",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "unmod",
+     "to": "trap",
+     "style": "solid"
+    },
+    {
+     "from": "trap",
+     "to": "emu",
+     "style": "solid"
+    },
+    {
+     "from": "mod",
+     "to": "hc",
+     "style": "solid"
+    },
+    {
+     "from": "hc",
+     "to": "vmmc",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A workload performs 1,000,000 privileged operations per second. Under full virtualization each one costs a trap and emulation of 2 μs. Under para-virtualization, 80% of them are replaced by hypercalls costing 1 μs each, and the remaining operations still trap at 2 μs. For 1,000 operations, find the total time under each scheme and the percentage saving.",
+   "steps": [
+    "Full virtualization: every one of the 1,000 operations traps. Time = 1,000 × 2 μs = 2,000 μs.",
+    "Convert to milliseconds: 2,000 μs ÷ 1,000 = 2 ms.",
+    "Para-virtualization: 80% of 1,000 = 800 operations become hypercalls at 1 μs = 800 μs.",
+    "The other 1,000 − 800 = 200 operations still trap at 2 μs = 400 μs.",
+    "Para total = 800 + 400 = 1,200 μs = 1.2 ms.",
+    "Saving = 2,000 − 1,200 = 800 μs = 0.8 ms.",
+    "Percentage saving is measured against the full-virtualization time: 800 ÷ 2,000 × 100 = 40%."
+   ],
+   "answer": "Full virtualization takes 2,000 μs (2 ms), para-virtualization takes 1,200 μs (1.2 ms), and the saving is 800 μs (0.8 ms), which is 40% of the full-virtualization time.",
+   "check": "n = 1000\nt_trap = 2.0\nn_hyper = 800\nn_trap = n - n_hyper\nt_hyper = 1.0\nfull = n * t_trap\npara = n_hyper * t_hyper + n_trap * t_trap\nprint(full)\nprint(para)\nprint(full - para)\nprint((full - para) / full * 100)",
+   "values": [
+    2000.0,
+    1200.0,
+    800.0,
+    40.0
+   ],
+   "code": {
+    "lang": "python",
+    "code": "n = 1000\nt_trap = 2.0\nn_hyper = 800\nn_trap = n - n_hyper\nt_hyper = 1.0\nfull = n * t_trap\npara = n_hyper * t_hyper + n_trap * t_trap\nprint(full)\nprint(para)\nprint(full - para)\nprint((full - para) / full * 100)",
+    "stdin": ""
+   },
+   "output": "2000.0\n1200.0\n800.0\n40.0"
+  }
+ ],
+ "traps": [
+  "Full virtualization does not run the guest in the highest privilege ring. The guest runs below the hypervisor; that is exactly why its privileged instructions trap.",
+  "Para-virtualization does not remove the hypervisor. It removes the <i>trap</i>, not the VMM — the guest still calls into it for every sensitive operation.",
+  "Sensitive and privileged are not synonyms. An instruction is privileged if the CPU blocks it in a lower ring; it is sensitive if its result depends on machine state. The Popek and Goldberg condition is that sensitive is a subset of privileged, not the other way round.",
+  "Percentage saving is divided by the <i>full-virtualization</i> time, not the para-virtualization time. Here 800 ÷ 2,000 = 40%, not 800 ÷ 1,200 = 67%.",
+  "Binary translation is not cross-architecture emulation. It rewrites the same instruction set into safe calls; running ARM code on x86 is a different technique."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a hypercall in one sentence.",
+   "marks": 2,
+   "a": "A hypercall is a deliberate software call from a para-virtualized guest kernel into the hypervisor, carrying a call number and arguments in agreed registers."
+  },
+  {
+   "level": "remember",
+   "q": "State the Popek and Goldberg condition for efficient virtualization.",
+   "marks": 2,
+   "a": "Every sensitive instruction must also be a privileged instruction; then traps alone can virtualize the machine without changing the guest."
+  },
+  {
+   "level": "understand",
+   "q": "Why is binary translation needed if trap-and-emulate already exists?",
+   "marks": 3,
+   "a": "Some privileged instructions on older x86 designs failed silently instead of trapping, so they never reached the VMM. Binary translation scans the guest code before execution and replaces those instructions with safe VMM calls, so they can never slip through."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a para-virtualized guest cannot be moved back to bare metal.",
+   "marks": 3,
+   "a": "Its kernel source has been edited to replace privileged instructions with hypercall instructions defined by a particular hypervisor's interface. On bare metal there is no hypervisor to answer those calls, so the kernel fails."
+  },
+  {
+   "level": "apply",
+   "q": "A guest performs 50,000 sensitive operations. Full virtualization traps each at 3 μs. Para-virtualization turns 90% of them into hypercalls at 1 μs and traps the rest at 3 μs. Find both total times and the saving.",
+   "marks": 4,
+   "a": "Full = 50,000 × 3 = 150,000 μs = 150 ms. Para: 45,000 × 1 = 45,000 μs, plus 5,000 × 3 = 15,000 μs, total 60,000 μs = 60 ms. Saving = 90 ms, which is 60% of the full time."
+  },
+  {
+   "level": "analyze",
+   "q": "A cloud provider wants customers to upload any OS image but also wants fast disk and network inside the VM. Which combination should it use, and why?",
+   "marks": 4,
+   "a": "Full virtualization for the guest kernel, so unmodified images boot, plus para-virtualized drivers for disk and network. The guest OS stays portable, while the hottest device paths use a cooperative ring instead of emulated hardware, which is much faster."
+  },
+  {
+   "level": "analyze",
+   "q": "Hardware-assisted virtualization made binary translation mostly unnecessary for unmodified guests. Did it also make para-virtualization pointless? Justify.",
+   "marks": 5,
+   "a": "No. Hardware support reduces the cost of a trap, not the number of traps. Para-virtualization also reduces trap count and removes work the guest would otherwise do — one hypercall can batch several operations, and cooperative drivers avoid device emulation entirely. Where the provider controls the guest, that is still a win; where the customer supplies the image, it is not available."
+  }
+ ],
+ "beyond": "Not for the exam. Production hypervisors now blend all three ideas: hardware-assisted traps for the guest kernel, para-virtualized drivers such as virtio for I/O, and memory overcommit tricks on top. Lightweight VMMs used for serverless functions push this further by stripping the virtual machine to a minimum device set so boot takes milliseconds. Research directions include unikernels, where the guest is compiled as a single library OS against the hypervisor interface, and confidential computing, where the hypervisor itself is no longer trusted. Useful search terms: virtio, hypercall ABI, VM exit cost, nested paging, unikernel."
+}

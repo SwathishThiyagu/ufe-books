@@ -1,0 +1,259 @@
+{
+ "lead": "A virtual machine (VM) runs a full guest operating system on a hypervisor, so each VM carries its own kernel and drivers. A Docker container packs an application with its libraries but shares the host Linux kernel, using namespaces to hide processes and cgroups to cap CPU and memory. The VM gives a strong boundary and slow start; the container gives a small image and fast start with a weaker boundary. A UPI payment service can run many container copies on one host; a legacy banking application that needs its own kernel stays in a VM.",
+ "prereq": "You need: the virtualization idea from <a href=\"#virtualization-characteristics-pros-and-cons\">3.1</a> and the hypervisor role from <a href=\"#hypervisors-and-virtual-machine-monitors\">3.3</a>.",
+ "sections": [
+  {
+   "h3": "The VM path: guest OS and hypervisor",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A virtual machine (VM) is a software computer created by a hypervisor, the layer that owns the physical CPU, memory and devices. The hypervisor gives each VM virtual CPUs, a memory range, virtual disks and virtual network cards. The VM then boots its own guest operating system (guest OS): a full kernel, drivers and system services. The application sits above that guest OS. A Type 1 hypervisor sits directly on hardware; a Type 2 hypervisor runs as a program on a host OS, as in the figure."
+    },
+    {
+     "type": "p",
+     "text": "This design gives strong isolation. Two VMs share hardware but not a kernel. A crash or kernel bug inside one guest OS does not directly reach another guest OS. The price is size and time. A VM image carries the guest OS, so it is often several GB before the application is added. Booting the guest OS takes seconds to minutes."
+    },
+    {
+     "type": "formula",
+     "text": "VM image = guest OS + app (+ any data baked into the image)",
+     "where": "guest OS is the installed guest operating system size; app is the application and its libraries; any data baked into the image is stored data included in the image. All terms are in GB. Live application data usually lives on separate volumes and is not counted here."
+    },
+    {
+     "type": "p",
+     "text": "Use a VM when the tenant needs a different kernel, a licensed operating system, or a hard boundary between customers. The hypervisor's own work is covered in <a href=\"#hypervisors-and-virtual-machine-monitors\">3.3</a>."
+    }
+   ]
+  },
+  {
+   "h3": "The Docker path: shared kernel, namespaces, cgroups",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Docker is a container platform; its engine starts containers from images. A container is one or more processes on the host, packed with their libraries and files, but it does not boot a guest OS. It uses the host kernel. The engine prepares a root filesystem from an image, then starts the process inside isolated views."
+    },
+    {
+     "type": "p",
+     "text": "Two Linux kernel features do the work. Namespaces isolate what a process can see: the process ID namespace gives its own PID 1, the mount namespace gives its own filesystem tree, the network namespace gives its own interfaces, and the UTS, IPC and user namespaces isolate hostname, inter-process communication and user IDs. Cgroups, or control groups, limit and account for resources: CPU shares, memory ceilings, block I/O and process counts. A namespace is not a quota; a cgroup is not a hiding mechanism."
+    },
+    {
+     "type": "p",
+     "text": "Images are built in layers. A base layer may hold a 100 MB Linux userland; an application layer adds 500 MB. Layers are read-only and shared. When a container writes, copy-on-write makes a private writable layer that stores only the changed data — whole files with overlay-style drivers, single blocks with block-level drivers — instead of the full image. Ten containers from one image therefore share the read-only layers instead of copying them ten times."
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi call this topic Docker containers, namespaces and cgroups. The limit is the shared kernel: a kernel vulnerability can cross containers, and a Linux container cannot run a Windows kernel. Unit 6 covers container security."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing between the two",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Use containers for stateless web servers, microservices, CI/CD build jobs and batch workers that need fast start and dense packing. Use VMs for legacy applications, different operating systems, untrusted tenants and workloads that need a separate kernel. Many clouds run containers inside VMs: the VM gives the tenant boundary, and containers give fast packing inside it. Running many containers across hosts needs orchestration; see Unit 5, Cloud Programming and Platforms."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Aspect",
+      "VM",
+      "Docker container"
+     ],
+     "rows": [
+      [
+       "Guest OS",
+       "one per VM",
+       "none — shares the host kernel"
+      ],
+      [
+       "Start",
+       "seconds to minutes",
+       "often under a second"
+      ],
+      [
+       "Image",
+       "GB",
+       "MB to GB with shared layers"
+      ],
+      [
+       "Isolation",
+       "strong, separate kernel",
+       "process-level, shared kernel"
+      ],
+      [
+       "Best for",
+       "different kernels, hard tenancy",
+       "many small services"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The storage gap follows from the image model. The worked example below turns this comparison into a storage calculation."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The left branch gives each VM its own guest OS; the right branch lets containers share the host kernel. The notes carry the worked example's sizes: 2 GB guest OS plus 500 MB app per VM, and a 100 MB shared base plus 500 MB app per container.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Guest OS versus shared kernel",
+   "aria": "A downward block diagram: hardware runs the host OS; the hypervisor leads to a VM guest OS and VM app, while the host OS also runs a container engine leading to a container app; notes give the example sizes.",
+   "nodes": [
+    {
+     "id": "hw",
+     "label": "Hardware",
+     "style": "normal"
+    },
+    {
+     "id": "hos",
+     "label": "Host OS",
+     "note": "shared kernel",
+     "style": "normal"
+    },
+    {
+     "id": "hyp",
+     "label": "Hypervisor",
+     "style": "accent"
+    },
+    {
+     "id": "gos",
+     "label": "VM guest OS",
+     "note": "2 GB guest OS",
+     "style": "normal"
+    },
+    {
+     "id": "vapp",
+     "label": "VM app",
+     "note": "500 MB app",
+     "style": "normal"
+    },
+    {
+     "id": "eng",
+     "label": "Container engine",
+     "note": "100 MB shared base",
+     "style": "live"
+    },
+    {
+     "id": "capp",
+     "label": "Container app",
+     "note": "500 MB app",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "hw",
+     "to": "hos",
+     "style": "solid"
+    },
+    {
+     "from": "hos",
+     "to": "hyp",
+     "style": "solid"
+    },
+    {
+     "from": "hyp",
+     "to": "gos",
+     "style": "solid"
+    },
+    {
+     "from": "gos",
+     "to": "vapp",
+     "style": "solid"
+    },
+    {
+     "from": "hos",
+     "to": "eng",
+     "style": "solid"
+    },
+    {
+     "from": "eng",
+     "to": "capp",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A team must host 10 copies of an application. A VM design gives each copy a 2 GB guest OS and a 500 MB application. A Docker design uses one shared 100 MB base image and a 500 MB application layer per container. Compare total image storage for 10 instances, and find the saving in GB and as a percentage.",
+   "steps": [
+    "Convert the mixed units: 500 MB = 0.5 GB and 100 MB = 0.1 GB.",
+    "VM storage per instance = 2 GB guest OS + 0.5 GB app = 2.5 GB.",
+    "VM storage for 10 instances = 10 × 2.5 GB = 25 GB.",
+    "Assume each copy has its own distinct application layer (for example, a different build), so only the 100 MB base is shared.",
+    "Container shared base = 0.1 GB, counted once.",
+    "Container app layers = 10 × 0.5 GB = 5 GB.",
+    "Container storage for 10 instances = 0.1 GB + 5 GB = 5.1 GB.",
+    "If all ten ran the identical image, the 500 MB app layer would also be shared and the total would be 0.1 GB + 0.5 GB = 0.6 GB.",
+    "Saving = 25 GB − 5.1 GB = 19.9 GB.",
+    "Percentage saving = (19.9 GB ÷ 25 GB) × 100 = 79.6%."
+   ],
+   "answer": "Under the assumption that each copy has a distinct application layer, the containers need 5.1 GB against 25 GB for the VMs, a saving of 19.9 GB, about 79.6%. If all ten ran the identical image, the 500 MB app layer would also be shared and the total would be 0.6 GB.",
+   "check": "vm_os_gb = 2\napp_gb = 500 / 1000\nn = 10\nvm_total = n * (vm_os_gb + app_gb)\nbase_gb = 100 / 1000\ncont_total = base_gb + n * app_gb\nsaving = vm_total - cont_total\npct = saving / vm_total * 100\nprint('{:.1f}'.format(vm_total))\nprint('{:.1f}'.format(cont_total))\nprint('{:.1f}'.format(saving))\nprint('{:.1f}'.format(pct))",
+   "values": [
+    25.0,
+    5.1,
+    19.9,
+    79.6
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Containers share the host kernel. They are not lightweight VMs and do not give the same isolation boundary.",
+  "A VM image includes a guest OS, so it is much larger than a container app layer. Do not compare only the application size.",
+  "Namespaces isolate visibility, while cgroups limit resources. A namespace is not a CPU or memory quota.",
+  "Docker image layers are read-only and shared; the writable layer is per container and uses copy-on-write. The base is not copied ten times.",
+  "Watch units: 500 MB is 0.5 GB, and a shared base is counted once, not once per container."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a VM include that a Docker container does not?",
+   "marks": 2,
+   "a": "A VM includes its own guest operating system and kernel. A container shares the host kernel."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a container usually start faster than a VM?",
+   "marks": 3,
+   "a": "A container starts a process using the already-running host kernel, so it does not boot a guest OS. A VM must boot its guest OS and drivers first."
+  },
+  {
+   "level": "apply",
+   "q": "A container image has a 150 MB shared base and 20 containers each add a 250 MB application layer. Find total storage in GB.",
+   "marks": 4,
+   "a": "Base = 150 MB = 0.15 GB. App layers = 20 × 250 MB = 20 × 0.25 GB = 5 GB. Total = 0.15 + 5 = 5.15 GB."
+  },
+  {
+   "level": "analyze",
+   "q": "A security team says containers give the same isolation as VMs. Evaluate this claim.",
+   "marks": 5,
+   "a": "The claim is false. Containers share the host kernel, so a kernel vulnerability can cross container boundaries. VMs have separate guest kernels. Containers are suitable for trusted workloads; stronger separation needs VMs, microVMs or extra sandboxing."
+  },
+  {
+   "level": "understand",
+   "q": "What do namespaces do, and what do cgroups do?",
+   "marks": 3,
+   "a": "Namespaces isolate what a process can see, such as process IDs, mounts and network interfaces. Cgroups limit and account for resources such as CPU, memory and block I/O."
+  },
+  {
+   "level": "apply",
+   "q": "Ten VMs each use a 3 GB guest OS and a 1 GB app. Ten containers use one 0.2 GB shared base; assume each container has its own distinct 1 GB application layer (for example, a different build). Find the saving in GB. What would the saving be if all ten ran the identical image?",
+   "marks": 4,
+   "a": "VM total = 10 × (3 + 1) = 40 GB. Container total = 0.2 + 10 × 1 = 10.2 GB. Saving = 40 − 10.2 = 29.8 GB. If all ten ran the identical image, the 1 GB app layer would also be shared: total = 0.2 + 1 = 1.2 GB, so saving = 40 − 1.2 = 38.8 GB."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does copy-on-write make many containers from one image cheap?",
+   "marks": 4,
+   "a": "Image layers are read-only and shared. Each container gets a small writable layer, and copy-on-write stores only the changed data — whole files with overlay-style drivers, single blocks with block-level drivers — instead of the full image. The full base is not copied per container, so disk use grows with changes, not with the whole image."
+  }
+ ],
+ "beyond": "Not for the exam. Docker split into containerd and runc; the OCI image and runtime standards let other engines use the same images. Kata Containers and Firecracker microVMs put each container in a small VM to recover a stronger boundary. gVisor intercepts system calls in user space to reduce kernel exposure. WebAssembly runtimes now offer another sandbox for small functions. Search for OCI image spec, runc, Kata Containers, Firecracker and gVisor."
+}

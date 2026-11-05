@@ -1,0 +1,217 @@
+{
+ "lead": "One physical server runs many virtual machines because a hypervisor can fake the three things every operating system needs: a processor, memory and devices. It gives each VM virtual CPUs that the host scheduler time-slices, a memory map that hides the real machine frames, and device interfaces that either emulate hardware or pass it through. This is the machinery behind every IaaS instance you rent, every VM on a developer laptop, and the isolation that keeps one tenant's crash away from another.",
+ "prereq": "You need: <a href=\"#hypervisors-and-virtual-machine-monitors\">3.3</a> for what a hypervisor is, and <a href=\"#full-virtualization-and-para-virtualization\">3.4</a> for full versus para-virtualized guests.",
+ "sections": [
+  {
+   "h3": "CPU virtualization: vCPUs, traps and hardware assist",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A guest OS runs its own scheduler and thinks it owns a physical processor. The hypervisor gives it a <b>vCPU</b>: a virtual processor with its own registers, program counter, flags and interrupt state. Every vCPU is a thread on the host, queued and time-sliced by the host scheduler. Two vCPUs on one core take turns, and the guest sees this only as slower time."
+    },
+    {
+     "type": "p",
+     "text": "Privileged instructions are the difficulty. A guest kernel changing page tables or masking interrupts must not affect the host. <b>Trap and emulate</b> handles this: hardware runs the guest in a restricted mode, the instruction faults into the hypervisor, the hypervisor performs the effect in software, and the guest resumes. Each trap costs microseconds, so frequent traps hurt."
+    },
+    {
+     "type": "p",
+     "text": "Some x86 instructions are sensitive but do not fault, so early hypervisors rewrote guest kernel code on the fly, called binary translation (<a href=\"#full-virtualization-and-para-virtualization\">3.4</a>). Intel VT-x and AMD-V add a root and a non-root mode: the guest runs in non-root mode at ring 0, and only a fixed list of events causes a <b>VM exit</b> to the hypervisor; a <b>VM entry</b> resumes the guest. Exits become rarer and cheaper, so CPU virtualization runs near native speed."
+    },
+    {
+     "type": "p",
+     "text": "Para-virtualized guests avoid many traps by calling the hypervisor directly with hypercalls."
+    },
+    {
+     "type": "p",
+     "text": "Scheduling matters when vCPUs outnumber cores. A host with 16 cores may run four VMs of 8 vCPUs each: 32 vCPUs share 16 cores, which is <b>oversubscription</b>. Busy guests then wait, and a guest can read the lost time as steal time. For SMP guests, the hypervisor may co-schedule sibling vCPUs together so they do not spin waiting for each other."
+    }
+   ]
+  },
+  {
+   "h3": "Memory virtualization: two levels of translation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Guest memory has two layers. The guest's own page table maps <b>guest virtual (GV)</b> to <b>guest physical (GP)</b>. The hypervisor's table maps GP to <b>machine (M)</b>, the real RAM frames. The MMU needs one GV→M translation per access."
+    },
+    {
+     "type": "p",
+     "text": "<b>Shadow page tables</b> do this by merging: the hypervisor builds a single GV→M table and points the MMU at it. Guest writes to its page tables are write-protected, so each update traps and the shadow table is rebuilt. That is accurate but costly for workloads that touch page tables often."
+    },
+    {
+     "type": "p",
+     "text": "<b>EPT</b> (Intel Extended Page Tables) and <b>NPT</b> (AMD Nested Page Tables) instead keep two tables and let hardware walk both: the MMU walks the guest table, and for each GP entry it walks the EPT table. A TLB miss needs a walk of the guest table plus an EPT walk for each level of it, so several memory accesses, but no traps. TLB entries are tagged with a virtual-processor or address-space identifier (VPID on Intel, ASID on AMD), so switching vCPUs or VMs need not flush the TLB."
+    },
+    {
+     "type": "formula",
+     "text": "MA = (MFN × page_size) + offset",
+     "where": "MA is the machine address in real RAM; MFN is the machine frame number holding that page; page_size is 4 KB = 0x1000 on x86; offset is the byte position inside the page, from 0 to 0xFFF."
+    },
+    {
+     "type": "p",
+     "text": "Hosts are usually <b>overcommitted</b>: 64 GB of RAM may back VMs configured for 96 GB. Three reclaim paths exist. A <b>balloon driver</b> inside the guest allocates pages, pins them and returns them to the hypervisor, so the guest's own allocator sees less RAM. <b>Page sharing</b> merges identical pages and copies on write. Host swapping pushes guest pages to disk, which is slow. Ballooning is cooperative and needs a driver in the guest; the hypervisor cannot know which guest pages are free."
+    }
+   ]
+  },
+  {
+   "h3": "I/O virtualization: emulation, virtio and passthrough",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In <b>emulation</b> the guest touches a device register at a fixed address, the access traps, and the hypervisor imitates a well-known device such as an Intel e1000 NIC or an IDE disk. Any unmodified guest works, but every I/O is a VM exit, so packet rates stay low."
+    },
+    {
+     "type": "p",
+     "text": "<b>Virtio</b> is para-virtualized I/O. A guest driver and a host backend share a ring of descriptors in guest memory. The guest places a buffer and kicks a doorbell register; the host reads the buffer directly from guest memory. One exit per batch replaces one exit per packet, which is why virtio-net and virtio-blk are the default in most clouds."
+    },
+    {
+     "type": "p",
+     "text": "<b>Direct assignment</b> (passthrough) gives a whole device to one VM. An <b>IOMMU</b> (Intel VT-d or AMD-Vi) translates the device's DMA addresses, so the device can reach only that guest's memory. Speed is near native, but the device cannot be shared."
+    },
+    {
+     "type": "p",
+     "text": "<b>SR-IOV</b> adds sharing without losing speed. A PCIe device exposes one <b>physical function (PF)</b> for control and many <b>virtual functions (VF)</b>, each with its own configuration space and queues. Each VF is passed to a different VM, so sixteen VMs can share one 10 GbE port at near-native speed."
+    },
+    {
+     "type": "p",
+     "text": "Storage and network virtualization as concepts are covered in <a href=\"#storage-and-network-virtualization\">3.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The VMM sits between the guest and the three resources it fakes. Notice that the vCPU is only a time-sliced core, and memory needs either a shadow or an EPT table.",
+  "spec": {
+   "type": "blocks",
+   "aria": "A guest VM connects down to the VMM, which fans out to three resources: a time-sliced vCPU, memory translated by shadow or EPT tables, and I/O that is emulated or passed through.",
+   "direction": "down",
+   "title": "Three virtualized resources",
+   "nodes": [
+    {
+     "id": "guest",
+     "label": "Guest VM",
+     "style": "normal"
+    },
+    {
+     "id": "vmm",
+     "label": "VMM",
+     "style": "accent"
+    },
+    {
+     "id": "cpu",
+     "label": "vCPU",
+     "note": "time-sliced core",
+     "style": "normal"
+    },
+    {
+     "id": "mem",
+     "label": "Memory",
+     "note": "shadow or EPT",
+     "style": "normal"
+    },
+    {
+     "id": "io",
+     "label": "I/O",
+     "note": "emulated or passthrough",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "guest",
+     "to": "vmm",
+     "style": "solid"
+    },
+    {
+     "from": "vmm",
+     "to": "cpu",
+     "style": "solid"
+    },
+    {
+     "from": "vmm",
+     "to": "mem",
+     "style": "solid"
+    },
+    {
+     "from": "vmm",
+     "to": "io",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A guest uses 4 KB pages. Guest virtual page 5 maps to guest physical page 20, and the hypervisor maps guest physical page 20 to machine page 80. Find the machine address that corresponds to guest virtual address offset 0x2F0 inside that page. Give the guest virtual, guest physical and machine addresses.",
+   "steps": [
+    "Page size = 4 KB = 0x1000 bytes, so the low 12 bits of an address are the offset. Offset = 0x2F0, which is less than 0x1000.",
+    "Guest virtual address = GV page × page_size + offset = 5 × 0x1000 + 0x2F0 = 0x5000 + 0x2F0 = 0x52F0.",
+    "Guest physical address = GP page × page_size + offset = 20 × 0x1000 + 0x2F0 = 0x14000 + 0x2F0 = 0x142F0.",
+    "Machine address = machine page × page_size + offset = 80 × 0x1000 + 0x2F0 = 0x50000 + 0x2F0 = 0x502F0.",
+    "The same three values in decimal: 21232, 82672 and 328432. The offset 0x2F0 is unchanged by both translations."
+   ],
+   "answer": "The machine address is 0x502F0, that is 328432 in decimal, reached through guest physical address 0x142F0.",
+   "check": "page_size = 4096\ngv_page = 5\ngp_page = 20\nm_page = 80\noffset = 0x2F0\ngv = gv_page * page_size + offset\ngp = gp_page * page_size + offset\nma = m_page * page_size + offset\nprint(gv)\nprint(gp)\nprint(ma)\n",
+   "values": [
+    21232,
+    82672,
+    328432
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A vCPU is a scheduled thread, not a dedicated core. Four VMs with 8 vCPUs each on a 16-core host do not deliver 32 cores of throughput; they share 16.",
+  "Trap and emulate means the instruction faults into the hypervisor. VT-x and AMD-V make exits rarer and cheaper, but they do not remove them; do not write that hardware assist eliminates traps.",
+  "Shadow page tables keep one merged GV→M table and trap on guest page-table writes. EPT and NPT keep two tables and walk both in hardware. Swapping these descriptions is the commonest mark-loser.",
+  "Passthrough without an IOMMU lets a device DMA into any memory. Always name the IOMMU (Intel VT-d, AMD-Vi) when you explain direct assignment.",
+  "Ballooning is cooperative and needs a driver inside the guest; page sharing by deduplication and host swapping are different reclaim paths."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a vCPU and say where its state lives.",
+   "marks": 2,
+   "a": "A vCPU is a virtual processor presented to a guest, holding its own registers, program counter, flags and interrupt state. On the host it is a thread scheduled on a physical core."
+  },
+  {
+   "level": "understand",
+   "q": "Why does full virtualization need trap and emulate, and what does hardware VT-x change?",
+   "marks": 3,
+   "a": "The guest kernel executes privileged instructions that must not affect the host or other guests, so they must fault into the hypervisor, which emulates the effect. VT-x adds root and non-root modes so the guest runs at ring 0 in non-root mode and only listed events cause a VM exit, making exits rarer and faster."
+  },
+  {
+   "level": "apply",
+   "q": "A guest uses 4 KB pages. Guest virtual page 7 maps to guest physical page 30, and guest physical page 30 maps to machine page 12. Find the machine address for guest virtual address 0x71A0.",
+   "marks": 4,
+   "a": "0x71A0 = page 7, offset 0x1A0. GP address = 30 × 0x1000 + 0x1A0 = 0x1E1A0. Machine address = 12 × 0x1000 + 0x1A0 = 0xC1A0."
+  },
+  {
+   "level": "analyze",
+   "q": "A 16-core host runs four VMs, each configured with 8 vCPUs. Explain what happens when all guests are busy, and name one metric that shows the problem.",
+   "marks": 5,
+   "a": "32 vCPUs share 16 cores, so the host scheduler time-slices them; each guest receives roughly half a core per vCPU and its own scheduler sees runnable threads waiting. Steal time, reported inside the guest, shows the lost CPU time. Oversubscription raises consolidation but breaks any promise of dedicated cores."
+  },
+  {
+   "level": "apply",
+   "q": "A host has 64 GB of RAM but its VMs are configured for 96 GB, with 70 GB actively used. A balloon driver in one VM inflates to 10 GB. What does the host gain and what does the guest lose?",
+   "marks": 4,
+   "a": "The host gains 10 GB of free machine frames for other VMs or for its own use. The guest's allocator now sees 10 GB less RAM, so it may swap or reclaim its own pages, which slows that guest."
+  },
+  {
+   "level": "understand",
+   "q": "Why is virtio faster than an emulated NIC?",
+   "marks": 3,
+   "a": "Emulation traps on every register access and copies each packet through the hypervisor. Virtio places buffers in a shared ring in guest memory and uses a doorbell, so one exit can cover a batch of packets and the host reads guest memory directly."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare direct device assignment with SR-IOV for a cloud host that must serve many tenants.",
+   "marks": 5,
+   "a": "Direct assignment gives one whole device to one VM, near-native speed and DMA confined by the IOMMU, but the device cannot be shared. SR-IOV splits the device into virtual functions, each assignable to a different VM with its own queues, so many tenants share one port at near-native speed. The PF stays with the host for control."
+  }
+ ],
+ "beyond": "Not for the exam. Cloud providers now expose SR-IOV virtual functions directly to tenant instances for line-rate networking, and virtio with vhost-user moves the datapath into user space. Confidential computing goes further: AMD SEV and Intel TDX encrypt guest memory so that the hypervisor itself cannot read it, which changes what a cloud operator can inspect. Nested virtualization lets a VM run its own hypervisor, and live migration of VMs depends on the memory and CPU state described here (see <a href=\"#virtual-clusters-and-virtualized-data-centres\">3.8</a>). Useful search terms: virtio specification, nested paging, IOMMU, memory ballooning, confidential virtual machines.",
+ "check": "page_size = 4096\ngv_page = 5\ngp_page = 20\nm_page = 80\noffset = 0x2F0\nprint(gv_page * page_size + offset)\nprint(gp_page * page_size + offset)\nprint(m_page * page_size + offset)\n"
+}

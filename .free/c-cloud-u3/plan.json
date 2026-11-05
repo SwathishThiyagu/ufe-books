@@ -1,0 +1,634 @@
+{
+ "lead": "This unit explains how one physical machine is made to look like many, and how containers split an operating system instead of a machine. You learn the hypervisor, full and para-virtualization, CPU, memory and I/O handling, storage and network virtualization, Docker, virtual clusters, and Xen, VMware and Hyper-V. After it you can choose a virtualization method for a workload and reason about its cost, isolation and limits.",
+ "about": "The unit moves from the meaning of virtualization to the machinery under it. Chapter 3.1 gives characteristics, benefits and costs. 3.2 classifies techniques by implementation level. 3.3 introduces the hypervisor, and 3.4 compares full and para-virtualization. 3.5 follows the same trap and hypercall idea into CPU, memory and I/O. 3.6 extends it to storage pools and virtual networks. 3.7 contrasts virtual machines with Docker containers, using namespaces and cgroups. 3.8 scales logical hosts into virtual clusters and virtual data centres. 3.9 grounds all of it in Xen, VMware and Hyper-V. Earlier units supply cloud models and networking; later units use these ideas for storage, platforms and security.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Virtualization inserts a software layer that shares one physical machine among isolated virtual machines.",
+   "depth": "Definition; virtualized environment characteristics such as partitioning, isolation, encapsulation and hardware independence; benefits: consolidation, utilisation, elasticity, legacy support; costs: overhead, complexity, licence, security surface. Some syllabi call this characteristics of virtualized environments and pros and cons of virtualization.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One host, three guests",
+    "nodes": [
+     {
+      "id": "host",
+      "label": "Physical host",
+      "style": "normal",
+      "note": "shared resources"
+     },
+     {
+      "id": "vmm",
+      "label": "Hypervisor",
+      "style": "accent"
+     },
+     {
+      "id": "vm1",
+      "label": "VM A",
+      "style": "normal"
+     },
+     {
+      "id": "vm2",
+      "label": "VM B",
+      "style": "normal"
+     },
+     {
+      "id": "vm3",
+      "label": "VM C",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "host",
+      "to": "vmm",
+      "label": "shares",
+      "style": "solid"
+     },
+     {
+      "from": "vmm",
+      "to": "vm1",
+      "label": "allocates",
+      "style": "solid"
+     },
+     {
+      "from": "vmm",
+      "to": "vm2",
+      "label": "allocates",
+      "style": "solid"
+     },
+     {
+      "from": "vmm",
+      "to": "vm3",
+      "label": "allocates",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A host has 16 CPU cores and 64 GB RAM. It runs 5 VMs, each with 2 vCPU and 8 GB RAM. Find allocated vCPU and RAM, remaining capacity, and physical CPU used if each VM averages 20% of its vCPU. Answer: 10 vCPU, 40 GB, 6 cores and 24 GB left; 5×0.4=2 cores, 12.5% of host.",
+   "trap": "Allocated vCPU or RAM is a limit, not reserved physical capacity; overcommit can fail under load.",
+   "prereq": "Unit 1: cloud essentials and service models.",
+   "leave": "Detailed hypervisor types to 3.3; container isolation to 3.7."
+  },
+  {
+   "k": 2,
+   "idea": "Virtualization techniques are classified by the implementation level where the software layer sits.",
+   "depth": "Taxonomy by implementation level: application, library, operating-system, hardware or hypervisor level. Mention resource-based and transparency-based views only briefly. Some syllabi call this taxonomy of virtualization techniques and types of virtualization. Hardware-level splits into full and para in 3.4; OS-level leads to containers in 3.7.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Virtualization",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Application",
+       "style": "normal",
+       "note": "JVM and CLR"
+      },
+      {
+       "label": "Library",
+       "style": "normal",
+       "note": "WINE"
+      },
+      {
+       "label": "OS-level",
+       "style": "normal",
+       "note": "containers"
+      },
+      {
+       "label": "Hardware",
+       "style": "normal",
+       "note": "hypervisor",
+       "children": [
+        {
+         "label": "Full",
+         "style": "normal",
+         "note": "unmodified guest"
+        },
+        {
+         "label": "Para",
+         "style": "normal",
+         "note": "modified guest"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "Classify Xen, Docker, the JVM and WINE by implementation level. Answer: Xen hardware level; Docker OS-level; JVM application-level; WINE library-level.",
+   "trap": "Level is not the same as full or para: full and para are transparency choices inside hardware-level virtualization.",
+   "prereq": "3.1.",
+   "leave": "Hypervisor internals to 3.3; Docker details to 3.7."
+  },
+  {
+   "k": 3,
+   "idea": "A hypervisor, or virtual machine monitor, creates and runs virtual machines on a physical host.",
+   "depth": "Hypervisor role; Type 1 bare-metal and Type 2 hosted; privileged control domain; CPU privilege rings; vCPU scheduling; device emulation. Examples: Xen, ESXi and Hyper-V are Type 1; VirtualBox and Workstation are Type 2. Some syllabi call the hypervisor a virtual machine monitor.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Two hypervisor placements",
+    "nodes": [
+     {
+      "id": "hw",
+      "label": "Hardware",
+      "style": "normal"
+     },
+     {
+      "id": "t1",
+      "label": "Type 1 VMM",
+      "style": "accent",
+      "note": "bare metal"
+     },
+     {
+      "id": "g1",
+      "label": "Guest VM",
+      "style": "normal"
+     },
+     {
+      "id": "hos",
+      "label": "Host OS",
+      "style": "normal"
+     },
+     {
+      "id": "t2",
+      "label": "Type 2 VMM",
+      "style": "live",
+      "note": "hosted"
+     },
+     {
+      "id": "g2",
+      "label": "Guest VM",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "hw",
+      "to": "t1",
+      "style": "solid"
+     },
+     {
+      "from": "t1",
+      "to": "g1",
+      "style": "solid"
+     },
+     {
+      "from": "hw",
+      "to": "hos",
+      "style": "solid"
+     },
+     {
+      "from": "hos",
+      "to": "t2",
+      "style": "solid"
+     },
+     {
+      "from": "t2",
+      "to": "g2",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A laptop has 16 GB RAM. The host OS uses 4 GB and a Type 2 hypervisor uses 1 GB. A VM is configured with 12 GB. Find free RAM before the VM: 16−4−1=11 GB. The VM cannot get its full 12 GB without overcommit or ballooning.",
+   "trap": "A Type 1 hypervisor runs directly on hardware; a Type 2 hypervisor needs a host OS underneath.",
+   "prereq": "3.2.",
+   "leave": "Full and para behaviour to 3.4; secure isolation to Unit 6."
+  },
+  {
+   "k": 4,
+   "idea": "Full virtualization hides the hypervisor from an unmodified guest, while para-virtualization asks a modified guest to cooperate through hypercalls.",
+   "depth": "Full virtualization: binary translation or trap-and-emulate, sensitive instructions, unmodified guest; para-virtualization: modified guest, hypercalls, cooperative interface; hardware-assisted virtualization as support. Trade-offs: compatibility against performance. Some syllabi spell para-virtualization as paravirtualization.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Trap versus hypercall",
+    "nodes": [
+     {
+      "id": "unmod",
+      "label": "Unmodified guest",
+      "style": "normal"
+     },
+     {
+      "id": "trap",
+      "label": "Trap to VMM",
+      "style": "accent"
+     },
+     {
+      "id": "emu",
+      "label": "Emulate instruction",
+      "style": "normal"
+     },
+     {
+      "id": "mod",
+      "label": "Modified guest",
+      "style": "normal"
+     },
+     {
+      "id": "hc",
+      "label": "Hypercall",
+      "style": "live"
+     },
+     {
+      "id": "vmmc",
+      "label": "VMM call",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "unmod",
+      "to": "trap",
+      "style": "solid"
+     },
+     {
+      "from": "trap",
+      "to": "emu",
+      "style": "solid"
+     },
+     {
+      "from": "mod",
+      "to": "hc",
+      "style": "solid"
+     },
+     {
+      "from": "hc",
+      "to": "vmmc",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A workload executes 1,000 privileged operations. Full virtualization traps each one at 2 μs; para-virtualization replaces 800 of them with 1 μs hypercalls and traps 200. Find total times and saving. Full = 1,000×2 = 2,000 μs = 2 ms; para = 800×1 + 200×2 = 1,200 μs = 1.2 ms; saving 0.8 ms, or 40%.",
+   "trap": "Para-virtualization needs a modified guest OS; full virtualization does not. Both still need a hypervisor.",
+   "prereq": "3.3.",
+   "leave": "CPU and memory mechanisms to 3.5; Xen examples to 3.9."
+  },
+  {
+   "k": 5,
+   "idea": "The hypervisor virtualizes CPU, memory and I/O by scheduling vCPUs, translating addresses and steering device access.",
+   "depth": "CPU: vCPU, scheduling, trap and emulate, hardware VT-x and AMD-V. Memory: guest virtual to guest physical to machine address, shadow page tables, EPT and NPT, ballooning, overcommit. I/O: emulation, virtio, direct assignment and SR-IOV. Some syllabi list virtualizing CPUs, full virtualization, para-virtualization and memory virtualization.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Three virtualized resources",
+    "nodes": [
+     {
+      "id": "guest",
+      "label": "Guest VM",
+      "style": "normal"
+     },
+     {
+      "id": "vmm",
+      "label": "VMM",
+      "style": "accent"
+     },
+     {
+      "id": "cpu",
+      "label": "vCPU",
+      "style": "normal",
+      "note": "time-sliced core"
+     },
+     {
+      "id": "mem",
+      "label": "Memory",
+      "style": "normal",
+      "note": "shadow or EPT"
+     },
+     {
+      "id": "io",
+      "label": "I/O",
+      "style": "normal",
+      "note": "emulated or passthrough"
+     }
+    ],
+    "edges": [
+     {
+      "from": "guest",
+      "to": "vmm",
+      "style": "solid"
+     },
+     {
+      "from": "vmm",
+      "to": "cpu",
+      "style": "solid"
+     },
+     {
+      "from": "vmm",
+      "to": "mem",
+      "style": "solid"
+     },
+     {
+      "from": "vmm",
+      "to": "io",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "Guest page size is 4 KB. Guest virtual page 5 maps to guest physical page 20; the hypervisor maps guest physical page 20 to machine page 80. Find the machine address for offset 0x2F0. Answer: 5×0x1000+0x2F0 = 0x52F0; 20×0x1000+0x2F0 = 0x142F0; 80×0x1000+0x2F0 = 0x502F0.",
+   "trap": "A vCPU is a scheduled thread, not a dedicated physical core; memory overcommit needs a reclaim path.",
+   "prereq": "3.3 and 3.4.",
+   "leave": "Storage and network to 3.6; VM migration details to 3.8 and Unit 4."
+  },
+  {
+   "k": 6,
+   "idea": "Storage virtualization pools physical disks behind logical volumes, and network virtualization separates virtual links from physical links.",
+   "depth": "Storage: LUN abstraction, storage pools, thin provisioning, snapshots, RAID. Network: vNICs, virtual switches, VLAN and VXLAN overlays, SDN separation of control and data. Some syllabi call this network and storage virtualization and link it to software-defined networks.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Virtual disk and virtual NIC",
+    "nodes": [
+     {
+      "id": "vm",
+      "label": "VM",
+      "style": "normal"
+     },
+     {
+      "id": "vd",
+      "label": "Virtual disk",
+      "style": "accent"
+     },
+     {
+      "id": "pool",
+      "label": "Storage pool",
+      "style": "normal"
+     },
+     {
+      "id": "disks",
+      "label": "Physical disks",
+      "style": "normal"
+     },
+     {
+      "id": "vnic",
+      "label": "vNIC",
+      "style": "accent"
+     },
+     {
+      "id": "vsw",
+      "label": "Virtual switch",
+      "style": "normal"
+     },
+     {
+      "id": "nic",
+      "label": "Physical NIC",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "vm",
+      "to": "vd",
+      "style": "solid"
+     },
+     {
+      "from": "vd",
+      "to": "pool",
+      "style": "solid"
+     },
+     {
+      "from": "pool",
+      "to": "disks",
+      "style": "solid"
+     },
+     {
+      "from": "vm",
+      "to": "vnic",
+      "style": "solid"
+     },
+     {
+      "from": "vnic",
+      "to": "vsw",
+      "style": "solid"
+     },
+     {
+      "from": "vsw",
+      "to": "nic",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A storage pool has 6 disks of 2 TB in RAID 5. Twelve VMs each get a thin volume of 1.5 TB. Usable = (6−1)×2 = 10 TB; provisioned = 12×1.5 = 18 TB; overprovision ratio = 1.8. At 40% average use the real data is 7.2 TB, so it fits. On the network, 20 VMs each capped at 1 Gb/s share a 10 Gb/s uplink: demand 20 Gb/s, contention 2:1.",
+   "trap": "Thin provisioning promises capacity that may not exist; VLANs isolate traffic but do not encrypt it.",
+   "prereq": "3.1 and 3.5.",
+   "leave": "Distributed file systems to Unit 4; SDN details to Unit 2; encryption to Unit 6."
+  },
+  {
+   "k": 7,
+   "idea": "A virtual machine carries its own guest OS, while a Docker container shares the host kernel and isolates processes with namespaces and cgroups.",
+   "depth": "VM: guest OS per instance, hypervisor, strong isolation, slower start. Docker: shared host kernel, namespaces for isolation, cgroups for limits, image layers, copy-on-write. Use cases and limits. Some syllabi call this Docker containers and containers, namespaces, cgroups.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Guest OS versus shared kernel",
+    "nodes": [
+     {
+      "id": "hw",
+      "label": "Hardware",
+      "style": "normal"
+     },
+     {
+      "id": "hos",
+      "label": "Host OS",
+      "style": "normal",
+      "note": "shared kernel"
+     },
+     {
+      "id": "hyp",
+      "label": "Hypervisor",
+      "style": "accent"
+     },
+     {
+      "id": "gos",
+      "label": "VM guest OS",
+      "style": "normal"
+     },
+     {
+      "id": "vapp",
+      "label": "VM app",
+      "style": "normal"
+     },
+     {
+      "id": "eng",
+      "label": "Container engine",
+      "style": "live"
+     },
+     {
+      "id": "capp",
+      "label": "Container app",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "hw",
+      "to": "hos",
+      "style": "solid"
+     },
+     {
+      "from": "hos",
+      "to": "hyp",
+      "style": "solid"
+     },
+     {
+      "from": "hyp",
+      "to": "gos",
+      "style": "solid"
+     },
+     {
+      "from": "gos",
+      "to": "vapp",
+      "style": "solid"
+     },
+     {
+      "from": "hos",
+      "to": "eng",
+      "style": "solid"
+     },
+     {
+      "from": "eng",
+      "to": "capp",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A VM image has a 2 GB guest OS plus a 500 MB app; 10 such VMs need 25 GB. A container uses a shared 100 MB base plus a 500 MB app per container; 10 containers need 100 MB + 10×500 MB = 5.1 GB. Find the storage saving. Saving = 25−5.1 = 19.9 GB, about 79.6%.",
+   "trap": "Containers share the host kernel; they are not lightweight VMs and do not give the same isolation boundary.",
+   "prereq": "3.1 and 3.3.",
+   "leave": "Kubernetes and orchestration to Unit 5; container security to Unit 6."
+  },
+  {
+   "k": 8,
+   "idea": "A virtual cluster groups VMs into a logical cluster, and a virtual data centre groups compute, storage and network into a tenant view.",
+   "depth": "Virtual cluster as a logical group of VMs; virtual data centre with pooled resources and tenant isolation; resource pools, placement, migration, oversubscription and blast radius. It completes the subject: the listed topics stop at hypervisors, containers and examples. Some syllabi treat this under data-centre virtualization.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Physical DC",
+     "style": "accent",
+     "children": [
+      {
+       "label": "VDC A",
+       "style": "normal",
+       "note": "tenant A",
+       "children": [
+        {
+         "label": "Cluster A1",
+         "style": "normal",
+         "children": [
+          {
+           "label": "VM",
+           "style": "normal"
+          },
+          {
+           "label": "VM",
+           "style": "normal"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "label": "VDC B",
+       "style": "normal",
+       "note": "tenant B",
+       "children": [
+        {
+         "label": "Cluster B1",
+         "style": "normal",
+         "children": [
+          {
+           "label": "VM",
+           "style": "normal"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "A physical data centre has 50 hosts, each 24 cores and 256 GB RAM. A tenant asks for a virtual data centre of 20 hosts, each 16 vCPU and 64 GB. Total physical = 50×24 = 1,200 cores and 50×256 = 12,800 GB. Requested = 20×16 = 320 vCPU and 20×64 = 1,280 GB. CPU use = 320/1,200 = 26.7%; RAM use = 1,280/12,800 = 10%; it fits.",
+   "trap": "A virtual cluster is a logical grouping; it does not guarantee separate physical hosts or failure domains.",
+   "prereq": "3.1 and 3.2.",
+   "leave": "Federated clouds to Unit 4; VM migration mechanics to Unit 4 and 3.9."
+  },
+  {
+   "k": 9,
+   "idea": "Xen, VMware and Hyper-V are real Type 1 hypervisors with different control-domain designs.",
+   "depth": "Xen: Dom0 control domain, DomU guests, paravirtual and HVM modes. VMware ESXi: Type 1 VMkernel, vSphere management. Microsoft Hyper-V: Type 1 microkernel, parent or root partition, child partitions, VMBus. Compare isolation and device paths. Some syllabi name only Xen, VMware and Hyper-V.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Hypervisors",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Xen",
+       "style": "normal",
+       "note": "Dom0 and DomU"
+      },
+      {
+       "label": "VMware ESXi",
+       "style": "normal",
+       "note": "VMkernel"
+      },
+      {
+       "label": "Hyper-V",
+       "style": "normal",
+       "note": "parent and child"
+      }
+     ]
+    }
+   },
+   "example": "A Xen host has 32 cores and 128 GB RAM. Dom0 uses 2 vCPU and 4 GB. Six DomU guests each use 4 vCPU and 8 GB. Find total vCPU and RAM allocated, and remaining. vCPU = 2+6×4 = 26, leaving 6 cores. RAM = 4+6×8 = 52 GB, leaving 76 GB.",
+   "trap": "Xen Dom0 and the Hyper-V parent partition are privileged management domains, not ordinary guest workloads.",
+   "prereq": "3.3 and 3.4.",
+   "leave": "Eucalyptus, OpenStack and EC2 to Unit 5; VM security to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "from what virtualization does to how techniques are classified"
+  ],
+  [
+   2,
+   3,
+   "implementation levels lead to the hypervisor"
+  ],
+  [
+   3,
+   4,
+   "hypervisor behaviour splits into full and para modes"
+  ],
+  [
+   4,
+   5,
+   "trap and hypercall ideas explain CPU, memory and I/O handling"
+  ],
+  [
+   5,
+   6,
+   "device virtualisation extends to storage and network"
+  ],
+  [
+   6,
+   7,
+   "virtual disks and vNICs compare with container isolation"
+  ],
+  [
+   7,
+   8,
+   "VMs and containers scale into virtual clusters"
+  ],
+  [
+   8,
+   9,
+   "real hypervisors build virtualised data centres"
+  ]
+ ]
+}

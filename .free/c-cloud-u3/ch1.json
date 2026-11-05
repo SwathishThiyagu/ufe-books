@@ -1,0 +1,254 @@
+{
+ "lead": "A virtual machine is a computer built in software. Virtualization is the layer that lets many such computers run on one physical server at the same time. Software called the hypervisor creates and runs the VMs, hands out virtual CPUs, memory, disks and network cards, and keeps the guests apart. A bare-metal (Type 1) hypervisor sits directly on the hardware and owns it; a hosted (Type 2) hypervisor runs as a program on top of a normal host OS. Virtualization exists because most servers use a small fraction of their capacity, so one server per application wastes money, power and rack space. Cloud providers use it to rent IaaS instances; enterprises use it to consolidate, test and recover.",
+ "prereq": "You need: <a href=\"#service-models-iaas-paas-saas\">Unit 1 on service models</a>, because a VM is the unit that IaaS rents out.",
+ "sections": [
+  {
+   "h3": "One physical machine, many guests",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Start with one server. It has a fixed number of CPU cores, a fixed amount of RAM, some disks and a network card. Without virtualization, one operating system owns all of it and every application runs inside that one OS. If two applications need different OS versions, or if one crashes the kernel, you buy a second server."
+    },
+    {
+     "type": "p",
+     "text": "Virtualization adds a software layer between the hardware and the operating systems. This layer is the <b>hypervisor</b>, also called the <b>virtual machine monitor</b> (VMM). The hypervisor creates <b>virtual machines</b> (VMs). A VM is a complete computer in software: it has a <b>virtual CPU</b> (vCPU), virtual RAM, a virtual disk and a virtual network card. A normal <b>guest operating system</b> and its applications run inside it."
+    },
+    {
+     "type": "p",
+     "text": "A bare-metal hypervisor owns the real hardware and decides which vCPU runs on which physical core and when, which physical memory pages hold which guest's data, and which guest's disk request reaches the controller. A hosted hypervisor runs as a program on a normal host OS and asks that OS for the same resources. Either way the guest does not see this. It believes it has a private machine. The physical server is the <b>host</b>. Its resources are shared among the guests. That sharing is the point: one host carries the load of many underused servers. Hypervisor designs differ; see <a href=\"#hypervisors-and-virtual-machine-monitors\">3.3</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Four characteristics of a virtualized environment",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Textbooks describe a virtualized environment by four properties."
+    },
+    {
+     "type": "p",
+     "text": "<b>Partitioning.</b> The host's resources are divided into separate slices, one per VM. Each VM is configured with a stated number of vCPUs and a stated amount of RAM. Slices can differ in size and can change later."
+    },
+    {
+     "type": "p",
+     "text": "<b>Isolation.</b> Each VM runs as if alone. A crash, a reboot or a runaway process in one VM does not stop the others. Isolation also separates security domains: code inside VM A cannot normally read VM B's memory. The strength of that separation is the strength of the hypervisor, so see Unit 6 on VM security."
+    },
+    {
+     "type": "p",
+     "text": "<b>Encapsulation.</b> A VM's configuration and disks live in a small set of files: a configuration file and one or more disk images, plus a memory snapshot if one is taken. Those files can be copied, backed up or moved. When a running VM is migrated, its memory pages are transferred separately over the network to the new host."
+    },
+    {
+     "type": "p",
+     "text": "<b>Hardware independence.</b> The guest sees standard virtual hardware, not the exact model of the physical board. An image built on one vendor's host boots on another host with the same CPU architecture."
+    },
+    {
+     "type": "p",
+     "text": "Two formulas describe the sharing:"
+    },
+    {
+     "type": "formula",
+     "text": "Allocated vCPU = Σ vCPU<sub>i</sub> for i = 1 to n",
+     "where": "vCPU<sub>i</sub> is the number of virtual CPUs configured for VM i; n is the number of VMs on the host; the sum is a limit, not reserved cores."
+    },
+    {
+     "type": "formula",
+     "text": "Consolidation ratio = number of VMs ÷ number of hosts",
+     "where": "a ratio of 20:1 means twenty VMs per host on average."
+    }
+   ]
+  },
+  {
+   "h3": "Pros and cons",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>Pros.</b>"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Consolidation: ten old servers, each using a small fraction of its own much larger capacity, become ten VMs on one powerful host, with less power, cooling, rack space and cabling.",
+      "Higher utilisation: the same hardware does more work.",
+      "Elasticity: a new VM is a file copy plus a boot, often under a minute; a template can be cloned to add capacity and deleted later.",
+      "Legacy support: an old application that needs an old OS runs in a VM on new hardware.",
+      "Encapsulation in practice: snapshots, backup and live migration of a running VM become file operations.",
+      "Tenant isolation, which is what makes public IaaS possible."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "<b>Cons.</b>"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Overhead: the hypervisor uses CPU and memory, and I/O passes through an extra layer. A few percent loss is normal; I/O-heavy workloads lose more.",
+      "Complexity: a new layer to configure, patch and monitor, and new skills to hire.",
+      "Licence cost: each guest OS and some per-core software must be licensed, so part of the hardware saving goes to licences.",
+      "Security surface: the hypervisor is a target. A bug that lets code escape a VM, called a VM escape, exposes every guest on the host.",
+      "Not universal: workloads that need hard real-time guarantees, special add-in cards or a specific GPU may virtualize poorly."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Allocated is a limit, not a reservation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When the hypervisor gives a VM 2 vCPU, it does not lock two physical cores for that VM. It records a limit and schedules the VM's vCPUs onto whatever cores are free. RAM is handled similarly, though it is reclaimed less freely; see <a href=\"#virtualization-of-cpu-memory-and-i-o-devices\">3.5</a> for ballooning and address translation."
+    },
+    {
+     "type": "p",
+     "text": "So the sum of allocated vCPU can exceed the number of physical cores. This is <b>overcommit</b>, and it is normal. It works because most VMs are idle most of the time. It fails when many VMs peak together: the host runs short of CPU, every guest slows down, and one busy neighbour spoils the others."
+    },
+    {
+     "type": "p",
+     "text": "The worked example puts numbers on a host of this kind."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One physical host is shared by a hypervisor, which gives each guest its own virtual machine. Notice that no guest touches the hardware directly; every resource passes through the hypervisor.",
+  "spec": {
+   "type": "blocks",
+   "aria": "A physical host feeds a hypervisor, which allocates separate virtual machines A, B and C.",
+   "direction": "down",
+   "title": "One host, three guests",
+   "nodes": [
+    {
+     "id": "host",
+     "label": "Physical host",
+     "note": "shared resources",
+     "style": "normal"
+    },
+    {
+     "id": "vmm",
+     "label": "Hypervisor",
+     "style": "accent"
+    },
+    {
+     "id": "vm1",
+     "label": "VM A",
+     "style": "normal"
+    },
+    {
+     "id": "vm2",
+     "label": "VM B",
+     "style": "normal"
+    },
+    {
+     "id": "vm3",
+     "label": "VM C",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "host",
+     "to": "vmm",
+     "label": "shares",
+     "style": "solid"
+    },
+    {
+     "from": "vmm",
+     "to": "vm1",
+     "label": "allocates",
+     "style": "solid"
+    },
+    {
+     "from": "vmm",
+     "to": "vm2",
+     "label": "allocates",
+     "style": "solid"
+    },
+    {
+     "from": "vmm",
+     "to": "vm3",
+     "label": "allocates",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A physical host has 16 CPU cores and 64 GB of RAM. It runs 5 virtual machines. Each VM is configured with 2 vCPU and 8 GB of RAM. (a) Find the total allocated vCPU and RAM. (b) Find the remaining unallocated vCPU and RAM. (c) Each VM averages 20% of its vCPU. Find the physical cores' worth of CPU used on average and the percentage of the host's cores.",
+   "steps": [
+    "Allocated vCPU = 5 VMs × 2 vCPU per VM = 10 vCPU.",
+    "Allocated RAM = 5 VMs × 8 GB per VM = 40 GB.",
+    "Allocated vCPU limit = 10 vCPU out of a hosting capacity of 16 cores, so the unused vCPU allowance is 16 − 10 = 6 vCPU (assuming one vCPU per core here).",
+    "Unallocated RAM = 64 GB − 40 GB = 24 GB.",
+    "Average CPU per VM = 20% of 2 vCPU = 0.20 × 2 = 0.4 vCPU.",
+    "Total average CPU = 5 × 0.4 = 2.0 vCPU. With perfect packing this is about 2 physical cores of work.",
+    "Fraction of the host = 2.0 ÷ 16 = 0.125 = 12.5%."
+   ],
+   "answer": "The host allocates 10 vCPU and 40 GB, leaving 6 vCPU and 24 GB unallocated; the VMs average 2.0 cores of work, which is 12.5% of the host's 16 cores.",
+   "check": "cores = 16\nram_gb = 64\nn_vms = 5\nvcpu_per_vm = 2\nram_per_vm = 8\navg_frac = 0.20\nalloc_vcpu = n_vms * vcpu_per_vm\nalloc_ram = n_vms * ram_per_vm\nfree_vcpu = cores - alloc_vcpu\nfree_ram = ram_gb - alloc_ram\nused_cores = n_vms * vcpu_per_vm * avg_frac\nhost_pct = used_cores / cores * 100\nprint(alloc_vcpu)\nprint(alloc_ram)\nprint(free_vcpu)\nprint(free_ram)\nprint(used_cores)\nprint(host_pct)",
+   "values": [
+    10,
+    40,
+    6,
+    24,
+    2.0,
+    12.5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Allocated vCPU is a limit, not a reserved core. Write 'configured with 2 vCPU', not 'owns 2 cores'.",
+  "Isolation is not absolute security. A hypervisor bug can allow a VM escape, so the hypervisor must be patched like any OS.",
+  "Overcommit is deliberate, not an arithmetic error. It fails only when many guests peak together, the noisy-neighbour effect.",
+  "A snapshot is not a backup when it sits on the same storage as the VM. Copy it to separate storage.",
+  "Hardware independence is about virtual hardware of the same architecture. An x86 image does not boot on an ARM host without emulation."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a hypervisor and say where it sits.",
+   "marks": 2,
+   "a": "A hypervisor, or virtual machine monitor, is the software layer that creates and runs virtual machines. It sits between the physical hardware and the guest operating systems and allocates CPU, memory and I/O to each guest."
+  },
+  {
+   "level": "remember",
+   "q": "Name the four characteristics of a virtualized environment and give one line on each.",
+   "marks": 3,
+   "a": "Partitioning: resources are divided into per-VM slices. Isolation: faults and security domains are kept apart. Encapsulation: a VM is files, namely configuration, disks and optional memory state. Hardware independence: the guest sees standard virtual hardware, so images move between hosts of the same architecture."
+  },
+  {
+   "level": "understand",
+   "q": "Why does encapsulation make live migration of a running VM possible?",
+   "marks": 3,
+   "a": "The whole VM state, meaning configuration, disk images and memory pages, can be copied to another host while the VM runs. The hypervisor then switches execution there, so the guest sees only a short pause."
+  },
+  {
+   "level": "apply",
+   "q": "A host has 8 cores and 32 GB of RAM and runs 4 VMs, each configured with 2 vCPU and 6 GB. Find the allocated and free vCPU and RAM.",
+   "marks": 4,
+   "a": "Allocated vCPU = 4 × 2 = 8. Allocated RAM = 4 × 6 = 24 GB. Free vCPU = 8 − 8 = 0 vCPU. Free RAM = 32 − 24 = 8 GB."
+  },
+  {
+   "level": "analyze",
+   "q": "A host has 8 physical cores, but its VMs are configured with 24 vCPU in total. Explain why the host may still run normally, and state when this arrangement fails.",
+   "marks": 5,
+   "a": "The 24 vCPU are limits, not reserved cores. The hypervisor schedules them onto 8 cores and relies on most VMs being idle. It fails when the combined busy demand of the VMs approaches the host's real capacity of 8 cores: run queues grow, every guest slows down and latency rises."
+  },
+  {
+   "level": "understand",
+   "q": "State two costs of virtualization and one benefit it gives a cloud provider.",
+   "marks": 3,
+   "a": "Costs: hypervisor overhead on CPU and I/O; extra complexity and patching; per-guest licence costs; a wider security surface. Benefit to a provider: many tenants share one host, so utilisation rises and the cost per rented VM falls."
+  },
+  {
+   "level": "apply",
+   "q": "A fleet runs 120 VMs on 6 hosts. Find the consolidation ratio.",
+   "marks": 2,
+   "a": "Consolidation ratio = 120 ÷ 6 = 20 VMs per host."
+  }
+ ],
+ "beyond": "Not for the exam. Modern CPUs carry hardware virtualization extensions such as Intel VT-x and AMD-V, which trap privileged instructions in hardware, so overhead is smaller than in early software-only designs. SR-IOV lets a VM use a slice of a physical network card directly, which matters for high-throughput workloads. Confidential computing encrypts each VM's memory with a key the host cannot read, and lightweight microVMs such as Firecracker sit behind serverless platforms. Search next for hardware-assisted virtualization, SR-IOV, confidential computing and microVM."
+}
