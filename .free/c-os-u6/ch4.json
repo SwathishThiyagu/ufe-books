@@ -1,0 +1,261 @@
+{
+ "lead": "Operating systems must decide who can use a resource, verify the decision, and later withdraw the permission when it is no longer needed. The mechanisms for granting, checking and revoking rights keep data safe and support policies such as user ownership, security clearance, or job role. They appear in file servers, cloud services, and mobile apps where a user may gain or lose privileges during a session.",
+ "prereq": "You need: the access matrix model and its implementation from <a href=\"#access-matrix-and-its-implementation\">access-matrix-and-its-implementation</a>.",
+ "sections": [
+  {
+   "h3": "Discretionary and mandatory access control",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Discretionary access control (DAC) lets the owner of an object decide which subjects may access it. The owner creates an entry in an access control list (ACL). Mandatory access control (MAC) enforces a system-wide policy based on security labels. Each subject and each object receives a label such as \"confidential\" or \"top‑secret\"."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "DAC: owner‑centric, flexible, common in desktop OS.",
+      "MAC: label‑centric, rigid, used in government and cloud."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "allow_DAC(s, o, op) = (op ∈ ACL(o, s))",
+     "where": "allow_DAC(s, o, op) is true if the ACL for object o grants operation op to subject s."
+    },
+    {
+     "type": "formula",
+     "text": "allow_MAC(s, o, op) = (label(s) ≥ label(o))",
+     "where": "allow_MAC(s, o, op) is true if the security label of subject s dominates the label of object o. The operation op is not consulted in a pure MAC decision."
+    },
+    {
+     "type": "p",
+     "text": "MAC evaluation steps:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "When a request arrives, the kernel reads the object's label.",
+      "It reads the subject's label.",
+      "It compares the labels according to the policy.",
+      "If the comparison succeeds, the request is granted (no ACL lookup)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "DAC evaluation steps:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "When a request arrives, the kernel reads the object's ACL.",
+      "It checks whether the requested operation appears in ACL(o, s).",
+      "If the operation is listed, the request is granted.",
+      "Otherwise, the request is denied."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Role‑based access control and ACLs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Role‑based access control (RBAC) groups permissions into roles such as \"admin\" or \"cashier\". Users are assigned roles, and roles hold the ACL entries. This reduces the number of entries that must be updated when a user changes job."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Role → set of permissions.",
+      "User → set of roles."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "def check(user, file, op):\n    for role in user.roles:\n        if op in role.acl.get(file, []):\n            return True\n    return False",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "When a role is revoked, the system removes the role assignment from the user. Any ACL entries that were generated from that role are no longer effective; in implementations that store role‑derived ACL entries, those entries are removed atomically."
+    }
+   ]
+  },
+  {
+   "h3": "Revocation techniques for capabilities",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A capability is an unforgeable token that combines an object reference with a set of rights. Revocation can be done by invalidating the token or by garbage collecting it after all references disappear."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Invalidation: the kernel marks the capability as revoked; future checks fail.",
+      "Revocation list: the kernel maintains a list of revoked capability identifiers. Any check against a revoked entry fails.",
+      "Versioning: each capability carries a version number; the kernel increments the version when revoking, making old copies invalid."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Reference counting is used for objects, not for capabilities. Objects are freed when their reference count reaches zero."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The revocation request marks the capability entry as revoked.",
+      "All processes that still hold a copy see the revoked flag on next check.",
+      "When no process holds a live reference, the entry is reclaimed."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A common trap is to assume that revocation instantly removes every copy. Distributed systems may still have copies in remote caches until they are garbage collected."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The flow from a user request to revocation and update of the permission data structure.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "aria": "Shows a user sending a request, the access control module deciding, the revocation action, and the updated ACL or capability.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "User",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Access Control Module",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Revoke",
+     "style": "live"
+    },
+    {
+     "id": "d",
+     "label": "Updated ACL/Cap",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "request",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "revoke",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "update",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "User U was assigned the admin role. The admin role gives write permission on files /etc/passwd, /etc/shadow and /var/log/syslog. After a policy change, U loses the admin role. How many ACL entries must be removed from the system? Show the steps.",
+   "steps": [
+    "Identify the set of files that the admin role can write: {/etc/passwd, /etc/shadow, /var/log/syslog}.",
+    "Count the files: 3.",
+    "Each file has one ACL entry for the admin role's write right.",
+    "Therefore, 3 ACL entries are removed."
+   ],
+   "answer": "Three ACL entries are removed.",
+   "check": "print(3)",
+   "values": [
+    3
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int removed = 3;\n    printf(\"%d\\n\", removed);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "file",
+     "removed"
+    ],
+    "rows": [
+     [
+      "/etc/passwd",
+      "1"
+     ],
+     [
+      "/etc/shadow",
+      "1"
+     ],
+     [
+      "/var/log/syslog",
+      "1"
+     ]
+    ]
+   },
+   "output": "3"
+  }
+ ],
+ "traps": [
+  "Assuming revocation instantly deletes all distributed capability copies; remote caches may retain them until garbage collection.",
+  "Confusing an ACL entry (object‑subject pair) with a role; revoking a role removes multiple entries, not just one.",
+  "Using the word \"permission\" for both the right and the ACL entry; the exam expects the count of entries."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does DAC stand for?",
+   "marks": 2,
+   "a": "Discretionary Access Control."
+  },
+  {
+   "level": "remember",
+   "q": "Name the data structure that stores a list of subjects and their rights for a single object.",
+   "marks": 2,
+   "a": "Access Control List (ACL)."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why MAC is preferred in a government classified system.",
+   "marks": 4,
+   "a": "MAC enforces a system‑wide policy based on security labels, preventing owners from granting higher clearance than allowed. This ensures that confidential data cannot be accessed by lower‑level subjects."
+  },
+  {
+   "level": "apply",
+   "q": "A file has ACL entries: (Alice, read), (Bob, write), (admin, write). If the admin role is revoked, list the remaining ACL entries.",
+   "marks": 4,
+   "a": "(Alice, read) and (Bob, write)."
+  },
+  {
+   "level": "apply",
+   "q": "Given a capability with a reference count of 2, what happens after one process releases it?",
+   "marks": 4,
+   "a": "The reference count drops to 1; the capability remains valid until the count reaches zero."
+  },
+  {
+   "level": "analyze",
+   "q": "A distributed file system uses capability tokens for read access. A user’s role is revoked, but a remote cache still holds a copy of the token. Discuss the security risk and a mitigation technique.",
+   "marks": 6,
+   "a": "The stale token can be used to read the file until the cache expires, violating the revocation. Mitigation: include a version number or expiration time in the token and have the server reject tokens with outdated versions."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the overhead of ACL‑based revocation with capability invalidation in a high‑frequency trading system.",
+   "marks": 6,
+   "a": "ACL revocation may require scanning and updating multiple entries, causing latency spikes. Capability invalidation can be done by setting a single revoked flag, offering constant‑time overhead, which is preferable for ultra‑low latency requirements. Capability invalidation is constant‑time locally, but in a distributed system the revocation flag must be communicated to other nodes, which may add latency."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, cloud providers combine RBAC with attribute‑based access control to support dynamic policies. Research explores decentralized revocation using blockchain to guarantee auditability. Emerging curricula add zero‑trust networking, where every access request is continuously verified. Look for papers on capability revocation in microkernel designs and on scalable ACL management in large‑scale storage clusters."
+}

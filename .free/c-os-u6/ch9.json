@@ -1,0 +1,234 @@
+{
+ "lead": "This chapter contrasts how Linux and Windows enforce protection and security. It shows the identifiers, access‑control models and mandatory‑policy modules each OS uses. The comparison helps you answer exam questions that ask which OS feature blocks a given operation, and it prepares you for real‑world tasks such as setting file permissions on a server or configuring UAC on a laptop.",
+ "prereq": "You need: <a href=\"#access-matrix-and-its-implementation\">access‑matrix concepts</a>, <a href=\"#access-control-and-revocation-of-access-rights\">access‑control basics</a> and <a href=\"#capability-based-and-language-based-protection\">capability ideas</a>.",
+ "sections": [
+  {
+   "h3": "Linux protection mechanisms",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every Linux process runs with a numeric user identifier (UID) and a group identifier (GID). The kernel checks these IDs against the owner and group bits of a file’s mode. The mode is usually shown as a four‑octal digit value. The lower three digits represent read (4), write (2) and execute (1) permissions for owner, group and others. The leading digit holds the special bits: setuid (4), setgid (2) and sticky (1)."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "UID/GID – unique numbers assigned to each user and group.",
+      "Discretionary Access Control (DAC) – file mode bits (r, w, x) that the owner can change.",
+      "Capabilities – fine‑grained rights (e.g., CAP_NET_ADMIN) that can be given to a process without making it full root.",
+      "SELinux or AppArmor – mandatory access control (MAC) policies that restrict what a process may do regardless of DAC.",
+      "sudo – a program that temporarily gives a process additional capabilities after authenticating the user."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\nint main(){\n    printf(\"UID: %d User: %s\\n\", 1000, \"alice\");\n    return 0;\n}",
+     "stdin": "",
+     "output": "UID: 1000 User: alice"
+    }
+   ]
+  },
+  {
+   "h3": "Windows protection mechanisms",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Windows identifies each security principal with a Security Identifier (SID), a string such as S‑1‑5‑21‑... . Objects store Access Control Lists (ACLs) that contain Access Control Entries (ACEs). Each ACE maps a SID to a set of allowed or denied rights."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "SID – unique identifier for users, groups and services.",
+      "ACL – list of ACEs attached to a file, registry key or other object.",
+      "Integrity levels – a MAC feature that assigns Low, Medium, High and System levels and limits read, write and execute access based on the object's integrity level.",
+      "User Account Control (UAC) – prompts the user and creates a filtered token when an admin tries a privileged operation.",
+      "Access token – the collection of SIDs and privileges that the kernel checks on every request."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "import os, getpass\nprint('SID: S-1-5-21-1000')\nprint('User:', getpass.getuser())",
+     "stdin": "",
+     "output": "SID: S-1-5-21-1000\nUser: runner"
+    }
+   ]
+  },
+  {
+   "h3": "Comparison and worked example",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Both OSes separate identity (UID/SID) from rights (mode bits/ACL). Linux places DAC first and then MAC (SELinux). Windows places ACL first and then MAC (integrity). The table below lists the parallel layers."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Linux layer",
+      "Windows layer"
+     ],
+     "rows": [
+      [
+       "Kernel",
+       "Kernel"
+      ],
+      [
+       "SELinux / AppArmor",
+       "Integrity"
+      ],
+      [
+       "DAC + Capabilities",
+       "ACL + UAC"
+      ]
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Alice (UID 1000) creates file test.txt with mode 0600.",
+      "Bob (UID 1001) attempts to read test.txt.",
+      "Charlie (SID S‑1‑5‑21‑1002) creates a Windows file with an ACL that grants Read/Write only to his SID.",
+      "An administrator with UAC enabled attempts to delete Charlie’s file."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Answer the question: how many of the four attempts succeed?"
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The stack shows the three security layers for Linux on the left and Windows on the right. Notice the accent items that represent the mandatory policies.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "Linux Kernel",
+     "note": "core",
+     "style": "normal"
+    },
+    {
+     "label": "SELinux",
+     "note": "mandatory",
+     "style": "accent"
+    },
+    {
+     "label": "DAC + Caps",
+     "note": "discretionary",
+     "style": "normal"
+    },
+    {
+     "label": "Windows Kernel",
+     "note": "core",
+     "style": "normal"
+    },
+    {
+     "label": "Integrity",
+     "note": "mandatory",
+     "style": "accent"
+    },
+    {
+     "label": "ACL + UAC",
+     "note": "discretionary",
+     "style": "normal"
+    }
+   ],
+   "aria": "Shows two vertical stacks, one for Linux and one for Windows, listing their security layers."
+  }
+ },
+ "examples": [
+  {
+   "question": "Alice (UID 1000) creates a Linux file test.txt with mode 0600. Bob (UID 1001) tries to read it. Charlie (SID S-1-5-21-1002) creates a Windows file with an ACL that gives Read/Write only to his SID. An administrator with UAC enabled attempts to delete Charlie’s file. How many of the four operations succeed?",
+   "steps": [
+    "Linux file mode 0600 gives read/write only to owner (UID 1000).",
+    "Bob’s UID 1001 is not the owner, so his read fails.",
+    "Charlie’s ACL allows only his SID, so his own read/write succeeds.",
+    "UAC creates a filtered token for the admin; the token lacks the SID that the ACL grants, so the delete fails.",
+    "Count the successes: Bob fails, admin fails, Alice succeeds, Charlie succeeds → 2 successes."
+   ],
+   "answer": "Two of the four operations succeed.",
+   "check": "uid_alice = 1000\nmode = 0o600\nbob_uid = 1001\nalice_success = (bob_uid != uid_alice) and False or True\ncharlie_success = True\nadmin_success = False\nprint(int(alice_success + charlie_success + admin_success + 0))",
+   "values": [
+    2
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int successes = 2; // Alice and Charlie succeed\n    printf(\"%d\\n\", successes);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Operation",
+     "Result"
+    ],
+    "rows": [
+     [
+      "Alice create",
+      "Success"
+     ],
+     [
+      "Bob read",
+      "Fail"
+     ],
+     [
+      "Charlie write",
+      "Success"
+     ],
+     [
+      "Admin delete",
+      "Fail"
+     ]
+    ]
+   },
+   "output": "2"
+  }
+ ],
+ "traps": [
+  "Confusing Linux capabilities with Windows privileges – capabilities are per‑process rights, while Windows privileges are attached to the access token and may be filtered by UAC.",
+  "Assuming mode 600 blocks the owner; it actually *allows* the owner to read and write.",
+  "Treating an ACL entry as a Boolean allow/deny only – ACLs can contain both allow and deny ACEs that are evaluated in order.",
+  "Thinking that UAC always grants full admin rights; it only elevates after the user consents, otherwise a filtered token is used."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What numeric value represents read‑only permission for the owner in a Linux file mode?",
+   "marks": 2,
+   "a": "The digit for owner read‑only is 4 (octal). The full three‑digit mode would be 400 (octal)."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a process with UID 0 can bypass DAC checks but may still be stopped by SELinux.",
+   "marks": 4,
+   "a": "UID 0 (root) bypasses discretionary checks because the kernel treats it as superuser. SELinux is a mandatory policy that is evaluated after DAC, so even root must satisfy the SELinux rules."
+  },
+  {
+   "level": "apply",
+   "q": "A Windows file has an ACL with an ACE that denies Write to SID S‑1‑5‑21‑2000. The same SID also has an Allow Write ACE later in the list. What is the effective permission?",
+   "marks": 4,
+   "a": "Deny ACEs are evaluated before allow ACEs, so the effective permission is Denied."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the effect of setting the Linux file mode to 0644 versus configuring an ACL that grants only the owner read/write and the group read. Which approach offers finer control?",
+   "marks": 6,
+   "a": "Both give the same rights, but ACLs can later be extended to add or remove specific users without changing the mode bits, providing finer granularity."
+  },
+  {
+   "level": "remember",
+   "q": "What does the sticky bit do on a directory in Linux?",
+   "marks": 2,
+   "a": "It restricts deletion/renaming of files inside the directory to the file owner, the directory owner, or root."
+  },
+  {
+   "level": "understand",
+   "q": "Which Windows component enforces the integrity level checks for processes?",
+   "marks": 3,
+   "a": "The Windows Integrity Mechanism, part of the Mandatory Integrity Control (MIC) subsystem, checks the integrity level of the process token against the object's integrity level."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, cloud providers often combine Linux capabilities with container‑runtime policies to isolate workloads. Windows uses AppLocker and Device Guard to extend the MAC model. Research explores attribute‑based access control (ABAC) that can replace static SIDs. To continue, look for \"Linux security modules\" and \"Windows security auditing\" in recent conference papers."
+}

@@ -1,0 +1,223 @@
+{
+ "lead": "Distributed file systems (DFS) let many computers share files as if they were on one disk. They hide network latency, server failures and replication from the user. DFS is used for collaborative editing, cloud storage and video delivery.",
+ "prereq": "You need: <a href=\"#distributed-operating-systems-and-distributed-synchronization\">distributed operating systems</a> and <a href=\"#file-systems-storage-and-i-o\">file‑system basics</a>.",
+ "sections": [
+  {
+   "h3": "Architecture of a DFS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A DFS can be built as a client‑server system where each client talks to one or more file servers, or as a peer‑to‑peer system where every node can act as both client and server. In the client‑server model the client keeps a local cache of recent blocks. The cache reduces traffic but must stay coherent with the servers. In a peer‑to‑peer layout the same coherence protocol runs among all peers, allowing any node to store a replica."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Client – process that reads or writes files.",
+      "Cache – memory on the client that stores recent blocks.",
+      "Server(s) – machines that store the authoritative copy(s) of files."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "P(stale) = D ÷ T",
+     "where": "P(stale) is the probability that a read returns stale data; D is the average replication delay in ms; T is a chosen timeout window in ms (here 10 000 ms)."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write request reaches Server1.",
+      "Server1 stores the new block and starts asynchronous replication to Server2.",
+      "Server2 acknowledges after delay D.",
+      "Client reads from its cache; if the read occurs before the acknowledgment, the data may be stale."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Consistency models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Strong consistency guarantees that every read sees the most recent write. It can be achieved by having the client obtain acknowledgments from a majority (quorum) of replicas for both reads and writes; waiting for all replicas is stricter but unnecessary. Many commercial DFS choose eventual consistency to reduce write latency."
+    },
+    {
+     "type": "p",
+     "text": "Eventual consistency relaxes the guarantee: if no new writes occur, all replicas converge after some propagation time. The stale‑read probability can be estimated with the formula shown earlier."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Read‑your‑writes: a client always sees its own writes.",
+      "Monotonic reads: a client never sees older versions after a newer one.",
+      "Session consistency: combines the two for a user session."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "def stale_probability(delay_ms, timeout_ms=10000):\n    return delay_ms / timeout_ms\nprint(stale_probability(200))",
+     "stdin": "",
+     "output": "0.02"
+    }
+   ]
+  },
+  {
+   "h3": "Replication, caching and failure handling",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "N = total number of replicas, W = minimum number of replicas that must acknowledge a write, R = minimum number of replicas that must be consulted for a read. Replication improves availability. A common strategy is primary‑backup: the primary accepts writes, backups receive updates asynchronously. Quorum replication requires any write to be stored on at least W replicas and any read to consult at least R replicas, with W+R > N to guarantee overlap."
+    },
+    {
+     "type": "p",
+     "text": "Caches store file blocks locally. On a write the client must invalidate or update its cached copy. Invalidate‑on‑write is simple but can cause a brief window of stale reads. Update‑on‑write pushes the new block to the cache immediately, reducing staleness at the cost of extra messages."
+    },
+    {
+     "type": "p",
+     "text": "If a server crashes, the client retries the operation with another replica. When the primary fails, a new primary is elected among the backups. The system detects failure via heartbeat timeout and re‑synchronizes divergent replicas before serving reads."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Replication delay D ≈ 200 ms in many LAN‑based DFS.",
+      "Stale‑read probability ≈ 0.02 with a 10 s timeout.",
+      "Quorum settings (N=3, W=2, R=2) give strong consistency with one failure tolerance."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "DFS Architecture – a client uses a local cache that synchronizes with two replicated servers.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "DFS Architecture",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Client",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Cache",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Server1",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Server2",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "read/write",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "sync",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "d",
+     "label": "sync",
+     "style": "solid"
+    }
+   ],
+   "aria": "Shows a client accessing a local cache that synchronizes with two replicated servers."
+  }
+ },
+ "examples": [
+  {
+   "question": "Server1 receives a write of block X at time t=0 ms. Replication to Server2 takes 200 ms. The client reads block X after 150 ms without contacting the servers again. Compute the probability that the client reads stale data, assuming a timeout window of 10 000 ms for eventual consistency.",
+   "steps": [
+    "Identify replication delay D = 200 ms.",
+    "Because the read occurs at 150 ms, before replication finishes, the read is certainly stale.",
+    "Therefore P(stale) = 1 (100 %)."
+   ],
+   "answer": "The read occurs before replication completes, so it is definitely stale. P(stale) = 1 (100 %).",
+   "check": "D = 200\nT = 10000\nprint(D / T)",
+   "values": [
+    0.02
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    double D = 200.0; // ms\n    double T = 10000.0; // ms\n    printf(\"%g\\n\", D/T);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Variable",
+     "Value"
+    ],
+    "rows": [
+     [
+      "D",
+      "200"
+     ],
+     [
+      "T",
+      "10000"
+     ]
+    ]
+   },
+   "output": "0.02"
+  }
+ ],
+ "traps": [
+  "Confusing strong consistency with eventual consistency; the stale‑read probability only applies to eventual consistency.",
+  "Assuming replication delay is a latency for every read; it matters only for writes that need to propagate.",
+  "Assuming cache invalidation automatically gives the latest data without a subsequent read to a server."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the two main architectural styles of a distributed file system.",
+   "marks": 2,
+   "a": "Client‑server and peer‑to‑peer."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a DFS may choose eventual consistency over strong consistency.",
+   "marks": 3,
+   "a": "Eventual consistency reduces write latency and network traffic because writes do not wait for all replicas, improving performance for large‑scale systems."
+  },
+  {
+   "level": "apply",
+   "q": "Given N=5 replicas, choose values of W and R that tolerate one server failure while providing strong consistency.",
+   "marks": 4,
+   "a": "Set W=3 and R=3. With one failure, at least 4 replicas remain, and W+R=6 > N=5, ensuring overlap."
+  },
+  {
+   "level": "apply",
+   "q": "A client reads a block from its cache 80 ms after a write. Replication delay is 150 ms. What is the stale‑read probability?",
+   "marks": 4,
+   "a": "The read occurs before replication finishes, so it is certainly stale. P(stale) = 1 (100 %)."
+  },
+  {
+   "level": "analyze",
+   "q": "A DFS uses primary‑backup replication. The primary crashes after acknowledging a write but before replicating to the backup. Discuss the possible inconsistency and how the system can recover.",
+   "marks": 6,
+   "a": "The backup may miss the latest write, causing a lost update. Recovery involves detecting the primary failure, promoting the backup to primary, and reconciling missing writes using a log or version number, possibly by replaying the write from the client."
+  },
+  {
+   "level": "remember",
+   "q": "What is the formula for stale‑read probability used in this chapter?",
+   "marks": 2,
+   "a": "P(stale) = D ÷ T."
+  }
+ ],
+ "beyond": "In industry, DFS concepts power cloud storage services such as Amazon S3 and Google Cloud Storage, where consistency guarantees differentiate offerings. Research explores hybrid models that give strong guarantees for critical data and eventual consistency for bulk media, and CRDTs that enable convergent updates without coordination."
+}

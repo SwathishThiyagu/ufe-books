@@ -1,0 +1,209 @@
+{
+ "lead": "A distributed operating system hides the fact that resources live on many computers. It gives the programmer a single system image. The OS must keep state consistent across nodes and let them act together. Synchronization is needed because actions on different machines can interleave. Logical clocks order events without a global timer. Distributed locks let only one node enter a critical section at a time. The ideas are used in cloud services, online gaming, and banking back‑ends that run on many servers.",
+ "prereq": "You need: <a href=\"#unit-3-process-synchronization-and-deadlocks\">Unit 3 Process Synchronization and Deadlocks</a>.",
+ "sections": [
+  {
+   "h3": "Transparency in a distributed OS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A distributed OS appears as a single machine to the user. It hides where code runs, where data lives, and how many copies exist. This is called transparency. Three main types are location, migration, and replication transparency."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Location transparency: a program can refer to a file without knowing which node stores it.",
+      "Migration transparency: a process can move to another node without changing its identifier.",
+      "Replication transparency: several copies of a service exist, but the user sees only one."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Transparency simplifies programming. The programmer writes code as if it runs on one computer. The OS handles message passing, data copying, and failure recovery."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "User issues an I/O request.",
+      "OS locates the nearest replica.",
+      "OS forwards the request to the replica.",
+      "Result is returned as if it came from a local device."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Logical clocks and Lamport timestamps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Physical clocks on different nodes drift. Distributed algorithms use logical clocks to order events. Lamport timestamps are a simple scalar clock."
+    },
+    {
+     "type": "formula",
+     "text": "C_i = max(C_i, C_j) + 1",
+     "where": "C_i is the clock of node i after receiving a message; C_j is the timestamp attached to the received message."
+    },
+    {
+     "type": "p",
+     "text": "When a node sends a message, it increments its clock and attaches the value. The receiver updates its clock using the formula above. This guarantees that if event A happens before event B, then timestamp(A) < timestamp(B)."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Node1 increments its clock to 5 and sends a lock request.",
+      "Node2 receives the request with timestamp 5, updates its clock from 7 to max(7,5)+1 = 8.",
+      "Node2 replies with its new clock value."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Distributed mutex using a reference monitor",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A reference monitor (RM) serialises lock requests. Nodes ask the RM for a lock. The RM grants the lock to the node with the smallest timestamp that is not currently holding the lock."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Node sends request with its Lamport timestamp.",
+      "RM compares timestamps of all pending requests.",
+      "RM sends \"grant\" to the chosen node.",
+      "Node releases lock; RM updates its queue."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\nint main(){\n    printf(\"Lock granted to Node1\\n\");\n    return 0;\n}",
+     "stdin": "",
+     "output": "Lock granted to Node1"
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Message exchange for a distributed lock using a reference monitor. Notice the timestamps attached to the request and the order of grant and release.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Node1",
+    "RM",
+    "Node2"
+   ],
+   "messages": [
+    {
+     "from": "Node1",
+     "to": "RM",
+     "label": "Lock request TS=5",
+     "dashed": false
+    },
+    {
+     "from": "RM",
+     "to": "Node1",
+     "label": "Grant lock",
+     "dashed": false
+    },
+    {
+     "from": "Node2",
+     "to": "RM",
+     "label": "Release lock",
+     "dashed": false
+    }
+   ],
+   "aria": "Shows the exchange of messages for a distributed lock using a reference monitor."
+  }
+ },
+ "examples": [
+  {
+   "question": "Node1 wants a mutex lock. Its Lamport timestamp is 5. Node2 currently holds the lock with timestamp 7. The reference monitor follows the rule: grant to the node with the smallest timestamp that is not holding the lock. Show the steps and state which node receives the lock.",
+   "steps": [
+    "Node1 sends request with TS=5.",
+    "RM compares timestamps: Node1=5, Node2=7 (currently holding).",
+    "Since Node2 holds the lock, RM queues Node1's request.",
+    "Node2 finishes its critical section and releases the lock.",
+    "RM now grants the lock to the queued request with smallest TS, i.e., Node1.",
+    "Node1 receives the lock at logical time max(5,7)+1 = 8."
+   ],
+   "answer": "Node1 receives the lock at logical time 8.",
+   "check": "ts1 = 5\nts2 = 7\n# Node2 releases, lock granted to Node1\ngrant_time = max(ts1, ts2) + 1\nprint(grant_time)",
+   "values": [
+    8
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int ts1 = 5, ts2 = 7;\n    int grant_node = (ts1 < ts2) ? 1 : 2;   // 1 = Node1, 2 = Node2\n    int new_time = (ts1 > ts2 ? ts1 : ts2) + 1; // logical time after lock release\n    printf(\"Lock granted to Node%d at logical time %d\\n\", grant_node, new_time);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Variable",
+     "Value"
+    ],
+    "rows": [
+     [
+      "ts1",
+      "5"
+     ],
+     [
+      "ts2",
+      "7"
+     ],
+     [
+      "grant",
+      "8"
+     ]
+    ]
+   },
+   "output": "Lock granted to Node1 at logical time 8"
+  }
+ ],
+ "traps": [
+  "Assuming a global physical clock exists; Lamport timestamps are logical, not real time.",
+  "Confusing the timestamp of the lock holder with the timestamp of the request; the grant time is computed after release.",
+  "Forgetting to increment the clock after sending a message; the sender must advance its own clock before attaching the timestamp.",
+  "Treating the reference monitor as a centralized lock server only; in practice it can be replicated with consensus."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three main types of transparency in a distributed operating system.",
+   "marks": 2,
+   "a": "Location, migration, and replication transparency."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why Lamport timestamps can order events even if clocks are not synchronized.",
+   "marks": 3,
+   "a": "Each node increments its logical clock before sending a message and updates it on receipt using C_i = max(C_i, C_j) + 1. This rule guarantees that causally related events receive increasing timestamps, providing a partial order."
+  },
+  {
+   "level": "apply",
+   "q": "Node A sends a request with timestamp 4. Node B receives it while its clock is 6. What timestamp does B assign to the receipt event?",
+   "marks": 3,
+   "a": "B updates its clock to max(6,4)+1 = 7 and records 7 for the receipt."
+  },
+  {
+   "level": "apply",
+   "q": "Using the reference‑monitor rule, decide which node gets the lock: Node X (TS=3) requests while Node Y (TS=5) holds it.",
+   "marks": 4,
+   "a": "Node Y releases the lock first. The RM then grants the lock to the waiting request with smallest timestamp, which is Node X. So Node X gets the lock."
+  },
+  {
+   "level": "analyze",
+   "q": "If two nodes send lock requests simultaneously with timestamps 8 and 9, but the network delivers the 9‑timestamp message first, which node will be granted the lock and why?",
+   "marks": 5,
+   "a": "The RM uses timestamps, not arrival order. It will compare 8 and 9, select the smaller timestamp (8), and grant the lock to the node with TS=8. The earlier delivery does not affect the decision."
+  },
+  {
+   "level": "analyze",
+   "q": "Identify a scenario where replication transparency can hide a consistency problem. Briefly describe the issue.",
+   "marks": 4,
+   "a": "If two replicas store different versions of a file due to a network partition, a user reading the file may receive stale data. Replication transparency hides the fact that multiple copies exist, so the inconsistency is not visible to the user."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, distributed synchronization is moving toward consensus protocols such as Raft and Paxos for fault‑tolerant lock services. Research explores hybrid logical clocks that combine physical time with Lamport counters to improve ordering precision. New curricula add container orchestration platforms like Kubernetes, where distributed locks protect shared configuration maps. Searching for \"distributed mutual exclusion algorithms\" and \"conflict‑free replicated data types\" will reveal the latest advances."
+}

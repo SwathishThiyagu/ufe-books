@@ -1,0 +1,201 @@
+{
+ "lead": "Capability‑based protection gives a process a unique, unforgeable token that describes exactly which objects it may use. The token can be passed to other processes, allowing controlled delegation of authority, and can be withdrawn to stop further use. Language‑based protection relies on the programming language to enforce safety, for example by guaranteeing type safety or sandboxing untrusted code. Both approaches limit the damage a buggy or malicious program can cause, and they are used in micro‑kernels, mobile OSes, and secure web browsers.",
+ "prereq": "You need: <a href=\"#access-control-and-revocation-of-access-rights\">Access control and revocation</a> and basic process concepts from earlier units.",
+ "sections": [
+  {
+   "h3": "Capability tokens",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A capability is a data structure that contains the object identifier and the set of allowed operations. The kernel creates the token and stores it in a protected memory area, so a user process cannot modify it. When a process makes a system call, it presents the capability; the kernel checks the embedded rights and grants access if they match."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Unforgeable: only the kernel can issue a valid token.",
+      "Self‑describing: the token itself lists the rights.",
+      "Transferable: a process can give a copy to another process."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "C = (obj_id, ops)",
+     "where": "C is a capability; obj_id uniquely identifies the object; ops is the set of permitted operations such as read, write, execute."
+    }
+   ]
+  },
+  {
+   "h3": "Delegation and revocation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Delegation works by copying a capability and giving the copy to another process. The new holder can use the same rights, but the original holder still retains them unless the kernel revokes the token. Revocation can be implemented by version numbers or by a revocation list that the kernel checks on every access."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Process A receives capability C for object O.",
+      "A copies C and sends the copy to Process B.",
+      "Kernel records that both A and B hold C.",
+      "When revocation is requested, the kernel marks C as invalid for all holders."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\nstruct cap { int obj; int valid; };\nint use_cap(struct cap *c) {\n    if (!c->valid) {\n        printf(\"Capability revoked\\n\");\n        return -1;\n    }\n    printf(\"Access granted to object %d\\n\", c->obj);\n    return 0;\n}\nint main(){\n    struct cap token = { .obj = 42, .valid = 1 };\n    use_cap(&token);          // works\n    token.valid = 0;          // kernel revokes\n    use_cap(&token);          // fails\n    return 0;\n}",
+     "stdin": "",
+     "output": "Access granted to object 42\nCapability revoked"
+    }
+   ]
+  },
+  {
+   "h3": "Language‑based protection",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A language can guarantee that a program never performs illegal memory accesses. Type safety ensures that a variable is used only according to its declared type. Sandboxing runs code in a restricted runtime that blocks system calls not explicitly permitted. The object‑capability model combines both ideas: an object reference is a capability, and the language prevents the creation of forged references."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Java bytecode verifier checks type safety before execution.",
+      "WebAssembly runs in a sandbox that isolates memory.",
+      "Erlang processes communicate by passing messages; while this model can be used to implement capability‑like security, the messages themselves are not capabilities."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Language‑based protection does not remove logical bugs; it only stops a program from breaking the OS or other programs."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Capability delegation from App A to App B and then to Service C. Notice the directed edges labeled “cap”.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "A",
+     "label": "App A",
+     "x": 0,
+     "y": 0,
+     "style": "accent"
+    },
+    {
+     "id": "B",
+     "label": "App B",
+     "x": 2,
+     "y": 0,
+     "style": "normal"
+    },
+    {
+     "id": "C",
+     "label": "Service C",
+     "x": 4,
+     "y": 0,
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "A",
+     "to": "B",
+     "label": "cap",
+     "style": "solid"
+    },
+    {
+     "from": "B",
+     "to": "C",
+     "label": "cap",
+     "style": "solid"
+    }
+   ],
+   "aria": "Shows capability delegation from App A to B and then to Service C."
+  }
+ },
+ "examples": [
+  {
+   "question": "A mobile payment app (App A) receives a payment‑token capability authorizing a payment of ₹500. The vendor app (App B) forwards the token to the bank service (Service C). If the user’s account initially holds ₹2000, compute the new balance after the transaction and state whether the vendor can reuse the token after it is revoked.",
+   "steps": [
+    "Initial balance = 2000 ₹.",
+    "Deduct authorized amount 500 ₹: 2000 ₹ − 500 ₹ = 1500 ₹.",
+    "The kernel revokes the token after the first use.",
+    "Because the token is revoked, any further attempt by the vendor to use it will be denied."
+   ],
+   "answer": "The new balance is 1500 ₹, and the vendor cannot reuse the token after revocation.",
+   "check": "balance = 2000\npayment = 500\nnew_balance = balance - payment\nprint(new_balance)",
+   "values": [
+    1500
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int balance = 2000;\n    int payment = 500;\n    int new_balance = balance - payment;\n    printf(\"%d\\n\", new_balance);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "step",
+     "balance",
+     "new_balance"
+    ],
+    "rows": [
+     [
+      "0",
+      "2000",
+      "1500"
+     ]
+    ]
+   },
+   "output": "1500"
+  }
+ ],
+ "traps": [
+  "Confusing capability revocation with object deletion – revocation stops use of the token but does not delete the underlying object.",
+  "Assuming language‑based protection eliminates all bugs – it only blocks illegal memory or system‑call actions.",
+  "Treating a capability as a password – a capability also carries the rights, not just identity.",
+  "Forgetting that a copied capability must be passed through the kernel; direct memory copy bypasses checks."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What two pieces of information does a capability contain?",
+   "marks": 2,
+   "a": "The object identifier and the set of allowed operations."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a capability is called “unforgeable”.",
+   "marks": 3,
+   "a": "Only the kernel can create a valid token and stores it in protected memory, so a user process cannot fabricate one."
+  },
+  {
+   "level": "apply",
+   "q": "If a process holds a capability for read‑only access, can it write to the object? Justify.",
+   "marks": 4,
+   "a": "No. The operation set in the capability does not include write, so the kernel will deny a write request."
+  },
+  {
+   "level": "apply",
+   "q": "A Java program tries to cast an Object to a String without a check. What language‑based protection stops this?",
+   "marks": 4,
+   "a": "The Java runtime performs a type check and throws a ClassCastException for an illegal cast. The bytecode verifier ensures that such casts are type‑safe before execution, but the actual protection occurs at runtime."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare delegation in capability systems with inheritance in object‑oriented languages. One similarity and one difference.",
+   "marks": 6,
+   "a": "Similarity: both allow reuse of existing rights or behavior. Difference: delegation transfers explicit authority at runtime, while inheritance defines static relationships at compile time."
+  },
+  {
+   "level": "analyze",
+   "q": "A system uses a revocation list checked on every access. What performance impact might this have, and how can it be mitigated?",
+   "marks": 5,
+   "a": "Each access incurs an extra lookup, increasing latency. Mitigation: use version numbers or hierarchical revocation to reduce the number of checks."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, capability ideas appear in secure micro‑kernels like seL4 and in web browsers that sandbox extensions. Research explores hardware support for capabilities to reduce kernel overhead. Modern curricula add object‑capability languages such as Pony and use WebAssembly for sandboxing. Next you may study “formal verification of capability systems” or “hardware‑enforced memory safety”."
+}
