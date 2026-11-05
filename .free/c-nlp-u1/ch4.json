@@ -1,0 +1,314 @@
+{
+ "lead": "Tokenization cuts a raw character stream into the units every later step counts. Before the cut, text is cleaned and normalized, because one word can arrive in several byte-level forms and each form becomes a different token. Normalization fixes character form, sentence segmentation finds sentence boundaries, and tokenization finds word boundaries inside each sentence. Tagging, parsing, search and classification all inherit these decisions, and two systems compare fairly only when they cut text the same way.",
+ "prereq": "You need: <a href=\"#regular-expressions-and-finite-state-automata\">chapter 1.3</a> for the regular expressions and finite-state automata that tokenizer rules are written in.",
+ "sections": [
+  {
+   "h3": "Cleaning and normalization: make the bytes agree",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Text arrives from chat logs, PDFs, web pages and OCR. Four kinds of noise repeat: wrong character encoding, several Unicode spellings of one character, markup and HTML entities, and inconsistent case, spacing, digits and dates. Cleaning removes what is not text. Normalization rewrites the remaining characters into one canonical form. Tokenization then cuts that form."
+    },
+    {
+     "type": "p",
+     "text": "Encoding. A file is a sequence of bytes, and a decoder maps bytes to characters. UTF-8 maps each character to one to four bytes and is the safe default. Decode once, at the door, and keep text as Unicode strings; a wrong decode turns ₹ into mojibake no later rule can repair."
+    },
+    {
+     "type": "p",
+     "text": "Unicode normalization. The accented e in café is either U+00E9 or e followed by U+0301; the full word is c a f plus that accented e. The two strings look identical and compare unequal, so the same word becomes two token types. Unicode defines normal forms: NFC composes, NFD decomposes. Pick NFC and apply it to every string before storing or comparing."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "import unicodedata\n\ns = \"cafe\" + chr(0x301)   # e followed by a combining acute accent\nnfc = unicodedata.normalize(\"NFC\", s)\nprint(len(s))\nprint(len(nfc))\nprint(s == nfc)\n",
+     "stdin": "",
+     "output": "5\n4\nFalse"
+    },
+    {
+     "type": "p",
+     "text": "Case, digits and accents. Case folding merges UPI, Upi and upi into one type and shrinks the vocabulary, but it deletes evidence a named-entity tagger needs, so many pipelines keep a cased copy. Replacing numbers, dates and money amounts with placeholders such as [NUM] or [DATE] shrinks the vocabulary and helps a classifier generalise. Strip accents only when the task does not depend on them."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Decode the bytes as UTF-8 and repair or drop undecodable bytes.",
+      "Remove scripts, styles and HTML tags, then unescape HTML entities into plain characters.",
+      "Normalize every string to NFC.",
+      "Map curly quotes to straight ones, collapse runs of whitespace, delete zero-width characters.",
+      "Choose case folding and placeholders, and record the choice, because every later count depends on it."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Sentence segmentation and its hard cases",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Sentence segmentation places a boundary between the last character of one sentence and the first of the next. Taggers, parsers and translation systems run sentence by sentence, so one bad split damages every stage after it."
+    },
+    {
+     "type": "p",
+     "text": "The naive rule — an end mark (. ! ?) followed by a space begins a new sentence — over-splits abbreviations (Dr. Rao), initials (A. P. J.), ellipsis (...), and splits before a closing quote after a full stop. A second naive rule, any period ends a sentence, breaks on decimals (5.5, ₹1,250.50) and on site names (site.in), because those periods sit inside one number or address."
+    },
+    {
+     "type": "p",
+     "text": "A rule-based splitter protects these cases: a period between two digits does not end a sentence, a single capital letter followed by a period is an initial, and a period inside a known e-mail or URL pattern is shielded. After protection, end mark plus whitespace plus a capital letter ends the sentence."
+    },
+    {
+     "type": "p",
+     "text": "Not every script ends a sentence with a period. Devanagari and several other Indic scripts use the danda । (U+0964). A splitter that searches only for . ! ? returns a whole Hindi paragraph as one sentence. Add each script's own end marks to the rule set."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Tag every character that could be an end mark: . ! ? and the script's own marks.",
+      "Shield the hard cases: abbreviation list, digit-dot-digit, single initial, e-mail and URL patterns.",
+      "Split at a surviving end mark followed by whitespace and a capital letter.",
+      "Attach a closing quote or bracket after the end mark to the sentence it closes."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Word tokenization, and token types versus token counts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Word tokenization cuts a sentence into word-like units. Splitting on whitespace is the simplest rule and the first to break: in Chennai; and now. the punctuation stays glued to the word, and don't becomes one token covering two words."
+    },
+    {
+     "type": "p",
+     "text": "A working rule set does four things. It makes each punctuation mark its own token. It keeps protected patterns whole: money (₹1,250.50), dates (3/5/24), times, e-mail addresses (rao@site.in), URLs, hashtags and each emoji. It splits clitics, so don't becomes do + n't and it's becomes it + 's. It decides about hyphens once — state-of-the-art as one token, four word tokens (state, of, the, art), or seven tokens if each hyphen is also a token — and applies that decision everywhere. Some syllabi call tokenization lexical analysis or segmentation."
+    },
+    {
+     "type": "p",
+     "text": "Hindi, Tamil, Telugu, Bengali and Marathi mark word boundaries with spaces, as English does, so whitespace splitting works at the top level. Two things differ. Words agglutinate, so one whitespace token can carry a stem with case endings (and, in some languages, attached postpositions) that English writes separately; tokens get longer and the type vocabulary grows. And casing rules do nothing, because these scripts have no case. Script-aware tokenizers add the danda and the script's punctuation to the rules."
+    },
+    {
+     "type": "p",
+     "text": "Token types and token counts. A token is one occurrence; a type is one distinct string. In the cat saw the dog there are five tokens and four types. Vocabulary size counts types; corpus size counts tokens. Normalization moves both: case folding merges types, splitting contractions adds tokens."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Raw text flows down through normalization, sentence splitting and tokenization to a flat token list. Normalization sits before every other decision; the output is one token per line.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "From raw text to tokens",
+   "nodes": [
+    {
+     "id": "raw",
+     "label": "Raw text",
+     "note": "chat, PDF, HTML",
+     "style": "normal"
+    },
+    {
+     "id": "norm",
+     "label": "Normalize",
+     "note": "Unicode, case, digits",
+     "style": "accent"
+    },
+    {
+     "id": "seg",
+     "label": "Sentence split",
+     "note": "rules for . ! ?",
+     "style": "normal"
+    },
+    {
+     "id": "tok",
+     "label": "Tokenize",
+     "note": "regex and rules",
+     "style": "normal"
+    },
+    {
+     "id": "out",
+     "label": "Token list",
+     "note": "one per line",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "raw",
+     "to": "norm",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "norm",
+     "to": "seg",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "seg",
+     "to": "tok",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "tok",
+     "to": "out",
+     "label": "",
+     "style": "solid"
+    }
+   ],
+   "aria": "A top to bottom pipeline of raw text, Unicode normalization, sentence splitting, tokenizing, and a final token list, with normalization and the token list picked out."
+  }
+ },
+ "examples": [
+  {
+   "question": "Tokenize and sentence-split: Dr. Rao paid ₹1,250.50 on 3/5/24 in Chennai; email rao@site.in in Chennai. Rules: an abbreviation keeps its period, a currency amount is one token, a date is one token, an e-mail address is one token, every other punctuation mark is its own token. Give the number of sentences, the token list, the token count and the type count.",
+   "steps": [
+    "Sentence split: the period in Dr. is an abbreviation period and the periods in rao@site.in are inside an e-mail pattern, so neither ends a sentence. The semicolon is not an end mark. The final period after Chennai ends the only sentence. Sentences = 1.",
+    "Protect four patterns before splitting: ₹1,250.50, 3/5/24, rao@site.in and Dr. Each is held as one token.",
+    "Split the rest: the semicolon after Chennai and the final full stop each become their own token.",
+    "Token list in order: Dr. | Rao | paid | ₹1,250.50 | on | 3/5/24 | in | Chennai | ; | email | rao@site.in | in | Chennai | .",
+    "Token count: 14 tokens, one occurrence each.",
+    "Type count: in appears twice and Chennai appears twice, so 14 − 2 = 12 types."
+   ],
+   "answer": "One sentence, 14 tokens and 12 token types.",
+   "check": "import re\n\ntext = \"Dr. Rao paid ₹1,250.50 on 3/5/24 in Chennai; email rao@site.in in Chennai.\"\n\npatterns = [\n    r\"₹\\d{1,3}(?:,\\d{3})*\\.\\d{2}\",\n    r\"\\d{1,2}/\\d{1,2}/\\d{2,4}\",\n    r\"[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+\",\n    r\"\\bDr\\.\",\n]\nstore = {}\n\ndef hide(m):\n    k = \"\\x00%d\\x00\" % len(store)\n    store[k] = m.group(0)\n    return k\n\nwork = text\nfor p in patterns:\n    work = re.sub(p, hide, work)\n\ntokens = []\nfor chunk in work.split():\n    for piece in re.findall(r\"\\x00\\d+\\x00|[^\\W_]+|[^\\w\\s]\", chunk):\n        tokens.append(store.get(piece, piece))\n\nprint(len(tokens))\nprint(len(set(tokens)))\n",
+   "values": [
+    14,
+    12
+   ],
+   "dry_run": {
+    "head": [
+     "Position",
+     "Token",
+     "Seen before?"
+    ],
+    "rows": [
+     [
+      "1",
+      "Dr.",
+      "no"
+     ],
+     [
+      "2",
+      "Rao",
+      "no"
+     ],
+     [
+      "3",
+      "paid",
+      "no"
+     ],
+     [
+      "4",
+      "₹1,250.50",
+      "no"
+     ],
+     [
+      "5",
+      "on",
+      "no"
+     ],
+     [
+      "6",
+      "3/5/24",
+      "no"
+     ],
+     [
+      "7",
+      "in",
+      "no"
+     ],
+     [
+      "8",
+      "Chennai",
+      "no"
+     ],
+     [
+      "9",
+      ";",
+      "no"
+     ],
+     [
+      "10",
+      "email",
+      "no"
+     ],
+     [
+      "11",
+      "rao@site.in",
+      "no"
+     ],
+     [
+      "12",
+      "in",
+      "yes"
+     ],
+     [
+      "13",
+      "Chennai",
+      "yes"
+     ],
+     [
+      "14",
+      ".",
+      "no"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Splitting on spaces and calling it tokenization. Whitespace splitting keeps Chennai; and now. as single tokens and hides the punctuation later stages need.",
+  "Deleting all punctuation before sentence splitting. The periods in Dr. and in an e-mail address are the evidence the splitter uses.",
+  "Lowercasing the whole corpus by habit. Case is a feature for named-entity recognition and for finding the sentence start after an end mark, so keep a cased copy.",
+  "Comparing a decomposed string with a composed one. café written as e plus a combining accent is unequal to its NFC form, so normalize both sides before any lookup.",
+  "Reporting a token count as vocabulary size. Vocabulary is counted in types, not tokens, and the two numbers differ as soon as any token repeats."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define token and token type, and give one example where the two counts differ.",
+   "marks": 2,
+   "a": "A token is one occurrence of a unit in the text; a type is one distinct string. In the cat saw the dog there are five tokens but four types, because the occurs twice."
+  },
+  {
+   "level": "understand",
+   "q": "Why does NFC normalization matter before two texts are compared?",
+   "marks": 3,
+   "a": "The same visible word can be stored as one code point or as a base letter plus a combining accent, and those strings compare unequal. NFC rewrites both to the composed form, so equality tests and dictionary lookups work."
+  },
+  {
+   "level": "apply",
+   "q": "Tokenize: It's 5.5 km to Chennai; don't be late. Rules: split every punctuation mark, split clitics, keep a decimal number whole.",
+   "marks": 4,
+   "a": "It | 's | 5.5 | km | to | Chennai | ; | do | n't | be | late | . giving 12 tokens. It's splits into It + 's, don't into do + n't, 5.5 stays whole, ; and . stand alone."
+  },
+  {
+   "level": "apply",
+   "q": "How many sentences are in: Dr. Rao paid ₹500. He left.",
+   "marks": 3,
+   "a": "Two. The period in Dr. is an abbreviation period and does not end a sentence. The period after ₹500 does, because it is followed by a space and a capital letter."
+  },
+  {
+   "level": "analyze",
+   "q": "A pipeline lowercases the text and deletes all punctuation before sentence splitting. State two things that go wrong.",
+   "marks": 5,
+   "a": "Deleting punctuation removes the end marks the splitter needs, so the text becomes one sentence. Lowercasing removes the capital letter that confirms a new sentence after an end mark. The boundary becomes undecidable from the text."
+  },
+  {
+   "level": "understand",
+   "q": "Why does whitespace tokenization work better for Hindi than for Chinese?",
+   "marks": 3,
+   "a": "Hindi writes spaces between words as English does, so whitespace already marks most boundaries. Chinese is written without spaces, so every word boundary must be found by a dictionary or a model."
+  },
+  {
+   "level": "analyze",
+   "q": "A tokenizer uses the e-mail pattern \\S+@\\S+. Why can that change the token count when the address ends a sentence?",
+   "marks": 4,
+   "a": "The pattern matches the full stop after the address, so rao@site.in. becomes one token. The separate sentence-final period token disappears; the character remains inside the e-mail token, so the token count is one less than expected."
+  }
+ ],
+ "beyond": "Not for the exam. Modern neural models use subword units learned by byte-pair encoding, WordPiece or SentencePiece, which keep frequent words whole and split rare ones into pieces. This removes the unknown-word problem and fixes the vocabulary size in advance. Indic languages gain most, because one long agglutinated word rebuilds from a few reusable pieces. Everything here still runs first: decode, normalize to NFC, split sentences."
+}

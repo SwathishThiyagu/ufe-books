@@ -1,0 +1,599 @@
+{
+ "lead": "This unit is about everything that happens to text before a model sees it: splitting it into tokens, cleaning it, chopping words down to stems or lemmas, and describing how words are built. After this unit you can write a tokenizer, a stemmer and a spelling corrector by hand, draw a finite-state automaton and a transducer, and build a small corpus of your own from web pages.",
+ "about": "This unit builds the lexical floor of NLP: the work that happens before any model sees text. Chapter 1.1 sets out where NLP came from, what it is used for, and why text is hard. Chapter 1.2 splits language into levels so every later topic has a place to sit. Chapter 1.3 gives the matching tool, regular expressions and finite-state automata, that 1.4 uses to cut raw text into tokens and normalize it. Chapter 1.5 shrinks the token list with stemming, lemmatization and stop-word removal. Chapter 1.6 goes inside words with morphology and finite-state transducers, and 1.7 reuses those word forms for spelling correction with minimum edit distance. Chapter 1.8, taught in only a few universities, shows how to gather real text into a corpus.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "NLP turns human text into structure a computer can act on, and its short history is a move from hand-written rules, to counts from corpora, to learned representations.",
+   "depth": "Define NLP and separate understanding (NLU) from generation (NLG); some syllabi use only the single word NLP. Cover the three eras at survey level: rule-based or symbolic (hand-written grammar and dictionaries), statistical (probabilities learned from corpora), neural (vectors and pretrained models). List applications with one line each: spam filtering, machine translation, sentiment on product reviews, search, chatbots for banking and rail enquiry, voice assistants, résumé screening. Cover challenges: ambiguity (lexical, syntactic, semantic, pragmatic), creativity and novel words, code-mixing such as Hinglish, spelling variation in social media, rich morphology and free word order in Indian languages, scarcity of labelled data, and evaluation. One paragraph per challenge, no formulas.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Three eras of NLP",
+    "nodes": [
+     {
+      "id": "r",
+      "label": "Rules era",
+      "note": "hand-written grammar",
+      "style": "muted"
+     },
+     {
+      "id": "s",
+      "label": "Statistical era",
+      "note": "counts from corpora",
+      "style": "normal"
+     },
+     {
+      "id": "n",
+      "label": "Neural era",
+      "note": "learned vectors",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "r",
+      "to": "s",
+      "label": "corpora",
+      "style": "solid"
+     },
+     {
+      "from": "s",
+      "to": "n",
+      "label": "deep nets",
+      "style": "solid"
+     }
+    ],
+    "aria": "Three boxes left to right labelled rules era, statistical era and neural era, with the neural era box highlighted as today's dominant approach."
+   },
+   "example": "Question: name the type of ambiguity in each sentence. (a) \"He sat by the bank.\" (b) \"Visiting relatives can be troublesome.\" (c) \"Can you pass the salt?\" (d) \"She saw the man with the binoculars.\" Answer: (a) lexical, because bank has a river sense and a money sense. (b) syntactic, because the phrase visiting relatives can be a subject or a modifier. (c) pragmatic, because the form is a question about ability but the use is a request. (d) syntactic attachment, because the phrase with the binoculars can attach to saw or to the man.",
+   "trap": "Writing that NLP is only machine translation, or that it began with deep learning. Also mixing up lexical ambiguity (one word, two senses) with syntactic ambiguity (one string, two structures).",
+   "prereq": "",
+   "leave": "Word-sequence probability and n-gram models go to Unit 2. Grammars and parsers go to Unit 3. Meaning, WordNet and word sense disambiguation go to Unit 4. Embeddings go to Unit 5."
+  },
+  {
+   "k": 2,
+   "idea": "Language is analysed in layers, each with its own unit and its own kind of ambiguity, and NLP systems are built layer by layer.",
+   "depth": "Define each level, its unit and the question it answers: phonetics and phonology (speech sounds), morphology (morphemes, word structure), syntax (words grouped into phrases and sentences, word order), semantics (literal meaning of words and sentences), pragmatics and discourse (meaning in context, speaker intent, speech acts, implicature). Give the same sentence read at every level. Some syllabi call this the levels of linguistic analysis or the building blocks of language. Show that higher levels depend on lower ones and that most NLP errors come from a wrong decision at a lower level. Keep parsing and meaning formalisms out; this chapter only names the layers.",
+   "figure": {
+    "type": "stack",
+    "pyramid": true,
+    "items": [
+     {
+      "label": "Pragmatics",
+      "note": "intent, context",
+      "style": "accent"
+     },
+     {
+      "label": "Semantics",
+      "note": "literal meaning",
+      "style": "normal"
+     },
+     {
+      "label": "Syntax",
+      "note": "phrase structure",
+      "style": "normal"
+     },
+     {
+      "label": "Morphology",
+      "note": "word parts",
+      "style": "normal"
+     },
+     {
+      "label": "Phonology",
+      "note": "speech sounds",
+      "style": "muted"
+     }
+    ],
+    "side": {
+     "top": "context",
+     "bottom": "sound"
+    },
+    "aria": "A five-layer pyramid from phonology at the base up to pragmatics at the top, showing that each higher level of language analysis builds on the one below."
+   },
+   "example": "Question: annotate the sentence \"Ravi paid the bill at the bank near Anna Salai\" at each level. Answer: phonology, the sounds of the words, for example the two different pronunciations of the article. Morphology, pay + -ed is a past-tense suffix on a verb stem; near is a single free morpheme. Syntax, subject Ravi, verb paid, object the bill, then a prepositional phrase at the bank and a second phrase near Anna Salai inside it. Semantics, bill means an amount owed and bank means a financial building; the other senses of bank do not fit. Pragmatics, the sentence is a report of a past event, used to inform the listener, and the listener is expected to know which bank is meant.",
+   "trap": "Putting morphology and syntax in the wrong order, or calling word-internal structure syntax. Also treating pragmatics as only politeness when it covers intent, context and implied meaning.",
+   "prereq": "Chapter 1.1 for the applications that each level serves.",
+   "leave": "Speech production and phonetics detail go to Unit 7. Formal grammars and parsing go to Unit 3. Word senses, discourse and coreference go to Unit 4."
+  },
+  {
+   "k": 3,
+   "idea": "A regular expression is a compact pattern for a set of strings, and every such pattern has an equivalent finite-state automaton that accepts or rejects a string in one left-to-right pass.",
+   "depth": "Cover the operators: literal characters, concatenation, union with |, Kleene star *, plus +, optional ?, character class [a-z], negation [^0-9], anchors ^ and $, any character, grouping and escaping. Define the language of a pattern as a set of strings. Build a nondeterministic automaton from a pattern by the standard construction: one state per operator, epsilon jumps for union and star. Convert to a deterministic automaton by subset construction, then trace strings. State clearly what automata cannot do: match aⁿbⁿ, because a finite machine cannot count without bound, which is why grammars come later. Mention that a finite-state transducer is the same machine with output on each arc, but leave it to chapter 1.6.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "q0",
+      "label": "q0",
+      "x": 0,
+      "y": 0,
+      "note": "start",
+      "style": "accent"
+     },
+     {
+      "id": "q1",
+      "label": "q1",
+      "x": 1,
+      "y": 0,
+      "note": "",
+      "style": "normal"
+     },
+     {
+      "id": "q2",
+      "label": "q2",
+      "x": 2,
+      "y": 0,
+      "note": "",
+      "style": "normal"
+     },
+     {
+      "id": "q3",
+      "label": "q3",
+      "x": 3,
+      "y": 0,
+      "note": "",
+      "style": "normal"
+     },
+     {
+      "id": "q4",
+      "label": "q4",
+      "x": 4,
+      "y": 0,
+      "note": "final",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "q0",
+      "to": "q1",
+      "label": "b",
+      "style": "solid"
+     },
+     {
+      "from": "q1",
+      "to": "q2",
+      "label": "a",
+      "style": "solid"
+     },
+     {
+      "from": "q2",
+      "to": "q3",
+      "label": "a",
+      "style": "solid"
+     },
+     {
+      "from": "q3",
+      "to": "q3",
+      "label": "a",
+      "style": "solid"
+     },
+     {
+      "from": "q3",
+      "to": "q4",
+      "label": "!",
+      "style": "solid"
+     }
+    ],
+    "aria": "A five-state deterministic automaton for the pattern baa+! that moves from the start state on b, then a, then a, loops on further a, and reaches the final state on the exclamation mark."
+   },
+   "example": "Question: write a regular expression for the sheep language, where a word is b, then at least two a, then an exclamation mark, and draw a deterministic automaton for it. Check the strings baa! and ba!. Answer: the pattern is ^baa+!$, because the plus means one or more copies of the letter just before it, so the shortest match is baa!. Read the table: from q0 on b go to q1, on a go to q2, on a go to q3, on a stay at q3, on ! go to q4, which is final, so baa! is accepted and baaa! is accepted. For ba! the machine reaches q2 after two symbols and has no ! arc there, so it dies and ba! is rejected.",
+   "trap": "Forgetting that * matches zero repetitions, so ab* also matches a. Also assuming a pattern matches the whole string when it only needs to match part of it, and expecting regular expressions to match balanced brackets.",
+   "prereq": "Chapter 1.2 for where word-level and sentence-level structure sits; basic strings and sets.",
+   "leave": "Probability over symbol sequences and n-gram models go to Unit 2. Context-free grammars and parsing, which can count, go to Unit 3. Using patterns inside a tokenizer is chapter 1.4."
+  },
+  {
+   "k": 4,
+   "idea": "Tokenization cuts a raw character stream into the units the rest of the pipeline counts, and the answer depends on the normalization decisions made just before it.",
+   "depth": "Start from why raw text is messy: encodings, Unicode variants of the same character, HTML entities, curly quotes, mixed case, missing spaces. Cover normalization: Unicode normalization, case folding, digit and date rewriting, accent handling, removing markup. Cover sentence segmentation and the hard cases: abbreviations such as Dr. and etc., decimal points, initials, ellipsis. Cover word tokenization: whitespace splitting and why it fails, separating punctuation, clitics such as don't to do and n't, hyphens, currency amounts, dates, URLs, e-mail addresses, hashtags, emoji. Note that Indian languages use spaces like English but carry long agglutinated words, and some scripts need a script-aware rule set. Some syllabi call tokenization lexical analysis or segmentation. Close with a token-type versus token-count distinction, since vocabulary size depends on it.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "From raw text to tokens",
+    "nodes": [
+     {
+      "id": "raw",
+      "label": "Raw text",
+      "note": "chat, PDF, HTML",
+      "style": "normal"
+     },
+     {
+      "id": "norm",
+      "label": "Normalize",
+      "note": "Unicode, case, digits",
+      "style": "accent"
+     },
+     {
+      "id": "seg",
+      "label": "Sentence split",
+      "note": "rules for . ! ?",
+      "style": "normal"
+     },
+     {
+      "id": "tok",
+      "label": "Tokenize",
+      "note": "regex and rules",
+      "style": "normal"
+     },
+     {
+      "id": "out",
+      "label": "Token list",
+      "note": "one per line",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "raw",
+      "to": "norm",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "norm",
+      "to": "seg",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "seg",
+      "to": "tok",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "tok",
+      "to": "out",
+      "label": "",
+      "style": "solid"
+     }
+    ],
+    "aria": "A top to bottom pipeline of raw text, Unicode normalization, sentence splitting, tokenizing, and a final token list, with normalization and the token list picked out."
+   },
+   "example": "Question: tokenize and sentence-split the line \"Dr. Rao paid ₹1,250.50 on 3/5/24; email rao@site.in.\" Use these rules: keep abbreviation periods, keep a currency amount as one token, keep a date as one token, keep an e-mail address as one token, split other punctuation. Answer: it is one sentence, because the periods inside Dr. and the e-mail address do not end a sentence and the last period does. The tokens in order are: Dr. | Rao | paid | ₹1,250.50 | on | 3/5/24 | ; | email | rao@site.in | . which is 10 tokens. The count of distinct token types is also 10 here, because no token repeats.",
+   "trap": "Splitting on spaces and calling that tokenization, and deleting all punctuation before sentence splitting, which loses the very clues sentence splitting needs. Lowercasing everything also destroys the evidence a named-entity tagger needs.",
+   "prereq": "Chapter 1.3 for the patterns and automata that tokenizer rules are written in.",
+   "leave": "N-grams and their probabilities go to Unit 2. Stemming, lemmatization and stop words are chapter 1.5. Bag-of-words and TF-IDF go to Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "Stemming strips endings with fixed rules, lemmatization returns the dictionary base form using morphology, and stop-word removal drops very frequent tokens that carry little topic information.",
+   "depth": "Define token, word form, stem and lemma. Cover stemming: rule-based suffix stripping as in the Porter stemmer, with the idea of a measure of how many vowel-consonant sequences a stem has, and one or two representative rules such as ies to i and removal of a final s. Name Lovins and Lancaster stemmers in one line each. Cover lemmatization: it needs part of speech and a lexicon or morphological analyser, so studies becomes study only if it is read as a verb or plural noun. Give a table of word, stem and lemma side by side. Define over-stemming (two different words collapse) and under-stemming. Cover stop words: list length, why the list is domain dependent, why negation words must stay for sentiment analysis. End with the effect on vocabulary size and on downstream accuracy.",
+   "figure": {
+    "type": "array",
+    "title": "Five words seen four ways",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "Word",
+      "cells": [
+       "studies",
+       "better",
+       "the",
+       "was",
+       "happily"
+      ]
+     },
+     {
+      "label": "Stop word?",
+      "cells": [
+       "no",
+       "no",
+       "yes",
+       "yes",
+       "no"
+      ],
+      "marks": {
+       "2": "accent"
+      }
+     },
+     {
+      "label": "Stem",
+      "cells": [
+       "studi",
+       "better",
+       "the",
+       "wa",
+       "happili"
+      ],
+      "marks": {
+       "1": "live"
+      }
+     },
+     {
+      "label": "Lemma",
+      "cells": [
+       "study",
+       "good",
+       "the",
+       "be",
+       "happily"
+      ]
+     }
+    ],
+    "aria": "A four-row table listing five words with their stop-word status, rule-based stem and dictionary lemma, with the dropped stop word the and the over-stemmed form studi marked."
+   },
+   "example": "Question: for each of studies, better, the, was, happily give the stop-word decision, the Porter stem and the lemma. Answer: studies is not a stop word, stems to studi, lemma study. better is not a stop word, stems to better unchanged, lemma good because it is the comparative of good. the is a stop word and is deleted, stem the, lemma the. was is a stop word in most lists, stems to wa because a final s is removed, lemma be. happily is not a stop word, stems to happili because y becomes i, lemma happily. Note that studi and wa are not English words, which is the price of stemming.",
+   "trap": "Treating a stem as a real word to print to a user, and deleting not, no and never before sentiment analysis, which flips the meaning of a review. Also assuming lemmatization can run without a part of speech.",
+   "prereq": "Chapter 1.4 for the token list this chapter reduces.",
+   "leave": "Morphological rules and their implementation as transducers are chapter 1.6. WordNet synsets, hypernyms and word senses go to Unit 4. The effect of reduced vocabulary on classifiers goes to Unit 5."
+  },
+  {
+   "k": 6,
+   "idea": "Morphology explains how words are built from morphemes, and a finite-state transducer compiles those rules into a two-tape machine that maps between a surface word and its lemma plus features in both directions.",
+   "depth": "Define morpheme, root, stem and affix, and separate free from bound morphemes. Cover prefix, suffix, infix and circumfix, and the difference between inflection (same lexeme, grammatical change such as plural or tense) and derivation (new lexeme, as in nation to national), plus compounding. Cover English morphology: the regular plural, past tense, -ing forms, spelling changes such as y to ies and e-drop, and irregular forms kept in a lexicon. Cover morphological typology in one paragraph each: isolating, agglutinative, fusional, polysynthetic. Cover the diversity of Indian languages: Dravidian languages such as Tamil and Kannada are agglutinative with long suffix chains for case, number and person; Hindi is more fusional and uses postpositions; Sanskrit has sandhi and rich inflection; compounding is common in all of them. Show a small paradigm table. Then build transducers: two tapes, one path per word, a lexicon transducer for stems and a rule transducer for spelling changes, and composition of the two. End with analysis versus generation, ambiguity in analysis, and a short note on automatic morphology learning from an unannotated corpus, which only a few universities teach.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "q0",
+      "label": "q0",
+      "x": 0,
+      "y": 1,
+      "note": "start",
+      "style": "accent"
+     },
+     {
+      "id": "q1",
+      "label": "q1",
+      "x": 1,
+      "y": 2,
+      "note": "",
+      "style": "normal"
+     },
+     {
+      "id": "q3",
+      "label": "q3",
+      "x": 1,
+      "y": 0,
+      "note": "",
+      "style": "normal"
+     },
+     {
+      "id": "q2",
+      "label": "q2",
+      "x": 2,
+      "y": 1,
+      "note": "final",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "q0",
+      "to": "q1",
+      "label": "cat:cat",
+      "style": "solid"
+     },
+     {
+      "from": "q1",
+      "to": "q2",
+      "label": "ε:s",
+      "style": "solid"
+     },
+     {
+      "from": "q0",
+      "to": "q3",
+      "label": "fox:fox",
+      "style": "solid"
+     },
+     {
+      "from": "q3",
+      "to": "q2",
+      "label": "ε:es",
+      "style": "solid"
+     },
+     {
+      "from": "q0",
+      "to": "q2",
+      "label": "goose:geese",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A transducer with one start state and one final state, three paths for cat to cats, fox to foxes and goose to geese, each arc labelled with the input string and the output string."
+   },
+   "example": "Question: build a finite-state transducer that maps the singulars cat, fox, goose to their plurals, and use it to generate the plural of fox and to analyse cats. Answer: put the irregular goose to geese on a single arc from the start state to the final state. For the regular words take the stem unchanged first: cat on the upper tape gives cat on the lower tape, then an arc that reads the empty string and writes s. For fox take the stem arc, then an arc that reads empty and writes es, which gives foxes rather than foxs. Generating fox follows the middle path and outputs foxes. Analysing cats runs the same machine in reverse, reaches the final state and returns cat plus the feature plural.",
+   "trap": "Calling every affix inflection, or applying English suffix rules to Tamil or Hindi words. Also forgetting that a transducer runs in both directions, so the same machine is an analyser and a generator.",
+   "prereq": "Chapter 1.3 for finite-state machines, and chapter 1.5 for the lemma this chapter builds from stems.",
+   "leave": "Part-of-speech tagsets and hidden Markov model tagging go to Unit 2. Sandhi and speech sounds go to Unit 7. WordNet relations and word senses go to Unit 4."
+  },
+  {
+   "k": 7,
+   "idea": "Minimum edit distance is the cheapest sequence of single-character insertions, deletions and substitutions that turns one string into another, and it is the core of spelling correction and word alignment.",
+   "depth": "Define the three edit operations and their costs, normally 1 each, and the resulting distance, also called Levenshtein distance; mention in one line that a transposition operation gives Damerau distance. Give the dynamic-programming recurrence on prefixes and fill it in a table, then backtrace to read the alignment. Cover the properties: distance to itself is zero, symmetry, triangle inequality. Cover applications: correcting non-word errors by generating candidates at distance 1 and 2 and ranking them, real-word errors such as there and their that need context, confusion sets and typo probability, and use of edit distance to score machine translation and speech output. Keep the probabilistic scoring to one line and hand the detail to Unit 2. Complexity as a table of size length times length.",
+   "figure": {
+    "type": "array",
+    "title": "Edit distance table, cat to cart",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "empty",
+      "cells": [
+       "0",
+       "1",
+       "2",
+       "3",
+       "4"
+      ]
+     },
+     {
+      "label": "c",
+      "cells": [
+       "1",
+       "0",
+       "1",
+       "2",
+       "3"
+      ]
+     },
+     {
+      "label": "a",
+      "cells": [
+       "2",
+       "2",
+       "0",
+       "1",
+       "2"
+      ]
+     },
+     {
+      "label": "t",
+      "cells": [
+       "3",
+       "3",
+       "3",
+       "1",
+       "1"
+      ],
+      "marks": {
+       "4": "accent"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 3,
+      "cell": 4,
+      "label": "answer"
+     }
+    ],
+    "aria": "A dynamic programming table with source prefixes cat down the rows and target prefixes cart across the columns, whose bottom right cell holds the answer 1 under the pointer."
+   },
+   "example": "Question: compute the minimum edit distance from cat to cart, and give one alignment. Answer: fill the first row as 0 1 2 3 4 and the first column as 0 1 2 3. For each inner cell take the smallest of the cell above plus one (a deletion), the cell on the left plus one (an insertion), and the diagonal plus one (a substitution), or plus zero when the two characters are equal. The equal pair c and c gives 0 at row c, column c, and the equal pair t and t keeps the value 1 from above. The bottom right cell is 1, so the distance is 1. Reading back: c to c copy, a to a copy, insert r, t to t copy, giving the alignment c a t to c a r t.",
+   "trap": "Copying the diagonal value with cost 1 when the characters match; the cost must be 0 then. Also reporting the number of cells on the backtrace as the distance instead of the sum of the operations.",
+   "prereq": "Chapter 1.4 for tokens as words and chapter 1.5 for word forms that a corrector works on.",
+   "leave": "Scoring candidate corrections with an n-gram language model goes to Unit 2. Evaluating translation output with edit distance is only mentioned here; machine translation is Unit 6."
+  },
+  {
+   "k": 8,
+   "idea": "A corpus is a fixed, cleaned, documented collection of real text, gathered so that every later model is trained and compared on the same data.",
+   "depth": "Only a few universities teach this. Keep it short. Cover sources: plain text, HTML pages, PDF documents, subtitles, newspaper archives, government portals, Wikipedia dumps, public web crawls, and transcripts of speech. Cover the legal and polite side: copyright, robots.txt, terms of service, request rate and delay, personal data, and why an institutional approval may be needed. Cover the steps: pick URLs, fetch, parse the HTML, select the content elements, extract text, decode correctly, drop boilerplate, remove near-duplicates by shingles or hashes, filter by language, hold out a small sample by hand, then split into train, development and test before any cleaning that looks at the test data. Cover storage: one document per line in JSONL, a CSV with a text column, plain files with a manifest. One line on measures of word association such as pointwise mutual information and the t-score, which some syllabi add, and hand the detail to Unit 5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Building a corpus",
+    "nodes": [
+     {
+      "id": "u",
+      "label": "URL list",
+      "note": "list of pages",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Fetch page",
+      "note": "robots.txt, delay",
+      "style": "accent"
+     },
+     {
+      "id": "p",
+      "label": "Parse HTML",
+      "note": "select content tags",
+      "style": "normal"
+     },
+     {
+      "id": "x",
+      "label": "Extract text",
+      "note": "drop boilerplate",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Clean, dedupe",
+      "note": "language filter",
+      "style": "normal"
+     },
+     {
+      "id": "o",
+      "label": "Corpus file",
+      "note": "one document per line",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "u",
+      "to": "f",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "p",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "x",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "x",
+      "to": "c",
+      "label": "",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "o",
+      "label": "",
+      "style": "solid"
+     }
+    ],
+    "aria": "A top to bottom flow from a list of URLs through fetching with a robots.txt check, parsing HTML, extracting text, cleaning and deduplicating, to a corpus file."
+   },
+   "example": "Question: you scrape 400 pages at an average of 650 words per page, and each word takes 5 characters plus 1 space in storage. Find the token count and the raw size, then the size after boilerplate removal deletes 20 percent of the words. Answer: token count is 400 times 650, which is 260,000 word tokens. Raw storage is 260,000 times 6 characters, which is 1,560,000 characters, about 1.56 MB of plain ASCII. Boilerplate removal deletes 20 percent, leaving 0.8 times 260,000, which is 208,000 words, and about 1.25 MB. Vocabulary size is counted after normalization and is far smaller than 208,000.",
+   "trap": "Ignoring robots.txt and request rate limits, counting HTML tags as text, and deduplicating after the train and test split so near-copies of test documents sit in the training set.",
+   "prereq": "Chapter 1.4 for normalization and tokenization of the extracted text.",
+   "leave": "Counting n-grams and smoothing them goes to Unit 2. Word association statistics, TF-IDF and classification go to Unit 5. Retrieval over the corpus goes to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "applications show why the layers matter"
+  ],
+  [
+   2,
+   3,
+   "word and sentence structure needs a pattern matcher"
+  ],
+  [
+   3,
+   4,
+   "tokenizers are written as regular expressions"
+  ],
+  [
+   4,
+   5,
+   "raw tokens are next reduced to stems and lemmas"
+  ],
+  [
+   5,
+   6,
+   "lemmas come from real morphology and transducers"
+  ],
+  [
+   6,
+   7,
+   "word forms drive edit-distance correction"
+  ],
+  [
+   4,
+   8,
+   "cleaned tokens are what a corpus stores"
+  ],
+  [
+   7,
+   8,
+   "corrected, normalized text makes a clean corpus"
+  ]
+ ]
+}
