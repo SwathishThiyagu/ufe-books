@@ -753,11 +753,15 @@ def render(spec, uid):
 def fallback(title, steps, uid, aria):
     """A plain chain of boxes, used only when the model's figure cannot be drawn."""
     steps = [s for s in steps if s][:5] or [title]
+    if len(steps) < 2: steps = [title, 'Worked example']
     nodes = [{'id': str(i), 'label': s[:60]} for i, s in enumerate(steps)]
     edges = [{'from': str(i), 'to': str(i + 1)} for i in range(len(nodes) - 1)]
     spec = {'type': 'blocks', 'direction': 'down', 'nodes': nodes, 'edges': edges, 'aria': aria}
     try:
         return render(spec, uid)
     except FigureError:
-        for n in nodes: n['label'] = ' '.join(n['label'].split()[:4])
-        return render(spec, uid)
+        for n in nodes: n['label'] = ' '.join(n['label'].split()[:3])
+        try:
+            return render(spec, uid)
+        except FigureError:
+            return svg(80, box(M, 16, W - 2 * M, 48, 'accent') + text_block(W / 2, 40, [' '.join(str(title).split()[:6])], FS, True), aria, uid)
