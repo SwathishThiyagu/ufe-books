@@ -1,0 +1,225 @@
+{
+ "lead": "Sockets are the programming interface that lets an application talk to another over a network using TCP or UDP. They hide the details of IP addresses and ports, letting developers send and receive data as if it were a local file descriptor. Sockets are used in web browsers, chat apps, online gaming, and any client‑server service on the Internet.",
+ "prereq": "You need: <a href=\"#chapter-id-transport-basics\">Transport basics</a> and <a href=\"#client-server-and-peer-to-peer-architectures\">Client‑server and peer‑to‑peer architectures</a>.",
+ "sections": [
+  {
+   "h3": "What is a socket?",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A socket is an endpoint for communication identified by an IP address and a port number. The IP address locates the host on the network, while the port (0‑65535) identifies the process on that host. The operating system maps the socket to a protocol (TCP or UDP) and provides system calls such as socket(), bind(), send(), recv() etc."
+    },
+    {
+     "type": "formula",
+     "text": "0 ≤ p ≤ 65535",
+     "where": "p is a port number; values 0‑1023 are well‑known ports, 1024‑49151 are registered, 49152‑65535 are dynamic."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "TCP sockets give reliable, ordered byte streams.",
+      "UDP sockets give connectionless datagrams with no guarantee of delivery."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "TCP socket programming steps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A TCP server creates a listening socket, waits for a client to connect, and then exchanges data on a new connected socket. The client creates a socket, connects to the server, and then reads or writes."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "socket() – create an endpoint of type SOCK_STREAM.",
+      "bind() – associate the socket with a local IP address and a port.",
+      "listen() – mark the socket as passive and set a backlog.",
+      "accept() – block until a client connects; returns a new socket for the session.",
+      "send() – transmit bytes on the connected socket.",
+      "recv() – receive bytes from the connected socket.",
+      "close() – release the socket."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n\nint main() {\n    int listen_sock = socket(AF_INET, SOCK_STREAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(6000);\n    serv.sin_addr.s_addr = INADDR_ANY;\n    bind(listen_sock, (struct sockaddr *)&serv, sizeof(serv));\n    listen(listen_sock, 1);\n    struct sockaddr_in client;\n    socklen_t cl_len = sizeof(client);\n    int conn_sock = accept(listen_sock, (struct sockaddr *)&client, &cl_len);\n    char buf[64];\n    recv(conn_sock, buf, sizeof(buf)-1, 0);\n    buf[63] = '\\0';\n    printf(\"Server received: %s\n\", buf);\n    const char *reply = \"ACK\";\n    send(conn_sock, reply, strlen(reply), 0);\n    close(conn_sock);\n    close(listen_sock);\n    return 0;\n}",
+     "stdin": "",
+     "output": "Server received: Hi"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Blocking mode: each call waits until it can complete.",
+      "Non‑blocking mode: set O_NONBLOCK flag; calls return -1 with EAGAIN if not ready."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "UDP socket programming steps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A UDP socket does not need a connection. The same socket can send to many destinations and receive from any. Because there is no handshake, the programmer must handle lost packets."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "socket() – create an endpoint of type SOCK_DGRAM.",
+      "bind() – optional for a client; required for a server to fix the listening port.",
+      "sendto() – specify destination address and port with each call.",
+      "recvfrom() – receive a datagram and learn the sender’s address.",
+      "close() – release the socket."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"127.0.0.1\");\n    const char *msg = \"Hi\";\n    sendto(sock, msg, strlen(msg), 0, (struct sockaddr *)&serv, sizeof(serv));\n    char buf[64];\n    struct sockaddr_in from;\n    socklen_t fromlen = sizeof(from);\n    recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&from, &fromlen);\n    buf[63] = '\\0';\n    printf(\"Received: %s\n\", buf);\n    close(sock);\n    return 0;\n}",
+     "stdin": "",
+     "output": "Received: Hi"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Because UDP is connectionless, sendto() must include the destination each time.",
+      "Using send() on a UDP socket is a common trap; it fails to specify the peer."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Three‑way TCP handshake followed by a data exchange.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Client",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "SYN, seq=x",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "SYN‑ACK, ack=x+1",
+     "dashed": false
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "ACK, ack=y+1",
+     "dashed": false
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "DATA",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "ACK",
+     "dashed": false
+    }
+   ],
+   "aria": "Shows the three‑way TCP handshake followed by a data exchange."
+  }
+ },
+ "examples": [
+  {
+   "question": "Two phones exchange the message \"Hi\" (2 bytes) using UDP on port 5000. Each datagram travels from sender to receiver in 100 ms. Compute the total time from the moment Phone A sends the message until it receives the reply from Phone B.",
+   "steps": [
+    "Phone A sends a 2‑byte datagram. Travel time = 100 ms.",
+    "Phone B receives the datagram and immediately sends a 2‑byte reply.",
+    "The reply also travels 100 ms back to Phone A.",
+    "Total round‑trip time = 100 ms + 100 ms = 200 ms."
+   ],
+   "answer": "The round‑trip takes 200 ms.",
+   "check": "print(100+100)",
+   "values": [
+    200
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"127.0.0.1\");\n    const char *msg = \"Hi\";\n    sendto(sock, msg, strlen(msg), 0, (struct sockaddr *)&serv, sizeof(serv));\n    char buf[64];\n    struct sockaddr_in from;\n    socklen_t fromlen = sizeof(from);\n    recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&from, &fromlen);\n    buf[63] = '\\0';\n    printf(\"Received: %s\n\", buf);\n    close(sock);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Action",
+     "Time (ms)"
+    ],
+    "rows": [
+     [
+      "1",
+      "send \"Hi\"",
+      "100"
+     ],
+     [
+      "2",
+      "receive reply",
+      "100"
+     ]
+    ]
+   },
+   "output": "Received: Hi"
+  }
+ ],
+ "traps": [
+  "Using send() instead of sendto() on a UDP socket; send() does not specify the destination address.",
+  "Calling bind() on a client TCP socket to a port already in use; the call fails with EADDRINUSE.",
+  "Assuming recv() returns the full message; TCP may deliver data in fragments, so a loop is needed.",
+  "Setting a socket to non‑blocking and forgetting to handle EAGAIN, causing the program to think data is lost."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What two numbers identify a socket uniquely on the Internet?",
+   "marks": 2,
+   "a": "The IP address and the port number."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why TCP provides reliable delivery while UDP does not.",
+   "marks": 4,
+   "a": "TCP uses sequence numbers, acknowledgments, retransmission, and flow control, guaranteeing ordered delivery. UDP sends independent datagrams without these mechanisms, so loss or reordering can occur."
+  },
+  {
+   "level": "apply",
+   "q": "Write the sequence of system calls a TCP client must invoke to connect to a server at 192.168.1.10 on port 8080.",
+   "marks": 5,
+   "a": "socket(), optionally bind(), connect()."
+  },
+  {
+   "level": "apply",
+   "q": "A UDP server is bound to port 4000. Show the call that receives a datagram and stores the sender’s address.",
+   "marks": 3,
+   "a": "recvfrom(sock, buffer, len, 0, (struct sockaddr *)&sender, &addrlen);"
+  },
+  {
+   "level": "analyze",
+   "q": "If a TCP socket is set to non‑blocking mode and accept() returns –1 with EAGAIN, what does that indicate and what should the program do?",
+   "marks": 6,
+   "a": "No pending connection requests; the program should either retry later (e.g., using select/poll) or continue other work."
+  },
+  {
+   "level": "analyze",
+   "q": "A programmer writes a TCP client that calls send() twice without checking the return value. What problem can arise?",
+   "marks": 5,
+   "a": "send() may send fewer bytes than requested; ignoring the return value can lead to truncated messages."
+  }
+ ],
+ "beyond": "Not for the exam. Modern services often wrap sockets with higher‑level libraries such as gRPC or WebSockets, which add framing, authentication, and multiplexing. In cloud environments, sockets are abstracted by load balancers and service meshes that handle retries and traffic shaping. Research on QUIC replaces TCP with a UDP‑based protocol that provides reliable streams while reducing handshake latency. To explore further, look up \"socket options\" (setsockopt) for tuning buffers, and study the epoll/kqueue APIs for scalable event‑driven I/O."
+}

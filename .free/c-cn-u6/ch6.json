@@ -1,0 +1,227 @@
+{
+ "lead": "SMTP (Simple Mail Transfer Protocol) moves electronic mail from the sender’s client to the recipient’s mailbox using a store‑and‑forward model. It exists because email must travel across many administrative domains that may not be directly reachable. SMTP is used by every major mail service, by corporate mail servers, and by mobile apps that send notifications via email.",
+ "prereq": "You need: basic socket use from <a href=\"#socket-programming-with-tcp-and-udp\">socket programming with TCP and UDP</a> and the request‑response idea from <a href=\"#world-wide-web-and-http\">HTTP</a>.",
+ "sections": [
+  {
+   "h3": "SMTP Overview and Ports",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SMTP is an application‑layer protocol defined in RFC 5321. It runs on top of TCP because reliable delivery is required. The standard port is 25 for plain SMTP. Port 587 is used for submission with STARTTLS, which upgrades the connection to TLS after a plain handshake. Port 465 is reserved for implicit TLS, where the TLS handshake starts immediately."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "MUA – Mail User Agent, the client program (e.g., Outlook, Thunderbird).",
+      "MTA – Mail Transfer Agent, the server that forwards mail (e.g., sendmail, Postfix).",
+      "MDA – Mail Delivery Agent, stores mail in the final mailbox (e.g., Dovecot)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "When a user clicks Send, the MUA opens a TCP connection to its configured MTA on port 587. After STARTTLS, the MUA issues a series of SMTP commands. Each command receives a numeric reply (e.g., 250 OK). The MTA may store the message locally and forward it to another MTA until the final MDA delivers it to the recipient’s mailbox."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Open TCP connection to MTA on port 587.",
+      "Issue STARTTLS and complete TLS handshake.",
+      "Send HELO/EHLO with the client domain.",
+      "Send MAIL FROM:<sender@example.com>.",
+      "Send RCPT TO:<receiver@example.org>.",
+      "Send DATA, then the message headers and body, end with a single period on a line.",
+      "Close the connection with QUIT."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "SMTP Command Sequence",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The command set is deliberately small. HELO or EHLO starts the session and tells the server the client’s domain name. MAIL FROM identifies the envelope sender; it may differ from the header From field. RCPT TO lists each envelope recipient; multiple RCPT commands are allowed. DATA begins the transfer of the message content; the server replies 354 to indicate it is ready. The client terminates the data with a line containing only a period."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Each command line ends with CRLF (carriage‑return and line‑feed).",
+      "Server replies are three‑digit codes; 2xx means success, 4xx temporary failure, 5xx permanent failure.",
+      "If any command fails, the client may abort with RSET or QUIT."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "T_total = T_cmd + (Size × 8) ÷ Rate",
+     "where": "T_total is total transfer time; T_cmd is cumulative command latency in seconds; Size is message size in bytes; Rate is link bandwidth in bits per second."
+    }
+   ]
+  },
+  {
+   "h3": "MIME for Attachments",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SMTP can carry only 7‑bit ASCII data. MIME (Multipurpose Internet Mail Extensions) defined in RFC 2045‑2049 allows binary files, Unicode text, and multiple parts inside a single message. The MUA encodes each attachment with Base64, adds a Content‑Type header, and separates parts with a boundary string."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Content‑Type: image/jpeg; name=\"photo.jpg\"",
+      "Content‑Transfer‑Encoding: base64",
+      "Content‑Disposition: attachment; filename=\"photo.jpg\""
+     ]
+    },
+    {
+     "type": "p",
+     "text": "When the message reaches the recipient’s MDA, the mail client decodes the Base64 blocks and presents the original file. MIME is also used for HTML mail, calendar invites, and signed messages."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Sequence diagram of an email moving from the sender’s client through two SMTP servers to the final mailbox.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "MUA",
+    "SMTP Server A",
+    "SMTP Server B",
+    "Mailbox"
+   ],
+   "messages": [
+    {
+     "from": "MUA",
+     "to": "SMTP Server A",
+     "label": "HELO",
+     "dashed": false
+    },
+    {
+     "from": "MUA",
+     "to": "SMTP Server A",
+     "label": "MAIL FROM",
+     "dashed": false
+    },
+    {
+     "from": "MUA",
+     "to": "SMTP Server A",
+     "label": "RCPT TO",
+     "dashed": false
+    },
+    {
+     "from": "MUA",
+     "to": "SMTP Server A",
+     "label": "DATA …",
+     "dashed": false
+    },
+    {
+     "from": "SMTP Server A",
+     "to": "SMTP Server B",
+     "label": "Forward",
+     "dashed": false
+    },
+    {
+     "from": "SMTP Server B",
+     "to": "Mailbox",
+     "label": "Deliver",
+     "dashed": false
+    }
+   ],
+   "aria": "Shows the flow of an email from the sender’s client through two SMTP servers to the recipient’s mailbox."
+  }
+ },
+ "examples": [
+  {
+   "question": "A student sends a 200 KB image as an attachment to a professor. The SMTP commands (HELO, MAIL FROM, RCPT TO, DATA) together add 0.6 s of latency. The network link between the two SMTP servers is 10 Mbps. Compute the total time from the moment the student clicks Send until the last bit of the image leaves the second SMTP server.",
+   "steps": [
+    "Convert 200 KB to bytes: 200 × 1024 = 204 800 bytes.",
+    "Convert bytes to bits: 204 800 × 8 = 1 638 400 bits.",
+    "Compute transmission time: 1 638 400 bits ÷ 10 000 000 bits/s = 0.16384 s.",
+    "Add command latency: 0.6 s + 0.16384 s = 0.76384 s.",
+    "Round to three decimal places: 0.764 s."
+   ],
+   "answer": "The total time is about 0.764 seconds.",
+   "check": "size_kb = 200\nsize_bytes = size_kb * 1024\nsize_bits = size_bytes * 8\nrate = 10_000_000\ntrans_time = size_bits / rate\ncmd_latency = 0.6\ntotal = cmd_latency + trans_time\nprint(round(total, 3))",
+   "values": [
+    0.764
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main() {\n    const int size_kb = 200;\n    const int bytes = size_kb * 1024;\n    const long bits = (long)bytes * 8;\n    const double rate = 10e6; // 10 Mbps\n    double trans = bits / rate;\n    double total = 0.6 + trans;\n    printf(\"Total time = %.3f s\\n\", total);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Value"
+    ],
+    "rows": [
+     [
+      "size_bytes",
+      "204800"
+     ],
+     [
+      "size_bits",
+      "1638400"
+     ],
+     [
+      "trans_time",
+      "0.16384"
+     ],
+     [
+      "total",
+      "0.76384"
+     ]
+    ]
+   },
+   "output": "Total time = 0.764 s"
+  }
+ ],
+ "traps": [
+  "Assuming SMTP deposits the message directly into the recipient’s mailbox without passing through intermediate MTAs.",
+  "Confusing the envelope sender (MAIL FROM) with the header From address; they can be different.",
+  "Treating the DATA command as a single packet; DATA streams the entire message body after the server’s 354 reply.",
+  "Adding TLS on port 25 without STARTTLS; plain port 25 does not negotiate encryption automatically.",
+  "Counting only the data transmission time and ignoring the 0.6 s command latency in the example."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which TCP port is the default for plain SMTP?",
+   "marks": 2,
+   "a": "Port 25."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three agents involved in email delivery (MUA, MTA, MDA).",
+   "marks": 2,
+   "a": "Mail User Agent, Mail Transfer Agent, Mail Delivery Agent."
+  },
+  {
+   "level": "understand",
+   "q": "Why does SMTP use TCP instead of UDP?",
+   "marks": 3,
+   "a": "SMTP requires reliable, ordered delivery and flow control, which TCP provides; UDP would lose or reorder parts of the mail."
+  },
+  {
+   "level": "apply",
+   "q": "A message of 50 KB is sent over a 5 Mbps link. If command latency is 0.4 s, compute the total time using the formula T_total = T_cmd + (Size×8)/Rate.",
+   "marks": 4,
+   "a": "Size_bytes = 50×1024 = 51200 B; bits = 409600; transmission = 409600/5 000 000 = 0.08192 s; total = 0.4 + 0.08192 ≈ 0.482 s."
+  },
+  {
+   "level": "apply",
+   "q": "Write the sequence of SMTP commands a client sends after establishing a TLS‑protected connection.",
+   "marks": 5,
+   "a": "EHLO <domain>, MAIL FROM:<sender>, RCPT TO:<receiver>, DATA, <message>, ., QUIT."
+  },
+  {
+   "level": "analyze",
+   "q": "If an MTA receives a message for a domain it does not serve, what steps does it take before the message is finally delivered?",
+   "marks": 6,
+   "a": "The MTA looks up the MX record of the recipient domain via DNS, opens a TCP connection to the next MTA, forwards the envelope using the same SMTP commands, and repeats until an MTA that serves the final domain delivers the message to its MDA."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, SMTP is being wrapped by APIs such as SendGrid or Amazon SES to hide server management. Research explores SMTP extensions for end‑to‑end encryption (e.g., DANE, MTA‑STS). New curricula add OAuth 2.0 authentication for submission on port 587. Searching for \"SMTP STARTTLS best practices\" or \"MTA‑STS deployment guide\" gives current operational advice."
+}

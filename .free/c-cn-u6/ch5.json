@@ -1,0 +1,254 @@
+{
+ "lead": "File Transfer Protocol (FTP) moves files between a client and a server using two TCP connections: one for control messages and one for the actual file data. The control channel stays open for the whole session and carries commands such as USER, PASS, RETR and STOR. The data channel is opened only when a file is transferred, either by the server (active mode) or by the client (passive mode). FTP is used for uploading website assets, backing up databases, and sharing large media files in many Indian enterprises and educational institutions.",
+ "prereq": "You need: <a href=\"#socket-programming-with-tcp-and-udp\">socket programming</a> and basic TCP knowledge.",
+ "sections": [
+  {
+   "h3": "Control and data connections",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When an FTP client starts, it opens a TCP connection to the server’s port 21. This is called the control connection. All commands and replies travel on this channel. The server replies with three‑digit codes, for example 220 means “Service ready”."
+    },
+    {
+     "type": "p",
+     "text": "A separate TCP connection carries the file bytes. In active mode the server opens a connection from its port 20 to a client port that the client has announced. In passive mode the client asks the server to listen on a random high port; the server replies with the chosen port and the client connects to it."
+    },
+    {
+     "type": "formula",
+     "text": "T_total = T_data + T_cmd",
+     "where": "T_total is total transfer time; T_data is time to move the file bytes; T_cmd is time spent on command exchange."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Port 21 – always the control port.",
+      "Port 20 – used by the server for active data connections.",
+      "Passive data port – chosen by the server, usually >1023."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "FTP command flow",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "Client → Server: USER <username>",
+      "Server → Client: 331 User name ok, need password.",
+      "Client → Server: PASS <password>",
+      "Server → Client: 230 User logged in.",
+      "Client → Server: PASV (for passive) or PORT (for active).",
+      "Server → Client: 227 Entering Passive Mode (h1,h2,h3,h4,p1,p2).",
+      "Client → Server: RETR <filename> to download or STOR <filename> to upload.",
+      "Server opens data connection, transfers file, then sends 226 Transfer complete."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Active mode often fails behind firewalls because the server must connect to a client‑side port that the firewall may block. Passive mode moves the connection initiation to the client, which is usually allowed."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "USER – tells the server which account to use.",
+      "PASS – sends the password in clear text.",
+      "PASV – asks the server to listen for a data connection.",
+      "PORT – tells the server which client port to connect to (active).",
+      "RETR – request a file download.",
+      "STOR – request a file upload."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Programming a simple FTP client",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Using the socket API, a client can implement the command flow shown above. The steps are: create a TCP socket, connect to port 21, read the 220 greeting, send USER and PASS, request PASV, parse the server’s 227 reply to obtain the data IP and port, open a second socket to that address, send RETR or STOR, read the file data, and finally close both sockets."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "import socket, re\n\ndef ftp_get(host, user, pwd, remote, local):\n    ctrl = socket.create_connection((host, 21))\n    ctrl.recv(1024)                           # 220 greeting\n    ctrl.sendall(f'USER {user}\\r\\n'.encode())\n    ctrl.recv(1024)                           # 331 response\n    ctrl.sendall(f'PASS {pwd}\\r\\n'.encode())\n    ctrl.recv(1024)                           # 230 response\n    ctrl.sendall(b'PASV\\r\\n')\n    resp = ctrl.recv(1024).decode()\n    nums = list(map(int, re.search(r'\\((\\d+,\\d+,\\d+,\\d+,\\d+,\\d+)\\)', resp).group(1).split(',')))\n    ip = '.'.join(map(str, nums[:4]))\n    port = nums[4]*256 + nums[5]\n    data = socket.create_connection((ip, port))\n    ctrl.sendall(f'RETR {remote}\\r\\n'.encode())\n    ctrl.recv(1024)                           # 150 opening data connection\n    with open(local, 'wb') as f:\n        while True:\n            chunk = data.recv(4096)\n            if not chunk:\n                break\n            f.write(chunk)\n    data.close()\n    ctrl.recv(1024)                           # 226 transfer complete\n    ctrl.sendall(b'QUIT\\r\\n')                # end session gracefully\n    ctrl.recv(1024)                           # 221 goodbye (optional)\n    ctrl.close()\n\n# Example call (won’t run here):\n# ftp_get('ftp.example.com', 'user', 'pass', 'file.pdf', 'file.pdf')",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "table",
+     "head": [
+      "Step",
+      "Command sent",
+      "Server reply code"
+     ],
+     "rows": [
+      [
+       "1",
+       "USER alice",
+       "331"
+      ],
+      [
+       "2",
+       "PASS secret",
+       "230"
+      ],
+      [
+       "3",
+       "PASV",
+       "227"
+      ],
+      [
+       "4",
+       "RETR data.txt",
+       "150"
+      ],
+      [
+       "5",
+       "—",
+       "226"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The client keeps a control connection to port 21 and opens a separate data connection in passive mode.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "FTP connections",
+   "nodes": [
+    {
+     "id": "c",
+     "label": "Client",
+     "style": "normal"
+    },
+    {
+     "id": "sCtrl",
+     "label": "Server 21",
+     "style": "accent"
+    },
+    {
+     "id": "sData",
+     "label": "Server 20/Passive",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "c",
+     "to": "sCtrl",
+     "label": "Control",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "sData",
+     "label": "Data (passive)",
+     "style": "solid"
+    }
+   ],
+   "aria": "Shows the client’s control connection to port 21 and the data connection in passive mode."
+  }
+ },
+ "examples": [
+  {
+   "question": "A client uploads a 5 MB PDF file to an FTP server using passive mode. The data channel can sustain 2 MB s⁻¹. Each command‑reply exchange (USER‑331, PASS‑230, PASV‑227, STOR‑150, final‑226) adds 0.04 s of latency. Compute the total time from the start of the USER command to the receipt of the final 226 reply.",
+   "steps": [
+    "Compute data transfer time: 5 MB ÷ 2 MB s⁻¹ = 2.5 s.",
+    "Count command‑reply exchanges: USER‑331, PASS‑230, PASV‑227, STOR‑150, final‑226 = 5 exchanges.",
+    "Total command latency: 5 × 0.04 s = 0.20 s.",
+    "Add data and command times: 2.5 s + 0.20 s = 2.70 s."
+   ],
+   "answer": "The upload completes in 2.70 seconds.",
+   "check": "print(round(5/2 + 5*0.04, 2))",
+   "values": [
+    2.7
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    double sizeMB = 5.0;\n    double rate = 2.0; // MB per second\n    double cmdLatency = 0.04; // seconds per command\n    int cmdCount = 5;\n    double total = sizeMB/rate + cmdCount*cmdLatency;\n    printf(\"Total time = %.2f seconds\\n\", total);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "sizeMB",
+     "rate",
+     "cmdLatency",
+     "cmdCount",
+     "total"
+    ],
+    "rows": [
+     [
+      "5.0",
+      "2.0",
+      "0.04",
+      "5",
+      "2.70"
+     ]
+    ]
+   },
+   "output": "Total time = 2.70 seconds"
+  }
+ ],
+ "traps": [
+  "Assuming the client opens port 20 in active mode; actually the server uses port 20.",
+  "Adding command latency twice (once for request and once for reply) – the 0.04 s already includes both directions.",
+  "Confusing passive mode (server listens) with active mode (client listens).",
+  "Using port 21 for data transfer – data always uses a different port."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which TCP port is reserved for the FTP control connection?",
+   "marks": 2,
+   "a": "Port 21."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why passive FTP works better with most firewalls.",
+   "marks": 4,
+   "a": "In passive mode the client initiates the data connection to a server‑chosen high port, so the firewall only needs to allow outbound connections, which is the default rule. In active mode the server initiates a connection to a client port, which many firewalls block."
+  },
+  {
+   "level": "apply",
+   "q": "A file of 12 MB is downloaded over active FTP. The data channel speed is 3 MB s⁻¹ and each command‑reply pair adds 0.05 s. Compute the total download time.",
+   "marks": 5,
+   "a": "Data time = 12 ÷ 3 = 4 s. Command exchanges = USER‑331, PASS‑230, PORT‑200 (reply), RETR‑150, and the final 226 reply after data transfer = 5 exchanges. Total latency = 5 × 0.05 s = 0.25 s. Total time = 4 + 0.25 = 4.25 seconds."
+  },
+  {
+   "level": "analyze",
+   "q": "A network admin observes that FTP uploads succeed but downloads fail. The server runs in passive mode. Suggest a likely cause.",
+   "marks": 6,
+   "a": "In passive mode the client initiates the data connection to the server’s passive port for both uploads and downloads. If downloads fail while uploads succeed, a likely cause is a permission problem on the server (read permission missing) or a mis‑configuration of the server’s passive‑port range that blocks inbound data for the specific file type. It is not a firewall issue specific to downloads."
+  },
+  {
+   "level": "evaluate",
+   "q": "Compare active and passive FTP in terms of server resource usage and client‑side firewall requirements.",
+   "marks": 5,
+   "a": "Active FTP requires the server to open a data socket from port 20 to the client, consuming an extra server socket per transfer. The client must allow inbound connections on the chosen port, which many firewalls block. Passive FTP shifts the data‑socket creation to the client; the server only listens, using one listening socket per transfer. Clients need only permit outbound connections, which matches typical firewall rules, making passive FTP more firewall‑friendly."
+  },
+  {
+   "level": "remember",
+   "q": "What FTP reply code indicates that the server is ready to transfer data after a RETR or STOR command?",
+   "marks": 2,
+   "a": "226 – “Transfer complete”."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the password sent in clear text in FTP, and what security risk does this pose?",
+   "marks": 4,
+   "a": "FTP was designed before widespread encryption, so the PASS command transmits the password as plain ASCII characters. This allows anyone who can sniff the network traffic, such as on a public Wi‑Fi, to read the credentials and gain unauthorized access."
+  },
+  {
+   "level": "apply",
+   "q": "You need to download a 20 MB file using passive FTP. The data channel runs at 4 MB s⁻¹ and each command‑reply exchange adds 0.03 s. How long will the download take from the first USER command to the final 226 reply?",
+   "marks": 5,
+   "a": "Data time = 20 ÷ 4 = 5 s. Exchanges: USER‑331, PASS‑230, PASV‑227, RETR‑150, final‑226 = 5 exchanges. Latency = 5 × 0.03 s = 0.15 s. Total = 5 + 0.15 = 5.15 seconds."
+  }
+ ],
+ "beyond": "Not for the exam. Modern deployments replace plain FTP with FTPS or SFTP to protect credentials and data. Cloud storage services expose REST APIs that hide the FTP control/data split. Researchers are exploring FTP over QUIC to improve performance on lossy mobile networks. To learn more, search for \"FTP passive mode firewall configuration\" and \"secure file transfer alternatives\"."
+}
