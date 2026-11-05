@@ -1,0 +1,590 @@
+{
+ "lead": "This unit builds a 3D scene on paper and on screen: how a solid is stored as polygons or curved surfaces, how smooth curves are drawn between control points, and how the machine decides what is visible and what colour each pixel gets. After it you can read a polygon table, evaluate a Bezier or B-spline point, run a Z-buffer, shade a surface with Phong lighting and trace a ray to its nearest surface.",
+ "about": "Unit 3 goes from storing one 3D object to drawing a fully shaded image. Chapter 3.1 keeps a solid in vertex, edge and polygon tables, and 3.2 turns those faces into a mesh, each face with a plane equation. Chapter 3.3 swaps flat faces for quadric surfaces and blended blobby objects. Chapters 3.4 and 3.5 build free-form curves and surfaces from control points, first with Bezier and then with locally controlled B-splines. Chapter 3.6 removes hidden surfaces using the Z-buffer and BSP trees. Chapter 3.7 lights the visible surfaces with Gouraud and Phong shading, and 3.8 follows rays from the eye to add shadows, reflections and transparency.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A 3D solid is stored as flat polygon faces, and each vertex, edge and face is listed once and linked to the others by index.",
+   "depth": "Vertex table (x, y, z per vertex), edge table (the two vertex indices plus the faces that share the edge), polygon table (list of edge indices plus attributes such as colour and normal). Show why sharing matters: a cube has 8 vertices, 12 edges and 6 faces, but 6 × 4 = 24 vertex references if each face is stored alone. Cover the clockwise vertex ordering convention and the Euler check V − E + F = 2 for a closed surface. Some syllabi call this 'polygon surface representation' or 'geometric and attribute tables'. Only a few universities teach the full table bookkeeping; most need only the idea of shared vertices.",
+   "figure": {
+    "type": "array",
+    "title": "Edge table of the square pyramid",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "E1",
+      "cells": [
+       "V1",
+       "V2",
+       "P1",
+       "P2"
+      ],
+      "marks": {
+       "2": "accent",
+       "3": "accent"
+      }
+     },
+     {
+      "label": "E2",
+      "cells": [
+       "V2",
+       "V3",
+       "P1",
+       "P3"
+      ]
+     },
+     {
+      "label": "E3",
+      "cells": [
+       "V3",
+       "V4",
+       "P1",
+       "P4"
+      ]
+     },
+     {
+      "label": "E4",
+      "cells": [
+       "V4",
+       "V1",
+       "P1",
+       "P5"
+      ]
+     },
+     {
+      "label": "E5",
+      "cells": [
+       "V1",
+       "V5",
+       "P2",
+       "P5"
+      ]
+     }
+    ],
+    "aria": "Five rows of an edge table, each row naming the two end vertices and the two faces that share that edge."
+   },
+   "example": "A square pyramid has base vertices V1=(1,1,0), V2=(−1,1,0), V3=(−1,−1,0), V4=(1,−1,0) and apex V5=(0,0,3). Build the three tables. Answer: 5 vertices. 8 edges: E1=V1V2, E2=V2V3, E3=V3V4, E4=V4V1, E5=V1V5, E6=V2V5, E7=V3V5, E8=V4V5. 5 faces: base P1=(E4,E3,E2,E1); sides P2=(E1,E6,E5), P3=(E2,E7,E6), P4=(E3,E8,E7), P5=(E4,E5,E8). Euler check: 5 − 8 + 5 = 2. Stored face by face, the faces repeat 4 + 4×3 = 16 vertex references; the table stores 5 vertices once.",
+   "trap": "Quoting 24 vertices for a cube instead of 8, or storing every face as its own coordinate list so shared edges appear twice; also forgetting that a closed mesh must satisfy V − E + F = 2.",
+   "prereq": "Unit 1 for raster images and output primitives; Unit 2 for 3D coordinates.",
+   "leave": "Plane equations to 3.2, moving and rotating the object to Unit 2, colouring the faces to 3.7."
+  },
+  {
+   "k": 2,
+   "idea": "A polygon mesh is a connected set of planar faces, and each planar face satisfies Ax + By + Cz + D = 0, which gives its normal and an inside/outside test.",
+   "depth": "Triangle meshes, quad meshes and the vertex-array plus index-array way of storing a mesh. Face count relations and the Euler formula. Plane equation from three vertices: normal n = (P2 − P1) × (P3 − P1) = (A, B, C), then D = −(A x1 + B y1 + C z1). Normalise the normal to get unit n and true distance. Test any point: the sign of Ax + By + Cz + D says which side it lies on. Mention that a quad whose four vertices are not coplanar has no single plane and is usually split into two triangles. Only a few universities teach the coefficient formulas; the rest use plane equations only for back-face tests.",
+   "figure": {
+    "type": "graph",
+    "directed": false,
+    "nodes": [
+     {
+      "id": "P1",
+      "label": "P1",
+      "x": 0,
+      "y": 3,
+      "note": "(1, 0, 0)",
+      "style": "accent"
+     },
+     {
+      "id": "P2",
+      "label": "P2",
+      "x": 4,
+      "y": 3,
+      "note": "(0, 1, 0)",
+      "style": "accent"
+     },
+     {
+      "id": "P3",
+      "label": "P3",
+      "x": 2,
+      "y": 4,
+      "note": "(0, 0, 1)",
+      "style": "accent"
+     },
+     {
+      "id": "P4",
+      "label": "P4",
+      "x": 2,
+      "y": 1,
+      "note": "(0, 0, 0)"
+     }
+    ],
+    "edges": [
+     {
+      "from": "P1",
+      "to": "P2",
+      "style": "accent"
+     },
+     {
+      "from": "P2",
+      "to": "P3",
+      "style": "accent"
+     },
+     {
+      "from": "P3",
+      "to": "P1",
+      "style": "accent"
+     },
+     {
+      "from": "P1",
+      "to": "P4"
+     },
+     {
+      "from": "P2",
+      "to": "P4"
+     },
+     {
+      "from": "P3",
+      "to": "P4"
+     }
+    ],
+    "aria": "Four vertices joined as a tetrahedron; the three highlighted edges mark the face whose plane equation is computed."
+   },
+   "example": "Find the plane through P1=(1,0,0), P2=(0,1,0), P3=(0,0,1). P2 − P1 = (−1,1,0) and P3 − P1 = (−1,0,1). Cross product = (1×1 − 0×0, 0×(−1) − (−1)×1, (−1)×0 − 1×(−1)) = (1,1,1). So A=1, B=1, C=1 and D = −(1×1 + 1×0 + 1×0) = −1. Plane: x + y + z − 1 = 0. Unit normal = (1,1,1)/√3. Test the fourth vertex (0,0,0): 0 + 0 + 0 − 1 = −1, a negative value, so it lies on the inner side of that face.",
+   "trap": "Getting the sign of D wrong (it is minus the dot product with any point on the plane), quoting an unnormalised normal as a distance, and assuming a four-vertex face always has one plane.",
+   "prereq": "Chapter 3.1 for vertex and polygon tables; Unit 2 for 3D vectors and transformations.",
+   "leave": "Curved surfaces to 3.3; using the normal for shading to 3.7; splitting planes in BSP trees to 3.6."
+  },
+  {
+   "k": 3,
+   "idea": "Curved solids are described by second-degree equations (quadrics) or by a smooth scalar field that is cut at a threshold (blobby objects).",
+   "depth": "General quadric Ax² + By² + Cz² + Dxy + Eyz + Fxz + Gx + Hy + Iz + J = 0. Standard forms and parameters: sphere, ellipsoid, elliptic paraboloid, hyperboloid of one and two sheets, cylinder, cone. Give both implicit and parametric forms of the sphere and ellipsoid. Note that the torus has degree four, so it is not a quadric. Blobby objects (metaballs): a density function such as f(d) = e^(−d²) around each centre, summed over all centres, with the surface drawn where the sum equals a threshold; radius of a single blob from e^(−r²) = T. Superquadrics only in one line. Only a few universities teach blobby objects, so keep them short.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "distance r",
+     "min": 0,
+     "max": 3
+    },
+    "y": {
+     "label": "density f",
+     "min": 0,
+     "max": 1
+    },
+    "series": [
+     {
+      "name": "e^(−r²)",
+      "expr": "exp(-x**2)",
+      "style": "accent"
+     },
+     {
+      "name": "threshold 0.5",
+      "expr": "0.5+0*x",
+      "style": "live"
+     }
+    ],
+    "aria": "A falling curve from 1 at r = 0 crosses the flat threshold line at about r = 0.83 and then stays below it."
+   },
+   "example": "(a) Sphere of radius 5 centred at (2,3,1): (x−2)² + (y−3)² + (z−1)² = 25, which expands to x² + y² + z² − 4x − 6y − 2z − 11 = 0 because 4 + 9 + 1 − 25 = −11. (b) Two blobs at (0,0,0) and (4,0,0), density f(d) = e^(−d²), threshold T = 0.5. One blob alone has e^(−r²) = 0.5, so r² = ln 2 = 0.693 and r = 0.83. At the midpoint (2,0,0) the distance to each centre is 2, so the sum is e^(−4) + e^(−4) = 0.018 + 0.018 = 0.037, far below 0.5. The two blobs stay separate.",
+   "trap": "Calling the torus a quadric, forgetting that a quadric is an infinite surface that must be clipped to a finite patch, and mixing up the threshold with the blob radius.",
+   "prereq": "Chapter 3.2 for surface normals; Unit 2 for translation of the centre.",
+   "leave": "Free-form curves to 3.4 and 3.5; ray–quadric intersection to 3.8; shading to 3.7."
+  },
+  {
+   "k": 4,
+   "idea": "A Bezier curve is a smooth curve pulled toward control points by blending functions, passing through its two end points and staying inside the convex hull of all the points.",
+   "depth": "Bernstein form B(t) = Σ Pᵢ C(n,i) tⁱ (1−t)^(n−i) for i = 0 to n, with each term explained. The cubic case with the coefficients 1, 3, 3, 1. Properties: end points interpolated, tangent at t = 0 along P1 − P0, tangent at t = 1 along Pn − P(n−1), convex hull, affine invariance, and no local control (moving one point changes the whole curve). De Casteljau repeated midpoint construction. Bezier surfaces as a tensor product of two Bezier curves, with a control net instead of a control polygon. Joining two Beziers with C⁰ and C¹ continuity.",
+   "figure": {
+    "type": "tree",
+    "shape": "circle",
+    "root": {
+     "label": "S0",
+     "note": "(2, 1.5)",
+     "style": "accent",
+     "children": [
+      {
+       "label": "R0",
+       "note": "(1.25, 1.5)",
+       "edge": "0.5",
+       "children": [
+        {
+         "label": "Q0",
+         "note": "(0.5, 1)",
+         "children": [
+          {
+           "label": "P0",
+           "note": "(0, 0)"
+          },
+          {
+           "label": "P1",
+           "note": "(1, 2)"
+          }
+         ]
+        },
+        {
+         "label": "Q1",
+         "note": "(2, 2)",
+         "children": [
+          {
+           "label": "P1",
+           "note": "(1, 2)"
+          },
+          {
+           "label": "P2",
+           "note": "(3, 2)"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "label": "R1",
+       "note": "(2.75, 1.5)",
+       "edge": "0.5",
+       "children": [
+        {
+         "label": "Q1",
+         "note": "(2, 2)",
+         "children": [
+          {
+           "label": "P2",
+           "note": "(3, 2)"
+          },
+          {
+           "label": "P3",
+           "note": "(4, 0)"
+          }
+         ]
+        },
+        {
+         "label": "Q2",
+         "note": "(3.5, 1)",
+         "children": [
+          {
+           "label": "P2",
+           "note": "(3, 2)"
+          },
+          {
+           "label": "P3",
+           "note": "(4, 0)"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A four-level construction tree in which each pair of points is halved, ending at the single point (2, 1.5) on the curve."
+   },
+   "example": "Cubic Bezier with P0=(0,0), P1=(1,2), P2=(3,2), P3=(4,0). At t = 0.5 use B = (1/8)(P0 + 3P1 + 3P2 + P3) = (1/8)((0,0) + (3,6) + (9,6) + (4,0)) = (16/8, 12/8) = (2, 1.5). Check with de Casteljau: Q0=(0.5,1), Q1=(2,2), Q2=(3.5,1); R0=(1.25,1.5), R1=(2.75,1.5); S0=(2,1.5). Tangent at t = 0 is 3(P1 − P0) = (3,6), direction (1,2); at t = 1 it is 3(P3 − P2) = (3,−6), direction (1,−2).",
+   "trap": "Assuming the curve passes through every control point; using degree n equal to the number of points instead of n − 1; dropping the 1, 3, 3, 1 coefficients in the cubic.",
+   "prereq": "Unit 1 for line drawing (the curve is polyline-approximated); Unit 2 for affine transforms of control points.",
+   "leave": "Local control and knot vectors to 3.5; tessellating the curve for display to 3.6."
+  },
+  {
+   "k": 5,
+   "idea": "A B-spline uses a knot vector and short-range basis functions, so shifting one control point changes only a small piece of the curve.",
+   "depth": "Degree p, order k = p + 1, knot vector U = (u₀, u₁, … , u_m), and the counting rule: number of knots = number of control points + p + 1. Basis recursion N(i,0) = 1 on its span and 0 elsewhere, then N(i,p) = ((t − uᵢ)/(u(i+p) − uᵢ)) N(i,p−1) + ((u(i+p+1) − t)/(u(i+p+1) − u(i+1))) N(i+1,p−1). Uniform, open (clamped) and non-uniform knots. Continuity C^(p−s) at a knot of multiplicity s. Show that a Bezier curve is a B-spline with knots 0,0,0,0,1,1,1,1. B-spline surfaces as a tensor product, and one line on NURBS as the rational extension used by CAD software.",
+   "figure": {
+    "type": "array",
+    "title": "Cubic B-spline knot vector U",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "U",
+      "cells": [
+       "0",
+       "0",
+       "0",
+       "0",
+       "1",
+       "2",
+       "2",
+       "2",
+       "2"
+      ],
+      "marks": {
+       "0": "accent",
+       "4": "live",
+       "8": "accent"
+      }
+     }
+    ],
+    "aria": "Nine knots in one row: four zeros, then a single 1 at index 4, then three 2s; the first and last knots are clamped."
+   },
+   "example": "For the cubic B-spline (p = 3) with knot vector U = (0,0,0,0,1,2,2,2,2), find the number of control points and the continuity at each knot. Answer: highest index m = 8, so 8 = n + p + 1 gives n = 4, that is 5 control points P0 to P4. At t = 0 the multiplicity is 4, more than p, so the curve is clamped and starts exactly at P0. At t = 1 the multiplicity is 1, so continuity is C^(3−1) = C². At t = 2 the multiplicity is 3, so continuity is C^(3−3) = C⁰, a visible corner.",
+   "trap": "Swapping degree and order, miscounting knots as equal to control points, and assuming a B-spline interpolates all its control points.",
+   "prereq": "Chapter 3.4 for control points, blending and the Bezier special case; Unit 2 for matrix forms.",
+   "leave": "The full Cox–de Boor algorithm beyond the recursion statement, and NURBS weights beyond one line."
+  },
+  {
+   "k": 6,
+   "idea": "Hidden surface removal decides which surface a viewer actually sees at each pixel: the Z-buffer does it pixel by pixel with a depth array, and a BSP tree does it by splitting space with polygon planes.",
+   "depth": "Object-space versus image-space methods, and the painter's algorithm as the simple baseline. Z-buffer: depth array the size of the frame buffer initialised to the far value, depth interpolated along the scan line (z = z1 + (x − x1)(z2 − z1)/(x2 − x1)), compare, then write colour and depth. Advantages: no sorting, works for any polygon order. Drawbacks: memory, no transparency, aliasing at edges. BSP tree: pick a polygon, use its plane to split the others into front and back, recurse, then display back to front from the eye position. Only a few universities teach BSP construction with polygon splitting in full.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Z-buffer inner loop",
+    "nodes": [
+     {
+      "id": "init",
+      "label": "Depth = far",
+      "note": "one value per pixel",
+      "style": "normal"
+     },
+     {
+      "id": "poly",
+      "label": "Next polygon",
+      "style": "normal"
+     },
+     {
+      "id": "pix",
+      "label": "Depth of pixel",
+      "note": "interpolate along scan line",
+      "style": "normal"
+     },
+     {
+      "id": "test",
+      "label": "z < depth?",
+      "style": "live",
+      "note": "smaller z is nearer"
+     },
+     {
+      "id": "write",
+      "label": "Write colour",
+      "note": "and store new z",
+      "style": "accent"
+     },
+     {
+      "id": "skip",
+      "label": "Keep old pixel",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "init",
+      "to": "poly"
+     },
+     {
+      "from": "poly",
+      "to": "pix"
+     },
+     {
+      "from": "pix",
+      "to": "test"
+     },
+     {
+      "from": "test",
+      "to": "write",
+      "label": "yes"
+     },
+     {
+      "from": "test",
+      "to": "skip",
+      "label": "no"
+     },
+     {
+      "from": "skip",
+      "to": "poly",
+      "label": "next polygon",
+      "style": "dashed"
+     },
+     {
+      "from": "write",
+      "to": "poly",
+      "label": "next polygon",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A loop that walks polygons and pixels, compares each new depth with the stored one, and updates the pixel only when the new point is nearer."
+   },
+   "example": "(a) At pixel (5,5) polygon A gives z = 0.6 and polygon B gives z = 0.4. The depth buffer holds 1.0 at the start. A is tested first: 0.6 < 1.0, so the buffer takes 0.6 and A's colour. B is tested next: 0.4 < 0.6, so the buffer takes 0.4 and B's colour. The pixel ends with B's colour and depth 0.4. (b) Polygon P1 lies in the plane x = 2, P2 lies entirely at x = 5, P3 entirely at x = 0. The BSP tree has root P1 with P3 on the back side and P2 on the front side. With the eye at x = 10 the drawing order is P3, then P1, then P2.",
+   "trap": "Treating a larger z as nearer (state your convention), forgetting to reset the depth buffer to the far value each frame, and forgetting that BSP splitting creates two new polygons when a polygon crosses a plane.",
+   "prereq": "Chapter 3.2 for plane equations and face normals; Unit 2 for projection to screen coordinates.",
+   "leave": "Shading the surviving pixels to 3.7; anti-aliasing and texture filtering to Unit 4 and Unit 5."
+  },
+  {
+   "k": 7,
+   "idea": "Lighting computes a colour from surface and light geometry, and shading spreads that colour across a polygon, either by interpolating vertex intensities (Gouraud) or vertex normals (Phong).",
+   "depth": "Light sources: ambient, point with distance attenuation, and directional (parallel) light. Phong reflection model: I = k_a I_a + Σ [k_d I_l (N·L) + k_s I_l (R·V)ⁿ], with every term named; N unit surface normal, L unit vector to the light, R the mirror reflection of L about N, V unit vector to the viewer, n the specular exponent that sets highlight size. Flat shading, then Gouraud (compute colour at each vertex, interpolate across the polygon), then Phong (interpolate the normals, normalise per pixel, light per pixel). Compare cost and quality; Gouraud misses small highlights and shows Mach bands along edges.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Two shading pipelines",
+    "nodes": [
+     {
+      "id": "v",
+      "label": "Vertex normals",
+      "note": "one per mesh vertex",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "Gouraud",
+      "style": "accent"
+     },
+     {
+      "id": "gi",
+      "label": "Interpolate colour",
+      "style": "accent"
+     },
+     {
+      "id": "p",
+      "label": "Phong",
+      "style": "live"
+     },
+     {
+      "id": "pn",
+      "label": "Interpolate normals",
+      "note": "normalise per pixel",
+      "style": "live"
+     },
+     {
+      "id": "pc",
+      "label": "Pixel colour",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "v",
+      "to": "g"
+     },
+     {
+      "from": "g",
+      "to": "gi"
+     },
+     {
+      "from": "gi",
+      "to": "pc"
+     },
+     {
+      "from": "v",
+      "to": "p"
+     },
+     {
+      "from": "p",
+      "to": "pn"
+     },
+     {
+      "from": "pn",
+      "to": "pc"
+     }
+    ],
+    "aria": "Both paths start at the vertex normals; the upper one interpolates colour and the lower one interpolates and normalises normals before lighting each pixel."
+   },
+   "example": "Surface normal N = (0, 0.6, 0.8) with 0.36 + 0.64 = 1, light direction L = (0,0,1), so N·L = 0.8. Take k_a I_a = 0.2, k_d = 0.7, I_l = 1.0, k_s = 0.5, specular exponent n = 10 and R·V = 0.8. Diffuse term = 0.7 × 1.0 × 0.8 = 0.56. Specular term = 0.5 × 1.0 × 0.8¹⁰ = 0.5 × 0.107 = 0.054. Total I = 0.2 + 0.56 + 0.054 = 0.814, about 0.81. Gouraud check: vertex intensities 0.2 and 0.6, point a quarter of the way along the edge gives 0.2 + 0.25 × (0.6 − 0.2) = 0.3.",
+   "trap": "Expecting Gouraud to show a sharp specular highlight, forgetting to normalise N and L before the dot product, and thinking the exponent n changes brightness when it really changes the size of the highlight.",
+   "prereq": "Chapter 3.2 for face normals; chapter 3.6 for knowing which surface is visible.",
+   "leave": "Colour models (RGB, HSV) to Unit 1; textures and image formats to Unit 4."
+  },
+  {
+   "k": 8,
+   "idea": "Ray tracing throws one ray per pixel from the eye into the scene, keeps the nearest hit, and then follows reflected and refracted rays to produce shadows, mirrors and glass.",
+   "depth": "Ray equation P = E + t d with E the eye point, d a unit direction and t ≥ 0 the distance. Ray–sphere: substitute and solve the quadratic, keep the smaller positive root. Ray–plane: t = −(n·E + D)/(n·d). Nearest-hit loop over all objects. Shadow rays towards each light, with a small epsilon offset to avoid self-hits. Reflection ray r = d − 2(d·n)n, recursion with a depth limit, and local colour combined as I = local + k_r I_reflect + k_t I_refract. One line on refraction by Snell's law. Cost grows as pixels × objects × depth. Only a few universities teach recursive ray tracing; keep the arithmetic to spheres and planes.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One traced ray",
+    "nodes": [
+     {
+      "id": "eye",
+      "label": "Eye ray",
+      "note": "one per pixel",
+      "style": "normal"
+     },
+     {
+      "id": "hit",
+      "label": "Nearest hit",
+      "note": "smallest t above 0",
+      "style": "accent"
+     },
+     {
+      "id": "sh",
+      "label": "Shadow ray",
+      "note": "blocked means dark",
+      "style": "normal"
+     },
+     {
+      "id": "re",
+      "label": "Reflected ray",
+      "note": "recurse, depth minus 1",
+      "style": "live"
+     },
+     {
+      "id": "rf",
+      "label": "Refracted ray",
+      "note": "only for glass",
+      "style": "muted"
+     },
+     {
+      "id": "out",
+      "label": "Combine colours",
+      "note": "local plus reflected plus refracted",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "eye",
+      "to": "hit"
+     },
+     {
+      "from": "hit",
+      "to": "sh"
+     },
+     {
+      "from": "sh",
+      "to": "re"
+     },
+     {
+      "from": "re",
+      "to": "rf"
+     },
+     {
+      "from": "rf",
+      "to": "out"
+     }
+    ],
+    "aria": "A chain from the eye ray to the nearest surface, then shadow, reflection and refraction rays, all combined into the pixel colour."
+   },
+   "example": "Eye at E = (0,0,0), direction d = (0,0,−1), sphere centre C = (0,0,−5) with radius 1. Write P = E + t d = (0,0,−t). Then (0)² + (0)² + (−t + 5)² = 1, so t² − 10t + 24 = 0, giving t = 4 or t = 6. The nearer hit is t = 4 at the point (0,0,−4). Cost check: a 800 × 600 image is 480,000 pixels, and with 3 objects the primary rays alone need 480,000 × 3 = 1,440,000 intersection tests.",
+   "trap": "Taking either root instead of the smallest positive one, accepting a hit with t < 0 (behind the eye), and leaving out the epsilon offset so the shadow ray hits the surface it started from.",
+   "prereq": "Chapter 3.7 for the lighting model; chapter 3.2 for plane equations; chapter 3.3 for sphere equations.",
+   "leave": "Real-time GPU rasterisation, photon mapping and anti-aliasing sampling schemes to later study; ray–polygon intersection beyond one line."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the faces listed in the polygon table each get a plane equation"
+  ],
+  [
+   2,
+   3,
+   "flat facets approximate a curved quadric surface"
+  ],
+  [
+   2,
+   6,
+   "plane normals drive the BSP split and the front/back test"
+  ],
+  [
+   3,
+   8,
+   "a quadric gives a closed-form ray intersection, so it is cheap to trace"
+  ],
+  [
+   4,
+   5,
+   "a Bezier curve is a B-spline with end knots repeated four times"
+  ],
+  [
+   5,
+   6,
+   "curves and surfaces are tessellated into polygons before visibility testing"
+  ],
+  [
+   6,
+   7,
+   "once the visible surface is known, that pixel is shaded"
+  ],
+  [
+   7,
+   8,
+   "ray tracing replaces scan-line shading with a shading call per ray hit"
+  ]
+ ]
+}
