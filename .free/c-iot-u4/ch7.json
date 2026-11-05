@@ -1,0 +1,221 @@
+{
+ "lead": "A simple IoT system turns a physical goal into a short loop: a sensor measures, a board decides, an actuator acts, and the board reports. The loop must still work when Wi-Fi or the cloud is down. Home water tanks show the pattern: an ultrasonic sensor measures empty space from the top, the board subtracts that from tank height, a relay starts a pump at a low level, and an MQTT dashboard shows the level. The same four steps fit parking, crop moisture, cold-chain and energy meters.",
+ "prereq": "You need: Chapters <a href='#interfacing-sensors-and-actuators-with-boards'>4.5</a> and <a href='#other-boards-esp8266-beaglebone-pcduino'>4.6</a>, MQTT basics from Unit 3, and the cloud overview in Unit 5.",
+ "sections": [
+  {
+   "h3": "From goal to threshold",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The design starts with one measurable goal, not a board. For a home tank, the goal is: keep water between 30 cm and 90 cm, and show the level on a phone. Write each limit with its unit and the exact operator. A start rule of ≤ 30 cm and a stop rule of ≥ 90 cm are different from a start rule of < 30 cm and a stop rule of > 90 cm: at exactly 30 cm the first starts the pump and the second does not."
+    },
+    {
+     "type": "p",
+     "text": "Choose a board after the goal. A Wi-Fi ESP8266 is enough for one ultrasonic sensor, one relay and an MQTT publish; a Raspberry Pi is better if you also need a camera or local logging (<a href='#other-boards-esp8266-beaglebone-pcduino'>4.6</a>). Mount the ultrasonic sensor at the tank top, facing down. It measures distance d to the water surface, not water depth. Define H as tank height in cm and d as that empty distance in cm. Then h = H − d, where h is water height in cm."
+    },
+    {
+     "type": "formula",
+     "text": "h = H − d    V = h × A",
+     "where": "h is water height in cm; H is tank height in cm; d is the distance from the top sensor to the water surface in cm; V is volume in cm³; A is base area in cm²."
+    },
+    {
+     "type": "p",
+     "text": "With base area A, volume V = h × A. Keep units consistent: 1 m² = 10 000 cm², and 1 L = 1000 cm³. Measure A from the inside of the tank. A square tank of side s has A = s²; a rectangular tank has A = length × breadth."
+    }
+   ]
+  },
+  {
+   "h3": "Local loop, radio and report",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Write the local control loop first, with the radio off. Read the sensor every few seconds; convert echo time to distance; compute h; reject impossible readings; apply the rule; drive the relay, an electrically operated switch. The pump must run on the local rule even when Wi-Fi or the cloud is down."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sense: trigger the ultrasonic sensor and read the echo; store d in cm.",
+      "Convert: h = H − d; if h < 0 or h > H, mark the reading invalid.",
+      "Decide: start pump when h ≤ 30 cm; stop pump when h ≥ 90 cm.",
+      "Act: switch the relay; keep the relay off while the reading is invalid.",
+      "Report: publish h, d and relay state to an MQTT topic such as home/tank/level every 60 s."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Hysteresis means two thresholds, not one. A single rule at 30 cm would switch the relay on and off as the water surface ripples. The 30 cm start and 90 cm stop band prevents that chatter. The cloud side can use MQTT, a publish-subscribe protocol, or HTTP, the request-reply protocol of the web. MQTT publishes to a topic and a dashboard subscribes; HTTP posts to an endpoint and waits for a reply. MQTT suits small, frequent readings on one topic. HTTP suits occasional updates where the device posts to an endpoint and waits for the reply. The dashboard shows level in cm, litres and pump state."
+    },
+    {
+     "type": "p",
+     "text": "Power and enclosure are part of the design. Use a regulated 5 V supply for the ESP8266; power the relay module from its specified supply. Use an opto-isolated relay board and keep the 230 V mains wiring in a closed box, wired by a qualified person. Add a watchdog timer, which reboots a stuck board. The safe fallback is simple: local control continues, the relay goes off on invalid sensor data, and readings wait in a small buffer for the next connection."
+    }
+   ]
+  },
+  {
+   "h3": "Test the boundary and the failure",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Test with a ruler, not only with water. Hold the sensor at known distances and check h and V. Test d = H (empty tank), d = 0 (full tank), and d just above and below each threshold. The 30 cm boundary is the examiner’s favourite: with the rule ≤ 30 cm the pump starts at exactly 30 cm; with < 30 cm it does not. Write the operator you tested."
+    },
+    {
+     "type": "p",
+     "text": "Failures to test: Wi-Fi off, cloud unreachable, sensor unplugged, board reboot, and power cut. After power returns, keep the pump off until a valid reading arrives. Do not expose the relay to the public internet; use a device password and an encrypted connection. Unit 5 covers cloud platforms and security design; here, keep secrets out of source code and give each device its own credentials. Log every threshold event with a timestamp; this turns a demo into a maintainable system."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The tank is 100 cm tall; at d = 70 cm the water height is 30 cm, so the level rule starts the pump. Notice that the cloud report is a dashed side path: the pump control stays local.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Water tank IoT loop",
+   "nodes": [
+    {
+     "id": "sense",
+     "label": "Ultrasonic sensor",
+     "note": "distance d",
+     "style": "accent"
+    },
+    {
+     "id": "mcu",
+     "label": "ESP8266",
+     "note": "height = 100 − d",
+     "style": "accent"
+    },
+    {
+     "id": "rule",
+     "label": "Level ≤ 30 cm?",
+     "note": "start pump",
+     "style": "live"
+    },
+    {
+     "id": "relay",
+     "label": "Relay",
+     "note": "pump switch",
+     "style": "normal"
+    },
+    {
+     "id": "pump",
+     "label": "Pump",
+     "note": "fills tank",
+     "style": "next"
+    },
+    {
+     "id": "cloud",
+     "label": "MQTT cloud",
+     "note": "dashboard",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "sense",
+     "to": "mcu",
+     "label": "echo",
+     "style": "solid"
+    },
+    {
+     "from": "mcu",
+     "to": "rule",
+     "label": "level",
+     "style": "solid"
+    },
+    {
+     "from": "rule",
+     "to": "relay",
+     "label": "ON",
+     "style": "solid"
+    },
+    {
+     "from": "relay",
+     "to": "pump",
+     "label": "230 V",
+     "style": "solid"
+    },
+    {
+     "from": "mcu",
+     "to": "cloud",
+     "label": "publish every 60 s",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Block diagram shows an ultrasonic sensor feeding an ESP8266 that starts a pump through a relay at low level and publishes readings to an MQTT cloud dashboard."
+  }
+ },
+ "examples": [
+  {
+   "question": "A home water tank is 100 cm tall and has base area 1 m². An ultrasonic sensor at the top reads distance d = 70 cm to the water surface. Find the water height and the volume in litres. The pump starts at level ≤ 30 cm and stops at level ≥ 90 cm. State the pump action at d = 70 cm. Explain why the operator matters at the boundary.",
+   "steps": [
+    "Tank height H = 100 cm; sensor distance d = 70 cm.",
+    "Water height h = H − d = 100 cm − 70 cm = 30 cm.",
+    "Base area A = 1 m² = 1 × 10 000 cm² = 10 000 cm².",
+    "Volume V = h × A = 30 cm × 10 000 cm² = 300 000 cm³.",
+    "Convert: V = 300 000 cm³ ÷ 1000 cm³/L = 300 L.",
+    "Rule: start when h ≤ 30 cm. Here h = 30 cm, so the condition is true and the pump starts.",
+    "The stop rule h ≥ 90 cm is false. If the start rule were h < 30 cm, the pump would not start at this exact reading, so the operator must match the design."
+   ],
+   "answer": "Water height is 30 cm, volume is 300 L, and the pump starts because 30 cm ≤ 30 cm.",
+   "check": "H = 100\nd = 70\nA_m2 = 1\nA_cm2 = A_m2 * 10000\nh = H - d\nV_cm3 = h * A_cm2\nV_L = V_cm3 / 1000\nprint(h)\nprint(int(V_L))",
+   "values": [
+    30,
+    300
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The sensor measures the air gap from the top, not the water depth. Subtract d from tank height H.",
+  "Do not convert m² to cm² by dividing; multiply by 10 000.",
+  "A single threshold makes the relay chatter; use hysteresis with separate start and stop levels.",
+  "At the boundary, ≤ and < give different actions; copy the design operator exactly.",
+  "The relay switches 230 V mains; keep low-voltage control and mains wiring isolated and enclosed."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four steps of the simple IoT loop in this chapter.",
+   "marks": 2,
+   "a": "Sense, decide, act, report. Convert (h = H − d) is a calculation inside the decide step, not a fifth step."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the pump use a 30 cm start and 90 cm stop instead of a single 30 cm threshold?",
+   "marks": 3,
+   "a": "Hysteresis prevents relay chatter and rapid pump cycling when the water surface ripples near the threshold."
+  },
+  {
+   "level": "apply",
+   "q": "A tank is 120 cm tall with base area 0.8 m². The sensor reads d = 45 cm. Find h and V in litres.",
+   "marks": 4,
+   "a": "h = 120 − 45 = 75 cm. A = 0.8 × 10 000 = 8000 cm². V = 75 × 8000 = 600 000 cm³ = 600 L."
+  },
+  {
+   "level": "analyze",
+   "q": "Wi-Fi fails for two hours. What should the ESP8266 do about the pump and about reporting?",
+   "marks": 4,
+   "a": "Keep local sense-decide-act running; keep the relay rule active. Buffer or drop readings and send the latest state when the link returns; do not stop the pump only because the cloud is unreachable."
+  },
+  {
+   "level": "apply",
+   "q": "Tank height 100 cm, rule starts at ≤ 25 cm and stops at ≥ 85 cm. The sensor reads d = 75 cm. What is h and what does the pump do?",
+   "marks": 2,
+   "a": "h = 100 − 75 = 25 cm; 25 ≤ 25 is true, so the pump starts."
+  },
+  {
+   "level": "understand",
+   "q": "Why publish every 60 s instead of on every loop pass?",
+   "marks": 3,
+   "a": "The dashboard does not need every sample; fewer messages save power and bandwidth and reduce cloud load. The local loop still runs fast."
+  },
+  {
+   "level": "analyze",
+   "q": "The sensor reports d = 0 cm on a 100 cm tank. What does that mean and what should the controller do?",
+   "marks": 5,
+   "a": "d = 0 means the surface is at the sensor, so h = 100 cm (full) if the reading is valid; however, it can also be a stuck or fault reading. Check range and continuity, keep the pump off because h = 100 ≥ 90, and flag a sensor fault if the value does not change."
+  }
+ ],
+ "beyond": "Not for the exam. Industrial designs add edge filtering, signed over-the-air updates, and a local-first rule engine so pumps and valves keep working during a cloud outage. Research directions include TinyML on the sensor node and anomaly detection on the gateway. Search for “local-first IoT”, “OTA firmware update” and “edge analytics for water networks” to go further. The design habit to keep: one goal, one measured quantity, two thresholds, and a safe state."
+}

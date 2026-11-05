@@ -1,0 +1,235 @@
+{
+ "lead": "Python is the usual language for Raspberry Pi control because it reads like plain English and has libraries for the GPIO header. A short script can set a pin high, wait, read a button, or fetch a number from an external chip. This chapter shows the Python pieces you need, the gpiozero calls for LEDs and buttons, and the SPI route to an analog sensor. The Pi has no analog input pins, so an external ADC such as the MCP3008 is part of the circuit, not an optional extra.",
+ "prereq": "You need: the Raspberry Pi board, Linux and 3.3 V GPIO header from <a href=\"#raspberry-pi-board-interfaces-and-linux\">Chapter 4.3</a>.",
+ "sections": [
+  {
+   "h3": "Python pieces you need",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A variable is a name for a value. <code>t = 20.0</code> stores a float in <code>t</code>. A list holds many values in order: <code>temps = [20.0, 21.5, 19.8]</code>. Indexing starts at 0, so <code>temps[0]</code> is 20.0. A <code>for</code> loop visits each item. An <code>if</code> chooses a branch when a condition is true. A function groups steps under a name and returns a result."
+    },
+    {
+     "type": "p",
+     "text": "Use <code>import</code> to load a module. <code>import time</code> gives <code>time.sleep</code>; <code>from gpiozero import LED</code> brings one class into your file. Save a script as <code>blink.py</code> and run it with <code>python3 blink.py</code>. The program runs top to bottom, then exits unless it contains a loop."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "temps = [20.0, 21.5, 19.8]\ntotal = 0.0\nfor t in temps:\n    total = total + t\nmean = total / len(temps)\nprint(f'mean = {mean:.2f} C')",
+     "stdin": "",
+     "output": "mean = 20.43 C"
+    }
+   ]
+  },
+  {
+   "h3": "GPIO output and input with gpiozero",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "GPIO means general-purpose input/output. gpiozero names a pin by its Broadcom GPIO number. <code>LED(17)</code> means GPIO17, not physical pin 17. The library sets the pin as an output for you. <code>led.on()</code>, <code>led.off()</code> and <code>led.toggle()</code> change it. For input, <code>Button(27)</code> creates a button object on GPIO27. <code>button.is_pressed</code> is <code>True</code> while the button is held. <code>button.when_pressed</code> can call a function instead of polling."
+    },
+    {
+     "type": "p",
+     "text": "The older <code>RPi.GPIO</code> library uses different names. You set a numbering mode once with <code>GPIO.setmode(GPIO.BCM)</code>; then <code>GPIO.setup(17, GPIO.OUT)</code>, <code>GPIO.setup(27, GPIO.IN)</code>, <code>GPIO.output(17, GPIO.HIGH)</code>, and <code>GPIO.input(27)</code> work on the same header. Do not mix BCM and board numbering in one program. <code>time.sleep(0.05)</code> pauses for 0.05 s and stops the CPU from spinning in a tight loop."
+    },
+    {
+     "type": "code",
+     "lang": "pseudo",
+     "code": "from gpiozero import LED, Button\nfrom time import sleep\nled = LED(17)\nbutton = Button(27)\nwhile True:\n    if button.is_pressed:\n        led.on()\n    else:\n        led.off()\n    sleep(0.05)",
+     "stdin": "",
+     "output": ""
+    }
+   ]
+  },
+  {
+   "h3": "Reading an analog sensor over SPI",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Pi's GPIO header is digital: a pin reads 0 or 1, roughly 0 V or 3.3 V. A sensor such as the LM35 gives a voltage that changes smoothly with temperature, so the Pi needs an external analog-to-digital converter (ADC). The MCP3008 is a 10-bit ADC with eight input channels and an SPI (Serial Peripheral Interface) connection. It returns an integer code from 0 to 1023."
+    },
+    {
+     "type": "p",
+     "text": "Wire the LM35 output to channel 0 of the MCP3008. The Pi talks to the MCP3008 over SPI: four wires, clock, data in, data out and chip select. In Python, <code>gpiozero</code> provides <code>MCP3008</code>; create it as <code>adc = MCP3008(channel=0)</code> together with the SPI pins. Then <code>adc.value</code> gives the reading as a fraction of V<sub>ref</sub> (0 to 1), and <code>adc.raw_value</code> gives the integer code 0 to 1023. For another channel, create another <code>MCP3008</code> object with a different channel number. The conversion is:"
+    },
+    {
+     "type": "formula",
+     "text": "V<sub>in</sub> = (code ÷ 1023) × V<sub>ref</sub>",
+     "where": "V<sub>in</sub> is the ADC input voltage in volts; code is the raw 10-bit value, 0 to 1023; 1023 is 2<sup>10</sup> − 1, the full-scale code; V<sub>ref</sub> is the ADC reference voltage in volts, here 3.3 V."
+    },
+    {
+     "type": "p",
+     "text": "For the LM35, the output is 10 mV per °C, that is 0.010 V/°C. So <code>T = V<sub>in</sub> ÷ 0.010 V/°C</code>. A code of 62 with V<sub>ref</sub> = 3.3 V gives 0.200 V and 20.0 °C. The sequence diagram shows the same exchange. Keep the reference stable; a noisy 3.3 V rail adds error to every code. Sensor physics is in <a href=\"#interfacing-sensors-and-actuators-with-boards\">Chapter 4.5</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "A Python script asks gpiozero for channel 0; the MCP3008 samples the LM35 and returns raw 62, which the script converts to 20.0 °C.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Python script",
+    "gpiozero",
+    "MCP3008",
+    "LM35"
+   ],
+   "messages": [
+    {
+     "from": "Python script",
+     "to": "gpiozero",
+     "label": "open SPI",
+     "dashed": false
+    },
+    {
+     "from": "gpiozero",
+     "to": "MCP3008",
+     "label": "read channel 0",
+     "dashed": false
+    },
+    {
+     "from": "MCP3008",
+     "to": "LM35",
+     "label": "sample voltage",
+     "dashed": false
+    },
+    {
+     "from": "LM35",
+     "to": "MCP3008",
+     "label": "0.200 V",
+     "dashed": true
+    },
+    {
+     "from": "MCP3008",
+     "to": "gpiozero",
+     "label": "raw 62",
+     "dashed": true
+    },
+    {
+     "from": "gpiozero",
+     "to": "Python script",
+     "label": "62",
+     "dashed": true
+    },
+    {
+     "from": "Python script",
+     "to": "Python script",
+     "label": "T = 20.0 °C",
+     "dashed": false
+    }
+   ],
+   "aria": "Sequence diagram shows a Python script asking gpiozero, MCP3008 and LM35 for a reading, returning raw 62 and 20.0 °C."
+  }
+ },
+ "examples": [
+  {
+   "question": "An LM35 sensor outputs 10 mV per °C. It feeds channel 0 of an MCP3008 10-bit ADC with reference 3.3 V. A Python script reads raw value 62. Find the ADC input voltage and the temperature. Then write a Python program that performs the conversion and prints both values.",
+   "steps": [
+    "LM35 sensitivity = 10 mV/°C = 0.010 V/°C; ADC full-scale code = 2<sup>10</sup> − 1 = 1023.",
+    "ADC input voltage: V<sub>in</sub> = (62 ÷ 1023) × 3.3 V = 0.200 V. Here 62 is the raw code, 1023 is full scale, and 3.3 V is V<sub>ref</sub>.",
+    "Temperature: T = 0.200 V ÷ 0.010 V/°C = 20.0 °C.",
+    "The program uses the same formula; its output is V = 0.200 V and T = 20.0 C."
+   ],
+   "answer": "The ADC input is 0.200 V and the LM35 temperature is 20.0 °C.",
+   "check": "code = 62\nvref = 3.3\nfull_scale = 1023\nvin = code / full_scale * vref\nsensitivity = 0.010\ntemperature = vin / sensitivity\nprint(round(vin, 3))\nprint(round(temperature, 1))",
+   "values": [
+    0.2,
+    20.0
+   ],
+   "code": {
+    "lang": "python",
+    "code": "code = 62\nvref = 3.3\nfull_scale = 1023\nvin = code / full_scale * vref\nsensitivity = 0.010\ntemperature = vin / sensitivity\nprint(f'V = {vin:.3f} V')\nprint(f'T = {temperature:.1f} C')",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "code",
+     "V_in (V)",
+     "T (°C)"
+    ],
+    "rows": [
+     [
+      "Read raw value",
+      "62",
+      "",
+      ""
+     ],
+     [
+      "Scale by V_ref",
+      "62",
+      "0.200",
+      ""
+     ],
+     [
+      "Divide by sensitivity",
+      "62",
+      "0.200",
+      "20.0"
+     ]
+    ]
+   },
+   "output": "V = 0.200 V\nT = 20.0 C"
+  }
+ ],
+ "traps": [
+  "The Pi has no analog input pins. <code>analogRead()</code> is an Arduino call; on the Pi use an external ADC such as MCP3008 or ADS1115.",
+  "Pin numbers: gpiozero uses BCM numbers. <code>LED(17)</code> is GPIO17, not physical pin 17. Set RPi.GPIO to <code>GPIO.BCM</code> and stay with it.",
+  "MCP3008 is 10-bit: the code runs 0 to 1023. Using 1024 as the full-scale divisor gives a small but real error.",
+  "LM35 sensitivity is 10 mV/°C = 0.010 V/°C, not 10 V/°C. A reading of 0.200 V is 20 °C, not 200 °C.",
+  "gpiozero and RPi.GPIO have different method names. <code>led.on()</code> is gpiozero; <code>GPIO.output(pin, GPIO.HIGH)</code> is RPi.GPIO. Do not mix them in one object."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which gpiozero classes are used for an LED and a push button?",
+   "marks": 2,
+   "a": "<code>LED</code> and <code>Button</code>; for example <code>from gpiozero import LED, Button</code>."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a Raspberry Pi need an MCP3008 to read an LM35?",
+   "marks": 3,
+   "a": "The Pi GPIO header is digital only; the LM35 output is an analog voltage. The MCP3008 converts that voltage to a 10-bit digital code over SPI."
+  },
+  {
+   "level": "apply",
+   "q": "An MCP3008 has V_ref = 3.3 V and returns code 512. Find V_in.",
+   "marks": 4,
+   "a": "V_in = (512 ÷ 1023) × 3.3 V = 1.652 V, about 1.65 V."
+  },
+  {
+   "level": "analyze",
+   "q": "The LM35 temperature rises from 20 °C to 30 °C. What happens to the raw MCP3008 code? Use 10 mV/°C and V_ref = 3.3 V.",
+   "marks": 4,
+   "a": "LM35 output rises by 10 mV/°C × 10 °C = 0.100 V, from 0.200 V to 0.300 V. Code rises from 62 to (0.300 ÷ 3.3) × 1023 ≈ 93, an increase of about 31 counts."
+  },
+  {
+   "level": "apply",
+   "q": "An LM35 output is 0.300 V. Find the temperature.",
+   "marks": 3,
+   "a": "T = 0.300 V ÷ 0.010 V/°C = 30.0 °C."
+  },
+  {
+   "level": "understand",
+   "q": "What does <code>time.sleep(0.05)</code> do in a GPIO loop?",
+   "marks": 2,
+   "a": "It pauses the script for 0.05 s, reducing CPU use and setting the loop period."
+  },
+  {
+   "level": "remember",
+   "q": "In RPi.GPIO, what does <code>GPIO.setmode(GPIO.BCM)</code> choose?",
+   "marks": 2,
+   "a": "It chooses Broadcom GPIO numbers for pin names, not physical header pin numbers."
+  },
+  {
+   "level": "analyze",
+   "q": "A program uses <code>LED(17)</code> but the LED is wired to physical pin 11. Will it light? Explain.",
+   "marks": 4,
+   "a": "On a 40-pin header, physical pin 11 is GPIO17, so yes, if the LED is on GPIO17. If the LED were on a different GPIO, it would not light; gpiozero uses BCM numbers."
+  }
+ ],
+ "beyond": "Not for the exam. Newer Pi images replace some old GPIO libraries with <code>lgpio</code> and <code>libgpiod</code>; gpiozero can sit on top of them, so the same LED and Button code often survives. Search for <code>gpiozero</code>, <code>libgpiod</code>, and <code>MCP3008 SPI Python</code> to see current examples. In products, the same read-compute-act loop is wrapped in a service that logs readings and reconnects after a network drop. For fast or many-channel sensing, an ADS1115 or a small microcontroller front end is common. The pattern to carry forward is: keep the hardware call short, convert units once, and test with known values."
+}
