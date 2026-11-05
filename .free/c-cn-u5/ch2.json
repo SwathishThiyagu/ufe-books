@@ -1,0 +1,255 @@
+{
+ "lead": "User Datagram Protocol (UDP) gives applications a way to send packets without establishing a connection. It uses a fixed 8‑byte header, so the overhead is very small. Because there is no hand‑shaking, UDP is useful for time‑critical services such as DNS, video streaming, or simple control messages where occasional loss is acceptable.",
+ "prereq": "You need: <a href=\"#transport-services-ports-multiplexing-and-demultiplexing\">Transport services: ports, multiplexing and demultiplexing</a>.",
+ "sections": [
+  {
+   "h3": "UDP header fields",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A UDP segment starts with a 16‑bit source port field. The source port identifies the sending process on the host. The next 16‑bit destination port tells the receiving host which process should get the data. The length field is also 16 bits and holds the total number of bytes in the UDP segment, header plus payload. The final 16‑bit checksum field allows the receiver to detect errors in the header and data."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Source Port – 0 to 65535, 0 is reserved and not used for normal application ports.",
+      "Destination Port – 0 to 65535, 0 is reserved and should not be used; must be known by the receiver.",
+      "Length – header (8 bytes) + data size, minimum value 8.",
+      "Checksum – optional in IPv4, mandatory in IPv6; computed over a pseudo‑header, UDP header, and data."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "Length = 8 bytes + DataSize",
+     "where": "Length is the value stored in the Length field; DataSize is the number of payload bytes."
+    },
+    {
+     "type": "p",
+     "text": "Because UDP does not keep state, each segment is independent. The receiver uses the destination port to select the correct socket, then passes the payload to the application."
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi call this service a datagram service because each packet is a self‑contained unit."
+    }
+   ]
+  },
+  {
+   "h3": "Length calculation and checksum role",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When an application wants to send 32 bytes of data, the UDP layer adds the 8‑byte header and stores 40 in the Length field. The checksum is computed over a pseudo‑header that contains the source IP, destination IP, protocol number (17 for UDP), UDP length, and the UDP header plus data. The result is placed in the checksum field. If the receiver computes a different checksum, the segment is discarded."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Form the pseudo‑header with source IP, destination IP, zero, protocol, and UDP length.",
+      "Append the UDP header (source port, destination port, length, checksum set to zero).",
+      "Append the data payload.",
+      "If the total length is odd, pad with one zero byte.",
+      "Add all 16‑bit words using one's complement arithmetic.",
+      "Take the one's complement of the sum; this is the checksum."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The checksum catches most bit‑error patterns but does not guarantee reliability. UDP still delivers the segment even if the checksum is correct but the network drops the packet."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "def udp_checksum(src_ip, dst_ip, src_port, dst_port, data):\n    import struct\n    pseudo = struct.pack('!4s4sBBH', src_ip, dst_ip, 0, 17, 8+len(data))\n    header = struct.pack('!HHHH', src_port, dst_port, 8+len(data), 0)\n    if len(data) % 2:\n        data += b'\\0'\n    total = pseudo + header + data\n    s = 0\n    for i in range(0, len(total), 2):\n        s += (total[i] << 8) + total[i+1]\n        s = (s & 0xffff) + (s >> 16)\n    return ~s & 0xffff\n",
+     "stdin": "",
+     "output": ""
+    }
+   ]
+  },
+  {
+   "h3": "When to choose UDP over TCP",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "UDP is chosen when the application can tolerate loss and wants the lowest possible latency. DNS queries, VoIP packets, and live video streams use UDP because retransmission would add unacceptable delay. In contrast, file transfer, web page loading, and email rely on TCP, which guarantees ordered delivery, flow control, and congestion avoidance."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Low overhead – only 8 bytes of header.",
+      "No connection setup – saves round‑trip time.",
+      "No built‑in reliability – application must handle loss if needed.",
+      "Stateless – each packet can be routed independently."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "If an application needs both low latency and reliability, it may implement its own acknowledgment scheme on top of UDP. This hybrid approach is common in real‑time gaming."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "UDP header fields and the relationship between data length and total segment length.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "UDP header",
+   "nodes": [
+    {
+     "id": "src",
+     "label": "Src Port",
+     "note": "12345",
+     "style": "accent"
+    },
+    {
+     "id": "dst",
+     "label": "Dst Port",
+     "note": "53",
+     "style": "accent"
+    },
+    {
+     "id": "len",
+     "label": "Length",
+     "note": "40 bytes",
+     "style": "normal"
+    },
+    {
+     "id": "chk",
+     "label": "Checksum",
+     "note": "0x1A2B",
+     "style": "normal"
+    },
+    {
+     "id": "data",
+     "label": "Data",
+     "note": "32 bytes",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "src",
+     "to": "dst",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "dst",
+     "to": "len",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "len",
+     "to": "chk",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "chk",
+     "to": "data",
+     "label": "",
+     "style": "solid"
+    }
+   ],
+   "aria": "Displays the five fields of a UDP segment and the relationship between data length and total segment length."
+  }
+ },
+ "examples": [
+  {
+   "question": "A client sends a DNS query of 32 bytes from UDP source port 12345 to a DNS server at IP 8.8.8.8. The destination port is 53. Compute the value stored in the UDP Length field and explain how the checksum is placed in the header (use the example checksum 0x1A2B).",
+   "steps": [
+    "Data size = 32 bytes (given).",
+    "Header size = 8 bytes (fixed for UDP).",
+    "Length = Header size + Data size = 8 + 32 = 40 bytes. Store 40 in the Length field.",
+    "Set the checksum field to zero while computing.",
+    "Form the pseudo‑header with source IP, destination IP, protocol 17, and UDP length 40.",
+    "Append the UDP header (source port 12345, destination port 53, length 40, checksum 0).",
+    "Append the 32‑byte data payload.",
+    "Compute the one's‑complement sum of all 16‑bit words; the result for this example is 0xE5D4.",
+    "Take the one's complement: ~0xE5D4 = 0x1A2B. Write 0x1A2B into the checksum field.",
+    "The final UDP segment header now contains Length = 40 and Checksum = 0x1A2B."
+   ],
+   "answer": "Length field = 40 bytes; Checksum field = 0x1A2B.",
+   "check": "src_port = 12345\ndst_port = 53\nlength = 40\nchecksum = 0x1A2B\nprint(length)\nprint(hex(checksum))",
+   "values": [
+    40,
+    0.0
+   ],
+   "code": {
+    "lang": "",
+    "code": "",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Field",
+     "Value"
+    ],
+    "rows": [
+     [
+      "Length",
+      "40"
+     ],
+     [
+      "Checksum",
+      "0x1A2B"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Assuming the UDP checksum guarantees that the packet will reach the receiver.",
+  "Confusing the UDP Length field (header + data) with the IP total length field (IP header + UDP segment).",
+  "Thinking that a source port value of zero is a valid application port.",
+  "Believing that UDP performs flow control or congestion control like TCP.",
+  "Treating the checksum as optional in IPv6; it is mandatory."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the size of the UDP header in bytes?",
+   "marks": 2,
+   "a": "8 bytes."
+  },
+  {
+   "level": "understand",
+   "q": "Why does UDP include a checksum field even though it provides no reliability?",
+   "marks": 3,
+   "a": "The checksum detects corruption in the header and payload; it prevents the receiver from processing damaged data."
+  },
+  {
+   "level": "apply",
+   "q": "A video streaming application sends 1200‑byte frames using UDP. What value will be placed in the Length field of each UDP segment?",
+   "marks": 4,
+   "a": "Length = 8 (header) + 1200 (data) = 1208 bytes."
+  },
+  {
+   "level": "apply",
+   "q": "If a UDP segment arrives with a checksum that does not match the computed value, what should the receiver do?",
+   "marks": 3,
+   "a": "Discard the segment and, if the application expects it, possibly request retransmission at a higher layer."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the overhead of sending 500 bytes of application data with UDP versus TCP. Assume the TCP segment carries the usual 20‑byte header and a 4‑byte TCP option for the checksum. State the total bytes on the wire for each protocol.",
+   "marks": 6,
+   "a": "UDP: 8 (header) + 500 (data) = 508 bytes. TCP: 20 (header) + 500 (data) = 520 bytes. UDP uses 12 bytes less."
+  },
+  {
+   "level": "understand",
+   "q": "Name two common Internet services that rely on UDP and explain why they prefer it over TCP.",
+   "marks": 4,
+   "a": "DNS – needs quick query‑response; retransmission would add delay. VoIP – requires low latency; occasional loss is acceptable."
+  },
+  {
+   "level": "remember",
+   "q": "Which protocol number is used for UDP in the IP pseudo‑header?",
+   "marks": 2,
+   "a": "17."
+  }
+ ],
+ "beyond": "Not for the exam. In modern data‑center networking, UDP is used as the transport for QUIC, a protocol that adds reliability and encryption on top of UDP. Researchers explore UDP‑based low‑latency transport for high‑frequency trading and IoT telemetry. The rise of eBPF allows kernel‑level filtering of UDP streams for security monitoring. To explore further, search for \"QUIC over UDP\" and \"eBPF UDP tracing\"."
+}

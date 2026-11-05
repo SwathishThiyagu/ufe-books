@@ -1,0 +1,187 @@
+{
+ "lead": "TCP flow control prevents a fast sender from overrunning a slow receiver. The receiver tells the sender how much buffer space is free using the receive‑window field. The sender limits the amount of unacknowledged data to this advertised size. If the window becomes zero, the sender sends a zero‑window probe (a 1‑byte segment) to learn when space is available again. This mechanism is used in all reliable TCP connections, for example when a mobile phone downloads a video over a 4G link that occasionally stalls.",
+ "prereq": "You need: <a href=\"#tcp-connection-establishment-and-release\">TCP connection establishment and release</a>.",
+ "sections": [
+  {
+   "h3": "Receive window field",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The TCP header contains a 16‑bit receive‑window field. The field value, called rwnd, is the number of bytes the receiver can accept without overflow. rwnd is the number of bytes of free space in the receiver buffer, i.e., the amount of data the receiver can accept without overflow."
+    },
+    {
+     "type": "p",
+     "text": "rwnd is sent in every ACK. The sender reads the value and treats it as an upper bound on the amount of data that may be outstanding."
+    },
+    {
+     "type": "formula",
+     "text": "sendable ≤ rwnd",
+     "where": "sendable is the total number of bytes transmitted but not yet acknowledged; rwnd is the advertised receive window in bytes."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "rwnd = 0 means the receiver buffer is full.",
+      "rwnd > 0 allows the sender to transmit up to rwnd bytes."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Sender limit and zero‑window probing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The sender maintains a variable called outstanding, the sum of all transmitted bytes that have not been ACKed. Before sending a new segment the sender checks outstanding + segment size ≤ rwnd."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Read rwnd from the latest ACK.",
+      "Compute allowed = rwnd – outstanding.",
+      "If allowed ≥ MSS, send floor(allowed/MSS) full‑size segments.",
+      "If rwnd == 0 (i.e., allowed = 0 because the advertised window is zero), send a 1‑byte zero‑window probe.",
+      "If allowed = 0 but rwnd > 0, wait for ACKs; do not send a probe."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A zero‑window probe forces the receiver to send an ACK that contains an updated rwnd. The probe carries only one byte so it does not fill the buffer."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Sliding window shows that the sender may transmit only up to the advertised receive window.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Sliding window",
+   "nodes": [
+    {
+     "id": "snd",
+     "label": "Sender",
+     "note": "5 KB window",
+     "style": "accent"
+    },
+    {
+     "id": "rcv",
+     "label": "Receiver",
+     "note": "3 KB advertised",
+     "style": "accent"
+    },
+    {
+     "id": "buf",
+     "label": "Buffer",
+     "note": "",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "snd",
+     "to": "buf",
+     "label": "send ≤ 3 KB",
+     "style": "solid"
+    },
+    {
+     "from": "rcv",
+     "to": "buf",
+     "label": "ack",
+     "style": "solid"
+    }
+   ],
+   "aria": "Illustrates how the sender can transmit only up to the advertised receive window size."
+  }
+ },
+ "examples": [
+  {
+   "question": "A TCP sender has a congestion window (cwnd) of 5 KB and receives a receive‑window advertisement (rwnd) of 3 KB. The maximum segment size (MSS) is 1 KB. How many full‑size segments can the sender transmit before it must wait for a new ACK? If the receiver later advertises a zero window, what does the sender do?",
+   "steps": [
+    "Read rwnd = 3 KB.",
+    "Compute allowed = min(cwnd, rwnd) = 3 KB.",
+    "Number of full‑size segments = floor(allowed / MSS) = floor(3 KB / 1 KB) = 3.",
+    "The sender transmits three 1 KB segments.",
+    "If rwnd becomes 0, the sender sends a 1‑byte zero‑window probe.",
+    "The probe elicits an ACK that may contain a non‑zero rwnd."
+   ],
+   "answer": "The sender can send 3 full‑size segments (3 KB) before waiting for an ACK; on a zero window it sends a 1‑byte probe.",
+   "check": "rwnd = 3 * 1024\nmss = 1 * 1024\nsegments = rwnd // mss\nprint(segments)",
+   "values": [
+    3
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int cwnd = 5*1024; // bytes (congestion window)\n    int rwnd = 3*1024; // bytes (receive window)\n    int mss  = 1*1024; // bytes (maximum segment size)\n    int allowed = (cwnd < rwnd) ? cwnd : rwnd; // apply both limits\n    int seg = allowed / mss; // number of full‑size segments\n    printf(\"%d\\n\", seg);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "i",
+     "rwnd",
+     "seg"
+    ],
+    "rows": [
+     [
+      "0",
+      "3072",
+      "3"
+     ]
+    ]
+   },
+   "output": "3"
+  }
+ ],
+ "traps": [
+  "Confusing the receive window (rwnd) with the congestion window (cwnd) and applying both limits twice.",
+  "Treating rwnd = 0 as a permanent deadlock instead of a condition that can be resolved with a zero‑window probe.",
+  "Using the advertised window in bytes but subtracting the segment header size, which the protocol does not require.",
+  "Assuming the sender can send more data after a probe before receiving the updated rwnd."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What TCP header field carries the amount of free buffer space at the receiver?",
+   "marks": 2,
+   "a": "The 16‑bit receive‑window field (rwnd)."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why the sender must limit outstanding data to the advertised receive window.",
+   "marks": 3,
+   "a": "If the sender exceeds the advertised space, the receiver’s buffer overflows, causing packet loss and retransmission. Limiting to rwnd guarantees that every byte can be stored until the receiver reads it."
+  },
+  {
+   "level": "apply",
+   "q": "Given cwnd = 8 KB, rwnd = 4 KB, and MSS = 1 KB, calculate the maximum number of full‑size segments the sender may transmit now.",
+   "marks": 4,
+   "a": "Allowed = min(cwnd, rwnd) = 4 KB. Segments = floor(4 KB / 1 KB) = 4."
+  },
+  {
+   "level": "apply",
+   "q": "If a receiver advertises rwnd = 0, what exact segment does the sender transmit and why?",
+   "marks": 3,
+   "a": "The sender transmits a 1‑byte zero‑window probe to elicit an ACK that may contain a non‑zero rwnd."
+  },
+  {
+   "level": "analyze",
+   "q": "A connection shows rwnd values of 6 KB, 0 KB, 2 KB in three successive ACKs while cwnd stays at 10 KB. Identify the likely cause of the zero‑window event and the effect of the subsequent probe.",
+   "marks": 5,
+   "a": "The receiver’s buffer became full (e.g., application stopped reading). The zero‑window forces the sender to send a probe; the next ACK with rwnd = 2 KB indicates the receiver freed 2 KB, allowing the sender to resume sending."
+  },
+  {
+   "level": "understand",
+   "q": "Why does TCP use a 16‑bit field for rwnd, and what is the practical limit on the advertised window size?",
+   "marks": 3,
+   "a": "A 16‑bit field allows values up to 65 535 bytes. TCP uses a scaling option to increase the effective window up to several megabytes when needed."
+  },
+  {
+   "level": "remember",
+   "q": "Name the mechanism that updates the sender about a newly available receive window after a zero‑window probe.",
+   "marks": 2,
+   "a": "The receiver sends an ACK that carries the updated rwnd value."
+  }
+ ],
+ "beyond": "Not for the exam. In modern data‑center fabrics, flow control interacts with explicit congestion notification (ECN) to improve latency. Research explores dynamic window scaling based on machine‑learning predictions of application consumption rates. Mobile operating systems combine TCP flow control with power‑saving modes to avoid wake‑ups. Future curricula may merge TCP receive‑window management with QUIC’s stream‑level flow control."
+}
