@@ -1,0 +1,261 @@
+{
+ "lead": "Forward propagation runs a neural network from input to loss and stores every intermediate value. Backpropagation starts at the loss and applies the chain rule backwards to get the gradient of that loss for every weight and bias. The pair is the training engine of deep learning: the forward pass gives one number that says how wrong the network is, and the backward pass says how to change each weight to make that number smaller. The same machinery trains image classifiers, speech recognisers and language models, and one backward pass costs about as much as one forward pass.",
+ "prereq": "You need: <a href=\"#multilayer-perceptrons-and-universal-approximation\">multilayer perceptrons</a>, <a href=\"#activation-functions-sigmoid-tanh-relu-and-softmax\">activation derivatives</a>, and <a href=\"#loss-functions-and-output-layers\">loss functions</a>.",
+ "sections": [
+  {
+   "h3": "Forward pass on a computation graph",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Write the network as a graph. Each node is a small operation: a matrix product, a bias add, an activation, a loss. For a two-layer network with input x, hidden layer 1 and output layer:"
+    },
+    {
+     "type": "formula",
+     "text": "z¹ = W¹x + b¹",
+     "where": "x is the input vector; W¹ is the weight matrix of layer 1; b¹ is its bias vector; z¹ is the pre-activation vector."
+    },
+    {
+     "type": "formula",
+     "text": "h = f(z¹)",
+     "where": "h is the hidden activation; f is a non-linear function such as ReLU, sigmoid or tanh."
+    },
+    {
+     "type": "formula",
+     "text": "ŷ = w²h + b²",
+     "where": "w² is the output weight row; b² is the output bias; ŷ is the network output."
+    },
+    {
+     "type": "formula",
+     "text": "L = loss(ŷ, y)",
+     "where": "y is the target; L is one scalar loss that says how wrong the output is."
+    },
+    {
+     "type": "p",
+     "text": "This forward run computes L from x. Store z¹, h, ŷ and any other intermediate value. The backward pass reuses them, so recomputing them is wasted work. In deep networks the graph can have millions of nodes, but each node is local and cheap."
+    }
+   ]
+  },
+  {
+   "h3": "Backward pass: the chain rule in layers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Backpropagation asks one question: if L changes slightly when a weight changes, by how much does L change? The chain rule answers it along the graph. For the output weight w, ∂L/∂w = ∂L/∂ŷ · ∂ŷ/∂w. The first factor is the loss slope at the output. The second factor is local to the output layer. In the example, ∂L/∂w² = (ŷ − y)h."
+    },
+    {
+     "type": "formula",
+     "text": "δˡ = ∂L/∂zˡ",
+     "where": "δˡ is the local error vector of layer l; it measures how sensitive the loss is to the pre-activation zˡ."
+    },
+    {
+     "type": "p",
+     "text": "At the output layer, start with δ = ∂L/∂ŷ ⊙ f′(z). For a hidden layer, push the error back through the next weight matrix and multiply by the local activation derivative:"
+    },
+    {
+     "type": "formula",
+     "text": "δˡ = (Wˡ⁺¹)ᵀ δˡ⁺¹ ⊙ f′(zˡ)",
+     "where": "Wˡ⁺¹ is the weight matrix of the next layer; ᵀ means transpose; ⊙ means element-wise product; f′ is the derivative of the activation."
+    },
+    {
+     "type": "p",
+     "text": "Once δˡ is known, the gradients for that layer are simple:"
+    },
+    {
+     "type": "formula",
+     "text": "∂L/∂Wˡ = δˡ (aˡ⁻¹)ᵀ",
+     "where": "aˡ⁻¹ is the activation from the previous layer; the outer product gives one gradient for every weight in Wˡ."
+    },
+    {
+     "type": "formula",
+     "text": "∂L/∂bˡ = δˡ",
+     "where": "the bias gradient is just the local error vector."
+    },
+    {
+     "type": "p",
+     "text": "The backward pass visits each node once in reverse order. Its cost is about the same as the forward pass, constant-factor times, not a new big-O class. A gradient check compares a backward gradient with (L(w+ε) − L(w−ε))/(2ε) for a small ε. Some syllabi call this area other differentiation algorithms; the practical answer is automatic differentiation, which differentiates the same graph exactly."
+    }
+   ]
+  },
+  {
+   "h3": "Shapes and the ReLU gate",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Keep shapes straight. For a layer with nˡ units and previous layer with nˡ⁻¹ units, Wˡ has shape nˡ × nˡ⁻¹, bˡ has shape nˡ, δˡ has shape nˡ, and aˡ⁻¹ has shape nˡ⁻¹. Then δˡ(aˡ⁻¹)ᵀ has shape nˡ × nˡ⁻¹, which matches Wˡ. A shape error in backprop usually means a transpose is missing or the batch dimension is treated like a feature."
+    },
+    {
+     "type": "p",
+     "text": "The activation derivative is a gate. ReLU has derivative 1 for z > 0 and 0 for z < 0. If z¹ is negative, δ¹ becomes zero and the first layer receives no gradient from this example. That is not a bug; it is the ReLU deciding that this unit is off. Sigmoid and tanh have small derivatives at large magnitudes, so their gradients shrink."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The forward chain turns x = (1, 2) into loss L = 0.5; the dashed path carries each local derivative back to the first layer. The output-layer gradient ∂L/∂w² = −2.5 is the first value the backward pass can compute.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One forward and one backward pass",
+   "nodes": [
+    {
+     "id": "in",
+     "label": "Input",
+     "note": "x = (1, 2)",
+     "style": "accent"
+    },
+    {
+     "id": "z1",
+     "label": "Linear layer 1",
+     "note": "z¹ = 2.5",
+     "style": "normal"
+    },
+    {
+     "id": "relu",
+     "label": "ReLU",
+     "note": "h = 2.5",
+     "style": "normal"
+    },
+    {
+     "id": "out",
+     "label": "Output layer",
+     "note": "ŷ = 4",
+     "style": "live"
+    },
+    {
+     "id": "loss",
+     "label": "Loss",
+     "note": "L = 0.5",
+     "style": "next"
+    },
+    {
+     "id": "back",
+     "label": "Backward pass",
+     "note": "∂L/∂w² = −2.5",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "in",
+     "to": "z1"
+    },
+    {
+     "from": "z1",
+     "to": "relu"
+    },
+    {
+     "from": "relu",
+     "to": "out"
+    },
+    {
+     "from": "out",
+     "to": "loss"
+    },
+    {
+     "from": "loss",
+     "to": "back",
+     "label": "chain rule",
+     "style": "dashed"
+    },
+    {
+     "from": "back",
+     "to": "z1",
+     "label": "gradients",
+     "style": "dashed"
+    }
+   ],
+   "aria": "The forward chain runs from the input through a linear layer, ReLU, output layer and loss, then a dashed backward pass returns gradients to the first layer."
+  }
+ },
+ "examples": [
+  {
+   "question": "A network has input x = (1, 2), one hidden unit with weights W¹ = (0.5, 1.0), bias b¹ = 0, and ReLU activation. The output is ŷ = 2h − 1 with target y = 5. The loss is L = ½(ŷ − y)². Compute the forward values, every gradient named below, and one gradient-descent update for w² and b¹ with step size 0.1. Use ∂L/∂w², ∂L/∂b², ∂L/∂h, ∂L/∂z¹, ∂L/∂w₁¹, ∂L/∂w₂¹, ∂L/∂b¹.",
+   "steps": [
+    "Forward linear step: z¹ = 0.5×1 + 1.0×2 + 0 = 2.5.",
+    "ReLU step: h = max(0, 2.5) = 2.5.",
+    "Output step: ŷ = 2×2.5 − 1 = 4.0.",
+    "Loss step: L = ½(4 − 5)² = 0.5.",
+    "Output slope: ∂L/∂ŷ = ŷ − y = 4 − 5 = −1.0.",
+    "Output weight gradient: ∂L/∂w² = ∂L/∂ŷ × h = −1.0 × 2.5 = −2.5.",
+    "Output bias gradient: ∂L/∂b² = ∂L/∂ŷ × 1 = −1.0.",
+    "Hidden slope: ∂L/∂h = ∂L/∂ŷ × w² = −1.0 × 2 = −2.0.",
+    "ReLU derivative at z¹ = 2.5 is 1, so ∂L/∂z¹ = ∂L/∂h × f′(z¹) = −2.0 × 1 = −2.0.",
+    "First weight gradients: ∂L/∂w₁¹ = ∂L/∂z¹ × x₁ = −2.0 × 1 = −2.0; ∂L/∂w₂¹ = ∂L/∂z¹ × x₂ = −2.0 × 2 = −4.0.",
+    "First bias gradient: ∂L/∂b¹ = ∂L/∂z¹ × 1 = −2.0.",
+    "Update w²: w²_new = 2 − 0.1 × (−2.5) = 2.25.",
+    "Update b¹: b¹_new = 0 − 0.1 × (−2.0) = 0.2."
+   ],
+   "answer": "The forward values are z¹ = 2.5, h = 2.5, ŷ = 4.0 and L = 0.5 (all unitless); the gradients are ∂L/∂w² = −2.5, ∂L/∂b² = −1.0, ∂L/∂h = −2.0, ∂L/∂z¹ = −2.0, ∂L/∂w₁¹ = −2.0, ∂L/∂w₂¹ = −4.0 and ∂L/∂b¹ = −2.0; after a step of 0.1, w² = 2.25 and b¹ = 0.2.",
+   "check": "x1 = 1.0\nx2 = 2.0\nw11 = 0.5\nw12 = 1.0\nb1 = 0.0\nz1 = w11*x1 + w12*x2 + b1\nh = max(0.0, z1)\nw2 = 2.0\nb2 = -1.0\nyhat = w2*h + b2\ny = 5.0\nL = 0.5*(yhat - y)**2\ndL_dyhat = yhat - y\ndL_dw2 = dL_dyhat*h\ndL_db2 = dL_dyhat\ndL_dh = dL_dyhat*w2\nrelu_grad = 1.0 if z1 > 0.0 else 0.0\ndelta1 = dL_dh*relu_grad\ndL_dw11 = delta1*x1\ndL_dw12 = delta1*x2\ndL_db1 = delta1\nlr = 0.1\nnew_w2 = w2 - lr*dL_dw2\nnew_b1 = b1 - lr*dL_db1\nprint(z1)\nprint(h)\nprint(yhat)\nprint(L)\nprint(dL_dyhat)\nprint(dL_dw2)\nprint(dL_db2)\nprint(dL_dh)\nprint(delta1)\nprint(dL_dw11)\nprint(dL_dw12)\nprint(dL_db1)\nprint(new_w2)\nprint(new_b1)",
+   "values": [
+    2.5,
+    2.5,
+    4.0,
+    0.5,
+    -1.0,
+    -2.5,
+    -1.0,
+    -2.0,
+    -2.0,
+    -2.0,
+    -4.0,
+    -2.0,
+    2.25,
+    0.2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Backpropagation is not gradient descent. Backprop computes ∂L/∂w and ∂L/∂b only; the optimizer, such as plain gradient descent, chooses the step size and changes the weights.",
+  "Do not drop the activation derivative. If z¹ = −2.5, ReLU has derivative 0, so δ¹ = 0 and every first-layer gradient is 0 for that example.",
+  "The transpose in δˡ = (Wˡ⁺¹)ᵀ δˡ⁺¹ matters. Using Wˡ⁺¹ without transpose usually breaks the shape and gives a wrong gradient.",
+  "A missing minus sign in ∂L/∂ŷ = ŷ − y flips every gradient. Check one scalar case by hand before trusting the full vector."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does forward propagation compute, and what does backpropagation compute?",
+   "marks": 2,
+   "a": "Forward propagation computes the output ŷ and the loss L from the input x. Backpropagation computes the gradient of L with respect to every weight and bias."
+  },
+  {
+   "level": "understand",
+   "q": "Why are forward intermediate values stored?",
+   "marks": 3,
+   "a": "The backward pass needs zˡ, aˡ⁻¹ and activation derivatives that were already computed in the forward pass. Storing them avoids recomputing the same values during backpropagation."
+  },
+  {
+   "level": "apply",
+   "q": "Let δ² = (−1, 2), W² = [[0.5, −1], [2, 1]], and f′(z¹) = (1, 0). Compute δ¹.",
+   "marks": 4,
+   "a": "W²ᵀ δ² = [[0.5, 2], [−1, 1]](−1, 2) = (0.5×−1 + 2×2, −1×−1 + 1×2) = (3.5, 3.0). Then δ¹ = (3.5, 3.0) ⊙ (1, 0) = (3.5, 0)."
+  },
+  {
+   "level": "apply",
+   "q": "In the worked example, if target y = 6 instead of 5, compute ∂L/∂w².",
+   "marks": 3,
+   "a": "The forward values do not change: h = 2.5 and ŷ = 4.0. Then ∂L/∂ŷ = ŷ − y = 4 − 6 = −2.0. So ∂L/∂w² = ∂L/∂ŷ × h = −2.0 × 2.5 = −5.0."
+  },
+  {
+   "level": "analyze",
+   "q": "If z¹ = −0.5 in the worked example, what are ∂L/∂w₁¹ and ∂L/∂b¹?",
+   "marks": 4,
+   "a": "ReLU has derivative 0 at z¹ = −0.5, so δ¹ = 0. Then ∂L/∂w₁¹ = δ¹x₁ = 0 and ∂L/∂b¹ = δ¹ = 0. The first layer gets no gradient from this example."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain why one backward pass costs about the same as one forward pass.",
+   "marks": 4,
+   "a": "The backward pass visits each node and edge of the computation graph once, in reverse order. Each visit does a small local derivative and a multiply-add, the same kind of work as the forward visit, so the count of operations is the same up to a constant factor."
+  },
+  {
+   "level": "understand",
+   "q": "Write the three backpropagation formulas for a layer l.",
+   "marks": 3,
+   "a": "δˡ = (Wˡ⁺¹)ᵀ δˡ⁺¹ ⊙ f′(zˡ), ∂L/∂Wˡ = δˡ(aˡ⁻¹)ᵀ, and ∂L/∂bˡ = δˡ."
+  }
+ ],
+ "beyond": "Not for the exam. Reverse-mode automatic differentiation is the general name for the backward sweep used here, and modern frameworks build a graph and differentiate it for you. The same graph idea scales to transformers and diffusion models, where a training step still has one forward and one backward pass. Search for reverse-mode autodiff, computational graphs and gradient checking to go deeper."
+}
