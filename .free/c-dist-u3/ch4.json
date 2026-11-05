@@ -1,0 +1,261 @@
+{
+ "lead": "A CUDA program has two parts: host code that runs on the CPU and kernels that run on the GPU. A kernel is a function launched over a grid of blocks, and each block holds a fixed number of threads. Every thread computes its own global index from built-in variables, then works on one array element. This structure lets one launch cover thousands of independent data items. It is used in image filters, matrix multiplication, neural-network training and any loop whose iterations do not depend on each other.",
+ "prereq": "You need: the GPU execution model from <a href=\"#gpu-architecture-and-the-cuda-programming-model\">Chapter 3.3</a>.",
+ "sections": [
+  {
+   "h3": "Host code and device kernels",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A CUDA source file mixes two kinds of code. Host code runs on the CPU. Device code runs on the GPU. A function marked __global__ is a kernel: the host launches it, and many GPU threads run the same body. A function marked __device__ is called only from GPU code. A function marked __host__ is ordinary CPU code, which is the default. Kernels must return void."
+    },
+    {
+     "type": "p",
+     "text": "The launch syntax is kernel<<<grid, block>>>(arguments). The first slot gives grid dimensions, the second gives block dimensions. For a 1D launch of 2 blocks with 4 threads each, write add<<<2, 4>>>(dA, dB, dC). The host first allocates device arrays and copies input data. Then it launches the kernel. Then it copies the result back. The memory copies are covered in <a href=\"#host-device-memory-transfers-and-data-locality\">Chapter 3.6</a>."
+    },
+    {
+     "type": "p",
+     "text": "nvcc, the NVIDIA CUDA compiler, compiles the file. It splits host code for the CPU compiler and device code for the GPU. A typical command is nvcc add.cu -o add. The host code cannot read a device pointer directly; device memory is a separate address space. The pointer arguments passed to a kernel must point to device memory. The kernel itself does not allocate global arrays; the host does that before launch."
+    }
+   ]
+  },
+  {
+   "h3": "Grid, block and thread indices",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CUDA gives each thread four built-in variables. gridDim.x is the number of blocks in the grid along x. blockDim.x is the number of threads in one block along x. blockIdx.x is the block number, from 0 to gridDim.x − 1. threadIdx.x is the thread number inside its block, from 0 to blockDim.x − 1. The fields .x, .y and .z allow 1D, 2D or 3D layouts."
+    },
+    {
+     "type": "formula",
+     "text": "i = blockIdx.x × blockDim.x + threadIdx.x",
+     "where": "i is the global array index; blockIdx.x is the block number; blockDim.x is the number of threads per block; threadIdx.x is the thread number inside its block."
+    },
+    {
+     "type": "p",
+     "text": "With blockDim.x = 4, block 0 gives i = 0,1,2,3 and block 1 gives i = 4,5,6,7. Every thread gets a different i, so threads do not collide. For 2D data such as an image of width W, use column = blockIdx.x × blockDim.x + threadIdx.x and row = blockIdx.y × blockDim.y + threadIdx.y. The flat index is i = row × W + column. This row-major order matches a C array stored row by row. A launch of dim3 grid(2,3) and dim3 block(16,16) therefore has 2 × 3 = 6 blocks and 16 × 16 = 256 threads per block."
+    }
+   ]
+  },
+  {
+   "h3": "Bounds checks and two common patterns",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A launch often rounds the block count up. If N = 10 and blockDim.x = 4, you need ceil(10/4) = 3 blocks, which gives 12 threads. Threads with i = 10 and i = 11 have no array element. Guard every access with if (i < N) { ... }. Without this check, the extra threads read or write past the array. The write may corrupt another variable, or the read may return garbage."
+    },
+    {
+     "type": "p",
+     "text": "The map pattern gives each thread one output element: C[i] = A[i] + B[i]. The kernel body is short, and the grid supplies all parallelism. A grid-stride loop handles arrays larger than one launch: for (int i = blockIdx.x*blockDim.x + threadIdx.x; i < N; i += blockDim.x*gridDim.x) { ... }. Each thread processes several elements with the same index formula."
+    },
+    {
+     "type": "p",
+     "text": "The reduce pattern combines many values into one. A simple version has each thread load one element, then threads in a block combine partial results. The final result may need one more pass over per-block partials. Shared memory makes the in-block part faster; that memory space is described in <a href=\"#gpu-memory-hierarchy-global-shared-and-constant-memory\">Chapter 3.5</a>. Bounds checks remain necessary in both patterns whenever N is not an exact multiple of the block size."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Each cell is the global index i of one thread. Block 0 supplies i = 0 to 3 and Block 1 supplies i = 4 to 7; the pointer marks the thread with i = 5, which is threadIdx.x = 1 in blockIdx.x = 1.",
+  "spec": {
+   "type": "array",
+   "title": "Thread index to array element",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Block 0",
+     "cells": [
+      "0",
+      "1",
+      "2",
+      "3"
+     ],
+     "marks": {
+      "0": "accent",
+      "3": "live"
+     }
+    },
+    {
+     "label": "Block 1",
+     "cells": [
+      "4",
+      "5",
+      "6",
+      "7"
+     ],
+     "marks": {
+      "1": "accent"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 1,
+     "cell": 1,
+     "label": "i=5"
+    }
+   ],
+   "aria": "Two rows of four cells show global thread indices 0 to 3 in Block 0 and 4 to 7 in Block 1, with a pointer to index 5."
+  }
+ },
+ "examples": [
+  {
+   "question": "The arrays A = [2,3,5,7,11,13,17,19] and B = [1,1,2,2,3,3,4,4] have N = 8 elements. A kernel is launched with gridDim.x = 2 and blockDim.x = 4. Using the 1D global index, compute every C[i] = A[i] + B[i]. Show the index for each thread.",
+   "steps": [
+    "Total threads = gridDim.x × blockDim.x = 2 × 4 = 8.",
+    "Global index for block b and thread t is i = b × 4 + t.",
+    "Block 0 has b = 0 and t = 0,1,2,3, so i = 0,1,2,3. The sums are C[0] = 2 + 1 = 3, C[1] = 3 + 1 = 4, C[2] = 5 + 2 = 7, C[3] = 7 + 2 = 9.",
+    "Block 1 has b = 1 and t = 0,1,2,3, so i = 4,5,6,7. The sums are C[4] = 11 + 3 = 14, C[5] = 13 + 3 = 16, C[6] = 17 + 4 = 21, C[7] = 19 + 4 = 23.",
+    "Every i from 0 to 7 is used exactly once, so the full result is C = [3,4,7,9,14,16,21,23]."
+   ],
+   "answer": "C = [3,4,7,9,14,16,21,23].",
+   "check": "A = [2,3,5,7,11,13,17,19]\nB = [1,1,2,2,3,3,4,4]\nC = [a+b for a,b in zip(A,B)]\nfor c in C:\n    print(c)",
+   "values": [
+    3,
+    4,
+    7,
+    9,
+    14,
+    16,
+    21,
+    23
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\n\nint main(void) {\n    int A[8] = {2,3,5,7,11,13,17,19};\n    int B[8] = {1,1,2,2,3,3,4,4};\n    int C[8];\n    int gridDim_x = 2, blockDim_x = 4;\n    for (int blockIdx_x = 0; blockIdx_x < gridDim_x; blockIdx_x++) {\n        for (int threadIdx_x = 0; threadIdx_x < blockDim_x; threadIdx_x++) {\n            int i = blockIdx_x * blockDim_x + threadIdx_x;\n            C[i] = A[i] + B[i];\n        }\n    }\n    for (int i = 0; i < 8; i++) {\n        printf(\"%d\", C[i]);\n        if (i < 7) printf(\" \");\n    }\n    printf(\"\\n\");\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "blockIdx.x",
+     "threadIdx.x",
+     "i",
+     "A[i]",
+     "B[i]",
+     "C[i]"
+    ],
+    "rows": [
+     [
+      "0",
+      "0",
+      "0",
+      "2",
+      "1",
+      "3"
+     ],
+     [
+      "0",
+      "1",
+      "1",
+      "3",
+      "1",
+      "4"
+     ],
+     [
+      "0",
+      "2",
+      "2",
+      "5",
+      "2",
+      "7"
+     ],
+     [
+      "0",
+      "3",
+      "3",
+      "7",
+      "2",
+      "9"
+     ],
+     [
+      "1",
+      "0",
+      "4",
+      "11",
+      "3",
+      "14"
+     ],
+     [
+      "1",
+      "1",
+      "5",
+      "13",
+      "3",
+      "16"
+     ],
+     [
+      "1",
+      "2",
+      "6",
+      "17",
+      "4",
+      "21"
+     ],
+     [
+      "1",
+      "3",
+      "7",
+      "19",
+      "4",
+      "23"
+     ]
+    ]
+   },
+   "output": "3 4 7 9 14 16 21 23"
+  }
+ ],
+ "traps": [
+  "Launching ceil(N/blockDim.x) blocks but testing i <= N instead of i < N, so one thread writes past the array.",
+  "Swapping gridDim and blockDim when computing i; the global index becomes wrong for almost every thread, including nonzero threadIdx values in block 0.",
+  "Forgetting that a __global__ kernel must return void; writing int kernel(...) fails at compile time.",
+  "Passing a host array pointer directly to a kernel; the device cannot read host memory through that pointer.",
+  "In 2D, using i = row + col instead of row*width + col; rows overlap and results are wrong."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the difference between __host__ and __device__ functions?",
+   "marks": 2,
+   "a": "__host__ code runs on the CPU. __device__ code runs on the GPU and is called from GPU code."
+  },
+  {
+   "level": "remember",
+   "q": "Which built-in variable gives the number of threads in one block along x?",
+   "marks": 2,
+   "a": "blockDim.x."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the 1D global index multiply blockIdx.x by blockDim.x?",
+   "marks": 3,
+   "a": "Blocks own consecutive groups of blockDim.x indices, so block b starts at b*blockDim.x; adding threadIdx.x gives the position inside that group."
+  },
+  {
+   "level": "apply",
+   "q": "A launch has gridDim.x = 3 and blockDim.x = 5. Find i for blockIdx.x = 2 and threadIdx.x = 4. For N = 14, is this i valid?",
+   "marks": 3,
+   "a": "i = 2*5 + 4 = 14. It is valid only if i < 14, so for N = 14 it is invalid."
+  },
+  {
+   "level": "apply",
+   "q": "N = 10 and blockDim.x = 4. How many blocks are launched with ceil(N/blockDim.x)? Which thread indices are invalid?",
+   "marks": 4,
+   "a": "ceil(10/4) = 3 blocks, giving 12 threads. The invalid indices are i = 10 and i = 11, so the kernel needs the guard i < 10."
+  },
+  {
+   "level": "analyze",
+   "q": "For N = 8, compare the launches <<<1,8>>> and <<<8,1>>>. Do they produce the same global indices? Why might performance differ?",
+   "marks": 5,
+   "a": "Both give i = 0 to 7. <<<1,8>>> has one block of 8 threads, so only one block is available to occupy an SM. <<<8,1>>> has eight blocks of one thread, which wastes warp lanes and adds block scheduling. Neither uses full warps well, but block size and block count change occupancy."
+  },
+  {
+   "level": "analyze",
+   "q": "A kernel writes C[i] without if (i < N). N = 1000, blockDim.x = 256 and gridDim.x = 4. How many threads launch and which writes are out of bounds?",
+   "marks": 4,
+   "a": "4*256 = 1024 threads launch. The writes for i = 1000 to 1023 are out of bounds, so four writes go past C."
+  }
+ ],
+ "beyond": "Not for the exam. CUDA's grid, block and thread vocabulary reappears in HIP, SYCL, OpenCL and GPU libraries, so the index formula transfers almost unchanged. Production kernels add grid-stride loops, occupancy tuning and cooperative groups for block-wide synchronization. Newer curricula also show Triton and CUDA C++ templates that generate launch configurations. Search next for CUDA occupancy, grid-stride loop and cooperative groups."
+}

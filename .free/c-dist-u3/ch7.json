@@ -1,0 +1,264 @@
+{
+ "lead": "OpenCL is a portable framework for running one program on CPUs, GPUs, and other accelerators. A host program finds available devices, prepares a kernel, and launches it over an NDRange. The NDRange is divided into work-groups, and each work-group contains work-items. Each work-item runs the same kernel on its own data. Phones, laptops, and FPGA boards use OpenCL when the same code must use whichever device is present.",
+ "prereq": "You need Chapters <a href=\"#gpu-architecture-and-the-cuda-programming-model\">3.3</a> to <a href=\"#host-device-memory-transfers-and-data-locality\">3.6</a>: GPU SIMT execution, CUDA grids and blocks, the memory hierarchy, and host-device transfers.",
+ "sections": [
+  {
+   "h3": "Platform, NDRange and work-groups",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "OpenCL has a platform model and an execution model. The host is the CPU program that controls everything. An OpenCL device is a processor that runs kernels: a GPU, a CPU, or an accelerator. A platform is the vendor runtime that exposes devices. A device contains compute units; each compute unit contains processing elements that execute work-items."
+    },
+    {
+     "type": "p",
+     "text": "A kernel is a function written in OpenCL C and compiled for the device. The host launches it over an NDRange, a one-, two-, or three-dimensional index space. The global size is the total number of work-items. The NDRange is cut into work-groups; the local size is the number of work-items in one work-group."
+    },
+    {
+     "type": "p",
+     "text": "A work-item is one parallel instance of the kernel. Each work-item has a global id in the NDRange and a local id inside its work-group. A work-group is a set of work-items that can share local memory and synchronise at a barrier. In the usual one-dimensional case, global size must be a multiple of local size: global size 8 and local size 4 give 2 work-groups, each with 4 work-items."
+    },
+    {
+     "type": "formula",
+     "text": "global id = group id × local size + local id",
+     "where": "For a one-dimensional NDRange, group id = global id ÷ local size (integer division) and local id = global id mod local size. Local size is the number of work-items per work-group."
+    }
+   ]
+  },
+  {
+   "h3": "Memory spaces and host steps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "OpenCL defines four memory spaces. Global memory is visible to all work-items and is read/write; the host allocates it and copies data in and out. Constant memory is read-only for kernels and cached for repeated reads. Local memory is shared by the work-items of one work-group and is faster than global memory. Private memory belongs to one work-item, like registers and a private stack. A local array is not shared across work-groups."
+    },
+    {
+     "type": "p",
+     "text": "The host follows a fixed sequence. First query platforms and choose a device. Second create a context, which holds devices and memory objects, and a command queue, which orders work for one device. Third create a program from kernel source and build it for the device. Fourth create buffers, copy inputs, enqueue the kernel with global and local sizes, wait, and read the output buffer. Enqueue is asynchronous, so the host must wait on an event or call finish before reading results. This transfer cost is the same issue as in <a href=\"#host-device-memory-transfers-and-data-locality\">Chapter 3.6</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Reading ids and comparing with CUDA",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Inside a kernel, get_global_id(0) returns the global id, get_local_id(0) returns the id inside the group, and get_group_id(0) returns the group number. Use the global id for array indexing and the local id for a local-memory slot. Mixing them makes two work-items write the same local slot or read the wrong global element."
+    },
+    {
+     "type": "p",
+     "text": "OpenCL terms map closely to CUDA: a work-item is a thread, a work-group is a block, and an NDRange is a grid. The global id matches a global thread index; the local id matches threadIdx. Local memory matches shared memory. The same kernel can therefore be built for a GPU, a CPU, or an FPGA, while CUDA targets NVIDIA devices. Portability has a cost: the runtime build step and device queries add host code, and performance still depends on memory access patterns."
+    },
+    {
+     "type": "table",
+     "head": [
+      "OpenCL term",
+      "CUDA term",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "work-item",
+       "thread",
+       "one kernel instance"
+      ],
+      [
+       "work-group",
+       "block",
+       "group sharing local memory"
+      ],
+      [
+       "NDRange",
+       "grid",
+       "full launch index space"
+      ],
+      [
+       "get_global_id(0)",
+       "global thread index",
+       "index in whole NDRange"
+      ],
+      [
+       "get_local_id(0)",
+       "threadIdx.x",
+       "index inside group"
+      ],
+      [
+       "local memory",
+       "shared memory",
+       "per-group fast memory"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The host queries a platform and device, creates a context and queue, builds the kernel, enqueues it over an NDRange with global size 8 and local size 4, then reads the result. The launch creates two work-groups of four work-items.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "aria": "Host queries an OpenCL platform, creates a context and queue, builds the kernel, enqueues it over an NDRange with global size 8 and local size 4, and reads the result.",
+   "nodes": [
+    {
+     "id": "query",
+     "label": "Query platform",
+     "note": "devices",
+     "style": "normal"
+    },
+    {
+     "id": "ctx",
+     "label": "Create context",
+     "note": "queue, program",
+     "style": "accent"
+    },
+    {
+     "id": "build",
+     "label": "Build kernel",
+     "note": "compile for device",
+     "style": "normal"
+    },
+    {
+     "id": "launch",
+     "label": "Enqueue kernel",
+     "note": "global 8, local 4",
+     "style": "live"
+    },
+    {
+     "id": "read",
+     "label": "Read result",
+     "note": "host memory",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "query",
+     "to": "ctx"
+    },
+    {
+     "from": "ctx",
+     "to": "build"
+    },
+    {
+     "from": "build",
+     "to": "launch"
+    },
+    {
+     "from": "launch",
+     "to": "read"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A one-dimensional OpenCL NDRange has global size 8 and local size 4. (a) State the number of work-groups. (b) State the global id of the last work-item. (c) For A = [1,2,3,4,5,6,7,8] and B = [10,10,10,10,10,10,10,10], the kernel computes C[i] = A[i] + B[i] using zero-based global id i. Compute C[6].",
+   "steps": [
+    "Global size N = 8 work-items. Local size L = 4 work-items per group.",
+    "Number of work-groups = N ÷ L = 8 ÷ 4 = 2 work-groups.",
+    "Global ids run from 0 to N − 1 = 7, so the last global id is 7.",
+    "Work-item i reads A[i] and B[i]. For i = 6: A[6] = 7 and B[6] = 10.",
+    "C[6] = A[6] + B[6] = 7 + 10 = 17."
+   ],
+   "answer": "There are 2 work-groups, the last global id is 7, and C[6] = 17.",
+   "check": "N = 8\nL = 4\nA = [1,2,3,4,5,6,7,8]\nB = [10,10,10,10,10,10,10,10]\nprint(N // L)\nprint(N - 1)\nprint(A[6] + B[6])",
+   "values": [
+    2,
+    7,
+    17
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(void) {\n    int N = 8, L = 4;\n    int A[8] = {1,2,3,4,5,6,7,8};\n    int B[8] = {10,10,10,10,10,10,10,10};\n    int C[8];\n    int g, lid, i;\n    for (g = 0; g < N / L; g++) {\n        for (lid = 0; lid < L; lid++) {\n            i = g * L + lid;\n            C[i] = A[i] + B[i];\n        }\n    }\n    printf(\"work-groups = %d\\n\", N / L);\n    printf(\"last global id = %d\\n\", N - 1);\n    printf(\"C[6] = %d\\n\", C[6]);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "group g",
+     "local id",
+     "global id i",
+     "A[i]",
+     "B[i]",
+     "C[i]"
+    ],
+    "rows": [
+     [
+      "1",
+      "2",
+      "6",
+      "7",
+      "10",
+      "17"
+     ],
+     [
+      "1",
+      "3",
+      "7",
+      "8",
+      "10",
+      "18"
+     ]
+    ]
+   },
+   "output": "work-groups = 2\nlast global id = 7\nC[6] = 17"
+  }
+ ],
+ "traps": [
+  "Do not use get_local_id(0) as the array index. For a one-dimensional NDRange, global id = group id × local size + local id = get_global_id(0).",
+  "Global size is the number of work-items, not the number of work-groups. Divide by local size to get the group count.",
+  "In the simple one-dimensional launch, local size must divide global size. Global size 10 and local size 4 do not give 2.5 groups; that launch is invalid under the simple rule.",
+  "OpenCL kernels are compiled by the runtime for the device. Host C code cannot call a kernel like an ordinary function.",
+  "Local memory is per work-group, not per device; another work-group cannot see it."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a work-item, and what is a work-group?",
+   "marks": 2,
+   "a": "A work-item is one parallel instance of a kernel; a work-group is a set of work-items that share local memory and barriers."
+  },
+  {
+   "level": "understand",
+   "q": "Why must local size divide global size in a simple one-dimensional NDRange?",
+   "marks": 3,
+   "a": "The NDRange is cut into whole groups; a remainder would leave a partial group, which the simple launch rule does not allow."
+  },
+  {
+   "level": "apply",
+   "q": "Global size 12, local size 3: how many work-groups, and what is the last global id?",
+   "marks": 2,
+   "a": "12 ÷ 3 = 4 work-groups; ids run 0 to 11, so the last global id is 11."
+  },
+  {
+   "level": "analyze",
+   "q": "Global size 8, local size 4. Work-item 5: group number, local id, global id?",
+   "marks": 4,
+   "a": "Group = 5 ÷ 4 = 1; local id = 5 mod 4 = 1; global id = 5."
+  },
+  {
+   "level": "remember",
+   "q": "Name the four OpenCL memory spaces and their scope.",
+   "marks": 2,
+   "a": "Global: all work-items; constant: all work-items, read-only; local: one work-group; private: one work-item."
+  },
+  {
+   "level": "understand",
+   "q": "Order the host steps: build program, enqueue kernel, query platform, create context, read result.",
+   "marks": 3,
+   "a": "Query platform, create context, build program, enqueue kernel, read result."
+  },
+  {
+   "level": "apply",
+   "q": "Global size 8, local size 4: list the global ids in work-group 1.",
+   "marks": 2,
+   "a": "4, 5, 6, 7."
+  },
+  {
+   "level": "analyze",
+   "q": "Why put filter coefficients in constant memory?",
+   "marks": 4,
+   "a": "They are read-only and reused by every work-item; constant memory is cached and broadcasts one value efficiently, saving global-memory traffic."
+  }
+ ],
+ "beyond": "Not for the exam. OpenCL is one of several portable acceleration models; SYCL and oneAPI let C++ programmers target CPUs, GPUs, and FPGAs with similar ideas. Vendors supply OpenCL runtimes for mobile chips and embedded accelerators. Researchers use OpenCL to test the same kernel on different hardware without rewriting it. Search for SYCL, oneAPI DPC++, and the OpenCL memory model to go further."
+}

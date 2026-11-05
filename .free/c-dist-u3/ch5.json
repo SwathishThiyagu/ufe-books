@@ -1,0 +1,225 @@
+{
+ "lead": "A CUDA kernel sees several memory spaces. A register belongs to one thread. Shared memory belongs to one block. Global and constant memory belong to the whole grid. They differ in speed, size and who can access them. The hierarchy exists because fast memory is small and close to the arithmetic units, while large memory is slow and off-chip. Every serious GPU kernel uses it: matrix multiplication tiles a matrix in shared memory, and an ML kernel keeps filter weights in constant memory so every thread reads the same value cheaply.",
+ "prereq": "You need: <a href=\"#gpu-architecture-and-the-cuda-programming-model\">Chapter 3.3</a> for warps and blocks, and <a href=\"#cuda-program-structure-kernels-grids-blocks-threads\">Chapter 3.4</a> for grid and block dimensions.",
+ "sections": [
+  {
+   "h3": "Scope: who can see a variable",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A CUDA memory space has a scope and a location. Scope is which threads can see a variable. Location is on-chip or off-chip. On-chip memory is fast and small; off-chip memory is slow and large. Registers are per-thread. Shared memory is per-block. Global and constant memory are per-grid."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Registers</b>: per-thread, on-chip, fastest. The compiler places scalar variables here. A thread cannot read another thread's register.",
+      "<b>Local memory</b>: per-thread, but physically in global memory. It holds spills and large private arrays. It is cached.",
+      "<b>Shared memory</b>: per-block, on-chip, programmer-managed. Declare it with <code>__shared__</code>. Each block gets its own copy.",
+      "<b>Global memory</b>: per-grid, off-chip DRAM, largest. All threads can read and write it.",
+      "<b>Constant memory</b>: per-grid, read-only from device code, cached. Declare it with <code>__constant__</code>. The host writes it before launch."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A CUDA programmer chooses a space for each array, not just a data type."
+    }
+   ]
+  },
+  {
+   "h3": "Shared memory and __syncthreads",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Shared memory is a scratchpad inside a block. A declaration such as <code>__shared__ float tile[16][16];</code> is visible to every thread in the block. Block 0 and block 1 each get a separate tile."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Each thread loads one or more elements from global memory into the shared tile.",
+      "Call <code>__syncthreads()</code> so every load is visible.",
+      "Threads read the tile, compute, and write results.",
+      "Call <code>__syncthreads()</code> again before reusing the tile."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "<code>__syncthreads()</code> is a block-wide barrier. Every thread in the block must reach it; no thread passes until all have arrived. It does not synchronise different blocks."
+    },
+    {
+     "type": "p",
+     "text": "Shared memory uses banks, typically 32 banks of 4 bytes. A warp of 32 threads can service one 4-byte word per bank per cycle. If two threads in a warp request different words in the same bank, the hardware serialises them: a bank conflict. A stride of 32 floats maps every thread to bank 0, a 32-way conflict. Padding a row to 17 floats changes the stride and removes the conflict."
+    },
+    {
+     "type": "formula",
+     "text": "bank = (byte_address ÷ 4) mod 32",
+     "where": "bank is the shared-memory bank number; byte_address is the address of the 4-byte word in bytes; 32 is the number of banks on typical NVIDIA GPUs."
+    }
+   ]
+  },
+  {
+   "h3": "Tiling reused data and constant-memory broadcast",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Tiling is the main use of shared memory. If a block reads the same global value many times, load it once into shared memory, synchronise, then reuse it. In matrix multiplication, each block loads one tile of A and one tile of B, so arithmetic reads on-chip shared memory instead of slow global memory."
+    },
+    {
+     "type": "p",
+     "text": "In a convolution kernel, a block may need the same filter values for every output pixel. Put the filter in constant memory. Constant memory is small, read-only and cached. When all threads of a warp read the same constant address, the hardware broadcasts one value. That matches filter weights: one weight, many threads."
+    },
+    {
+     "type": "p",
+     "text": "Declare constant memory outside the kernel: <code>__constant__ float filter[256];</code>. The host copies values with <code>cudaMemcpyToSymbol</code> before launch. If threads read different addresses, the constant cache serialises them. Large tables with random per-thread indices belong in global memory."
+    },
+    {
+     "type": "p",
+     "text": "Choose by reuse and access pattern: shared for per-block reuse, constant for grid-wide read-only broadcast, global for large read-write data. Host-device copy costs are covered in <a href=\"#host-device-memory-transfers-and-data-locality\">Chapter 3.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The stack orders CUDA memory spaces from fastest and smallest at the top to slowest and largest at the bottom. Notice that shared memory is per block, while constant and global memory are per grid.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "aria": "Registers are fastest and per thread; shared memory is per block; constant memory is read-only and cached; global memory is largest and slowest.",
+   "items": [
+    {
+     "label": "Registers",
+     "note": "per thread",
+     "style": "live"
+    },
+    {
+     "label": "Shared memory",
+     "note": "per block",
+     "style": "accent"
+    },
+    {
+     "label": "Constant memory",
+     "note": "read-only, cached",
+     "style": "normal"
+    },
+    {
+     "label": "Global memory",
+     "note": "per grid",
+     "style": "muted"
+    }
+   ],
+   "side": {
+    "top": "faster, smaller",
+    "bottom": "slower, larger"
+   }
+  }
+ },
+ "examples": [
+  {
+   "question": "A block of 4 threads sums x = [3, 1, 4, 2] using shared memory. Thread 0 adds x[0] and x[1]; thread 1 adds x[2] and x[3]. Thread 0 then adds the two results. Show the shared array after loading, after the first step, and the final sum. The C listing below runs on the host and simulates the four threads' steps. Real CUDA declares <code>__shared__ int s[4]</code> inside the kernel, calls <code>__syncthreads()</code> between the steps, and cannot declare <code>__shared__</code> or call <code>__syncthreads()</code> in host code.",
+   "steps": [
+    "In real CUDA, declare <code>__shared__ int s[4]</code> inside the kernel. Thread tid loads <code>s[tid] = x[tid]</code>. After load: s = [3, 1, 4, 2].",
+    "Call <code>__syncthreads()</code> so all four loads are visible.",
+    "First step. Thread 0 computes 3 + 1 = 4. Thread 1 computes 4 + 2 = 6. Write <code>s[0] = 4</code> and <code>s[1] = 6</code>. After step 1: s = [4, 6, 4, 2].",
+    "Call <code>__syncthreads()</code> again.",
+    "Second step. Thread 0 computes 4 + 6 = 10. Write <code>s[0] = 10</code>. Final sum = 10."
+   ],
+   "answer": "After loading s = [3, 1, 4, 2]; after the first step s = [4, 6, 4, 2]; the final sum is 10.",
+   "check": "x = [3, 1, 4, 2]\ns = x[:]\ns[0] = x[0] + x[1]\ns[1] = x[2] + x[3]\nprint(s[0])\nprint(s[1])\nprint(s[0] + s[1])",
+   "values": [
+    4,
+    6,
+    10
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(void) {\n    int x[4] = {3, 1, 4, 2};\n    int s[4];\n    int i;\n    for (i = 0; i < 4; i++) s[i] = x[i];\n    printf(\"After load:\");\n    for (i = 0; i < 4; i++) printf(\" %d\", s[i]);\n    printf(\"\\n\");\n    s[0] = x[0] + x[1];\n    s[1] = x[2] + x[3];\n    printf(\"After step 1:\");\n    for (i = 0; i < 4; i++) printf(\" %d\", s[i]);\n    printf(\"\\n\");\n    s[0] = s[0] + s[1];\n    printf(\"Final sum: %d\\n\", s[0]);\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "s[0]",
+     "s[1]",
+     "s[2]",
+     "s[3]"
+    ],
+    "rows": [
+     [
+      "Load",
+      "3",
+      "1",
+      "4",
+      "2"
+     ],
+     [
+      "Step 1",
+      "4",
+      "6",
+      "4",
+      "2"
+     ],
+     [
+      "Step 2",
+      "10",
+      "6",
+      "4",
+      "2"
+     ]
+    ]
+   },
+   "output": "After load: 3 1 4 2\nAfter step 1: 4 6 4 2\nFinal sum: 10"
+  }
+ ],
+ "traps": [
+  "Reading a shared tile before __syncthreads() after loading it. Other threads may see stale or partly written values.",
+  "Thinking shared memory is shared across blocks. Each block gets a private copy, so block 0 cannot see block 1's tile.",
+  "Using constant memory for per-thread random indices. Constant memory is fast for broadcast, not for divergent addresses.",
+  "Confusing local memory with registers. Local memory is per-thread but off-chip and cached, not a fast register.",
+  "Assuming blocks in a grid run in a fixed order. Global memory results from one block cannot be used by another block without a kernel boundary or explicit synchronisation."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the scope of shared memory in CUDA?",
+   "marks": 2,
+   "a": "Per block. Each block has a private copy."
+  },
+  {
+   "level": "understand",
+   "q": "Why is __syncthreads() needed after threads load a shared tile?",
+   "marks": 3,
+   "a": "Without it, a thread may read a tile element before the owning thread has written it. The barrier makes all loads visible before any thread uses the tile."
+  },
+  {
+   "level": "apply",
+   "q": "Four threads load x = [3, 1, 4, 2] into shared s. Thread 0 computes s[0]+s[1], thread 1 computes s[2]+s[3], then thread 0 adds the two results. Give s after the first step and the final sum.",
+   "marks": 4,
+   "a": "s = [4, 6, 4, 2]; final sum = 10."
+  },
+  {
+   "level": "analyze",
+   "q": "A warp reads constant array c with index tid, so thread 0 reads c[0], thread 1 reads c[1], and so on. Is this a good use of constant memory? Explain.",
+   "marks": 5,
+   "a": "No. Constant memory is fast when all threads in the warp read the same address (broadcast). Different addresses per thread serialise the constant cache. Use global memory or shared memory for per-thread indices."
+  },
+  {
+   "level": "apply",
+   "q": "A shared array is declared float tile[32][32]. Threads in a warp access tile[tid][0]. What bank problem can occur, and what padding fixes it?",
+   "marks": 4,
+   "a": "The row stride is 32 floats, so tile[tid][0] maps to bank (tid*32) mod 32 = 0 for all threads. That is a 32-way bank conflict. Declare tile[32][33] so the stride is 33; then the banks differ."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between a register and local memory.",
+   "marks": 3,
+   "a": "A register is on-chip and per thread. Local memory is per-thread address space but physically in global memory and cached; it is used for spills and large private arrays."
+  },
+  {
+   "level": "analyze",
+   "q": "A block repeatedly reads the same 16×16 tile of a matrix from global memory. Explain how shared memory tiling changes the number of global reads and why a barrier is required.",
+   "marks": 5,
+   "a": "Load the 256 values once from global into shared memory, then reuse them from shared memory. Global reads for that tile drop from one per use to 256 total per block. A barrier after loading ensures every thread sees the full tile before arithmetic starts."
+  }
+ ],
+ "beyond": "Not for the exam. Newer NVIDIA GPUs let you split the on-chip memory between L1 cache and shared memory, so the same hardware serves both roles. Newer NVIDIA GPUs also let blocks in the same cluster read each other's shared memory (distributed shared memory); the cluster is co-scheduled on one GPU, so this is not memory across chips. Search for CUDA shared memory bank conflicts, constant cache broadcast, and thread block clusters to go further."
+}

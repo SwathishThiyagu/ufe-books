@@ -1,0 +1,285 @@
+{
+ "lead": "A shared-memory parallel program runs several threads inside one process. Threads read and write the same RAM, so splitting work is cheap: no data is copied and no messages are sent. The price is coordination: two threads updating one variable at the same moment can lose an update. Pthreads (POSIX threads) is the C library that creates, joins and locks threads. OpenMP uses compiler pragmas for the same job with less typing. Multicore laptops, phone chips and cloud servers all use these tools.",
+ "prereq": "You need Unit 1 on shared-memory architecture and the speedup measure S = T₁/T_p, where T₁ is the one-thread time and T_p is the time on p threads (see Unit 1, Foundations).",
+ "sections": [
+  {
+   "h3": "Threads share one address space",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process is a running program with its own virtual memory. A thread is one execution path inside it. Threads of one process share code, global variables and heap; each thread has its own registers, program counter and stack. Passing data between threads costs nothing, but any thread can overwrite a variable another is reading."
+    },
+    {
+     "type": "p",
+     "text": "Pthreads is the standard C interface for this. Four calls carry most programs: <code>pthread_create(&amp;tid, NULL, fn, arg)</code> starts function fn with argument arg in a new thread and fills in tid; <code>pthread_join(tid, NULL)</code> waits for that thread to finish; <code>pthread_mutex_lock(&amp;m)</code> and <code>pthread_mutex_unlock(&amp;m)</code> bracket a critical section that only one thread may enter at a time."
+    },
+    {
+     "type": "p",
+     "text": "A data race happens when two threads touch the same memory location at the same time, at least one writes, and no lock orders the accesses. The result then depends on timing. The statement <code>total += a[i]</code> is three machine steps: load total, add a[i], store total. Two threads can load the old value, both add, and both store, so one addition disappears."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <pthread.h>\n\nint a[4] = {10, 20, 30, 40};\nlong total = 0;\npthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;\n\nvoid *add(void *arg) {\n    int id = *(int *)arg;\n    for (int i = 2 * id; i < 2 * id + 2; i++) {\n        pthread_mutex_lock(&m);\n        total += a[i];\n        pthread_mutex_unlock(&m);\n    }\n    return NULL;\n}\n\nint main(void) {\n    pthread_t t[2];\n    int id[2] = {0, 1};\n    for (int k = 0; k < 2; k++) pthread_create(&t[k], NULL, add, &id[k]);\n    for (int k = 0; k < 2; k++) pthread_join(t[k], NULL);\n    printf(\"total = %ld\\n\", total);\n    return 0;\n}\n",
+     "stdin": "",
+     "output": "total = 100"
+    }
+   ]
+  },
+  {
+   "h3": "OpenMP: parallel for, reduction, critical, atomic, barrier",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "OpenMP (Open Multi-Processing) puts the same idea into compiler directives for C, C++ and Fortran. You mark a loop and the compiler writes the thread creation, private copies and joins. The model is fork-join: one master thread runs serially, reaches a parallel region, forks a team, and joins them at the end."
+    },
+    {
+     "type": "p",
+     "text": "<code>#pragma omp parallel for</code> splits the iterations of the next for loop among the team. The default schedule is static: the range is cut into contiguous blocks, one per thread. Every variable that exists before the loop is shared unless you say otherwise. <code>private(x)</code> gives each thread an uninitialised copy of x; <code>firstprivate(x)</code> copies the current value in. In C and C++ the loop index of a parallel for is private automatically."
+    },
+    {
+     "type": "p",
+     "text": "<code>reduction(+:S)</code> is the standard way to sum in parallel. Each thread adds into its own private copy of S, and at the join OpenMP combines the copies with +. Other operators are *, −, min, max, &amp;, |, ^, &amp;&amp; and ||. Use <code>#pragma omp critical</code> when a block of statements must run alone, <code>#pragma omp atomic</code> for a single simple update such as x += y, which is cheaper, and <code>#pragma omp barrier</code> when every thread must arrive before any continues."
+    }
+   ]
+  },
+  {
+   "h3": "Schedules, false sharing and correctness",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>schedule(static)</code> costs nothing at run time and suits loops where every iteration does equal work, such as adding array elements. <code>schedule(dynamic, c)</code> hands out chunks of c iterations to whichever thread is free, so it balances uneven loops, for example a loop over image pixels where some pixels take an extra branch. It pays a small scheduling cost per chunk. <code>guided</code> sits between the two."
+    },
+    {
+     "type": "p",
+     "text": "False sharing: two threads write different variables that happen to sit in the same 64-byte cache line. There is no data race and the answer is correct, yet the line bounces between cores on every write, so the parallel code can be slower than the serial one. Pad hot per-thread structures to a cache line, or use a reduction."
+    },
+    {
+     "type": "p",
+     "text": "Two conditions decide whether a loop may be parallelised at all. The iterations must be independent: no iteration reads a value that another iteration writes, no iteration writes a value that another iteration reads, and no two iterations write the same location. Loop-carried dependences in either direction break the parallel for. Every shared update must go through reduction, critical or atomic. If both hold, the loop is correct on any number of threads. Without them, a shared update in a parallel loop is a data race that OpenMP never fixes for you."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Serial code forks four threads at the parallel for; each thread sums its own quarter of 1 to 1,000,000 into a private partial sum, and the join adds the four partial sums into S.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "OpenMP fork-join",
+   "aria": "Serial code forks into four threads at a parallel for; threads 0 to 3 sum the ranges 1-250000, 250001-500000, 500001-750000 and 750001-1000000, and the join adds the four partial sums into S.",
+   "nodes": [
+    {
+     "id": "serial",
+     "label": "Serial code",
+     "note": "one thread",
+     "style": "normal"
+    },
+    {
+     "id": "fork",
+     "label": "parallel for",
+     "note": "4 threads",
+     "style": "accent"
+    },
+    {
+     "id": "t0",
+     "label": "Thread 0",
+     "note": "1 to 250000",
+     "style": "live"
+    },
+    {
+     "id": "t1",
+     "label": "Thread 1",
+     "note": "250001 to 500000",
+     "style": "live"
+    },
+    {
+     "id": "t2",
+     "label": "Thread 2",
+     "note": "500001 to 750000",
+     "style": "live"
+    },
+    {
+     "id": "t3",
+     "label": "Thread 3",
+     "note": "750001 to 1000000",
+     "style": "live"
+    },
+    {
+     "id": "join",
+     "label": "Join",
+     "note": "add partial sums",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "serial",
+     "to": "fork"
+    },
+    {
+     "from": "fork",
+     "to": "t0"
+    },
+    {
+     "from": "fork",
+     "to": "t1"
+    },
+    {
+     "from": "fork",
+     "to": "t2"
+    },
+    {
+     "from": "fork",
+     "to": "t3"
+    },
+    {
+     "from": "t0",
+     "to": "join"
+    },
+    {
+     "from": "t1",
+     "to": "join"
+    },
+    {
+     "from": "t2",
+     "to": "join"
+    },
+    {
+     "from": "t3",
+     "to": "join"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Write an OpenMP C program that computes S = 1 + 2 + ... + 1,000,000 with 4 threads and a reduction clause. Give S and the partial sum of each thread under the default static schedule. Then explain why a shared variable total updated inside the loop without a critical section can print a wrong value.",
+   "steps": [
+    "The loop has 1,000,000 iterations. The num_threads(4) clause fixes the team at 4 threads, and the runtime splits the iterations across them.",
+    "The default schedule(static) cuts the loop into 4 contiguous blocks of 1,000,000 / 4 = 250,000 iterations. Thread 0 gets 1..250000, thread 1 gets 250001..500000, thread 2 gets 500001..750000, thread 3 gets 750001..1000000.",
+    "Each thread keeps a private copy of S, starting at 0, and adds its own block into it.",
+    "Block sums use n(n+1)/2 for a range. Thread 0: 250000 × 250001 / 2 = 31,250,125,000.",
+    "Thread 1: 500000 × 500001 / 2 − 31,250,125,000 = 125,000,250,000 − 31,250,125,000 = 93,750,125,000.",
+    "Thread 2: 750000 × 750001 / 2 − 125,000,250,000 = 281,250,375,000 − 125,000,250,000 = 156,250,125,000.",
+    "Thread 3: 1,000,000 × 1,000,001 / 2 − 281,250,375,000 = 500,000,500,000 − 281,250,375,000 = 218,750,125,000.",
+    "The join adds the four private copies: 31,250,125,000 + 93,750,125,000 + 156,250,125,000 + 218,750,125,000 = 500,000,500,000.",
+    "Without the reduction, total += i is a load, an add and a store on one shared variable. Two threads can load the same old total and both store their own new value, so additions are lost. The printed total is then smaller than 500,000,500,000 and changes from run to run."
+   ],
+   "answer": "S = 500,000,500,000, formed from the four static block sums 31,250,125,000 + 93,750,125,000 + 156,250,125,000 + 218,750,125,000; without the reduction the shared update races and the total comes out wrong.",
+   "check": "n = 1000000\np = 4\nper = n // p\ntotal = n * (n + 1) // 2\nprint(total)\ns = 0\nfor t in range(p):\n    lo = t * per + 1\n    hi = (t + 1) * per\n    part = hi * (hi + 1) // 2 - (lo - 1) * lo // 2\n    print(part)\n    s += part\nassert s == total\n",
+   "values": [
+    500000500000,
+    31250125000,
+    93750125000,
+    156250125000,
+    218750125000
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\n\nint main(void) {\n    long long S = 0;\n    long long i;\n    #pragma omp parallel for reduction(+:S) num_threads(4)\n    for (i = 1; i <= 1000000; i++) {\n        S += i;\n    }\n    printf(\"S = %lld\\n\", S);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Thread",
+     "Iterations",
+     "First i",
+     "Last i",
+     "Private S"
+    ],
+    "rows": [
+     [
+      "0",
+      "250000",
+      "1",
+      "250000",
+      "31250125000"
+     ],
+     [
+      "1",
+      "250000",
+      "250001",
+      "500000",
+      "93750125000"
+     ],
+     [
+      "2",
+      "250000",
+      "500001",
+      "750000",
+      "156250125000"
+     ],
+     [
+      "3",
+      "250000",
+      "750001",
+      "1000000",
+      "218750125000"
+     ],
+     [
+      "join",
+      "-",
+      "-",
+      "-",
+      "500000500000"
+     ]
+    ]
+   },
+   "output": "S = 500000500000"
+  }
+ ],
+ "traps": [
+  "A shared variable updated in a parallel loop is not made atomic by the pragma. <code>#pragma omp parallel for</code> splits iterations; it does not lock the body. Missing <code>reduction(+:S)</code> gives a wrong, varying total.",
+  "<code>private(x)</code> gives an uninitialised copy, not the old value. Use <code>firstprivate(x)</code> to carry the value in, and remember the reduction result is written back to the shared variable only at the join.",
+  "The loop index of a parallel for is private automatically in C/C++, but any variable declared before the loop stays shared unless you name it in private or declare it inside the loop.",
+  "False sharing is not a data race. Nothing is logically wrong and the answer is correct, but the program is slow because one cache line is traded between cores.",
+  "Critical is correct but serialises; putting it inside a loop of a million iterations usually makes the program slower than the serial version. Atomic fits one simple statement only."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a data race in one sentence.",
+   "marks": 2,
+   "a": "Two threads access the same memory location concurrently, at least one access is a write, and no lock orders them, so the result depends on timing."
+  },
+  {
+   "level": "remember",
+   "q": "What does pthread_join(tid, NULL) do?",
+   "marks": 2,
+   "a": "It blocks the calling thread until thread tid has finished."
+  },
+  {
+   "level": "understand",
+   "q": "Why does reduction(+:S) give the correct total while a plain S += i inside a parallel loop may not?",
+   "marks": 3,
+   "a": "Reduction gives every thread a private copy of S, so no two threads touch the same memory; the copies are added once at the join. A plain S += i is load-add-store on one shared variable, so concurrent updates are lost."
+  },
+  {
+   "level": "apply",
+   "q": "A loop of 100,000 iterations runs under #pragma omp parallel for with 5 threads and the default static schedule. How many iterations does each thread get, and which ranges?",
+   "marks": 4,
+   "a": "100000 / 5 = 20,000 iterations each: thread 0 gets 1..20000, thread 1 gets 20001..40000, thread 2 gets 40001..60000, thread 3 gets 60001..80000, thread 4 gets 80001..100000."
+  },
+  {
+   "level": "analyze",
+   "q": "Two threads write to different fields of one struct. There are no locks and the answers are correct, yet the program is slower than the serial version. Explain and give one fix.",
+   "marks": 4,
+   "a": "False sharing: both fields lie in one 64-byte cache line, so the line moves between cores on each write. Pad each field to its own cache line, or write to thread-local copies and combine at the end."
+  },
+  {
+   "level": "apply",
+   "q": "This loop is wrong: #pragma omp parallel for private(tmp) for (i = 0; i < n; i++) { tmp = a[i]*a[i]; S += tmp; }. State the bug and the fix.",
+   "marks": 5,
+   "a": "S is shared and updated by S += tmp from all threads, which is a data race. Fix it with reduction(+:S); tmp can stay private or be declared inside the loop. Private tmp does not protect S."
+  },
+  {
+   "level": "understand",
+   "q": "When do you use critical instead of atomic?",
+   "marks": 3,
+   "a": "atomic covers one simple statement such as x += y. critical protects a block of several statements, at the cost of a lock on every entry."
+  }
+ ],
+ "beyond": "Not for the exam. OpenMP now has tasks (#pragma omp task with depend clauses) for irregular work such as tree traversals, and target directives that offload a region to a GPU. C++ programmers often use std::thread or std::async instead of raw Pthreads; Rust's rayon and Intel TBB offer work-stealing pools. Profilers such as perf, VTune and ThreadSanitizer catch races and false sharing. Good searches: OpenMP task depend, ThreadSanitizer data race, NUMA first touch."
+}

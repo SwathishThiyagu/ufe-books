@@ -1,0 +1,422 @@
+{
+ "lead": "This unit teaches the three common ways to program parallel machines: shared-memory threads with Pthreads/OpenMP, message passing with MPI, and data-parallel GPU kernels with CUDA/OpenCL. After it you can write, launch and reason about a small parallel program on each model, and choose the right model for a task.",
+ "about": "The unit starts with shared-memory programming in 3.1: Pthreads and OpenMP show how threads cooperate through one address space. 3.2 switches to distributed memory, where MPI processes exchange explicit messages. 3.3 introduces GPU architecture and the CUDA programming model; 3.4 turns that model into kernels, grids, blocks and threads. 3.5 explains global, shared and constant memory, and 3.6 shows how host-device transfers and data locality decide real speed. 3.7 maps the same ideas to OpenCL for portable heterogeneous programming. Each chapter adds one programming model and one performance habit, so the unit moves from CPU threads to clusters to GPUs.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Threads in one process share memory, so OpenMP or Pthreads can split work across cores but must control shared updates.",
+   "depth": "Pthreads = POSIX threads; cover pthread_create, pthread_join, mutex lock/unlock and a race example. OpenMP = Open Multi-Processing; cover #pragma omp parallel for, private and shared variables, reduction, critical, atomic, barrier, and static versus dynamic schedules. Define data race and false sharing. Keep speedup formulas to Unit 1.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "OpenMP fork-join",
+    "aria": "Serial code forks four threads for a parallel loop; each thread computes a partial sum and the join combines them.",
+    "nodes": [
+     {
+      "id": "serial",
+      "label": "Serial code",
+      "note": "one thread",
+      "style": "normal"
+     },
+     {
+      "id": "fork",
+      "label": "parallel for",
+      "note": "4 threads",
+      "style": "accent"
+     },
+     {
+      "id": "t0",
+      "label": "Thread 0",
+      "note": "partial sum",
+      "style": "live"
+     },
+     {
+      "id": "t1",
+      "label": "Thread 1",
+      "note": "partial sum",
+      "style": "live"
+     },
+     {
+      "id": "t2",
+      "label": "Thread 2",
+      "note": "partial sum",
+      "style": "live"
+     },
+     {
+      "id": "t3",
+      "label": "Thread 3",
+      "note": "partial sum",
+      "style": "live"
+     },
+     {
+      "id": "join",
+      "label": "Join",
+      "note": "combine sums",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "serial",
+      "to": "fork"
+     },
+     {
+      "from": "fork",
+      "to": "t0"
+     },
+     {
+      "from": "fork",
+      "to": "t1"
+     },
+     {
+      "from": "fork",
+      "to": "t2"
+     },
+     {
+      "from": "fork",
+      "to": "t3"
+     },
+     {
+      "from": "t0",
+      "to": "join"
+     },
+     {
+      "from": "t1",
+      "to": "join"
+     },
+     {
+      "from": "t2",
+      "to": "join"
+     },
+     {
+      "from": "t3",
+      "to": "join"
+     }
+    ]
+   },
+   "example": "Use OpenMP to compute S = 1 + 2 + ... + 1,000,000 with 4 threads. Write the reduction clause and give S. Explain why a shared variable total updated inside the loop without a critical section can give a wrong answer. Expected S = 500000500000 with reduction(+:S).",
+   "trap": "Missing reduction or private clauses cause a data race; OpenMP does not make every shared update atomic by itself.",
+   "prereq": "Unit 1 shared-memory architecture and speedup.",
+   "leave": "Distributed message passing to 3.2; GPU kernels to 3.3; detailed speedup laws to Unit 1."
+  },
+  {
+   "k": 2,
+   "idea": "MPI processes have separate memories and cooperate only by sending and receiving explicit messages.",
+   "depth": "MPI = Message Passing Interface. Cover MPI_Init, MPI_Finalize, MPI_Comm_rank, MPI_Comm_size, MPI_Send, MPI_Recv, tags, MPI_Bcast, MPI_Reduce, MPI_Scatter and MPI_Gather. Explain blocking sends and deadlock. Show a simple root-worker pattern and the idea of a communicator.",
+   "figure": {
+    "type": "sequence",
+    "aria": "Root sends the second half of the array to rank 1; rank 1 returns local sum 26; root adds its own 10 to get 36.",
+    "actors": [
+     "Rank 0",
+     "Rank 1"
+    ],
+    "messages": [
+     {
+      "from": "Rank 0",
+      "to": "Rank 1",
+      "label": "Scatter [5,6,7,8]",
+      "dashed": false
+     },
+     {
+      "from": "Rank 1",
+      "to": "Rank 0",
+      "label": "Reduce 26",
+      "dashed": false
+     }
+    ]
+   },
+   "example": "Two MPI processes sum A = [1,2,3,4,5,6,7,8] using MPI_Scatter and MPI_Reduce with SUM. Give the four elements and local sum of each rank, and the final sum at rank 0. Rank 0 gets [1,2,3,4] with sum 10; rank 1 gets [5,6,7,8] with sum 26; final sum is 36.",
+   "trap": "Assuming MPI processes share variables, or assuming a blocking MPI_Send always completes before a matching receive; both can deadlock or give wrong results.",
+   "prereq": "Unit 1 distributed-memory model; Unit 4 message passing basics.",
+   "leave": "Logical clocks and group communication to Unit 4; consensus to Unit 5; MPI performance tuning not covered."
+  },
+  {
+   "k": 3,
+   "idea": "A GPU is a many-core device with a SIMT execution model: many threads run in warps inside blocks inside a grid.",
+   "depth": "Compare CPU cores with GPU streaming multiprocessors. Define SIMT = single instruction, multiple threads, warp size 32 threads in current CUDA, block and grid. Cover host and device roles, kernel launch syntax, thread organization, SIMT execution and warp divergence. Include device query with cudaGetDeviceProperties.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "aria": "One grid contains many blocks; each block contains warps; each warp contains 32 threads.",
+    "root": {
+     "label": "Grid",
+     "note": "many blocks",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Block0",
+       "note": "many warps",
+       "style": "normal",
+       "children": [
+        {
+         "label": "Warp0",
+         "note": "32 threads",
+         "style": "live"
+        },
+        {
+         "label": "Warp1",
+         "note": "32 threads",
+         "style": "live"
+        }
+       ]
+      },
+      {
+       "label": "Block1",
+       "note": "many warps",
+       "style": "normal",
+       "children": [
+        {
+         "label": "Warp2",
+         "note": "32 threads",
+         "style": "live"
+        },
+        {
+         "label": "Warp3",
+         "note": "32 threads",
+         "style": "live"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "A CUDA kernel launches 2 blocks of 4 threads. Write the global thread index formula and list the 8 indices. For A[5]=11 and B[5]=3, state which thread computes C[5]. Index is tid = blockIdx.x*blockDim.x + threadIdx.x; indices are 0 to 7; thread 5, in block 1 thread 1, computes C[5]=14.",
+   "trap": "Treating a GPU thread like an independent CPU thread; a warp runs in lockstep and divergent branches serialize both paths.",
+   "prereq": "Unit 1 SIMD and data parallelism.",
+   "leave": "Kernel syntax to 3.4; memory spaces to 3.5; transfers to 3.6; OpenCL to 3.7."
+  },
+  {
+   "k": 4,
+   "idea": "A CUDA program is host code plus one or more kernels that run as many threads mapped by grid and block dimensions.",
+   "depth": "Cover __global__, __device__ and __host__, kernel launch <<<grid, block>>>, built-in variables threadIdx, blockIdx, blockDim and gridDim, 1D and 2D indexing, bounds checks, and nvcc compilation. Show mapping from thread index to array element. Mention map and reduce as common patterns.",
+   "figure": {
+    "type": "array",
+    "title": "Thread index to array element",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Block 0",
+      "cells": [
+       "0",
+       "1",
+       "2",
+       "3"
+      ],
+      "marks": {
+       "0": "accent",
+       "3": "live"
+      }
+     },
+     {
+      "label": "Block 1",
+      "cells": [
+       "4",
+       "5",
+       "6",
+       "7"
+      ],
+      "marks": {
+       "1": "accent"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 1,
+      "cell": 1,
+      "label": "i=5"
+     }
+    ]
+   },
+   "example": "Add A = [2,3,5,7,11,13,17,19] and B = [1,1,2,2,3,3,4,4] with gridDim.x = 2 and blockDim.x = 4. Write the global index and compute all C[i]. C = [3,4,7,9,14,16,21,23].",
+   "trap": "Launching enough threads for the next multiple of the block size without a bounds check i < N; extra threads read or write past the array.",
+   "prereq": "Chapter 3.3 GPU model.",
+   "leave": "Memory hierarchy to 3.5; transfer scheduling to 3.6; OpenCL NDRange to 3.7."
+  },
+  {
+   "k": 5,
+   "idea": "CUDA memory spaces differ in scope and speed: shared memory serves a block, while global and constant memory serve the grid.",
+   "depth": "Cover registers and local memory briefly, then focus on global, shared and constant memory. Define per-thread, per-block and per-grid scope. Explain __shared__, __constant__, __syncthreads and bank conflicts. Show tiling for reused data and a read-only constant-memory broadcast. Use an ML example: caching weights or filter values.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "aria": "Registers are fastest and per thread; shared memory is per block; constant memory is read-only and cached; global memory is largest and slowest.",
+    "items": [
+     {
+      "label": "Registers",
+      "note": "per thread",
+      "style": "live"
+     },
+     {
+      "label": "Shared memory",
+      "note": "per block",
+      "style": "accent"
+     },
+     {
+      "label": "Constant memory",
+      "note": "read-only, cached",
+      "style": "normal"
+     },
+     {
+      "label": "Global memory",
+      "note": "per grid",
+      "style": "muted"
+     }
+    ],
+    "side": {
+     "top": "faster, smaller",
+     "bottom": "slower, larger"
+    }
+   },
+   "example": "A block of 4 threads sums x = [3,1,4,2] using shared memory. Show shared array after loading, after the first reduction step where threads 0 and 1 add pairs, and the final sum. Load gives [3,1,4,2]; after step one s = [4,6,4,2]; final sum is 10.",
+   "trap": "Reading a shared tile before __syncthreads after loading it; other threads may see stale values.",
+   "prereq": "Chapters 3.3 and 3.4.",
+   "leave": "Host-device copy costs to 3.6; OpenCL local memory to 3.7."
+  },
+  {
+   "k": 6,
+   "idea": "Host-device transfers cost time, so real CUDA speed depends on minimizing copies and arranging coalesced, reused data.",
+   "depth": "Cover cudaMalloc, cudaMemcpy, cudaFree, synchronous versus asynchronous copies, pinned host memory and streams. Explain coalesced global access, tiling or blocking for locality, and arithmetic intensity. Use a repeated ML training or matrix workload to show why data should stay on the device.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "Host",
+      "bars": [
+       {
+        "label": "H2D",
+        "start": 0,
+        "end": 0.4,
+        "style": "accent"
+       },
+       {
+        "label": "D2H",
+        "start": 0.6,
+        "end": 1.0,
+        "style": "live"
+       }
+      ]
+     },
+     {
+      "label": "GPU",
+      "bars": [
+       {
+        "label": "kernel",
+        "start": 0.4,
+        "end": 0.6,
+        "style": "next"
+       }
+      ]
+     }
+    ]
+   },
+   "example": "A CUDA program processes N = 1,000,000 floats. One host-to-device copy and one device-to-host copy each move 4 MB at 10 GB/s; the kernel takes 0.2 ms. Find total time for one iteration and for 10 iterations if data stays on the device between iterations. One copy is 0.4 ms, so one iteration is 1.0 ms; 10 iterations are 0.4 + 10*0.2 + 0.4 = 2.8 ms.",
+   "trap": "Counting only kernel time and ignoring host-device copies; for small kernels the transfers can dominate.",
+   "prereq": "Chapters 3.4 and 3.5.",
+   "leave": "CUDA memory spaces to 3.5; OpenCL buffers to 3.7."
+  },
+  {
+   "k": 7,
+   "idea": "OpenCL is a portable heterogeneous framework: a host program launches kernels over an NDRange of work-items grouped into work-groups.",
+   "depth": "Cover the platform model (host plus devices), execution model (NDRange, work-item, work-group), and memory model (global, constant, local, private). Show host steps: query platform and device, create context and queue, build program, enqueue kernel, read result. Compare terms with CUDA: work-item with thread, work-group with block.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "aria": "Host queries an OpenCL platform, creates a context and queue, builds the kernel, enqueues it over an NDRange, and reads the result.",
+    "nodes": [
+     {
+      "id": "query",
+      "label": "Query platform",
+      "note": "devices",
+      "style": "normal"
+     },
+     {
+      "id": "ctx",
+      "label": "Create context",
+      "note": "queue, program",
+      "style": "accent"
+     },
+     {
+      "id": "build",
+      "label": "Build kernel",
+      "note": "compile for device",
+      "style": "normal"
+     },
+     {
+      "id": "launch",
+      "label": "Enqueue kernel",
+      "note": "NDRange",
+      "style": "live"
+     },
+     {
+      "id": "read",
+      "label": "Read result",
+      "note": "host memory",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "query",
+      "to": "ctx"
+     },
+     {
+      "from": "ctx",
+      "to": "build"
+     },
+     {
+      "from": "build",
+      "to": "launch"
+     },
+     {
+      "from": "launch",
+      "to": "read"
+     }
+    ]
+   },
+   "example": "An OpenCL 1-D NDRange has global size 8 and local size 4. State the number of work-groups and the global id of the last work-item. For A = [1,2,3,4,5,6,7,8] and B = [10,10,10,10,10,10,10,10], compute C[6]. There are 2 work-groups; last global id is 7; C[6] = 7 + 10 = 17.",
+   "trap": "Mixing get_global_id and get_local_id, or forgetting that local size must divide global size in a one-dimensional NDRange.",
+   "prereq": "Chapters 3.3 to 3.6.",
+   "leave": "CUDA-specific syntax to 3.3 to 3.6; detailed OpenCL runtime API not covered."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "shared variables become explicit MPI messages"
+  ],
+  [
+   2,
+   3,
+   "cluster message passing gives way to many-core data parallelism"
+  ],
+  [
+   3,
+   4,
+   "thread hierarchy becomes kernel launch"
+  ],
+  [
+   4,
+   5,
+   "threads use different memory spaces"
+  ],
+  [
+   5,
+   6,
+   "memory choices drive transfer costs"
+  ],
+  [
+   3,
+   7,
+   "CUDA concepts map to OpenCL"
+  ],
+  [
+   6,
+   7,
+   "locality rules carry to OpenCL"
+  ]
+ ]
+}

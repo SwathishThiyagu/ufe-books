@@ -1,0 +1,213 @@
+{
+ "lead": "MPI is the Message Passing Interface: a library and standard for programs whose processes have separate memories. They cannot read each other’s variables. To cooperate, one process packs data into a message and sends it; another receives it. This is the natural model for a cluster, where each node has its own RAM, and for supercomputers used in weather, crash simulation and train scheduling. This chapter shows the six calls that carry most MPI programs: init, rank, size, send, receive and finalize, then the collectives that replace many hand-written messages.",
+ "prereq": "You need: Unit 1’s distributed-memory model and the message-passing basics in Unit 4; compare with <a href=\"#shared-memory-programming-with-pthreads-and-openmp\">shared-memory programming</a>, where threads share variables.",
+ "sections": [
+  {
+   "h3": "Separate memories, one communicator",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every MPI program starts with <code>MPI_Init(&argc, &argv)</code> and ends with <code>MPI_Finalize()</code>. Between them the process may call MPI. A communicator is a named group of processes allowed to talk. The default, <code>MPI_COMM_WORLD</code>, contains all processes started by <code>mpirun -np P</code>. P is the number of processes."
+    },
+    {
+     "type": "p",
+     "text": "Inside a communicator each process has a rank: an integer from 0 to P−1. <code>MPI_Comm_rank(comm, &rank)</code> writes the caller’s rank into rank. <code>MPI_Comm_size(comm, &size)</code> writes the number of processes into size. Rank is an identity, not a priority; rank 0 is usually the root that reads input and prints output."
+    },
+    {
+     "type": "p",
+     "text": "Each process runs the same program, called SPMD: single program, multiple data. It uses <code>if (rank == 0) ... else ...</code> to take different paths. Variables are private. If rank 0 sets x = 5, rank 1’s x is unchanged unless a message carries the value. This is the key break from <a href=\"#shared-memory-programming-with-pthreads-and-openmp\">Pthreads and OpenMP</a>, where a shared variable is visible to all threads."
+    }
+   ]
+  },
+  {
+   "h3": "Point-to-point: send, receive, tag and deadlock",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A point-to-point message has a sender and a receiver. The basic calls are <code>MPI_Send(buf, count, datatype, dest, tag, comm)</code> and <code>MPI_Recv(buf, count, datatype, source, tag, comm, &status)</code>. buf is the address of the data; count is how many items; datatype is e.g. MPI_INT or MPI_DOUBLE; dest and source are ranks; tag is an integer label; comm is the communicator. MPI_Recv also needs a status object that records the actual source and tag."
+    },
+    {
+     "type": "p",
+     "text": "Tags let one process send different kinds of message to the same receiver. A receive with tag 7 will not take a message with tag 8. Source can be MPI_ANY_SOURCE and tag MPI_ANY_TAG, but then read the real values from status."
+    },
+    {
+     "type": "p",
+     "text": "Both calls are blocking in the usual sense. MPI_Send returns when the send buffer can be reused; for a small message it may copy into an internal buffer and return at once, for a large message it may wait until the matching receive starts. MPI_Recv returns only after the message has arrived and been copied into buf. So a blocking send is not a promise that the receiver has finished using the data."
+    },
+    {
+     "type": "p",
+     "text": "Deadlock is the common failure. If rank 0 calls MPI_Send to rank 1 and then MPI_Recv from rank 1, while rank 1 calls MPI_Send to rank 0 and then MPI_Recv from rank 0, each send may wait for the other’s receive. No process proceeds. Safe orders: make one side send first and the other receive first, or use non-blocking calls, or <code>MPI_Sendrecv</code> which does both in one call."
+    }
+   ]
+  },
+  {
+   "h3": "Collectives and the root-worker pattern",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A collective is one call made by every process in a communicator. The library does the many point-to-point messages for you. All ranks must pass matching arguments for that collective: same root for rooted collectives such as Bcast, Scatter, Gather and Reduce, same count and datatype, and same op for Reduce. Otherwise the program may hang. If one rank skips a collective, the others wait forever."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Collective",
+      "Action"
+     ],
+     "rows": [
+      [
+       "MPI_Bcast",
+       "Root sends the same buffer to every rank."
+      ],
+      [
+       "MPI_Reduce",
+       "Combines each rank's value with an operation such as MPI_SUM into the root's buffer."
+      ],
+      [
+       "MPI_Scatter",
+       "Root splits its array into equal chunks, one chunk per rank."
+      ],
+      [
+       "MPI_Gather",
+       "Root collects one chunk from each rank into its array."
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Root-worker pattern: rank 0 is root. It reads the whole array, scatters chunks, workers compute local results, reduce returns combined result to root, root prints. Total elements = size × count per rank. In the sum example root sends [5,6,7,8] to rank 1 and keeps [1,2,3,4]; each rank sums; MPI_Reduce with MPI_SUM adds 10 and 26 to give 36 at rank 0. MPI_Gather would instead collect the two local sums [10,26] at root. The figure shows the two-rank case."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Rank 0 scatters the second half [5,6,7,8] to rank 1; rank 1 returns its local sum 26. Rank 0 adds its own local sum 10 to print 36.",
+  "spec": {
+   "type": "sequence",
+   "aria": "Root sends the second half of the array to rank 1; rank 1 returns local sum 26; root adds its own 10 to get 36.",
+   "actors": [
+    "Rank 0",
+    "Rank 1"
+   ],
+   "messages": [
+    {
+     "from": "Rank 0",
+     "to": "Rank 1",
+     "label": "Scatter [5,6,7,8]",
+     "dashed": false
+    },
+    {
+     "from": "Rank 1",
+     "to": "Rank 0",
+     "label": "Reduce 26",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Two MPI processes, ranks 0 and 1, sum A = [1,2,3,4,5,6,7,8] with MPI_Scatter and MPI_Reduce using MPI_SUM. Give the four elements and local sum of each rank, and the final sum at rank 0. Write the key MPI calls.",
+   "steps": [
+    "P = 2 processes and n = 8 integers, so each rank gets count = 8 ÷ 2 = 4 elements.",
+    "Rank 0 receives indices 0 to 3: values [1,2,3,4]. Local sum = 1+2+3+4 = 10.",
+    "Rank 1 receives indices 4 to 7: values [5,6,7,8]. Local sum = 5+6+7+8 = 26.",
+    "MPI_Reduce with MPI_SUM sends both local sums to root rank 0. Root computes 10 + 26 = 36.",
+    "For printing, MPI_Gather collects [10,26] at rank 0; the final total is already 36."
+   ],
+   "answer": "Rank 0 gets [1,2,3,4] with local sum 10; rank 1 gets [5,6,7,8] with local sum 26; MPI_Reduce gives final sum 36 at rank 0.",
+   "check": "A = [1,2,3,4,5,6,7,8]\nlocal0 = A[:4]\nlocal1 = A[4:]\ns0 = sum(local0)\ns1 = sum(local1)\ntotal = s0 + s1\nprint(s0)\nprint(s1)\nprint(total)",
+   "values": [
+    10,
+    26,
+    36
+   ],
+   "code": {
+    "lang": "text",
+    "code": "#include <mpi.h>\n#include <stdio.h>\n\nint main(int argc, char **argv) {\n    int rank, size, i;\n    int A[8] = {1,2,3,4,5,6,7,8};\n    int local[4], sum = 0, total = 0;\n    int sums[2];\n\n    MPI_Init(&argc, &argv);\n    MPI_Comm_rank(MPI_COMM_WORLD, &rank);\n    MPI_Comm_size(MPI_COMM_WORLD, &size);\n\n    MPI_Scatter(A, 4, MPI_INT, local, 4, MPI_INT, 0, MPI_COMM_WORLD);\n    for (i = 0; i < 4; i++) sum += local[i];\n    MPI_Reduce(&sum, &total, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);\n    MPI_Gather(&sum, 1, MPI_INT, sums, 1, MPI_INT, 0, MPI_COMM_WORLD);\n\n    if (rank == 0)\n        printf(\"local sums: %d %d\\ntotal: %d\\n\", sums[0], sums[1], total);\n\n    MPI_Finalize();\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Rank",
+     "Elements received",
+     "Local sum",
+     "Final total at rank 0"
+    ],
+    "rows": [
+     [
+      "0",
+      "[1,2,3,4]",
+      "10",
+      "36 (at rank 0)"
+     ],
+     [
+      "1",
+      "[5,6,7,8]",
+      "26",
+      "—"
+     ]
+    ]
+   },
+   "output": "local sums: 10 26\ntotal: 36"
+  }
+ ],
+ "traps": [
+  "Processes do not share variables. A global array in the program text is a private copy in each process; only messages or collectives move values.",
+  "A blocking MPI_Send is not a guarantee of delivery to the receiver's buffer; it only says the send buffer can be reused. Two sends before two receives can deadlock.",
+  "Ranks start at 0, so P processes have ranks 0 to P−1. Off-by-one errors in root or dest are common.",
+  "Collectives must be called by all ranks in the communicator, with matching arguments for that collective: same root for rooted collectives, same count and datatype, and same op for Reduce. One missing call hangs the job.",
+  "MPI_Scatter splits the array; it does not give every rank the whole array. That is MPI_Bcast."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which call writes the number of processes in a communicator into a variable?",
+   "marks": 2,
+   "a": "MPI_Comm_size."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an MPI process not see another process's global variable?",
+   "marks": 3,
+   "a": "Each process has its own address space; the same program text runs with private data. Values move only in messages or collectives."
+  },
+  {
+   "level": "apply",
+   "q": "P = 4 processes, A has 20 integers, and MPI_Scatter uses count = 5. Which indices does rank 2 receive?",
+   "marks": 3,
+   "a": "Ranks get blocks: rank 0 indices 0-4, rank 1 indices 5-9, rank 2 indices 10-14, rank 3 indices 15-19. Rank 2 gets A[10] to A[14]."
+  },
+  {
+   "level": "analyze",
+   "q": "Both ranks call MPI_Send and then MPI_Recv. Explain the deadlock and give one fix.",
+   "marks": 4,
+   "a": "Each send may block waiting for a matching receive, and no receive has been posted. Fix: rank 0 sends then receives while rank 1 receives then sends, or use MPI_Sendrecv or non-blocking calls."
+  },
+  {
+   "level": "remember",
+   "q": "Which call ends MPI use in a process?",
+   "marks": 2,
+   "a": "MPI_Finalize."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between MPI_Bcast and MPI_Scatter.",
+   "marks": 3,
+   "a": "Bcast gives the same full buffer to every rank; Scatter gives a different chunk to each rank."
+  },
+  {
+   "level": "apply",
+   "q": "Local sums 10 and 26 are reduced with MPI_SUM to root. What does root get?",
+   "marks": 2,
+   "a": "36."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must all ranks call MPI_Reduce with the same root and op?",
+   "marks": 5,
+   "a": "A collective is one global operation; the library matches calls across ranks. A mismatch can hang the job or produce wrong data, so every rank in the communicator must participate with matching arguments."
+  }
+ ],
+ "beyond": "Not for the exam. MPI-2 added one-sided communication; MPI-3 added shared-memory windows and non-blocking collectives. Real clusters use MPI under Slurm job scripts, often with GPU-aware MPI so a message can go straight from one GPU to another. Python users meet the same ideas through mpi4py. Search next for one-sided communication (MPI-2), non-blocking collectives (MPI-3), and GPU-aware MPI."
+}

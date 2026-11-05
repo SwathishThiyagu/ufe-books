@@ -1,0 +1,266 @@
+{
+ "lead": "A GPU is a many-core device built for data parallelism. It trades the few large cores of a CPU for many small lanes that run the same instruction across data. CUDA is NVIDIA's programming model for this device. Threads are grouped into warps, warps into blocks, and blocks into a grid. This structure lets one launch cover a large array. You meet it in matrix multiplication, image filters and neural-network training, where the same operation repeats over thousands of pixels or weights.",
+ "prereq": "You need: Unit 1 SIMD and data parallelism, and the thread idea from <a href=\"#shared-memory-programming-with-pthreads-and-openmp\">3.1</a>.",
+ "sections": [
+  {
+   "h3": "CPU cores and GPU streaming multiprocessors",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A CPU core is built to run one instruction stream fast. It has a large cache, branch prediction and out-of-order logic. A server CPU may have 8 to 64 such cores. A GPU uses a different balance. It has many streaming multiprocessors (SMs). Each SM holds many simple CUDA cores, a warp scheduler and registers. One SM can keep hundreds of threads alive. The GPU hides memory latency by switching to another warp while one waits. That is why a GPU is weak on a long serial loop but strong on an array operation."
+    },
+    {
+     "type": "p",
+     "text": "CUDA calls its execution model SIMT: single instruction, multiple threads. In one warp, the hardware issues one instruction to all active threads at the same time. Each thread still has its own registers and its own <code>threadIdx</code>. This differs from pure SIMD, where one instruction works on a vector of data lanes; SIMT keeps a thread view for the programmer."
+    },
+    {
+     "type": "p",
+     "text": "A warp is the hardware scheduling unit. In current CUDA a warp has 32 threads. A block is a group of threads that can share shared memory and synchronise. A grid is all blocks from one kernel launch. The figure shows the three levels."
+    }
+   ]
+  },
+  {
+   "h3": "Host, device and thread indexing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A CUDA program has a host (CPU) and a device (GPU). The host allocates data, copies it, launches a kernel and copies the result back. The device runs the kernel. A kernel is a C or C++ function marked <code>__global__</code>; the host calls it with launch syntax <code>kernel&lt;&lt;&lt;gridDim, blockDim&gt;&gt;&gt;(args)</code>. The first number is the blocks in the grid; the second is the threads per block. For example <code>add&lt;&lt;&lt;2, 4&gt;&gt;&gt;(A, B, C)</code> starts 2 blocks of 4 threads, so 8 threads total. Inside the kernel, built-in variables give position: <code>blockIdx.x</code>, <code>blockDim.x</code> and <code>threadIdx.x</code>."
+    },
+    {
+     "type": "formula",
+     "text": "tid = blockIdx.x × blockDim.x + threadIdx.x",
+     "where": "tid is the global thread index in the grid; blockIdx.x is the block number along x, from 0; blockDim.x is the number of threads in one block along x; threadIdx.x is the thread number inside its block, from 0."
+    },
+    {
+     "type": "p",
+     "text": "With one dimension, every thread gets a unique global index. A guard such as <code>if (tid &lt; N) { ... }</code> protects a partly filled last block, where N is the number of elements in the array. The host can query device limits with <code>cudaGetDeviceProperties(&prop, 0)</code>. Read <code>prop.name</code> for the GPU model, <code>prop.multiProcessorCount</code> for the number of SMs and <code>prop.maxThreadsPerBlock</code> for the largest legal block. The full kernel file layout is in <a href=\"#cuda-program-structure-kernels-grids-blocks-threads\">3.4</a>."
+    }
+   ]
+  },
+  {
+   "h3": "SIMT execution and warp divergence",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "All threads in a warp start together. They execute the same instruction. When a branch condition is equal for all 32 threads, the warp takes one path and no lane idles. When threads disagree, the warp is divergent. Hardware runs the taken path with some threads active, then the other path with the rest active. The two paths serialise; the cost is the sum, not the maximum. A loop whose trip count depends on <code>threadIdx.x</code> can also diverge. Code with <code>if (tid % 2 == 0)</code> makes half a warp idle on each side. This is the main trap: a GPU thread is not an independent CPU thread."
+    },
+    {
+     "type": "p",
+     "text": "Divergence is not an error; it is a cost. For data-parallel code, keep branch conditions uniform across a warp, for example branch on <code>blockIdx.x</code>. Warps in a block can be held at a barrier, and memory scope matters; see <a href=\"#gpu-memory-hierarchy-global-shared-and-constant-memory\">3.5</a> and <a href=\"#host-device-memory-transfers-and-data-locality\">3.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A grid holds blocks, a block holds warps, and a warp holds 32 threads. The 4-thread block in the worked example is only part of one warp.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "aria": "One grid contains many blocks; each block contains warps; each warp contains 32 threads.",
+   "root": {
+    "label": "Grid",
+    "note": "many blocks",
+    "style": "accent",
+    "children": [
+     {
+      "label": "Block0",
+      "note": "many warps",
+      "style": "normal",
+      "children": [
+       {
+        "label": "Warp0",
+        "note": "32 threads",
+        "style": "live",
+        "_d": 2,
+        "children": [],
+        "_x": 208.0968,
+        "_y": 170
+       },
+       {
+        "label": "Warp1",
+        "note": "32 threads",
+        "style": "live",
+        "_d": 2,
+        "children": [],
+        "_x": 309.3656,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 258.7312,
+      "_y": 106
+     },
+     {
+      "label": "Block1",
+      "note": "many warps",
+      "style": "normal",
+      "children": [
+       {
+        "label": "Warp2",
+        "note": "32 threads",
+        "style": "live",
+        "_d": 2,
+        "children": [],
+        "_x": 410.6344,
+        "_y": 170
+       },
+       {
+        "label": "Warp3",
+        "note": "32 threads",
+        "style": "live",
+        "_d": 2,
+        "children": [],
+        "_x": 511.90319999999997,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 461.2688,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   }
+  }
+ },
+ "examples": [
+  {
+   "question": "A CUDA kernel launches 2 blocks of 4 threads. Write the global thread index formula and list the 8 indices. For A[5]=11 and B[5]=3, state which thread computes C[5] and give C[5].",
+   "steps": [
+    "Read the launch: gridDim.x = 2 blocks and blockDim.x = 4 threads per block. Total threads = 2 × 4 = 8.",
+    "Write the one-dimensional index: tid = blockIdx.x × blockDim.x + threadIdx.x = blockIdx.x × 4 + threadIdx.x.",
+    "Block 0 has threadIdx.x = 0,1,2,3, so tid = 0,1,2,3. Block 1 has threadIdx.x = 0,1,2,3, so tid = 4,5,6,7.",
+    "Target C[5] uses tid = 5. blockIdx.x = floor(5 ÷ 4) = 1. threadIdx.x = 5 mod 4 = 1. So block 1, thread 1 computes it.",
+    "C[5] = A[5] + B[5] = 11 + 3 = 14."
+   ],
+   "answer": "The launch has 8 threads with indices 0 to 7; thread 5, in block 1 thread 1, computes C[5] = 14.",
+   "check": "blocks = 2\nthreads = 4\nn = blocks * threads\nprint(n)\ntid = 5\nprint(tid)\nb = tid // threads\nprint(b)\nt = tid % threads\nprint(t)\nA5 = 11\nB5 = 3\nC5 = A5 + B5\nprint(C5)",
+   "values": [
+    8,
+    5,
+    1,
+    1,
+    14
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(void) {\n    int A[8] = {0,0,0,0,0,11,0,0};\n    int B[8] = {0,0,0,0,0,3,0,0};\n    int C[8] = {0};\n    int blocks = 2;\n    int threads = 4;\n    for (int b = 0; b < blocks; b++) {\n        for (int t = 0; t < threads; t++) {\n            int tid = b * threads + t;\n            C[tid] = A[tid] + B[tid];\n            printf(\"block %d thread %d tid %d C=%d\\n\", b, t, tid, C[tid]);\n        }\n    }\n    printf(\"C[5]=%d\\n\", C[5]);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "block",
+     "thread",
+     "tid",
+     "C[tid]"
+    ],
+    "rows": [
+     [
+      "0",
+      "0",
+      "0",
+      "0"
+     ],
+     [
+      "0",
+      "1",
+      "1",
+      "0"
+     ],
+     [
+      "0",
+      "2",
+      "2",
+      "0"
+     ],
+     [
+      "0",
+      "3",
+      "3",
+      "0"
+     ],
+     [
+      "1",
+      "0",
+      "4",
+      "0"
+     ],
+     [
+      "1",
+      "1",
+      "5",
+      "14"
+     ],
+     [
+      "1",
+      "2",
+      "6",
+      "0"
+     ],
+     [
+      "1",
+      "3",
+      "7",
+      "0"
+     ]
+    ]
+   },
+   "output": "block 0 thread 0 tid 0 C=0\nblock 0 thread 1 tid 1 C=0\nblock 0 thread 2 tid 2 C=0\nblock 0 thread 3 tid 3 C=0\nblock 1 thread 0 tid 4 C=0\nblock 1 thread 1 tid 5 C=14\nblock 1 thread 2 tid 6 C=0\nblock 1 thread 3 tid 7 C=0\nC[5]=14"
+  }
+ ],
+ "traps": [
+  "A CUDA thread is not a CPU thread. Threads in a warp run the same instruction in lockstep; divergence makes both sides run one after the other.",
+  "Do not mix block index and thread index. <code>threadIdx.x</code> restarts at 0 in every block; only <code>blockIdx.x*blockDim.x + threadIdx.x</code> is global.",
+  "A block of 4 threads is not a warp of 4. A warp is 32 threads; a small block is part of one warp, and several small blocks may share an SM.",
+  "A branch that is uniform across a warp costs nothing extra. A branch on <code>threadIdx.x % 2</code> inside a warp serialises the two paths.",
+  "More threads do not always mean more speed; launch overhead, occupancy and memory access pattern set the real limit."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a warp? State its size in current CUDA.",
+   "marks": 2,
+   "a": "A warp is the hardware scheduling group of threads; current CUDA uses 32 threads per warp."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a GPU use many simple cores instead of a few large CPU cores?",
+   "marks": 3,
+   "a": "Data-parallel work repeats one operation on many elements. Many simple lanes hide memory latency and give high throughput; a few large cores are better for serial code."
+  },
+  {
+   "level": "apply",
+   "q": "A launch has 3 blocks of 8 threads. Find the global index of block 2, thread 5, and the total number of threads.",
+   "marks": 4,
+   "a": "tid = 2×8+5 = 21; total = 3×8 = 24."
+  },
+  {
+   "level": "apply",
+   "q": "For 2 blocks of 4 threads, A[6]=9 and B[6]=4, which thread computes C[6] and what is C[6]?",
+   "marks": 4,
+   "a": "tid=6; blockIdx.x=6÷4=1, threadIdx.x=6 mod 4=2, so block 1 thread 2; C[6]=9+4=13."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can <code>if (tid % 2 == 0) ... else ...</code> slow a warp?",
+   "marks": 5,
+   "a": "Threads in the warp disagree, so hardware runs the if path with even lanes active, then the else path with odd lanes active. Work serialises and half the lanes idle on each pass."
+  },
+  {
+   "level": "analyze",
+   "q": "A block has 40 threads. How many warps does it need, and how many threads are active in the last warp?",
+   "marks": 5,
+   "a": "ceil(40/32)=2 warps; last warp has 40−32=8 active threads."
+  },
+  {
+   "level": "understand",
+   "q": "What does cudaGetDeviceProperties give the host?",
+   "marks": 3,
+   "a": "A filled properties struct for a device: name, multiProcessorCount (SM count), maxThreadsPerBlock and other limits."
+  }
+ ],
+ "beyond": "Not for the exam. Newer NVIDIA GPUs add independent thread scheduling, tensor cores and cluster-level programming, but warp-level thinking remains. CUDA libraries such as cuBLAS and cuDNN hide launches behind tuned kernels for deep learning. Search for CUDA warp divergence, occupancy calculator and SIMT architecture."
+}

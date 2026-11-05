@@ -1,0 +1,223 @@
+{
+ "lead": "In CUDA, the CPU host and the GPU device have separate memories. Every array the kernel needs must cross the bus, and every result must come back. Those copies cost time, often more than the kernel itself. Real speed therefore comes from moving data once, keeping it on the device across iterations, and arranging device accesses so neighbouring threads read neighbouring addresses. cudaMalloc, cudaMemcpy and cudaFree set the pattern; pinned memory and streams hide copy time; coalescing, tiling and arithmetic intensity decide whether the GPU is fed or starved.",
+ "prereq": "You need: <a href=\"#cuda-program-structure-kernels-grids-blocks-threads\">Chapter 3.4</a> for the host/kernel split and <a href=\"#gpu-memory-hierarchy-global-shared-and-constant-memory\">Chapter 3.5</a> for global and shared memory.",
+ "sections": [
+  {
+   "h3": "Allocate, copy, free",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The host uses <code>malloc</code>; the device uses <code>cudaMalloc</code>. A device pointer is an address in GPU memory, and host code must not dereference it. Allocate with <code>cudaMalloc(&d_a, N * sizeof(float))</code>; <code>d_a</code> is a <code>float*</code>, N is the number of elements, and <code>sizeof(float)</code> is 4 bytes on standard CUDA platforms."
+    },
+    {
+     "type": "p",
+     "text": "Copy with <code>cudaMemcpy(d_a, h_a, bytes, cudaMemcpyHostToDevice)</code> and copy back with <code>cudaMemcpy(h_a, d_a, bytes, cudaMemcpyDeviceToHost)</code>. Release with <code>cudaFree(d_a)</code>. Plain <code>cudaMemcpy</code> is synchronous: the host call returns after the copy finishes."
+    },
+    {
+     "type": "formula",
+     "text": "T<sub>copy</sub> = B ÷ BW<sub>bus</sub>",
+     "where": "T<sub>copy</sub> is copy time in seconds; B is bytes moved; BW<sub>bus</sub> is effective bus bandwidth in bytes per second. Multiply by 1000 for milliseconds."
+    },
+    {
+     "type": "p",
+     "text": "A 4 MB copy at 10 GB/s takes 4×10<sup>6</sup> ÷ 10×10<sup>9</sup> = 0.0004 s = 0.4 ms. That is larger than many small kernels. A chain of small synchronous copies also leaves the GPU idle while the host waits."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Allocate host memory and fill it.",
+      "Allocate device memory with cudaMalloc.",
+      "Copy inputs host-to-device (H2D).",
+      "Launch the kernel.",
+      "Copy results device-to-host (D2H).",
+      "Free device memory with cudaFree."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Pinned memory and streams",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Ordinary <code>malloc</code> memory is pageable. The driver may copy through a hidden staging buffer, so <code>cudaMemcpyAsync</code> cannot safely overlap it. Pinned memory is locked in physical RAM. Allocate with <code>cudaHostAlloc(&h_a, bytes, cudaHostAllocDefault)</code> or <code>cudaMallocHost</code>; free with <code>cudaFreeHost</code>. Pinned memory gives faster copies but takes RAM the OS cannot page out."
+    },
+    {
+     "type": "p",
+     "text": "A stream is an ordered queue of device work. Operations in one stream run in issue order: H2D, kernel, D2H. Different streams can overlap if the GPU has copy engines. Split the array into chunks and use several streams to pipeline the copy of chunk k+1 with the kernel of chunk k."
+    },
+    {
+     "type": "p",
+     "text": "Asynchronous calls return at once. Use <code>cudaMemcpyAsync(d_a, h_a, bytes, cudaMemcpyHostToDevice, stream)</code> and <code>cudaDeviceSynchronize()</code> before reading results or stopping a timer. Overlap helps only when there is enough independent work; a single small kernel still waits for its input."
+    }
+   ]
+  },
+  {
+   "h3": "Coalescing, tiling and arithmetic intensity",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Global memory is fastest when a warp's 32 threads touch one contiguous block. If thread t reads <code>a[base + t]</code>, the hardware combines the 32 loads into a few 128-byte transactions. If threads read with stride 32, each load lands in a different segment and bandwidth is wasted. In CUDA the index <code>blockIdx.x * blockDim.x + threadIdx.x</code> gives coalesced access for a one-dimensional array."
+    },
+    {
+     "type": "p",
+     "text": "Tiling, also called blocking, copies a small tile into shared memory, synchronises, then reuses it. In matrix multiplication C = A × B, each block loads one tile of A and one of B, and each element is used <code>blockDim</code> times from shared memory instead of global memory. This is spatial locality: neighbours are used together. It is also temporal locality: the same value is reused."
+    },
+    {
+     "type": "p",
+     "text": "Arithmetic intensity I = F ÷ B, where F is floating-point operations and B is bytes moved between global memory and the processor, or between host and device. Low I means memory-bound: adding cores does not help. High I means compute-bound. Copies outside the kernel count in B, so a kernel that does ten operations per float has I = 10 ÷ 4 = 2.5 FLOP/byte, while a tiled matrix multiply that reuses a tile reaches far more."
+    },
+    {
+     "type": "p",
+     "text": "For repeated ML training, keep weights, gradients and the dataset on the device. Copy one minibatch H2D, run many kernels, and copy only final weights or metrics D2H. Copying the model every layer turns a compute problem into a bus problem."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One iteration on the bus: the input copy runs from 0 to 0.4 ms, the kernel from 0.4 to 0.6 ms, and the result copy from 0.6 to 1.0 ms. Two copies take 0.8 ms while the kernel takes 0.2 ms.",
+  "spec": {
+   "type": "gantt",
+   "aria": "Timeline of one CUDA iteration: a host-to-device copy from 0 to 0.4 ms, a GPU kernel from 0.4 to 0.6 ms, and a device-to-host copy from 0.6 to 1.0 ms.",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "Host",
+     "bars": [
+      {
+       "label": "H2D",
+       "start": 0,
+       "end": 0.4,
+       "style": "accent"
+      },
+      {
+       "label": "D2H",
+       "start": 0.6,
+       "end": 1.0,
+       "style": "live"
+      }
+     ]
+    },
+    {
+     "label": "GPU",
+     "bars": [
+      {
+       "label": "kernel",
+       "start": 0.4,
+       "end": 0.6,
+       "style": "next"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A CUDA program processes N = 1,000,000 single-precision floats. Each float is 4 bytes. The host-to-device copy and the device-to-host copy each move 4 MB at an effective bandwidth of 10 GB/s. The kernel takes 0.2 ms. (a) Find the time for one copy. (b) Find the total time for one iteration that copies in, runs the kernel and copies out. (c) Find the total time for 10 iterations if the array stays on the device between iterations, with one copy in before the first and one copy out after the last. (d) What percentage of the one-iteration time is kernel time?",
+   "steps": [
+    "Bytes per copy B = 1,000,000 × 4 = 4,000,000 bytes = 4 MB, using 1 MB = 10<sup>6</sup> bytes.",
+    "One copy: T = B ÷ BW = 4,000,000 ÷ 10,000,000,000 = 0.0004 s = 0.4 ms.",
+    "One iteration: 0.4 ms H2D + 0.2 ms kernel + 0.4 ms D2H = 1.0 ms.",
+    "Ten iterations with data resident: 0.4 ms + 10 × 0.2 ms + 0.4 ms = 0.4 + 2.0 + 0.4 = 2.8 ms. Only two copies occur, not twenty.",
+    "Kernel share: 0.2 ms ÷ 1.0 ms × 100 = 20%."
+   ],
+   "answer": "One copy is 0.4 ms, one iteration is 1.0 ms, ten iterations with the data resident are 2.8 ms, and the kernel is 20% of one iteration.",
+   "check": "N = 1000000\nbytes_moved = N * 4\nbw = 10e9\nt_copy_ms = bytes_moved / bw * 1000\nt_one = t_copy_ms + 0.2 + t_copy_ms\nt_ten = t_copy_ms + 10 * 0.2 + t_copy_ms\nshare = 0.2 / t_one * 100\nprint(f\"{t_copy_ms:.1f}\")\nprint(f\"{t_one:.1f}\")\nprint(f\"{t_ten:.1f}\")\nprint(f\"{share:.1f}\")\n",
+   "values": [
+    0.4,
+    1.0,
+    2.8,
+    20.0
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\n\nint main(void) {\n    double n = 1000000.0;\n    double bytes = n * 4.0;\n    double bw = 10e9;\n    double copy_ms = bytes / bw * 1000.0;\n    double kernel = 0.2;\n    double one = copy_ms + kernel + copy_ms;\n    double ten = copy_ms + 10.0 * kernel + copy_ms;\n    double share = kernel / one * 100.0;\n    printf(\"copy = %.1f ms\\n\", copy_ms);\n    printf(\"one iteration = %.1f ms\\n\", one);\n    printf(\"ten iterations = %.1f ms\\n\", ten);\n    printf(\"kernel share = %.1f%%\\n\", share);\n    return 0;\n}\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Variable",
+     "Value",
+     "Unit"
+    ],
+    "rows": [
+     [
+      "copy_ms",
+      "0.4",
+      "ms"
+     ],
+     [
+      "one",
+      "1.0",
+      "ms"
+     ],
+     [
+      "ten",
+      "2.8",
+      "ms"
+     ],
+     [
+      "share",
+      "20.0",
+      "%"
+     ]
+    ]
+   },
+   "output": "copy = 0.4 ms\none iteration = 1.0 ms\nten iterations = 2.8 ms\nkernel share = 20.0%\n"
+  }
+ ],
+ "traps": [
+  "Counting only kernel time. In the worked example the two copies take 0.8 ms, four times the 0.2 ms kernel.",
+  "Mixing MB and Mb. 4 MB is 4,000,000 bytes; 4 Mb is 500,000 bytes. Bandwidth in GB/s uses bytes.",
+  "Assuming cudaMemcpyAsync always overlaps. It needs pinned host memory, a stream and independent work; otherwise it is just a queued synchronous copy.",
+  "Copying the whole dataset every iteration when it fits on the device. Copy minibatches or changed data only; keep weights and optimiser state resident.",
+  "Confusing coalescing with shared memory. Coalescing is about neighbouring threads using neighbouring global addresses; tiling is about reusing a loaded block in shared memory."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What do cudaMalloc and cudaFree do?",
+   "marks": 2,
+   "a": "cudaMalloc allocates bytes in device global memory and writes a device pointer to the given pointer variable. cudaFree releases that device memory. Host code must not dereference the device pointer."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a synchronous cudaMemcpy dominate a loop of small kernels?",
+   "marks": 3,
+   "a": "The synchronous copy blocks the host until the transfer completes. The GPU is idle during the copy, and for a small kernel the 0.4 ms copy can be larger than the kernel time, so total time is set by the bus."
+  },
+  {
+   "level": "apply",
+   "q": "N = 2,000,000 floats, 4 bytes each, bandwidth 10 GB/s, kernel 0.5 ms. Find one iteration time with one H2D copy, the kernel and one D2H copy.",
+   "marks": 4,
+   "a": "B = 2,000,000 × 4 = 8,000,000 bytes = 8 MB. One copy = 8,000,000 ÷ 10,000,000,000 = 0.0008 s = 0.8 ms. One iteration = 0.8 + 0.5 + 0.8 = 2.1 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A kernel reads a 1D float array with index 2 * threadIdx.x. What is the access pattern and its effect on bandwidth?",
+   "marks": 5,
+   "a": "Threads in a warp read addresses 0, 2, 4, ..., 62, a stride-2 pattern. The 32 useful floats span 256 bytes and require two 128-byte transactions, so only 128 useful bytes are delivered per 256 bytes: about 50% efficiency. Neighbouring threads are not touching every neighbouring address, so coalescing is imperfect."
+  },
+  {
+   "level": "apply",
+   "q": "A loop runs 100 iterations. Each iteration would copy 4 MB H2D and 4 MB D2H at 10 GB/s and run a 0.2 ms kernel. Compare total time with copies every iteration against keeping data on the device with only one H2D before the loop and one D2H after it.",
+   "marks": 6,
+   "a": "One copy is 0.4 ms, so with copies every iteration each iteration is 0.4 + 0.2 + 0.4 = 1.0 ms and 100 iterations are 100 ms. With data resident, total = 0.4 + 100 × 0.2 + 0.4 = 0.4 + 20.0 + 0.4 = 20.8 ms. The saving is 79.2 ms."
+  },
+  {
+   "level": "understand",
+   "q": "What is arithmetic intensity, and what does a low value imply?",
+   "marks": 3,
+   "a": "Arithmetic intensity I = F ÷ B, where F is floating-point operations and B is bytes moved. A low value means the kernel is memory-bound: the GPU waits on data, and adding more compute cores does not help much."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can two streams overlap a copy with a kernel while one stream cannot?",
+   "marks": 4,
+   "a": "Operations in one stream are ordered, so a copy after a kernel waits for that kernel. With two streams and chunked data, the copy engine can move chunk k+1 while the compute engine runs the kernel for chunk k, provided the host memory is pinned and the GPU supports concurrent copy and compute."
+  }
+ ],
+ "beyond": "Not for the exam. Modern CUDA offers unified memory with <code>cudaMallocManaged</code>, where the driver migrates pages on demand; it simplifies code but does not remove the bus. Multi-GPU training uses NVLink and GPUDirect to move data between devices without the host. The roofline model plots achieved FLOP/s against arithmetic intensity and shows whether a kernel is memory-bound or compute-bound. Profilers such as Nsight Systems draw a timeline like the figure, so you can see copy and kernel gaps. Search for cudaMallocManaged, cudaMemcpyAsync, roofline model and Nsight Systems timeline."
+}
