@@ -1,15 +1,14 @@
 # c-cn-u4: free-model run
 
 - Book: `books/cse/c-cn/c-cn-u4.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 31 (100,407 tokens in, 106,115 out), 4.3 minutes
 
 ## Checker
 
 ```
-c-cn-u4.html: 9 chapters, 11943 words, 10 figures, 138 KB
-PROBLEMS:
- - page is wider than the screen at 390px (467>390): a table, figure or long word overflows
+c-cn-u4.html: 9 chapters, 11943 words, 10 figures, 141 KB
+OK
 ```
 
 ## For the reviewer
@@ -18,7 +17,6 @@ PROBLEMS:
 - chapter 8: a c program's shown output was replaced by its real output; check the text around it
 - chapter 3: a c program's shown output was replaced by its real output; check the text around it
 - chapter 4: a c program's shown output was replaced by its real output; check the text around it
-- checker: page is wider than the screen at 390px (467>390): a table, figure or long word overflows
 
 ## Reviewer notes (after any revision)
 
