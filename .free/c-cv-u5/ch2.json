@@ -1,0 +1,233 @@
+{
+ "lead": "A feature descriptor is a short vector that describes the patch around a keypoint. SIFT and SURF build that vector from local gradient patterns, so the same physical point gives a similar vector after zoom, rotation and small viewpoint change. The detector finds the point; the descriptor names it. Software then matches vectors between two images to stitch a panorama, locate an object, or build a 3D model. SIFT is the careful reference method. SURF is a faster approximation built from box filters. Both finish with a distance test between vectors.",
+ "prereq": "You need: <a href=\"#corner-and-blob-detection-harris-detector\">5.1 keypoints</a>, Unit 2 image pyramids and Gaussian filtering, and Unit 4 gradients.",
+ "sections": [
+  {
+   "h3": "Scale space and DoG keypoints",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Scale space is a stack of blurred copies of the same image. Small blur finds fine detail; large blur finds coarse structure. The Gaussian blurred image at scale σ is:"
+    },
+    {
+     "type": "formula",
+     "text": "L(x,y,σ) = G(x,y,σ) * I(x,y)",
+     "where": "I is the input image; G is a Gaussian kernel with standard deviation σ; * is convolution; (x,y) is a pixel position; L is the blurred image."
+    },
+    {
+     "type": "p",
+     "text": "SIFT builds several octaves. Each octave doubles σ and halves the image size. The Difference of Gaussians subtracts two nearby scales:"
+    },
+    {
+     "type": "formula",
+     "text": "D(x,y,σ) = L(x,y,kσ) − L(x,y,σ)",
+     "where": "k is a fixed scale factor, commonly 2^(1/3) in SIFT; D is the DoG image."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Build the Gaussian scale space and the DoG pyramid.",
+      "Test each DoG pixel against its 26 neighbours: 8 in the same scale, 9 below, 9 above.",
+      "Keep candidates whose |D| passes a contrast threshold.",
+      "Reject points on edges using the ratio of principal curvatures."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Orientation and the 128-D SIFT descriptor",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each keypoint gets one or more orientations. The gradient at a pixel has magnitude m and angle θ:"
+    },
+    {
+     "type": "formula",
+     "text": "m(x,y) = √((L(x+1,y)−L(x−1,y))² + (L(x,y+1)−L(x,y−1))²),  θ(x,y) = atan2(L(x,y+1)−L(x,y−1), L(x+1,y)−L(x−1,y))",
+     "where": "L is the blurred image at the keypoint scale; atan2 returns the angle in radians from −π to π."
+    },
+    {
+     "type": "p",
+     "text": "SIFT builds a 36-bin histogram of θ over a window around the keypoint. Each sample is weighted by m and by a Gaussian window. The highest peak is the keypoint orientation. Any other peak above 80% of the highest peak creates another keypoint with that orientation."
+    },
+    {
+     "type": "p",
+     "text": "The descriptor uses a square patch rotated to the keypoint orientation. The patch is divided into 4×4 cells. Each cell has an 8-bin gradient-orientation histogram. 4×4×8 = 128 values form the SIFT descriptor. Values are smoothed by trilinear interpolation, then normalized:"
+    },
+    {
+     "type": "formula",
+     "text": "d′ = d / ||d||₂,  ||d||₂ = √(Σ dᵢ²)",
+     "where": "d is the 128-D descriptor vector; dᵢ is one component; ||d||₂ is the L2 norm. SIFT then clips each component at 0.2 and renormalizes."
+    }
+   ]
+  },
+  {
+   "h3": "SURF: box filters and Haar wavelets",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SURF replaces Gaussian derivatives with box filters and uses an integral image:"
+    },
+    {
+     "type": "formula",
+     "text": "IΣ(x,y) = Σ x′≤x, y′≤y I(x′,y′)",
+     "where": "IΣ is the integral image; the sum runs over all pixels above and to the left of (x,y). Any rectangular sum is four additions, so box filters are fast at many scales."
+    },
+    {
+     "type": "p",
+     "text": "SURF uses the Hessian matrix. Its determinant is approximated as:"
+    },
+    {
+     "type": "formula",
+     "text": "det(H) ≈ D_xx D_yy − (0.9 D_xy)²",
+     "where": "D_xx, D_yy and D_xy are box-filter responses that approximate second derivatives; the factor 0.9 corrects the box-filter approximation. Keypoints are extrema of this determinant in scale and space."
+    },
+    {
+     "type": "p",
+     "text": "For orientation, SURF sums Haar wavelet responses in x and y inside a circular window. The longest sum vector gives the dominant direction. The descriptor uses a 4×4 grid of subregions. In each subregion it sums dx, dy, |dx| and |dy|, giving 4×4×4 = 64 values. The upright SURF variant skips rotation and is faster."
+    }
+   ]
+  },
+  {
+   "h3": "Matching with the ratio test",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Matching compares descriptors from two images. For a descriptor p in the first image, find its nearest neighbour q1 and second nearest neighbour q2 in the second image by Euclidean distance. The ratio test accepts the match only if:"
+    },
+    {
+     "type": "formula",
+     "text": "||p − q1|| / ||p − q2|| < 0.8",
+     "where": "||·|| is Euclidean distance; 0.8 is a typical threshold. A smaller threshold is stricter."
+    },
+    {
+     "type": "p",
+     "text": "A true match usually has q1 much closer than q2. An ambiguous match has q2 almost as close, so the ratio is near 1 and the match is rejected. This removes many false matches before RANSAC or bag-of-words. See <a href=\"#bag-of-visual-words\">5.4</a> for what comes next."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The SIFT pipeline: scale space produces DoG keypoints, orientation assignment makes the patch rotation-aware, and the descriptor turns local gradients into a 128-D vector.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "SIFT pipeline",
+   "nodes": [
+    {
+     "id": "scale",
+     "label": "Scale space",
+     "style": "normal"
+    },
+    {
+     "id": "key",
+     "label": "DoG keypoints",
+     "style": "accent"
+    },
+    {
+     "id": "ori",
+     "label": "Orientation",
+     "style": "normal"
+    },
+    {
+     "id": "desc",
+     "label": "Descriptor",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "scale",
+     "to": "key",
+     "style": "solid"
+    },
+    {
+     "from": "key",
+     "to": "ori",
+     "style": "solid"
+    },
+    {
+     "from": "ori",
+     "to": "desc",
+     "style": "solid"
+    }
+   ],
+   "aria": "SIFT pipeline from scale space to keypoints, orientation assignment and the final descriptor."
+  }
+ },
+ "examples": [
+  {
+   "question": "A SIFT descriptor is being built. One 4×4 spatial cell has an 8-bin orientation histogram. Four of its bins have counts [1, 3, 0, 2]; the other four are zero. Take only these four bins. (a) Compute the L2 norm. (b) Normalize the four-bin vector. (c) State what SIFT does to the full 128-D vector after normalization.",
+   "steps": [
+    "The four-bin vector is d = [1, 3, 0, 2].",
+    "Square each component: 1² = 1, 3² = 9, 0² = 0, 2² = 4.",
+    "Sum the squares: 1 + 9 + 0 + 4 = 14.",
+    "L2 norm: ||d||₂ = √14 = 3.7417 (rounded to 4 decimals).",
+    "Divide each component by 3.7417.",
+    "1 ÷ 3.7417 = 0.2673.",
+    "3 ÷ 3.7417 = 0.8018.",
+    "0 ÷ 3.7417 = 0.0.",
+    "2 ÷ 3.7417 = 0.5345.",
+    "Normalized vector = [0.2673, 0.8018, 0.0, 0.5345].",
+    "For the full SIFT descriptor, the 128 values are normalized, clipped at 0.2, and renormalized."
+   ],
+   "answer": "The L2 norm is 3.7417, and the normalized four-bin vector is [0.2673, 0.8018, 0.0, 0.5345].",
+   "check": "import math\ncounts = [1.0, 3.0, 0.0, 2.0]\nnorm = math.sqrt(sum(c*c for c in counts))\nprint(round(norm, 4))\nfor c in counts:\n    print(round(c/norm, 4))\n",
+   "values": [
+    3.7417,
+    0.2673,
+    0.8018,
+    0.0,
+    0.5345
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The descriptor is not the raw histogram count. Raw counts change with contrast; SIFT normalizes, clips and renormalizes to reduce illumination effects.",
+  "A 4×4 grid of cells with 8 bins is 128 values, not 4×4 = 16. Each cell contributes 8 numbers.",
+  "Orientation assignment happens before descriptor building. Skip it and the descriptor is not rotation invariant.",
+  "SURF is not SIFT with faster code. SURF uses a Hessian-determinant detector and Haar-wavelet descriptor; upright SURF is not rotation invariant.",
+  "In the ratio test, a smaller threshold is stricter. Do not accept a match just because the nearest distance is small; compare it with the second nearest."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the length of the standard SIFT descriptor vector?",
+   "marks": 2,
+   "a": "128 values: 4×4 spatial cells, each with 8 orientation bins."
+  },
+  {
+   "level": "understand",
+   "q": "Why is each gradient sample weighted by its magnitude in the orientation histogram?",
+   "marks": 3,
+   "a": "Strong gradients carry more reliable direction information. Magnitude weighting lets strong edges dominate the peak and reduces the effect of weak noisy gradients."
+  },
+  {
+   "level": "apply",
+   "q": "A DoG candidate has |D| = 0.025 and the contrast threshold is 0.03. Is it kept?",
+   "marks": 2,
+   "a": "No. 0.025 < 0.03, so the candidate fails the contrast test and is rejected."
+  },
+  {
+   "level": "apply",
+   "q": "The nearest-neighbour distance is 0.42 and the second-nearest distance is 0.70. Apply the ratio test with threshold 0.8. Is the match accepted?",
+   "marks": 3,
+   "a": "Ratio = 0.42 / 0.70 = 0.6. Since 0.6 < 0.8, the match is accepted."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does SURF use an integral image?",
+   "marks": 4,
+   "a": "An integral image gives any rectangular sum with four additions. SURF can then evaluate box filters at many scales cheaply, which makes its Hessian detector fast."
+  },
+  {
+   "level": "analyze",
+   "q": "What happens if you normalize a SIFT descriptor but do not clip large components?",
+   "marks": 4,
+   "a": "A few very large gradients can dominate the vector. Clipping at 0.2 limits their influence, then renormalization restores unit length. Without clipping, the descriptor is more sensitive to strong local edges and illumination changes."
+  }
+ ],
+ "beyond": "Not for the exam. Modern systems often replace hand-made descriptors with learned ones: SuperPoint for keypoints, LoFTR for detector-free matching, and CNN embeddings from Unit 6. Search 'SIFT scale space', 'SURF integral image' and 'ratio test descriptor matching' to go deeper. In industry, SIFT-like matching still appears in panorama stitching and drone mapping when training data is scarce. SURF's integral-image trick is a standard way to make any box filter cheap."
+}

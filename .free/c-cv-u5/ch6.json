@@ -1,0 +1,269 @@
+{
+ "lead": "Two photographs of the same scene are not independent. A 3D point seen in the left image must appear somewhere on a specific line in the right image, called the epipolar line. This constraint, captured by the fundamental matrix F, reduces matching from a 2D search to a 1D search. When the cameras are parallel, the line becomes a row shift called disparity, and depth follows from Z = f B / d. The same geometry gives camera motion, 3D triangulation and the base for structure from motion.",
+ "prereq": "You need: <a href=\"#camera-models-and-camera-calibration\">Chapter 5.5</a> for the pinhole camera and intrinsic matrix K, plus matrix multiplication, SVD and least squares.",
+ "sections": [
+  {
+   "h3": "Epipoles, epipolar planes and lines",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two cameras at centres C1 and C2 see a 3D point X. X projects to x1 in the left image and x2 in the right image. The plane through C1, C2 and X is the epipolar plane."
+    },
+    {
+     "type": "p",
+     "text": "The ray from C1 through X can slide while x1 stays fixed. As it slides, the epipolar plane turns about the baseline C1C2. In the left image every such plane cuts a line through one fixed point e1, the epipole. e1 is the image of C2 in camera 1. In the right image the lines pass through e2, the image of C1."
+    },
+    {
+     "type": "p",
+     "text": "Knowing x1, the match x2 must lie on the epipolar line l2 through e2. The search is now one-dimensional, and it does not depend on the depth of X. When the image planes are parallel, the epipoles go to infinity and the lines become horizontal; this is rectified stereo."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Detect a keypoint x1 in the left image.",
+      "Compute its epipolar line in the right image using F.",
+      "Search for the matching descriptor only along that line.",
+      "Reject weak matches with a ratio test or RANSAC."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "The fundamental matrix and the essential matrix",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Write image points as homogeneous vectors x1 = (u1, v1, 1)ᵀ and x2 = (u2, v2, 1)ᵀ, with u and v in pixels. The fundamental matrix F is the 3×3 matrix that encodes the epipolar geometry of the pair."
+    },
+    {
+     "type": "formula",
+     "text": "x<sub>2</sub><sup>ᵀ</sup> F x<sub>1</sub> = 0",
+     "where": "x1 and x2 are matching pixel points in homogeneous coordinates; F is the 3×3 fundamental matrix. The line l2 = F x1 is the epipolar line in image 2, and l1 = Fᵀ x2 is the line in image 1."
+    },
+    {
+     "type": "p",
+     "text": "F has rank 2 and is defined only up to scale. It has 7 degrees of freedom: 9 entries minus one for scale, minus one for the rank constraint. If the points are in normalized camera coordinates x̂ = K⁻¹x, the matrix is the essential matrix E, with x̂2ᵀ E x̂1 = 0. E = [t]× R, where R is the rotation and t the translation from camera 1 to camera 2, and [t]× is the cross-product matrix of t. E has 5 degrees of freedom: 3 for rotation and 2 for the translation direction. The link is F = K2⁻ᵀ E K1⁻¹."
+    },
+    {
+     "type": "p",
+     "text": "Eight-point algorithm: each match gives one linear equation in the nine entries of F. Stack eight or more matches into a matrix A and take the singular vector for the smallest singular value. Enforce rank 2 by zeroing the smallest singular value of the result. Real matches contain outliers, so run the fit inside RANSAC: sample eight matches, fit F, count inliers with |x2ᵀ F x1| near zero, and keep the best model. Normalize pixel coordinates before the SVD for stability."
+    }
+   ]
+  },
+  {
+   "h3": "Rectification, disparity and depth",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Rectification warps the two images so that epipolar lines become horizontal image rows. After rectification, a point at pixel (u1, v) in the left image has its match at (u2, v) in the right image. The horizontal shift is the disparity d = u1 − u2, measured in pixels."
+    },
+    {
+     "type": "formula",
+     "text": "Z = f B / d",
+     "where": "Z is the depth of the point in metres; f is the focal length in pixels; B is the baseline between the two camera centres in metres; d is the disparity in pixels. Pixels × metres ÷ pixels gives metres."
+    },
+    {
+     "type": "p",
+     "text": "A small disparity means a large depth, and a point at infinity has d = 0. Halving the depth doubles the disparity. For an unrectified pair, triangulate instead: back-project x1 and x2 as rays from C1 and C2 using the camera matrices P1 and P2, and find the 3D point X where they meet. Noise makes the rays miss, so solve a least-squares problem, typically by the direct linear transform. Triangulation needs the relative camera pose; rectified stereo is the special case of a pure horizontal translation."
+    }
+   ]
+  },
+  {
+   "h3": "Multi-view projective geometry",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A camera matrix P = K[R | t] maps a homogeneous 3D point X to a homogeneous image point x = P X. Two views of the same point give two such equations. Eliminating X gives the epipolar constraint, so F is a property of the camera pair, not of the scene. This is why the same F works for every point in the scene."
+    },
+    {
+     "type": "p",
+     "text": "One camera loses depth: X and every point along the ray from the camera centre project to the same pixel. Two views fix depth only up to the baseline length. Three or more views add constraints; the trifocal tensor plays the role of F for three views, and longer sequences are handled by <a href=\"#structure-from-motion-and-3d-reconstruction\">structure from motion</a>. Some syllabi call F the bifocal tensor. The same equations support pose estimation for a moving robot and augmented reality that must place a virtual object at the right depth."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The 3D point X projects to x1 and x2. The dashed lines from the camera centres to the epipoles show that each image point lies on a line through its epipole.",
+  "spec": {
+   "type": "graph",
+   "directed": false,
+   "nodes": [
+    {
+     "id": "C1",
+     "label": "C1",
+     "x": 0,
+     "y": 1,
+     "note": "left center",
+     "style": "accent"
+    },
+    {
+     "id": "C2",
+     "label": "C2",
+     "x": 4,
+     "y": 1,
+     "note": "right center",
+     "style": "accent"
+    },
+    {
+     "id": "X",
+     "label": "X",
+     "x": 2,
+     "y": 3,
+     "note": "3D point",
+     "style": "normal"
+    },
+    {
+     "id": "x1",
+     "label": "x1",
+     "x": 1,
+     "y": 2,
+     "note": "left image",
+     "style": "normal"
+    },
+    {
+     "id": "x2",
+     "label": "x2",
+     "x": 3,
+     "y": 2,
+     "note": "right image",
+     "style": "normal"
+    },
+    {
+     "id": "e1",
+     "label": "e1",
+     "x": 0.5,
+     "y": 1.6,
+     "note": "epipole",
+     "style": "muted"
+    },
+    {
+     "id": "e2",
+     "label": "e2",
+     "x": 3.5,
+     "y": 1.6,
+     "note": "epipole",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "C1",
+     "to": "X",
+     "style": "solid"
+    },
+    {
+     "from": "C2",
+     "to": "X",
+     "style": "solid"
+    },
+    {
+     "from": "X",
+     "to": "x1",
+     "style": "solid"
+    },
+    {
+     "from": "X",
+     "to": "x2",
+     "style": "solid"
+    },
+    {
+     "from": "C2",
+     "to": "e1",
+     "style": "dashed"
+    },
+    {
+     "from": "C1",
+     "to": "e2",
+     "style": "dashed"
+    },
+    {
+     "from": "x1",
+     "to": "e1",
+     "style": "accent"
+    },
+    {
+     "from": "x2",
+     "to": "e2",
+     "style": "accent"
+    }
+   ],
+   "aria": "Two camera centers C1 and C2 see a 3D point X; its projections x1 and x2 lie on corresponding epipolar lines through epipoles e1 and e2."
+  }
+ },
+ "examples": [
+  {
+   "question": "A rectified stereo pair has focal length f = 800 px and baseline B = 0.12 m. A matched point has disparity d = 24 px. Find its depth Z. State the units at each step.",
+   "steps": [
+    "Rectified pair, so the disparity is measured in pixels along a row: d = 24 px.",
+    "Formula: Z = f B / d.",
+    "Substitute: Z = 800 px × 0.12 m / 24 px.",
+    "800 × 0.12 = 96 px·m, and 96 / 24 = 4.0 m."
+   ],
+   "answer": "Z = 4.0 m.",
+   "check": "f = 800.0\nB = 0.12\nd = 24.0\nZ = f * B / d\nprint(Z)",
+   "values": [
+    4.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "F and E are not interchangeable: F acts on pixel coordinates, E on normalized camera coordinates x̂ = K⁻¹x. Mixing them gives wrong epipolar lines.",
+  "Disparity is in pixels, not metres. f must also be in pixels in Z = f B / d, while B and Z are in metres.",
+  "Z = f B / d assumes rectified images. On an unrectified pair, compute F and rectify first, or triangulate with P1 and P2.",
+  "The fundamental matrix has rank 2. A full-rank eight-point result does not give a single epipole; zero the smallest singular value.",
+  "The epipole is the image of the other camera centre, not a 3D point and not the same thing as an epipolar line."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define epipole and epipolar line.",
+   "marks": 2,
+   "a": "The epipole is the image of one camera centre in the other camera. An epipolar line is the intersection of an epipolar plane with an image; all such lines pass through the epipole."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the epipolar constraint turn a 2D search into a 1D search?",
+   "marks": 3,
+   "a": "A match for x1 must lie on l2 = F x1, a line, instead of anywhere in the second image. Sliding X along its ray does not change x1, so the line holds for every possible depth."
+  },
+  {
+   "level": "apply",
+   "q": "A rectified pair has f = 600 px, B = 0.10 m and disparity d = 15 px. Find Z.",
+   "marks": 3,
+   "a": "Z = f B / d = 600 × 0.10 / 15 = 60 / 15 = 4.0 m."
+  },
+  {
+   "level": "analyze",
+   "q": "Two points in a rectified pair have disparities 30 px and 10 px. Which is closer, and by what factor?",
+   "marks": 4,
+   "a": "Z = f B / d, so the 30 px point has Z = f B / 30 and the 10 px point has Z = f B / 10. The 30 px point is closer, by a factor of 3."
+  },
+  {
+   "level": "remember",
+   "q": "How many degrees of freedom do F and E have?",
+   "marks": 2,
+   "a": "F has 7: 9 entries minus one for scale and one for the rank-2 constraint. E has 5: 3 for rotation and 2 for the translation direction."
+  },
+  {
+   "level": "apply",
+   "q": "What does x2ᵀ F x1 = 0 mean geometrically?",
+   "marks": 2,
+   "a": "x2 lies on the epipolar line F x1, so x1 and x2 can be projections of the same 3D point."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is RANSAC used around the eight-point algorithm?",
+   "marks": 3,
+   "a": "Keypoint matches contain outliers, and the eight-point fit is sensitive to them. RANSAC samples eight matches repeatedly, fits F, and keeps the model with the most inliers, where |x2ᵀ F x1| is near zero."
+  },
+  {
+   "level": "understand",
+   "q": "Write the relation between F and E and explain K1 and K2.",
+   "marks": 3,
+   "a": "F = K2⁻ᵀ E K1⁻¹, where K1 and K2 are the intrinsic matrices of the two cameras; E is in normalized coordinates and F is in pixel coordinates."
+  }
+ ],
+ "beyond": "Not for the exam. Dual-camera phones and self-driving cars run dense stereo on rectified pairs, often with a learned cost volume instead of hand-crafted descriptors. Visual SLAM systems use E and F inside RANSAC for pose estimation, and photogrammetry pipelines refine depth maps across many views. Recent research replaces the eight-point algorithm with differentiable pose estimators and epipolar transformers. Search for 'stereo matching cost volume', 'epipolar transformer', 'trifocal tensor' and 'visual SLAM' to go further."
+}

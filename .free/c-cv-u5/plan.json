@@ -1,0 +1,641 @@
+{
+ "lead": "This unit shows how a vision system turns pixels into repeatable features, then uses geometry and motion to recover where cameras and objects are. You start with corners and descriptors, build image-level representations, then move to camera models, stereo, structure from motion, optical flow and registration. After it you can design a feature-matching pipeline, calibrate a camera, estimate depth or motion, and align two images.",
+ "about": "The unit moves from local evidence to global geometry. Chapter 5.1 detects corners and blobs with the Harris detector; 5.2 turns keypoints into SIFT and SURF descriptors; 5.3 and 5.4 make fixed-length and word-based image representations with HOG and bag of visual words. Chapter 5.5 introduces the pinhole camera and calibration. Chapter 5.6 explains epipolar geometry and stereo depth; 5.7 extends this to structure from motion and 3D reconstruction. Chapter 5.8 estimates pixel motion with optical flow; 5.9 aligns images with registration. Each chapter uses earlier filters, edges and transforms, and feeds later recognition or medical imaging work.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A corner is a point whose local intensity changes in two directions; Harris turns that test into a small matrix and a scalar response.",
+   "depth": "Visual features: edges, corners, blobs. Harris detector: image gradients Ix, Iy; window sum; structure matrix H = Σ w [Ix² IxIy; IxIy Iy²]; eigenvalues λ1, λ2; response R = det H − k(trace H)² with k ≈ 0.04; non-maximum suppression; threshold. Shi-Tomasi uses R = λmin. Blob detection by LoG/DoG at scales as a short bridge. Some syllabi call H the second-moment matrix. Mention Harris is rotation invariant but not scale invariant.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Harris detector",
+    "nodes": [
+     {
+      "id": "img",
+      "label": "Image",
+      "style": "normal"
+     },
+     {
+      "id": "grad",
+      "label": "Gradients Ix, Iy",
+      "style": "normal"
+     },
+     {
+      "id": "h",
+      "label": "Matrix H",
+      "style": "accent"
+     },
+     {
+      "id": "r",
+      "label": "Response R",
+      "style": "live"
+     },
+     {
+      "id": "nms",
+      "label": "NMS + threshold",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "img",
+      "to": "grad",
+      "style": "solid"
+     },
+     {
+      "from": "grad",
+      "to": "h",
+      "style": "solid"
+     },
+     {
+      "from": "h",
+      "to": "r",
+      "style": "solid"
+     },
+     {
+      "from": "r",
+      "to": "nms",
+      "style": "solid"
+     }
+    ],
+    "aria": "Flow of the Harris detector from image gradients to the structure matrix, response map and non-maximum suppression."
+   },
+   "example": "A 2×2 window has Ix = [2, 2; −2, −2] and Iy = [2, −2; 2, −2], equal weights. Find H, eigenvalues and Harris response with k = 0.04. Solution: Σ Ix² = 16, Σ Iy² = 16, Σ IxIy = 0, so H = [[16, 0], [0, 16]]. Eigenvalues are 16 and 16. det H = 256, trace H = 32, R = 256 − 0.04 × 32² = 256 − 40.96 = 215.04. Both eigenvalues are large, so the point is a corner.",
+   "trap": "Forgetting to sum over the window, or using the response without non-maximum suppression. A single-pixel H can label noise as a corner; Harris is not scale invariant.",
+   "prereq": "Unit 2 convolution and gradients; Unit 4 edges.",
+   "leave": "Scale-space SIFT in 5.2; matching and RANSAC in 5.4 and 5.7; Hough transform to Unit 4."
+  },
+  {
+   "k": 2,
+   "idea": "SIFT and SURF describe a keypoint by local gradient patterns so matches survive scale, rotation and small viewpoint changes.",
+   "depth": "Scale space; Difference of Gaussians; keypoint localization and contrast threshold; orientation assignment; 128-D SIFT descriptor (4×4 cells × 8 bins); normalization and clipping. SURF: box-filter Hessian approximation, Haar wavelets, 64-D descriptor, upright variant. Ratio test for matching. Some syllabi call this scale-invariant feature extraction. Only a few universities teach SURF's integral-image speed details; keep them short.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "SIFT pipeline",
+    "nodes": [
+     {
+      "id": "scale",
+      "label": "Scale space",
+      "style": "normal"
+     },
+     {
+      "id": "key",
+      "label": "DoG keypoints",
+      "style": "accent"
+     },
+     {
+      "id": "ori",
+      "label": "Orientation",
+      "style": "normal"
+     },
+     {
+      "id": "desc",
+      "label": "Descriptor",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "scale",
+      "to": "key",
+      "style": "solid"
+     },
+     {
+      "from": "key",
+      "to": "ori",
+      "style": "solid"
+     },
+     {
+      "from": "ori",
+      "to": "desc",
+      "style": "solid"
+     }
+    ],
+    "aria": "SIFT pipeline from scale space to keypoints, orientation assignment and the final descriptor."
+   },
+   "example": "A SIFT orientation cell gives 4-bin counts [1, 3, 0, 2]. Normalize the vector in L2 norm. Solution: norm = √(1² + 3² + 0² + 2²) = √14 = 3.742. Normalized vector = [0.267, 0.802, 0, 0.534] (rounded). In full SIFT, 16 such cells give 128 values, followed by clipping and renormalization.",
+   "trap": "Treating raw histogram counts as the descriptor; SIFT smooths the orientation histogram and normalizes the descriptor. SURF is not just a faster SIFT; its descriptor and detector differ.",
+   "prereq": "5.1 keypoints; Unit 2 image pyramids and Gaussian filtering; Unit 4 gradients.",
+   "leave": "Descriptor matching, RANSAC and vocabulary building to 5.4 and 5.7; CNN features to Unit 6."
+  },
+  {
+   "k": 3,
+   "idea": "HOG describes local shape by counting gradient directions in cells and normalizing over blocks.",
+   "depth": "Gradient magnitude and orientation; unsigned orientation bins (classic 9 bins over 0°–180°); cells; overlapping blocks; block normalization (L2-Hys); sliding-window detection; use in pedestrian detection. Compare with SIFT: HOG is dense, with no keypoint detector. Mention LBP as a related texture descriptor in some syllabi; keep LBP to one line.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "HOG descriptor",
+    "nodes": [
+     {
+      "id": "grad",
+      "label": "Gradients",
+      "style": "normal"
+     },
+     {
+      "id": "cell",
+      "label": "Cell histograms",
+      "style": "accent"
+     },
+     {
+      "id": "block",
+      "label": "Block normalize",
+      "style": "live"
+     },
+     {
+      "id": "vec",
+      "label": "HOG vector",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "grad",
+      "to": "cell",
+      "style": "solid"
+     },
+     {
+      "from": "cell",
+      "to": "block",
+      "style": "solid"
+     },
+     {
+      "from": "block",
+      "to": "vec",
+      "style": "solid"
+     }
+    ],
+    "aria": "HOG pipeline from gradients to cell histograms, block normalization and the final HOG vector."
+   },
+   "example": "One 8×8 cell has four gradient samples (angle, magnitude): (10°, 2), (50°, 1), (110°, 3), (170°, 2). Use 9 unsigned bins of 20° with no interpolation. Build the histogram and L2-normalize it. Solution: bins 1 to 9 are [2, 0, 1, 0, 0, 3, 0, 0, 2]. Norm = √(4 + 0 + 1 + 0 + 0 + 9 + 0 + 0 + 4) = √18 = 4.243. Normalized = [0.471, 0, 0.236, 0, 0, 0.707, 0, 0, 0.471].",
+   "trap": "Using signed orientation when the detector expects unsigned; misplacing 170° near 0°; forgetting block normalization. A cell histogram alone is not the final HOG descriptor.",
+   "prereq": "Unit 4 gradients and edges; 5.2 local descriptors.",
+   "leave": "Classifier training to Unit 6; LBP details to texture study in Unit 1/4; optical flow to 5.8."
+  },
+  {
+   "k": 4,
+   "idea": "Bag of visual words turns many local descriptors into a fixed-length histogram by clustering them into a visual vocabulary.",
+   "depth": "Local descriptors from 5.2; k-means vocabulary with k words; assignment to nearest word; histogram; tf-idf weighting; spatial pyramid matching; VLAD as a compact extension; classifier such as k-NN or SVM (only mention). Some syllabi call this bag-of-words or BoVW. Keep the VLAD formula short.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "BoVW pipeline",
+    "nodes": [
+     {
+      "id": "desc",
+      "label": "Descriptors",
+      "style": "normal"
+     },
+     {
+      "id": "vocab",
+      "label": "k-means vocab",
+      "style": "accent"
+     },
+     {
+      "id": "assign",
+      "label": "Assign words",
+      "style": "live"
+     },
+     {
+      "id": "hist",
+      "label": "Histogram",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "desc",
+      "to": "vocab",
+      "style": "solid"
+     },
+     {
+      "from": "vocab",
+      "to": "assign",
+      "style": "solid"
+     },
+     {
+      "from": "assign",
+      "to": "hist",
+      "style": "solid"
+     }
+    ],
+    "aria": "Bag-of-visual-words pipeline from local descriptors to vocabulary, word assignment and image histogram."
+   },
+   "example": "A vocabulary has k = 3 words. An image's six descriptors are assigned to words [1, 1, 2, 3, 3, 3]. Build the normalized histogram. Solution: counts are word 1 = 2, word 2 = 1, word 3 = 3. Total = 6. Normalized histogram = [2/6, 1/6, 3/6] = [0.333, 0.167, 0.500].",
+   "trap": "Recomputing k-means for every test image; forgetting that word order is arbitrary but fixed after training. A BoVW histogram loses spatial layout unless a pyramid is added.",
+   "prereq": "5.2 SIFT/SURF; basic clustering and classifiers from Unit 6 (k-NN, SVM).",
+   "leave": "Classifier details to Unit 6; RANSAC to 5.7; VLAD coding details advanced only."
+  },
+  {
+   "k": 5,
+   "idea": "A pinhole camera maps 3D points to pixels through intrinsic and extrinsic matrices, and calibration finds those numbers.",
+   "depth": "Pinhole model; perspective projection; homogeneous coordinates; intrinsic matrix K with focal lengths fx, fy and principal point (cx, cy); extrinsic rotation R and translation t; world-to-camera; radial and tangential distortion; checkerboard calibration; DLT and Zhang's method (only a few universities teach Zhang's closed-form steps in detail); reprojection error. Some syllabi call this camera resection.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Pinhole projection",
+    "nodes": [
+     {
+      "id": "world",
+      "label": "World point",
+      "style": "normal"
+     },
+     {
+      "id": "ext",
+      "label": "Extrinsic R, t",
+      "style": "accent"
+     },
+     {
+      "id": "int",
+      "label": "Intrinsic K",
+      "style": "live"
+     },
+     {
+      "id": "pix",
+      "label": "Pixel",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "world",
+      "to": "ext",
+      "style": "solid"
+     },
+     {
+      "from": "ext",
+      "to": "int",
+      "style": "solid"
+     },
+     {
+      "from": "int",
+      "to": "pix",
+      "style": "solid"
+     }
+    ],
+    "aria": "Pinhole projection from a world point through extrinsic rotation and translation, then the intrinsic matrix, to a pixel."
+   },
+   "example": "A camera has fx = fy = 800 px, cx = 320 px, cy = 240 px. A point in camera coordinates is (X, Y, Z) = (1.0 m, 0.5 m, 2.0 m). Find its pixel (u, v). Solution: u = fx X/Z + cx = 800 × 1.0/2.0 + 320 = 720 px. v = fy Y/Z + cy = 800 × 0.5/2.0 + 240 = 440 px.",
+   "trap": "Using focal length in millimetres inside K; forgetting to divide by Z; mixing world and camera coordinates. Extrinsic maps world to camera before K.",
+   "prereq": "Unit 1 image formation; matrix multiplication and homogeneous coordinates.",
+   "leave": "Epipolar geometry and stereo to 5.6; distortion fitting details to lab."
+  },
+  {
+   "k": 6,
+   "idea": "Two views of the same point constrain each other to epipolar lines; this gives depth and camera motion.",
+   "depth": "Epipole; epipolar plane and line; essential matrix E for normalized coordinates; fundamental matrix F for pixels; x2ᵀ F x1 = 0; eight-point algorithm with RANSAC (only a few universities teach the full derivation); stereo rectification; disparity d; depth Z = f B / d with baseline B and focal f; triangulation; multi-view projective geometry. Some syllabi call F the bifocal tensor.",
+   "figure": {
+    "type": "graph",
+    "directed": false,
+    "nodes": [
+     {
+      "id": "C1",
+      "label": "C1",
+      "x": 0,
+      "y": 1,
+      "note": "left center",
+      "style": "accent"
+     },
+     {
+      "id": "C2",
+      "label": "C2",
+      "x": 4,
+      "y": 1,
+      "note": "right center",
+      "style": "accent"
+     },
+     {
+      "id": "X",
+      "label": "X",
+      "x": 2,
+      "y": 3,
+      "note": "3D point",
+      "style": "normal"
+     },
+     {
+      "id": "x1",
+      "label": "x1",
+      "x": 1,
+      "y": 2,
+      "note": "left image",
+      "style": "normal"
+     },
+     {
+      "id": "x2",
+      "label": "x2",
+      "x": 3,
+      "y": 2,
+      "note": "right image",
+      "style": "normal"
+     },
+     {
+      "id": "e1",
+      "label": "e1",
+      "x": 0.5,
+      "y": 1.6,
+      "note": "epipole",
+      "style": "muted"
+     },
+     {
+      "id": "e2",
+      "label": "e2",
+      "x": 3.5,
+      "y": 1.6,
+      "note": "epipole",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "C1",
+      "to": "X",
+      "style": "solid"
+     },
+     {
+      "from": "C2",
+      "to": "X",
+      "style": "solid"
+     },
+     {
+      "from": "X",
+      "to": "x1",
+      "style": "solid"
+     },
+     {
+      "from": "X",
+      "to": "x2",
+      "style": "solid"
+     },
+     {
+      "from": "C2",
+      "to": "e1",
+      "style": "dashed"
+     },
+     {
+      "from": "C1",
+      "to": "e2",
+      "style": "dashed"
+     },
+     {
+      "from": "x1",
+      "to": "e1",
+      "style": "accent"
+     },
+     {
+      "from": "x2",
+      "to": "e2",
+      "style": "accent"
+     }
+    ],
+    "aria": "Two camera centers C1 and C2 see a 3D point X; its projections x1 and x2 lie on corresponding epipolar lines through epipoles e1 and e2."
+   },
+   "example": "A rectified stereo pair has focal length f = 800 px and baseline B = 0.12 m. A point has disparity d = 24 px. Find depth Z. Solution: Z = f B / d = 800 × 0.12 / 24 = 4.0 m.",
+   "trap": "Swapping F and E; using disparity in metres instead of pixels; forgetting that rectified images are needed for Z = fB/d. F uses pixels, E uses normalized camera coordinates.",
+   "prereq": "5.5 camera model and intrinsic matrix; linear algebra.",
+   "leave": "SfM and bundle adjustment to 5.7; dense stereo algorithms to lab."
+  },
+  {
+   "k": 7,
+   "idea": "Structure from motion recovers camera poses and 3D points together from many images.",
+   "depth": "Feature tracks; two-view initialization; triangulation; perspective-n-point (PnP); incremental SfM; bundle adjustment minimizing reprojection error; sparse vs dense reconstruction; multi-view stereo. Only a few universities teach bundle adjustment in detail; keep the normal equations short. Some syllabi call this 3D structure and motion estimation.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Incremental SfM",
+    "nodes": [
+     {
+      "id": "feat",
+      "label": "Features",
+      "style": "normal"
+     },
+     {
+      "id": "track",
+      "label": "Matches/tracks",
+      "style": "normal"
+     },
+     {
+      "id": "init",
+      "label": "Two-view init",
+      "style": "accent"
+     },
+     {
+      "id": "add",
+      "label": "Add views (PnP)",
+      "style": "live"
+     },
+     {
+      "id": "ba",
+      "label": "Bundle adjust",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "feat",
+      "to": "track",
+      "style": "solid"
+     },
+     {
+      "from": "track",
+      "to": "init",
+      "style": "solid"
+     },
+     {
+      "from": "init",
+      "to": "add",
+      "style": "solid"
+     },
+     {
+      "from": "add",
+      "to": "ba",
+      "style": "solid"
+     },
+     {
+      "from": "ba",
+      "to": "add",
+      "label": "repeat",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Incremental structure from motion from features and tracks to two-view initialization, adding views by PnP and bundle adjustment."
+   },
+   "example": "Two calibrated cameras look along +Z. C1 = (0, 0, 0), C2 = (1, 0, 0) m. A point has normalized image coordinates u1 = 0.2 in camera 1 and u2 = −0.1 in camera 2; both v = 0. Find X and Z. Solution: u1 = X/Z, u2 = (X − B)/Z with B = 1 m. Subtract: u1 − u2 = B/Z, so Z = B/(u1 − u2) = 1/0.3 = 3.333 m. X = u1 Z = 0.2 × 3.333 = 0.667 m. The 3D point is (0.667, 0, 3.333) m.",
+   "trap": "Monocular SfM has unknown scale; bundle adjustment minimizes reprojection error, not Euclidean 3D error. Poor tracks break initialization.",
+   "prereq": "5.2 descriptors; 5.6 epipolar geometry and triangulation.",
+   "leave": "Dense multi-view stereo and deep learned SfM to lab/Unit 6; camera calibration to 5.5."
+  },
+  {
+   "k": 8,
+   "idea": "Optical flow estimates per-pixel motion between frames using brightness constancy and smoothness.",
+   "depth": "Motion field vs optical flow; brightness constancy; gradient equation Ix u + Iy v + It = 0; aperture problem; Lucas-Kanade local least squares; Horn-Schunck global smoothness (only a few universities teach the variational derivation); pyramids for large motion; applications. Some syllabi call this motion estimation.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Lucas-Kanade flow",
+    "nodes": [
+     {
+      "id": "frames",
+      "label": "Two frames",
+      "style": "normal"
+     },
+     {
+      "id": "grad",
+      "label": "Gradients Ix, Iy, It",
+      "style": "accent"
+     },
+     {
+      "id": "ls",
+      "label": "Window least squares",
+      "style": "live"
+     },
+     {
+      "id": "flow",
+      "label": "Flow (u, v)",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "frames",
+      "to": "grad",
+      "style": "solid"
+     },
+     {
+      "from": "grad",
+      "to": "ls",
+      "style": "solid"
+     },
+     {
+      "from": "ls",
+      "to": "flow",
+      "style": "solid"
+     }
+    ],
+    "aria": "Lucas-Kanade optical flow from two frames and spatiotemporal gradients to window least squares and a flow vector."
+   },
+   "example": "Two pixels in a window give brightness equations: pixel A has (Ix, Iy, It) = (2, 0, 1); pixel B has (0, 2, 1). Solve Lucas-Kanade for flow (u, v) in pixels/frame. Solution: 2u + 0v + 1 = 0 → u = −0.5. 0u + 2v + 1 = 0 → v = −0.5. Flow = (−0.5, −0.5) px/frame; magnitude = √(0.5² + 0.5²) = 0.707 px/frame.",
+   "trap": "Using one pixel equation for two unknowns; confusing optical flow with true object motion. Brightness changes and occlusions break the constancy assumption.",
+   "prereq": "Unit 2 gradients/convolution; basic linear algebra.",
+   "leave": "Video action recognition to Unit 6; dense variational details advanced."
+  },
+  {
+   "k": 9,
+   "idea": "Registration finds a spatial transform that aligns one image to another.",
+   "depth": "Fixed and moving images; transform types translation, rigid, affine, projective, nonrigid; feature-based registration with keypoints and RANSAC; intensity-based registration with similarity metrics SSD, NCC and mutual information for multimodal medical images; optimizer; interpolation; resampling; evaluation by overlap or target registration error. Mention DICOM/PACS/NIfTI only as medical file context. Some syllabi call this image alignment.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Registration loop",
+    "nodes": [
+     {
+      "id": "fixed",
+      "label": "Fixed image",
+      "style": "normal"
+     },
+     {
+      "id": "moving",
+      "label": "Moving image",
+      "style": "normal"
+     },
+     {
+      "id": "transform",
+      "label": "Transform",
+      "style": "accent"
+     },
+     {
+      "id": "metric",
+      "label": "Similarity metric",
+      "style": "live"
+     },
+     {
+      "id": "opt",
+      "label": "Optimizer",
+      "style": "next"
+     },
+     {
+      "id": "aligned",
+      "label": "Aligned image",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "fixed",
+      "to": "transform",
+      "style": "solid"
+     },
+     {
+      "from": "moving",
+      "to": "transform",
+      "style": "solid"
+     },
+     {
+      "from": "transform",
+      "to": "metric",
+      "style": "solid"
+     },
+     {
+      "from": "metric",
+      "to": "opt",
+      "style": "solid"
+     },
+     {
+      "from": "opt",
+      "to": "transform",
+      "label": "update",
+      "style": "dashed"
+     },
+     {
+      "from": "transform",
+      "to": "aligned",
+      "style": "solid"
+     }
+    ],
+    "aria": "Registration loop where fixed and moving images meet at a transform, a similarity metric drives an optimizer that updates the transform, producing an aligned image."
+   },
+   "example": "Three corresponding points are moving (0,0), (1,0), (0,1) and fixed (1,1), (3,1), (1,3). Find the affine transform that maps moving to fixed in homogeneous form. Solution: x_fixed = 2x_moving + 1, y_fixed = 2y_moving + 1, so the matrix is [[2, 0, 1], [0, 2, 1], [0, 0, 1]].",
+   "trap": "Choosing a transform with too few degrees of freedom; using SSD for images with different brightness or modalities. Registration maps moving to fixed, so direction matters.",
+   "prereq": "Unit 1 geometric operations and interpolation; 5.2 feature matching.",
+   "leave": "Image fusion is outside this unit; optical flow to 5.8; deep registration to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "Harris keypoints feed SIFT"
+  ],
+  [
+   2,
+   4,
+   "SIFT descriptors build visual words"
+  ],
+  [
+   3,
+   4,
+   "HOG and BoVW both make image vectors"
+  ],
+  [
+   5,
+   6,
+   "Camera model gives epipolar geometry"
+  ],
+  [
+   6,
+   7,
+   "Stereo triangulation extends to SfM"
+  ],
+  [
+   7,
+   8,
+   "Camera motion relates to optical flow"
+  ],
+  [
+   2,
+   9,
+   "SIFT matches drive feature-based registration"
+  ]
+ ]
+}

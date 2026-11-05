@@ -1,0 +1,216 @@
+{
+ "lead": "Structure from motion (SfM) takes a set of photographs of a still scene and estimates, at the same time, where each camera was and where each visible 3D point lies. It exists because one image gives only directions; many images from different positions turn those directions into depth by triangulation. SfM is used to build 3D models from phone photos, to localise robots and drones, and to make maps inside augmented-reality and mapping apps.",
+ "prereq": "You need: <a href=\"#feature-descriptors-sift-and-surf\">5.2</a> for repeatable keypoints and descriptors, and <a href=\"#epipolar-geometry-stereo-and-multi-view-geometry\">5.6</a> for epipolar geometry, the essential matrix and triangulation.",
+ "sections": [
+  {
+   "h3": "From features to a reconstruction",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A feature track is a list of pixel observations of one physical 3D point, one observation per image where it was seen. Good tracks are long and consistent. SfM builds them before it estimates any geometry."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Detect keypoints in every image with a corner or blob detector (see <a href=\"#corner-and-blob-detection-harris-detector\">5.1</a>) and describe each with a descriptor such as SIFT (<a href=\"#feature-descriptors-sift-and-surf\">5.2</a>).",
+      "Match descriptors between image pairs and keep only mutual nearest matches that pass a ratio test.",
+      "Link pair matches into tracks: if feature a in image 1 matches b in image 2, and b matches c in image 3, then a, b, c form one track.",
+      "Pick an initial pair with a wide baseline and many reliable matches. Estimate its relative pose from the essential matrix and triangulate the tracks seen in both images.",
+      "For each remaining image, match its features to tracks that already have 3D points. Solve perspective-n-point (PnP) to get that camera's pose.",
+      "Triangulate tracks that now appear in at least two posed images, then run bundle adjustment over all poses and points."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The loop in step 5 and step 6 repeats until no image is left or no new track is reliable. The result is a sparse reconstruction: camera poses plus a 3D point for each surviving track."
+    }
+   ]
+  },
+  {
+   "h3": "Two-view start and adding a camera",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The initial pair fixes the coordinate frame. For calibrated cameras, a 3D point X projects to normalized image coordinates u = X/Z and v = Y/Z. The camera centre is the origin of its own coordinates, and Z is depth along the optical axis."
+    },
+    {
+     "type": "formula",
+     "text": "Z = B / (u₁ − u₂)",
+     "where": "B is the baseline between two cameras that look along +Z and are separated along X; u₁ and u₂ are the horizontal normalized coordinates of the same point in camera 1 and camera 2."
+    },
+    {
+     "type": "p",
+     "text": "This is triangulation in its simplest form. The difference u₁ − u₂ is the disparity; a small disparity means a far point, and a zero disparity means the point is at infinity for that pair. Real systems use the essential matrix and a general triangulation for arbitrary motion."
+    },
+    {
+     "type": "p",
+     "text": "PnP (perspective-n-point) is the reverse problem: known 3D points and their 2D pixels in a new image, find the camera rotation R and translation t. The minimal case P3P uses 3 points; practical solvers use 4 or more and RANSAC to reject outliers. Once the new camera is posed, new tracks are triangulated and added to the map."
+    }
+   ]
+  },
+  {
+   "h3": "Bundle adjustment and the two kinds of reconstruction",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every measured pixel is noisy, so the first estimate drifts. Bundle adjustment refines all camera poses and all 3D points together by minimising reprojection error: the distance between where a point actually appears in an image and where the current model projects it."
+    },
+    {
+     "type": "formula",
+     "text": "E = Σᵢ Σⱼ ρ( ‖ xᵢⱼ − π(K, Rᵢ, tᵢ, Xⱼ) ‖² )",
+     "where": "xᵢⱼ is the measured pixel of point j in image i; π projects 3D point Xⱼ through camera i with intrinsics K and pose (Rᵢ, tᵢ); ρ is a robust loss that reduces the pull of wrong matches; the sum runs over all observations."
+    },
+    {
+     "type": "p",
+     "text": "The unknowns are the camera poses and the 3D points. Levenberg-Marquardt solves the nonlinear least-squares problem by repeated linearisation. The normal equations are sparse because one point is seen in only a few images, so a solver can handle thousands of cameras. Only a few universities teach the normal equations in detail; the exam usually asks for the cost function and the meaning of each term."
+    },
+    {
+     "type": "p",
+     "text": "SfM itself is sparse: it reconstructs points only at tracked keypoints. Dense reconstruction, usually called multi-view stereo (MVS), takes the estimated poses and computes a depth map per pixel, then fuses the maps into a mesh or dense cloud. MVS is a separate stage; SfM gives it the camera geometry."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Features are matched into tracks, two views initialise the map, each new view is added by PnP, and bundle adjustment refines the whole reconstruction; the dashed edge repeats the add-and-adjust loop.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Incremental SfM",
+   "nodes": [
+    {
+     "id": "feat",
+     "label": "Features",
+     "style": "normal"
+    },
+    {
+     "id": "track",
+     "label": "Matches/tracks",
+     "style": "normal"
+    },
+    {
+     "id": "init",
+     "label": "Two-view init",
+     "style": "accent"
+    },
+    {
+     "id": "add",
+     "label": "Add views (PnP)",
+     "style": "live"
+    },
+    {
+     "id": "ba",
+     "label": "Bundle adjust",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "feat",
+     "to": "track",
+     "style": "solid"
+    },
+    {
+     "from": "track",
+     "to": "init",
+     "style": "solid"
+    },
+    {
+     "from": "init",
+     "to": "add",
+     "style": "solid"
+    },
+    {
+     "from": "add",
+     "to": "ba",
+     "style": "solid"
+    },
+    {
+     "from": "ba",
+     "to": "add",
+     "label": "repeat",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Incremental structure from motion from features and tracks to two-view initialization, adding views by PnP and bundle adjustment."
+  }
+ },
+ "examples": [
+  {
+   "question": "Two calibrated cameras look along +Z. Camera 1 is at C₁ = (0, 0, 0) m and camera 2 is at C₂ = (1, 0, 0) m. A 3D point has normalized image coordinates u₁ = 0.2 in camera 1 and u₂ = −0.1 in camera 2; both have v = 0. Find the point's X and Z coordinates in metres.",
+   "steps": [
+    "Both cameras have the same orientation. In camera 1, u₁ = X/Z = 0.2 and v = Y/Z = 0, so Y = 0.",
+    "Camera 2 is shifted by B = 1 m along X. In camera-2 coordinates the point is at X − 1, so u₂ = (X − 1)/Z = −0.1.",
+    "Subtract the two normalized equations: u₁ − u₂ = X/Z − (X − 1)/Z = 1/Z.",
+    "So Z = B/(u₁ − u₂) = 1/(0.2 − (−0.1)) = 1/0.3 = 3.333 m.",
+    "Then X = u₁ Z = 0.2 × 3.333 = 0.667 m, and Y = 0 m."
+   ],
+   "answer": "The 3D point is at (0.667, 0, 3.333) m in camera-1 coordinates.",
+   "check": "B = 1.0\nu1 = 0.2\nu2 = -0.1\nZ = B / (u1 - u2)\nX = u1 * Z\nprint(round(Z, 3))\nprint(round(X, 3))",
+   "values": [
+    3.333,
+    0.667
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Monocular SfM has unknown scale. A reconstruction scaled by any positive factor gives exactly the same pixels, so do not quote metres unless a known baseline, an object of known size, or an IMU/GPS fixes scale.",
+  "Bundle adjustment minimises reprojection error in pixels, not Euclidean distance between 3D points. A model can lower pixel error while 3D error grows in weakly observed regions.",
+  "A narrow-baseline first pair gives unstable triangulation: small pixel noise produces a large depth error. Choose a wide baseline with many inlier matches.",
+  "PnP needs 3D-to-2D correspondences. Two-view epipolar geometry uses 2D-to-2D matches; do not use PnP before the 3D points exist.",
+  "One wrong match inside a long track can pull a 3D point away from the true surface and corrupt the initial map. Use a ratio test and RANSAC before triangulation."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a feature track in structure from motion?",
+   "marks": 2,
+   "a": "A feature track is a set of pixel observations, one per image, that are believed to be the same physical 3D point."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a single calibrated image not give the 3D position of a point?",
+   "marks": 3,
+   "a": "A pixel gives a ray direction from the camera centre, not a distance along that ray. The point can lie anywhere on the ray, so depth Z is unknown without a second view or another constraint."
+  },
+  {
+   "level": "apply",
+   "q": "Two calibrated cameras have the same orientation and a baseline B = 0.5 m along X. The same point has u₁ = 0.3 and u₂ = −0.2, with v = 0 in both. Find Z and X in metres.",
+   "marks": 4,
+   "a": "u₁ − u₂ = 0.3 − (−0.2) = 0.5. Z = B/(u₁ − u₂) = 0.5/0.5 = 1 m. X = u₁Z = 0.3 × 1 = 0.3 m. The point is (0.3, 0, 1) m."
+  },
+  {
+   "level": "analyze",
+   "q": "Bundle adjustment lowers reprojection error, yet the Euclidean 3D error can increase. Explain why.",
+   "marks": 4,
+   "a": "Reprojection error is measured in image pixels after projection. Many 3D configurations can project to almost the same pixels, especially for points seen at small parallax. The cost function has a flat valley along the viewing ray, so the solver can move points along that valley with little pixel penalty while 3D distance changes."
+  },
+  {
+   "level": "apply",
+   "q": "A new image contains 5 reliable 3D-to-2D correspondences. Which step adds this image to an existing SfM reconstruction, and what is the minimum number of points for the minimal P3P solver?",
+   "marks": 3,
+   "a": "Use PnP (perspective-n-point) with RANSAC to estimate the new camera pose. The minimal P3P solver needs 3 points; 5 points give redundancy and allow outlier rejection."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between sparse SfM output and dense multi-view stereo output.",
+   "marks": 3,
+   "a": "Sparse SfM gives camera poses and 3D points only at tracked keypoints. Dense multi-view stereo uses those poses to compute a depth value at many or all pixels and fuses them into a dense cloud or mesh."
+  },
+  {
+   "level": "analyze",
+   "q": "A monocular SfM reconstruction is scaled by a factor of 2. Will the reprojection error change? What extra information fixes the scale?",
+   "marks": 4,
+   "a": "No. Scaling all camera baselines and all 3D points by 2 leaves every pixel projection unchanged, so reprojection error is identical. Scale is fixed by a known baseline, an object of known size, or inertial/GPS measurements."
+  },
+  {
+   "level": "remember",
+   "q": "Name the two main outputs of an SfM pipeline.",
+   "marks": 2,
+   "a": "The estimated camera poses and the sparse set of 3D points."
+  }
+ ],
+ "beyond": "Not for the exam. SfM is the geometry engine inside drone mapping, phone-based photogrammetry and AR tracking. Modern neural rendering pipelines such as NeRF and Gaussian splatting start from SfM poses and then learn a scene representation. Search for COLMAP, incremental SfM, bundle adjustment, multi-view stereo and scale recovery from IMU or GPS when you meet a real reconstruction problem."
+}

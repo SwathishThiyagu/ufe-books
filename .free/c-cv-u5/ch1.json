@@ -1,0 +1,267 @@
+{
+ "lead": "A feature is a small image patch that a program can find again in another image. A flat patch matches everywhere, an edge matches along its length, but a corner matches at one place only. Harris turns this idea into arithmetic: measure how brightness changes in a small window, put the changes into a 2×2 matrix, and score every pixel. The detector still runs inside phone panorama stitchers, visual odometry and tracking code. Blob detectors extend the same search from points to regions.",
+ "prereq": "You need Unit 2 (convolution and gradients) and Unit 4 (edge detection); the Sobel operator from Unit 4 is reused here.",
+ "sections": [
+  {
+   "h3": "Features: edges, corners, blobs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An edge is a line where brightness changes sharply across the line but stays nearly constant along it. A corner is a point where brightness changes sharply in two different directions, so the patch looks different when the window moves any way. A blob is a small region whose brightness differs from its surroundings."
+    },
+    {
+     "type": "p",
+     "text": "Matching a flat patch is impossible because every flat patch looks the same. Matching an edge has the aperture problem: slide the window along the edge and the pixels do not change, so the position along the line is unknown. A corner pins down both coordinates."
+    },
+    {
+     "type": "formula",
+     "text": "E(u, v) = Σ w(x, y) [I(x+u, y+v) − I(x, y)]²",
+     "where": "I(x, y) is the intensity in grey levels at pixel (x, y); w(x, y) is the window weight (1 inside a box window, 0 outside); (u, v) is the shift in pixels; E is the sum of squared differences."
+    },
+    {
+     "type": "p",
+     "text": "Harris asks one question at each pixel: if I shift a small window by (u, v), does the content change in all directions? If yes, the pixel is a corner."
+    }
+   ]
+  },
+  {
+   "h3": "Gradients and the structure matrix H",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The derivatives Ix = ∂I/∂x and Iy = ∂I/∂y come from Sobel filters (Unit 4). For a small shift, the squared-difference sum becomes a quadratic form in the shift."
+    },
+    {
+     "type": "formula",
+     "text": "E(u, v) ≈ [u v] H [u v]ᵀ,   H = Σ w(x, y) × [[Ix², IxIy], [IxIy, Iy²]]",
+     "where": "H is the 2×2 structure matrix; the sum runs over the window; w is the window weight; Ix and Iy are gradients in grey levels per pixel."
+    },
+    {
+     "type": "p",
+     "text": "H is symmetric, so it has two real eigenvalues λ1 and λ2. They are the weighted sum of the squared intensity change along the two principal directions of the window; with unit weights inside a box window, this is simply the sum. The eigenvectors give those directions."
+    },
+    {
+     "type": "table",
+     "head": [
+      "λ1",
+      "λ2",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "Large",
+       "Large",
+       "Corner: change in both directions"
+      ],
+      [
+       "Large",
+       "Small",
+       "Edge: change across the edge only"
+      ],
+      [
+       "Small",
+       "Small",
+       "Flat: little change anywhere"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The actual size of λ depends on contrast and on the window size, so only the pattern matters. Some syllabi call H the second-moment matrix."
+    }
+   ]
+  },
+  {
+   "h3": "Harris response, threshold and NMS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Computing eigenvalues at every pixel is slow, so Harris combines them into one number."
+    },
+    {
+     "type": "formula",
+     "text": "R = det H − k (trace H)²",
+     "where": "R is the Harris response in (grey levels)⁴ per pixel⁴, the same unit as det H and (trace H)²; det H = λ1λ2; trace H = λ1 + λ2; k is a constant, usually 0.04 to 0.06."
+    },
+    {
+     "type": "p",
+     "text": "For a corner both eigenvalues are large: det H is large and the subtracted trace term is smaller, so R is large and positive. For an edge one eigenvalue is tiny: det H stays small but (trace H)² is large, so R is negative. For a flat area both are small and R is near zero. Shi-Tomasi uses the simpler response R = λmin."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Smooth the image with a small Gaussian to reduce noise.",
+      "Compute Ix and Iy with Sobel filters.",
+      "At each pixel, sum Ix², Iy² and IxIy over a 3×3 or 5×5 window.",
+      "Form H and compute R.",
+      "Threshold R, for example keep R > 0.01 × max R.",
+      "Apply 3×3 non-maximum suppression: keep a pixel only if its R is the largest in its neighbourhood."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "NMS stops one corner from producing a cluster of keypoints; the threshold stops weak noise responses. Harris is rotation invariant: rotating the image rotates the eigenvectors but leaves the eigenvalues unchanged. It is not scale invariant, because the window size is fixed."
+    }
+   ]
+  },
+  {
+   "h3": "Blobs in brief",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A blob is a region, not a point: a dark spot on a bright background, a cell, a road sign. To find blobs of unknown size, filter the image with a Laplacian of Gaussian (LoG), a second-derivative filter shaped like a Mexican hat."
+    },
+    {
+     "type": "p",
+     "text": "The response is strongest when the filter's central lobe matches the blob. If the Gaussian has standard deviation σ in pixels, the blob radius is about √2 σ. Run the filter at many σ, a scale space, and keep the (x, y, σ) where the response peaks in space and scale. Difference of Gaussians (DoG) is a fast approximation: subtract two Gaussians with σ and 2σ. SIFT builds on DoG, as the next chapter shows."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The image gives two gradient images; window sums build H, the response map R scores every pixel, and non-maximum suppression with a threshold keeps one point per corner.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Harris detector",
+   "nodes": [
+    {
+     "id": "img",
+     "label": "Image",
+     "style": "normal"
+    },
+    {
+     "id": "grad",
+     "label": "Gradients Ix, Iy",
+     "style": "normal"
+    },
+    {
+     "id": "h",
+     "label": "Matrix H",
+     "style": "accent"
+    },
+    {
+     "id": "r",
+     "label": "Response R",
+     "style": "live"
+    },
+    {
+     "id": "nms",
+     "label": "NMS + threshold",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "img",
+     "to": "grad",
+     "style": "solid"
+    },
+    {
+     "from": "grad",
+     "to": "h",
+     "style": "solid"
+    },
+    {
+     "from": "h",
+     "to": "r",
+     "style": "solid"
+    },
+    {
+     "from": "r",
+     "to": "nms",
+     "style": "solid"
+    }
+   ],
+   "aria": "Flow of the Harris detector from image gradients to the structure matrix, response map and non-maximum suppression."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 2×2 window has equal weights w = 1. The horizontal gradient is Ix = [[2, 2], [−2, −2]] and the vertical gradient is Iy = [[2, −2], [2, −2]]. Find H, its eigenvalues, det H, trace H and the Harris response with k = 0.04. Is the point a corner?",
+   "steps": [
+    "1. Square the horizontal gradients and add: Σ Ix² = 2² + 2² + (−2)² + (−2)² = 16.",
+    "2. Square the vertical gradients and add: Σ Iy² = 2² + (−2)² + 2² + (−2)² = 16.",
+    "3. Multiply the pairs and add: Σ IxIy = (2)(2) + (2)(−2) + (−2)(2) + (−2)(−2) = 4 − 4 − 4 + 4 = 0.",
+    "4. Equal weights give H = [[16, 0], [0, 16]].",
+    "5. Solve det(H − λI) = (16 − λ)² = 0, so λ1 = λ2 = 16.",
+    "6. det H = 16 × 16 − 0 × 0 = 256. trace H = 16 + 16 = 32.",
+    "7. R = 256 − 0.04 × 32² = 256 − 0.04 × 1024 = 256 − 40.96 = 215.04.",
+    "8. R is large and positive and both eigenvalues are large, so the point is a corner."
+   ],
+   "answer": "H = [[16, 0], [0, 16]], λ1 = λ2 = 16, det H = 256, trace H = 32 and R = 215.04; the point is a corner.",
+   "check": "Ix = [[2.0, 2.0], [-2.0, -2.0]]\nIy = [[2.0, -2.0], [2.0, -2.0]]\nSxx = sum(Ix[i][j]**2 for i in range(2) for j in range(2))\nSyy = sum(Iy[i][j]**2 for i in range(2) for j in range(2))\nSxy = sum(Ix[i][j]*Iy[i][j] for i in range(2) for j in range(2))\ndet = Sxx*Syy - Sxy*Sxy\ntr = Sxx + Syy\nimport math\nd = math.sqrt((Sxx-Syy)**2 + 4*Sxy**2)\nlam1 = (tr + d)/2\nlam2 = (tr - d)/2\nk = 0.04\nR = det - k*tr**2\nprint(Sxx)\nprint(Syy)\nprint(Sxy)\nprint(lam1)\nprint(lam2)\nprint(det)\nprint(tr)\nprint(round(R, 2))",
+   "values": [
+    16.0,
+    16.0,
+    0.0,
+    16.0,
+    16.0,
+    256.0,
+    32.0,
+    215.04
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using one pixel's gradients instead of summing over the window. The Σ over w is the detector; a single-pixel H labels noise as a corner.",
+  "Skipping non-maximum suppression. Every pixel on a thick corner scores high, so you get clusters instead of one keypoint per corner.",
+  "Swapping det and trace. det H = λ1λ2 (256 in the example) and trace H = λ1 + λ2 (32); exchanging them changes the sign of R.",
+  "Claiming scale invariance. Harris uses a fixed window, so zooming in makes a corner flatter and the response falls.",
+  "Choosing k too small, or using a negative sign, leaves edges with R > 0, so they are wrongly kept as corners.",
+  "Choosing k too large pushes even true corners to R < 0, so corners are missed."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What do the eigenvalues λ1 and λ2 of H measure?",
+   "marks": 2,
+   "a": "The weighted sum of the squared intensity change along the two principal directions of the window; with unit weights inside a box window this is simply the sum. A large value means strong change in that direction."
+  },
+  {
+   "level": "understand",
+   "q": "Why is Harris rotation invariant but not scale invariant?",
+   "marks": 3,
+   "a": "A rotation only rotates the eigenvectors, so the eigenvalues of H and R stay the same. Scaling changes the corner size relative to the fixed window, so the response changes."
+  },
+  {
+   "level": "apply",
+   "q": "A window gives λ1 = 9 and λ2 = 1. With k = 0.04, find det H, trace H and R.",
+   "marks": 3,
+   "a": "det H = 9, trace H = 10, R = 9 − 0.04 × 100 = 5.0. Positive R and both eigenvalues large means a corner."
+  },
+  {
+   "level": "apply",
+   "q": "A window gives λ1 = 100 and λ2 = 2. With k = 0.04, find R and classify the point.",
+   "marks": 3,
+   "a": "det H = 200, trace H = 102, R = 200 − 0.04 × 10404 = −216.16. Negative R means an edge."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does an edge give a negative Harris response?",
+   "marks": 4,
+   "a": "For an edge λ1 ≫ λ2. det H = λ1λ2 grows only linearly with λ1, but (trace H)² ≈ λ1² grows quadratically, so the subtracted term wins and R < 0."
+  },
+  {
+   "level": "understand",
+   "q": "What does 3×3 non-maximum suppression do in Harris?",
+   "marks": 3,
+   "a": "It keeps a pixel only if its R is the largest in its 3×3 neighbourhood, so a thick corner yields one keypoint instead of a cluster."
+  },
+  {
+   "level": "remember",
+   "q": "What response does Shi-Tomasi use?",
+   "marks": 2,
+   "a": "R = λmin, the smaller eigenvalue of H."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does blob detection need several scales?",
+   "marks": 4,
+   "a": "Blob size is unknown. A LoG responds best when σ matches the blob radius (r ≈ √2 σ), so the image is filtered at many σ and the peak over (x, y, σ) gives centre and scale."
+  }
+ ],
+ "beyond": "Not for the exam. Harris remains the cheap default corner detector in visual odometry and SLAM front ends, often as the FAST or ORB variant that adds a decision tree and orientation. Learned detectors such as SuperPoint replace the hand-built response with a small CNN trained on corner labels. In industry you meet Harris inside OpenCV's cornerHarris and goodFeaturesToTrack, and inside panorama stitching pipelines. Search next for Harris affine, FAST corner detector and scale-space blob detection."
+}

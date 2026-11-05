@@ -1,0 +1,240 @@
+{
+ "lead": "Image registration finds a spatial transform that aligns a moving image to a fixed image. It exists because two pictures of the same scene rarely share a pixel grid: a patient moves between scans, a phone shifts between shots, or two satellites pass at different times. Registration is used in medical imaging to compare scans, in remote sensing to stack satellite images, and in vision to stitch panoramas. Some syllabi call this image alignment. The result is a transform plus an aligned image resampled on the fixed grid.",
+ "prereq": "You need: geometric operations and interpolation from Unit 1, and feature matching from <a href=\"#feature-descriptors-sift-and-surf\">5.2 Feature descriptors: SIFT and SURF</a>.",
+ "sections": [
+  {
+   "h3": "Fixed, moving and transform types",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Registration takes two images. The fixed image F is the reference and stays on its grid. The moving image M is warped by a transform T until it matches F. Direction matters: T maps coordinates in M to coordinates in F. To build the aligned image on the fixed grid we sample M at T⁻¹(x)."
+    },
+    {
+     "type": "formula",
+     "text": "T(x) = A x + t,  A = [[a, b], [c, d]],  t = [t_x, t_y]ᵀ",
+     "where": "x = (x, y) is a pixel coordinate in the moving image; T(x) is the matching coordinate in the fixed image; A is a 2×2 matrix for rotation, scale and shear; t is translation in pixels; ᵀ means transpose."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Translation: t only, 2 degrees of freedom (DOF) in 2D.",
+      "Rigid: rotation and translation, 3 DOF in 2D.",
+      "Affine: A and t, 6 DOF in 2D; parallel lines stay parallel.",
+      "Projective: homography, 8 DOF in 2D; straight lines stay straight but parallel lines may meet.",
+      "Nonrigid: a local deformation field with many DOF; used for soft tissue and breathing."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Feature-based registration",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Feature-based registration uses a small set of matching points. It is fast and can work when the two images have different brightness. Detect keypoints, which are distinctive image points, with a detector such as Harris or SIFT. Describe each keypoint and match descriptors. See <a href=\"#corner-and-blob-detection-harris-detector\">5.1 Corner and blob detection: Harris detector</a>."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Detect keypoints in F and M; keep the strongest N points.",
+      "Match descriptors; keep mutual nearest neighbours.",
+      "Pick a transform type and its minimum pairs: 1 pair for translation, 2 for rigid, 3 non-collinear pairs for affine, 4 for projective.",
+      "Run RANSAC: sample the minimum pairs, fit T, count inliers within a pixel threshold, repeat, then refit T on all inliers.",
+      "Warp M with the final T and resample it on the fixed grid."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "RANSAC is robust because each hypothesis is fitted from a minimal sample, so an outlier usually lands in a sample whose inlier count is low, and that hypothesis is discarded. The final transform is refitted only on the inlier set. The inlier threshold is in pixels. Too large a threshold admits wrong matches; too small a threshold rejects correct ones."
+    }
+   ]
+  },
+  {
+   "h3": "Intensity-based registration and evaluation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Intensity-based registration uses all pixels. It defines a cost C(θ) from F and the warped M, then searches transform parameters θ."
+    },
+    {
+     "type": "formula",
+     "text": "SSD(θ) = Σ_x [F(x) − M(T_θ⁻¹(x))]²",
+     "where": "F(x) is fixed intensity; M(T_θ⁻¹(x)) is the moving intensity sampled at the moving coordinate that lands on fixed pixel x; θ are transform parameters; x runs over overlapping pixels. Lower SSD is better, but SSD is sensitive to brightness and modality."
+    },
+    {
+     "type": "formula",
+     "text": "NCC = Σ_x (F(x)−F̄)(M(T_θ⁻¹(x))−M̄) / √(Σ_x (F(x)−F̄)² Σ_x (M(T_θ⁻¹(x))−M̄)²)",
+     "where": "F̄ and M̄ are means over the overlap; NCC is 1 for a perfect positive match, −1 for inverted contrast, and 0 for no linear relation."
+    },
+    {
+     "type": "formula",
+     "text": "MI(X,Y) = H(X) + H(Y) − H(X,Y)",
+     "where": "H is Shannon entropy in bits; X and Y are intensity values; joint entropy H(X,Y) uses their 2D histogram. MI is high when one image predicts the other; it works when intensities differ, as in CT and MRI."
+    },
+    {
+     "type": "p",
+     "text": "An optimizer changes θ to minimize C(θ) or maximize similarity. Common choices are gradient descent, Powell and Nelder-Mead simplex. Bilinear interpolation gives M at non-integer coordinates. Resampling writes the aligned image W(x)=M(T_θ⁻¹(x)) on the fixed grid. Evaluate by overlap for labels: Dice = 2|P∩Q|/(|P|+|Q|), where P and Q are label masks. For landmarks, target registration error (TRE) is the mean distance between corresponding points after transform, in mm or pixels. Lower TRE is better. In hospitals, DICOM files store scan pixels and metadata; PACS stores and serves them; NIfTI is a common research file. None of these is a registration method."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The fixed and moving images meet at a transform. A similarity metric scores the warped moving image, and an optimizer updates the transform until the aligned image fits the fixed image.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Registration loop",
+   "nodes": [
+    {
+     "id": "fixed",
+     "label": "Fixed image",
+     "style": "normal"
+    },
+    {
+     "id": "moving",
+     "label": "Moving image",
+     "style": "normal"
+    },
+    {
+     "id": "transform",
+     "label": "Transform",
+     "style": "accent"
+    },
+    {
+     "id": "metric",
+     "label": "Similarity metric",
+     "style": "live"
+    },
+    {
+     "id": "opt",
+     "label": "Optimizer",
+     "style": "next"
+    },
+    {
+     "id": "aligned",
+     "label": "Aligned image",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "fixed",
+     "to": "transform",
+     "style": "solid"
+    },
+    {
+     "from": "moving",
+     "to": "transform",
+     "style": "solid"
+    },
+    {
+     "from": "transform",
+     "to": "metric",
+     "style": "solid"
+    },
+    {
+     "from": "metric",
+     "to": "opt",
+     "style": "solid"
+    },
+    {
+     "from": "opt",
+     "to": "transform",
+     "label": "update",
+     "style": "dashed"
+    },
+    {
+     "from": "transform",
+     "to": "aligned",
+     "style": "solid"
+    }
+   ],
+   "aria": "Registration loop where fixed and moving images meet at a transform, a similarity metric drives an optimizer that updates the transform, producing an aligned image."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three corresponding points are moving (0,0), (1,0), (0,1) and fixed (1,1), (3,1), (1,3). Find the affine transform that maps moving to fixed in homogeneous form.",
+   "steps": [
+    "Write the affine form x_f = a x_m + b y_m + c and y_f = d x_m + e y_m + f.",
+    "Use the first pair (0,0) → (1,1): c = 1 and f = 1.",
+    "Use the second pair (1,0) → (3,1): a + c = 3, so a = 2; d + f = 1, so d = 0.",
+    "Use the third pair (0,1) → (1,3): b + c = 1, so b = 0; e + f = 3, so e = 2.",
+    "Write the homogeneous matrix: [[a, b, c], [d, e, f], [0, 0, 1]] = [[2, 0, 1], [0, 2, 1], [0, 0, 1]]."
+   ],
+   "answer": "The affine transform is x_f = 2x_m + 1, y_f = 2y_m + 1, with matrix [[2, 0, 1], [0, 2, 1], [0, 0, 1]], a uniform scale of 2 plus translation (1,1) pixels.",
+   "check": "m = [(0, 0), (1, 0), (0, 1)]\nf = [(1, 1), (3, 1), (1, 3)]\na = (f[1][0] - f[0][0]) / (m[1][0] - m[0][0])\nb = (f[2][0] - f[0][0]) / (m[2][1] - m[0][1])\nc = f[0][0] - a * m[0][0] - b * m[0][1]\nd = (f[1][1] - f[0][1]) / (m[1][0] - m[0][0])\ne = (f[2][1] - f[0][1]) / (m[2][1] - m[0][1])\nf0 = f[0][1] - d * m[0][0] - e * m[0][1]\nfor v in [a, b, c, d, e, f0, 0.0, 0.0, 1.0]:\n    print(float(v))",
+   "values": [
+    2.0,
+    0.0,
+    1.0,
+    0.0,
+    2.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Reversing the direction: registration maps moving to fixed, so building the aligned image needs T⁻¹, not T.",
+  "Choosing a transform with too few DOF. A translation cannot remove rotation; an affine cannot bend soft tissue.",
+  "Using SSD when brightness changes or when the two images come from different modalities. Use NCC for brightness shifts and mutual information for multimodal scans.",
+  "Ignoring interpolation. Nearest-neighbour resampling gives jitter; bilinear interpolation is smoother but blurs fine detail.",
+  "Setting the RANSAC threshold badly: too large admits outliers and biases the transform; too small rejects true inliers."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define fixed image and moving image in registration.",
+   "marks": 2,
+   "a": "The fixed image is the reference grid; the moving image is warped onto that grid."
+  },
+  {
+   "level": "remember",
+   "q": "List the DOF for translation, rigid, affine and projective transforms in 2D.",
+   "marks": 2,
+   "a": "Translation 2, rigid 3, affine 6, projective 8."
+  },
+  {
+   "level": "understand",
+   "q": "Why is mutual information preferred over SSD for CT-to-MRI registration?",
+   "marks": 3,
+   "a": "CT and MRI intensities are not linearly related. MI measures statistical dependence between intensities, while SSD assumes equal intensity values at matching points."
+  },
+  {
+   "level": "apply",
+   "q": "A moving point (2,3) is transformed by x_f = 2x_m + 1, y_f = 2y_m + 1. Find its fixed coordinate.",
+   "marks": 3,
+   "a": "x_f = 2(2)+1 = 5; y_f = 2(3)+1 = 7. The fixed coordinate is (5,7) pixels."
+  },
+  {
+   "level": "apply",
+   "q": "How many non-collinear point pairs are needed to fit a 2D affine transform?",
+   "marks": 2,
+   "a": "Three non-collinear point pairs. An affine transform has 6 unknowns, and each pair gives 2 equations."
+  },
+  {
+   "level": "analyze",
+   "q": "A registration gives low SSD but the moving image is still shifted by 3 pixels. Explain how this can happen.",
+   "marks": 4,
+   "a": "Low SSD can occur on flat or repeated regions where many shifts give similar intensities. SSD alone is not proof of alignment; check landmarks, TRE, or overlap on labelled structures."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain the effect of setting the RANSAC inlier threshold too large in feature-based registration.",
+   "marks": 4,
+   "a": "Too large a threshold counts wrong matches as inliers. The refitted transform is biased by outliers, so the moving image is misaligned even though the inlier count looks high."
+  },
+  {
+   "level": "understand",
+   "q": "When should you evaluate registration by Dice overlap, and when by target registration error?",
+   "marks": 4,
+   "a": "Use Dice when both images have label masks, such as organ segmentations. Use TRE when corresponding landmarks are available but labels are not."
+  }
+ ],
+ "beyond": "Not for the exam. Registration is the core of medical image pipelines: atlas building, tumour follow-up, and surgery planning. In industry, the same loop aligns satellite passes, factory inspection images, and phone panoramas. Research moves toward deep learning registration and learned similarity metrics. Search next for \"mutual information registration\", \"RANSAC affine estimation\", and \"deformable registration\"."
+}
