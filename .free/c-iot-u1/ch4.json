@@ -1,0 +1,184 @@
+{
+ "lead": "An IoT system rarely acts alone. Devices, gateways and cloud services must exchange readings and commands in a repeatable way. A communication model is the pattern of that exchange, such as one device asking and another answering, or many devices publishing to a shared topic. An API, short for application programming interface, is the contract a program uses to reach such a service. This chapter names the common models and shows how REST and WebSocket APIs make them usable by ordinary software. It is the bridge between the functional blocks of an IoT system and the protocols studied later.",
+ "prereq": "You need <a href=\"#logical-design-of-iot-functional-blocks\">1.3</a> for the functional blocks; a basic client-server idea helps.",
+ "sections": [
+  {
+   "h3": "Four communication models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A communication model is the rule for who sends, who receives and how the exchange ends. Four patterns cover most IoT systems."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Request-response:</b> a client sends a request to a server and waits for one reply. The server keeps no session state between calls. A sensor reading lookup is the common case. CoAP is an example of this model.",
+      "<b>Publish-subscribe:</b> a publisher sends a message to a broker under a topic, a short name such as room1/temperature. The broker forwards it to every subscriber of that topic. Publisher and subscriber do not know each other's addresses. This decoupling lets a new dashboard subscribe without changing the device. MQTT is an example of this model.",
+      "<b>Push-pull:</b> a producer pushes data into a buffer or queue; a consumer pulls it when ready. The queue absorbs bursts. A camera may push frames to storage while an analytics job pulls them later.",
+      "<b>Exclusive pair:</b> two parties keep one dedicated connection for the whole session. Each side can send while the connection is open, as in a phone call. A control link between a robot arm and its controller may use this pattern."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The model is not the radio. The same model can run over Wi-Fi, Ethernet or a mobile network."
+    }
+   ]
+  },
+  {
+   "h3": "APIs expose the models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An API (application programming interface) is a named set of operations a program may call, with agreed inputs and outputs. A device API might offer readTemperature, setSwitch and listDevices. The API hides whether the server talks to the device over Wi-Fi or a serial cable."
+    },
+    {
+     "type": "p",
+     "text": "A REST-style API (representational state transfer) uses HTTP and treats data as resources with URLs. The common methods are:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>GET:</b> read a resource. GET /devices/17 returns device 17's data.",
+      "<b>PUT:</b> replace or update a resource at a known URL.",
+      "<b>POST:</b> create a new resource, or send a command for processing.",
+      "<b>DELETE:</b> remove a resource."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A successful GET returns status 200 OK with a body such as {\"value\": 31.5, \"unit\": \"°C\"}. The figure shows this path."
+    },
+    {
+     "type": "p",
+     "text": "WebSocket is a different API style. The client opens one connection and both sides can send messages at any time. This full-duplex link suits live dashboards and fast control loops better than repeated polling."
+    },
+    {
+     "type": "p",
+     "text": "REST usually carries request-response. Publish-subscribe APIs expose publish(topic, message) and subscribe(topic). MQTT is the common IoT protocol for this model; CoAP is used for constrained request-response work. See <a href=\"#iot-architectures-and-layered-reference-models\">1.5</a> for where APIs sit in a layered design."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing a model",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Choose the model from the job, not from fashion. Request-response fits a client that needs one fresh answer now, such as a mobile app checking a door lock. Publish-subscribe fits one reading that many consumers need, such as a temperature sent to a dashboard, a logger and an alarm. Push-pull fits a fast producer and a slower consumer, such as camera frames and an analytics job. Exclusive pair fits continuous two-way control, such as a robot arm and its controller."
+    },
+    {
+     "type": "p",
+     "text": "The choice changes traffic. Polling means asking again at fixed intervals. Fifty clients polling every ten seconds create steady load even when nothing changes. A publish-subscribe broker forwards every message it is given, so the publisher decides how often to publish — often only when a value changes. If the broker keeps the last message (the retained message in MQTT), a new subscriber gets that value at once. The cost is a broker to run and secure. Record the request and response sizes before you promise a data plan. Also record how many clients subscribe or poll. These two numbers decide whether the link is cheap or congested. The API style fixes what the client sees, not what sits behind it. A REST endpoint backed by a broker is still request-response for the client, unless the client itself subscribes to a topic."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A request-response call: the client asks the API server for device 17, the server reads the sensor, and the value comes back. Notice that the client never talks to the device directly.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Client",
+    "API server",
+    "Device"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "API server",
+     "label": "GET /devices/17",
+     "dashed": false
+    },
+    {
+     "from": "API server",
+     "to": "Device",
+     "label": "read sensor",
+     "dashed": false
+    },
+    {
+     "from": "Device",
+     "to": "API server",
+     "label": "31.5 °C",
+     "dashed": false
+    },
+    {
+     "from": "API server",
+     "to": "Client",
+     "label": "200 OK, value",
+     "dashed": false
+    }
+   ],
+   "aria": "A sequence diagram of a request-response API call: the client asks the API server, the server reads the device, and the value returns to the client."
+  }
+ },
+ "examples": [
+  {
+   "question": "A REST API is polled by 50 clients every 10 s. Each request is 300 bytes and each response is 500 bytes. Find traffic per hour in MB, taking 1 MB = 10^6 bytes.",
+   "steps": [
+    "One poll exchanges one request and one response: 300 bytes + 500 bytes = 800 bytes per poll.",
+    "Polls per hour per client: 3600 s ÷ 10 s = 360 polls.",
+    "Traffic for one client per hour: 800 bytes × 360 = 288,000 bytes.",
+    "Traffic for 50 clients per hour: 50 × 288,000 bytes = 14,400,000 bytes.",
+    "Convert to MB: 14,400,000 ÷ 1,000,000 = 14.4 MB."
+   ],
+   "answer": "The traffic is 14.4 MB per hour.",
+   "check": "clients = 50\npoll_s = 10\nrequest_bytes = 300\nresponse_bytes = 500\nbytes_per_poll = request_bytes + response_bytes\npolls_per_hour = 3600 // poll_s\ntotal_bytes = clients * bytes_per_poll * polls_per_hour\nmb = total_bytes / 1_000_000\nprint(mb)",
+   "values": [
+    14.4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not call MQTT request-response. MQTT is publish-subscribe through a broker.",
+  "An API is an interface, not a radio protocol. The same API can sit above Wi-Fi, Ethernet or a mobile link.",
+  "POST and PUT both write data, but POST creates or processes while PUT replaces at a known URL.",
+  "Polling traffic counts both request and response bytes. Forgetting the response under-counts badly. In worked example 1 it gives 5.4 MB instead of 14.4 MB per hour.",
+  "Publish-subscribe decoupling does not remove the broker. Every message still passes through it."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define communication model and API.",
+   "marks": 2,
+   "a": "A communication model is the pattern of message exchange between parties, such as request-response or publish-subscribe. An API is a named set of operations a program calls, with agreed inputs and outputs."
+  },
+  {
+   "level": "remember",
+   "q": "Name the four communication models covered in this chapter.",
+   "marks": 2,
+   "a": "Request-response, publish-subscribe, push-pull and exclusive pair."
+  },
+  {
+   "level": "understand",
+   "q": "Why does publish-subscribe decouple a publisher from its subscribers?",
+   "marks": 3,
+   "a": "The publisher sends to a broker under a topic and does not store subscriber addresses. The broker forwards each message to current subscribers. A new subscriber joins the topic without changing the publisher."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between REST GET and REST POST.",
+   "marks": 3,
+   "a": "GET reads a resource and should not change server state. POST creates a resource or sends a command for processing, so it may change state."
+  },
+  {
+   "level": "apply",
+   "q": "A REST API is polled by 20 clients every 5 s. Each request is 200 bytes and each response is 400 bytes. Find traffic per hour in MB, with 1 MB = 10^6 bytes.",
+   "marks": 4,
+   "a": "Bytes per poll = 200 + 400 = 600 bytes. Polls per hour = 3600 ÷ 5 = 720. One client per hour = 600 × 720 = 432,000 bytes. Twenty clients = 20 × 432,000 = 8,640,000 bytes = 8.64 MB per hour."
+  },
+  {
+   "level": "analyze",
+   "q": "A dashboard with 500 viewers polls one sensor every second. Suggest a better communication model and give the reason.",
+   "marks": 5,
+   "a": "Use publish-subscribe. The sensor publishes once per update to a broker, and the 500 viewers subscribe to the topic. This removes 500 separate polling requests per second: the sensor publishes once per update instead of answering 500 queries. The saving is on the upstream side — one publish instead of 500 requests. The broker still sends one copy to each of the 500 subscribers per update, so downstream traffic per viewer stays roughly the same. The cost is running a broker."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is WebSocket often better than REST polling for a live control loop?",
+   "marks": 4,
+   "a": "WebSocket keeps one open, full-duplex connection, so either side can send immediately. REST polling repeats a request and response cycle, adding delay and overhead when values change quickly."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, API gateways add authentication, rate limits and logging in front of device APIs. Device shadows store the last known state so a client can read it when a device is offline. Newer designs combine REST for setup with WebSocket or publish-subscribe for live data. Useful search terms are REST resource modelling, WebSocket, MQTT topic design, API gateway and device shadow."
+}
