@@ -1,0 +1,242 @@
+{
+ "lead": "An encoder-decoder model turns one sequence into another sequence of a different length. The encoder reads the source and compresses it into a context vector c. The decoder starts from c and generates the target one token at a time, feeding each produced token back as the next input. This design powers translation, speech-to-text, summarisation and image captioning. It exists because plain RNNs predict same-length tags or next tokens, while many tasks need a full source sentence read before a full target sentence is written. Some syllabi call it seq2seq or sequence-to-sequence.",
+ "prereq": "You need: <a href=\"#recurrent-neural-networks-and-unfolding-in-time\">4.2</a> for RNN cells and <a href=\"#sequence-learning-problems-and-sequential-data\">4.1</a> for sequence tasks.",
+ "sections": [
+  {
+   "h3": "Encoder, context and decoder",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A sequence-to-sequence task maps a source sequence x₁ … x<sub>T</sub> to a target sequence y₁ … y<sub>U</sub>. Lengths T and U can differ. Translation is the standard case: an English sentence of 7 words can become a Tamil sentence of 9 words. A same-length tagger from <a href=\"#sequence-learning-problems-and-sequential-data\">4.1</a> does not need this split."
+    },
+    {
+     "type": "p",
+     "text": "The encoder is an RNN, often an LSTM from <a href=\"#long-short-term-memory-lstm-and-gated-units\">4.4</a>. It reads x₁ … x<sub>T</sub> in order. Its final hidden state h<sub>T</sub> becomes the context vector c. Some models use a small summary network on h<sub>T</sub>, but the basic idea is one fixed-size vector."
+    },
+    {
+     "type": "formula",
+     "text": "P(y₁ … y<sub>U</sub> | x₁ … x<sub>T</sub>) = Π<sub>t=1</sub><sup>U</sup> P(y<sub>t</sub> | y₁ … y<sub>t−1</sub>, c)",
+     "where": "c is the encoder context vector; y<sub>t</sub> is the target token at step t; y₁ … y<sub>t−1</sub> are earlier target tokens; P(y<sub>t</sub> | ...) is the decoder softmax probability for token y<sub>t</sub>."
+    },
+    {
+     "type": "p",
+     "text": "The decoder is a second RNN. It starts with c and a start token. At step t it takes the previous target token and the previous decoder state. It outputs logits z<sub>t</sub> over the vocabulary. Softmax turns z<sub>t</sub> into probabilities. The model either picks the highest-probability token or samples."
+    },
+    {
+     "type": "p",
+     "text": "The fixed vector c is a bottleneck. Every detail of the source must pass through the same c. Long source sentences lose information. The symptom is that translation quality drops as input length grows. Attention in Unit 5 lets the decoder look back at all encoder states instead of only c."
+    }
+   ]
+  },
+  {
+   "h3": "Training: teacher forcing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Training uses pairs of source and target sequences. At decoder step t, the correct previous target y<sub>t−1</sub> is fed as input. This is teacher forcing. The decoder never sees its own wrong guess during training, so gradients are stable."
+    },
+    {
+     "type": "formula",
+     "text": "L = −Σ<sub>t=1</sub><sup>U</sup> log P(y<sub>t</sub> = true token | y₁ … y<sub>t−1</sub>, c)",
+     "where": "L is the total cross-entropy loss over the target sequence; log is natural log; true token is the target token at step t."
+    },
+    {
+     "type": "p",
+     "text": "Backpropagation through time from <a href=\"#backpropagation-through-time\">4.3</a> flows through decoder and encoder. The encoder learns a c that helps the decoder."
+    },
+    {
+     "type": "p",
+     "text": "Teacher forcing creates a mismatch. At inference the true previous token is not available, so the decoder must use its own previous output. A small early error then changes later inputs. Scheduled sampling reduces this: with probability ε feed the true token, with probability 1−ε feed the model's token. ε is often decreased over training."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Training input at step t: true y<sub>t−1</sub>.",
+      "Inference input at step t: predicted previous token.",
+      "Never mix the two unless scheduled sampling is explicit."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Inference: greedy and beam search",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Inference starts with c and a start token. Greedy decoding picks the token with the largest probability at each step, appends it, and feeds it back. It stops at an end token or at a maximum length. Greedy is fast but one bad early choice cannot be undone."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set decoder state from c; input the start token.",
+      "Compute logits and softmax probabilities.",
+      "Pick the argmax token; append it to the output.",
+      "If the token is an end token or the length limit is reached, stop; otherwise feed the token back."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Beam search keeps k partial sequences, called beams. Each beam has a score: the sum of log probabilities of its tokens. At each step expand every beam with all vocabulary tokens, keep the k highest scores, and continue. k is beam width. k = 1 is greedy. Beam search costs about k times more than greedy."
+    },
+    {
+     "type": "formula",
+     "text": "score(y₁ … y<sub>t</sub>) = Σ<sub>i=1</sub><sup>t</sup> log P(y<sub>i</sub> | y₁ … y<sub>i−1</sub>, c)",
+     "where": "score is the log-probability of a partial output; log is natural log; a higher score means a more likely sequence."
+    },
+    {
+     "type": "p",
+     "text": "Use greedy for quick demos and beam search when quality matters. Older RNN translation systems often used beam width 4 to 10. Length normalisation is needed because log probabilities are negative and longer sequences get lower scores; its variants are left to Unit 5."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The encoder compresses the source into one context vector c = [1, 0]; the decoder reads c and emits target tokens. Notice that the whole source passes through the single fixed vector.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Seq2seq",
+   "nodes": [
+    {
+     "id": "src",
+     "label": "Source tokens",
+     "style": "normal"
+    },
+    {
+     "id": "enc",
+     "label": "Encoder RNN",
+     "style": "accent"
+    },
+    {
+     "id": "ctx",
+     "label": "Context c",
+     "note": "c = [1, 0]",
+     "style": "live"
+    },
+    {
+     "id": "dec",
+     "label": "Decoder RNN",
+     "style": "accent"
+    },
+    {
+     "id": "tgt",
+     "label": "Target tokens",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "src",
+     "to": "enc"
+    },
+    {
+     "from": "enc",
+     "to": "ctx"
+    },
+    {
+     "from": "ctx",
+     "to": "dec"
+    },
+    {
+     "from": "dec",
+     "to": "tgt"
+    }
+   ],
+   "aria": "Source tokens enter the encoder, become the context vector c = [1, 0], and the decoder emits target tokens from that vector."
+  }
+ },
+ "examples": [
+  {
+   "question": "A toy seq2seq model has encoder context c = [1, 0]. The decoder vocabulary is {a, b, c, end}. At step 1 the decoder logits for a, b, c, end are [2, 1, 0, -1]. At step 2 the logits are [0, 1, 2, -1]. Use greedy decoding and stop after two tokens. Show the chosen token at each step and the final sequence as token indices (a = 0, b = 1, c = 2, end = 3).",
+   "steps": [
+    "Step 1 logits: a = 2, b = 1, c = 0, end = −1. The largest is 2 at index 0, so the step-1 token is a.",
+    "Feed a back as the previous token. Step 2 logits: a = 0, b = 1, c = 2, end = −1. The largest is 2 at index 2, so the step-2 token is c.",
+    "Two tokens are produced, so stop. The output sequence is [a, c]; its token indices are [0, 2]."
+   ],
+   "answer": "Greedy decoding outputs the token sequence [a, c], that is, token indices [0, 2].",
+   "check": "step1 = [2, 1, 0, -1]\nstep2 = [0, 1, 2, -1]\ni1 = max(range(len(step1)), key=lambda i: step1[i])\ni2 = max(range(len(step2)), key=lambda i: step2[i])\nprint(i1)\nprint(i2)",
+   "values": [
+    0,
+    2
+   ],
+   "code": {
+    "lang": "python",
+    "code": "step1 = [2, 1, 0, -1]\nstep2 = [0, 1, 2, -1]\ni1 = max(range(len(step1)), key=lambda i: step1[i])\ni2 = max(range(len(step2)), key=lambda i: step2[i])\nprint(i1, i2)",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "step",
+     "logits",
+     "chosen index"
+    ],
+    "rows": [
+     [
+      "1",
+      "[2, 1, 0, -1]",
+      "0"
+     ],
+     [
+      "2",
+      "[0, 1, 2, -1]",
+      "2"
+     ]
+    ]
+   },
+   "output": "0 2"
+  }
+ ],
+ "traps": [
+  "Feeding the true previous target token at inference is teacher forcing; a model trained that way but run without it must use its own previous output. Mixing the two in one decoding pass is a common exam error.",
+  "The basic encoder's context is the final hidden state h<sub>T</sub>, not the full list h₁ … h<sub>T</sub>. The full list is used by attention in Unit 5.",
+  "Do not call logits probabilities. Greedy argmax is the same on logits or softmax, but beam scores add log probabilities; applying softmax twice changes the values.",
+  "Input and output lengths need not match. Seq2seq supports T ≠ U; a same-length tagger does not.",
+  "The context c is a vector, not a single token or scalar; its size is fixed by the encoder hidden size."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the context vector in a basic encoder-decoder model?",
+   "marks": 2,
+   "a": "The final hidden state h<sub>T</sub> of the encoder RNN, or a small summary of it. It is a fixed-size vector c that summarises the source sequence."
+  },
+  {
+   "level": "understand",
+   "q": "Why is teacher forcing used in seq2seq training?",
+   "marks": 3,
+   "a": "It feeds the true previous target token at each decoder step, so the decoder is trained on correct prefixes and gradients are stable. It avoids early training on mostly wrong self-generated tokens."
+  },
+  {
+   "level": "apply",
+   "q": "Given c = [1, 0], step 1 logits [2, 1, 0, -1] and step 2 logits [0, 1, 2, -1] for tokens a, b, c, end, what does greedy decoding output after two steps?",
+   "marks": 4,
+   "a": "Step 1 argmax is a (index 0, score 2). Step 2 argmax is c (index 2, score 2). Output is [a, c], that is, token indices [0, 2]."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the fixed context vector hurt long source sentences? Name one symptom and one fix.",
+   "marks": 5,
+   "a": "All source information must fit in one fixed-size c. Long sentences need more detail than c can hold, so translation quality drops as length grows. Attention lets the decoder read all encoder states, not just c."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between the decoder input at training and at inference in basic seq2seq.",
+   "marks": 3,
+   "a": "Training uses the true previous target token, which is teacher forcing. Inference uses the model's own previous predicted token."
+  },
+  {
+   "level": "apply",
+   "q": "A beam width k = 2 decoder has first-step probabilities a = 0.6, b = 0.3, c = 0.1. Which beams survive after step 1?",
+   "marks": 5,
+   "a": "Keep the two highest: a with score log 0.6 and b with score log 0.3. c is dropped."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can greedy decoding be worse than beam search?",
+   "marks": 4,
+   "a": "Greedy commits to the highest-probability token at each step and cannot undo an early mistake. Beam search keeps k partial sequences, so a token with slightly lower first-step probability can still lead to a higher total log-probability sequence."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, seq2seq appears in speech recognition, machine translation, text summarisation and image captioning. Modern systems add attention and transformers, but the encoder-decoder split survives. Search next for teacher forcing, exposure bias, scheduled sampling and beam search. The fixed-vector bottleneck is the reason attention became standard."
+}

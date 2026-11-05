@@ -1,0 +1,226 @@
+{
+ "lead": "Backpropagation through time is ordinary backpropagation applied to an RNN after unfolding it into a chain of repeated cells. The chain has one copy of the cell per time step, all sharing the same weights. A loss at each step adds a term to the total loss. Gradients from every term flow back through the chain and are summed into the shared weights. BPTT trains language models, speech recognisers, and any model that predicts from a sequence.",
+ "prereq": "You need <a href=\"#recurrent-neural-networks-and-unfolding-in-time\">4.2</a> for the RNN equations, Unit 1 for the chain rule, and Unit 2 for gradient clipping.",
+ "sections": [
+  {
+   "h3": "Unfolding turns time into depth",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An RNN repeats one cell. At step t it reads x_t and the previous state h_{t-1}, and produces h_t. Unfolding draws a copy of the cell for every t and connects the copies in a line. The copy at t uses the same weight matrix W_hh as every other copy."
+    },
+    {
+     "type": "formula",
+     "text": "L = Σ_{t=1}^{T} L_t",
+     "where": "L_t is the loss at time step t; T is the sequence length; L is the total training loss."
+    },
+    {
+     "type": "p",
+     "text": "Each L_t depends on h_t, and h_t depends on h_{t-1}, which depends on h_{t-2}, and so on back to h_0. Training needs ∂L/∂W_hh. The parameter is shared, so every L_t contributes. BPTT computes all contributions in one backward sweep over the unfolded chain. This is the same algorithm as backpropagation in a deep feedforward network, with two changes: the weight matrices are tied across layers, and the “layers” are time steps. The forward pass stores h_t and x_t for every t; the backward pass needs them. Some syllabi call the method BPTT; the name only records that the backward pass runs through time."
+    }
+   ]
+  },
+  {
+   "h3": "The backward recursion and the Jacobian",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Write the recurrence h_t = tanh(W_xh x_t + W_hh h_{t-1} + b_h). h_t is a vector of d_h hidden units; W_hh is the shared d_h × d_h recurrent matrix. The Jacobian J_t = ∂h_t/∂h_{t-1} has entry (i,j) equal to ∂h_t[i]/∂h_{t-1}[j]. For tanh, J_t = diag(1 − h_t²) W_hh, where 1 − h_t² is a vector and diag makes a diagonal matrix from it."
+    },
+    {
+     "type": "p",
+     "text": "Let δ_t = ∂L/∂h_t. The loss at t gives a direct term ∂L_t/∂h_t. Future losses reach h_t through h_{t+1}. The backward recursion is"
+    },
+    {
+     "type": "formula",
+     "text": "δ_t = ∂L_t/∂h_t + J_{t+1}ᵀ δ_{t+1}",
+     "where": "δ_t is the gradient of the total loss with respect to h_t; J_{t+1} = ∂h_{t+1}/∂h_t; δ_{T+1} = 0."
+    },
+    {
+     "type": "p",
+     "text": "The parameter gradient sums every path from each loss to the shared weight:"
+    },
+    {
+     "type": "formula",
+     "text": "∂L/∂W_hh = Σ_{t=1}^{T} Σ_{k=1}^{t} (J_t J_{t-1} ⋯ J_{k+1})ᵀ (∂L_t/∂h_t) (∂h_k/∂W_hh)",
+     "where": "∂L_t/∂h_t is a column vector; J_j = ∂h_j/∂h_{j-1}; the product J_t J_{t-1} ⋯ J_{k+1} is the identity matrix when k = t (the empty product); ∂h_k/∂W_hh is the local derivative of step k holding h_{k-1} fixed."
+    },
+    {
+     "type": "p",
+     "text": "This double sum is the BPTT sum. For each L_t it walks every path back to W_hh, including paths through earlier hidden states."
+    }
+   ]
+  },
+  {
+   "h3": "Long products, truncation and clipping",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The product Π J_j causes the main difficulty. If the Jacobians are repeatedly below 1 in norm, the product shrinks exponentially with distance and the gradient from early steps becomes too small. If they are above 1, the product grows and the gradient explodes. The spectral radius ρ(J_t) is the largest absolute eigenvalue of the Jacobian. It gives local intuition: if ρ < 1 the product contracts, and if ρ > 1 it expands. In a tanh RNN the activation derivative is at most 1, but W_hh can still produce small singular values or large ones."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Gradient clipping: if ||g|| > c, replace g by c·g/||g||. This keeps the direction and caps the step size.",
+      "Truncated BPTT: split a long stream into chunks of length k. Forward-propagate through a chunk, backpropagate k steps, update, carry h forward, and detach it from the graph at the chunk boundary. The model still sees long context in the forward state, but gradients do not cross the boundary. This bounds memory and compute and avoids a product of thousands of Jacobians."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Gated cells in 4.4 change J_t; optimizers in Unit 2 consume the gradient computed here."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Forward pass runs h0 → h1 → h2 → Loss with u = 1 at both recurrent steps. The backward pass follows the upward arrows and adds the gradient from every path into u.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "BPTT graph",
+   "nodes": [
+    {
+     "id": "h0",
+     "label": "h0",
+     "note": "0.2",
+     "style": "muted"
+    },
+    {
+     "id": "h1",
+     "label": "h1",
+     "note": "0.604",
+     "style": "normal"
+    },
+    {
+     "id": "h2",
+     "label": "h2",
+     "note": "0.802",
+     "style": "normal"
+    },
+    {
+     "id": "L",
+     "label": "Loss",
+     "note": "L = 0.020",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "h0",
+     "to": "h1",
+     "label": "u=1",
+     "style": "solid"
+    },
+    {
+     "from": "h1",
+     "to": "h2",
+     "label": "u=1",
+     "style": "solid"
+    },
+    {
+     "from": "h2",
+     "to": "L",
+     "style": "solid"
+    },
+    {
+     "from": "L",
+     "to": "h2",
+     "label": "dL/dh",
+     "style": "dashed"
+    },
+    {
+     "from": "h2",
+     "to": "h1",
+     "label": "back",
+     "style": "dashed"
+    },
+    {
+     "from": "h1",
+     "to": "h0",
+     "label": "back",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Forward hidden states h0, h1 and h2 feed the loss; backward arrows send gradients through the shared weight u = 1."
+  }
+ },
+ "examples": [
+  {
+   "question": "An RNN has scalar hidden state h_t = tanh(x_t + u h_{t-1}), output y = h_2, and loss L = 0.5(y − 1)². Use h_0 = 0.2, x_1 = x_2 = 0.5, and u = 1. (a) Compute h_1, h_2 and L. (b) Compute ∂L/∂u by BPTT. Split the answer into the direct path and the path through h_1.",
+   "steps": [
+    "Step 1: h_1 = tanh(x_1 + u h_0) = tanh(0.5 + 1×0.2) = tanh(0.7) = 0.6044.",
+    "Step 2: h_2 = tanh(x_2 + u h_1) = tanh(0.5 + 1×0.6044) = tanh(1.1044) = 0.8021.",
+    "Step 3: L = 0.5(h_2 − 1)² = 0.5(−0.1979)² = 0.0196 ≈ 0.020.",
+    "Step 4: derivative at the output: dL/dh_2 = h_2 − 1 = −0.1979.",
+    "Step 5: local tanh derivative: 1 − h_2² = 1 − 0.8021² = 0.3566.",
+    "Step 6: direct path. Treat h_1 as constant: ∂h_2/∂u_direct = (1 − h_2²)h_1 = 0.3566×0.6044 = 0.2156. Contribution = −0.1979×0.2156 = −0.0427 ≈ −0.043.",
+    "Step 7: path through h_1. ∂h_1/∂u = (1 − h_1²)h_0 = (1 − 0.6044²)×0.2 = 0.1269. ∂h_2/∂u_via = (1 − h_2²)u∂h_1/∂u = 0.3566×1×0.1269 = 0.0453. Contribution = −0.1979×0.0453 = −0.0090 ≈ −0.009.",
+    "Step 8: sum paths. ∂L/∂u = −0.0427 − 0.0090 = −0.0517 ≈ −0.052."
+   ],
+   "answer": "h_1 ≈ 0.604, h_2 ≈ 0.802, L ≈ 0.020; ∂L/∂u ≈ −0.052, made of −0.043 from the direct path and −0.009 through h_1.",
+   "check": "import math\nh0 = 0.2\nx1 = 0.5\nx2 = 0.5\nu = 1.0\nh1 = math.tanh(x1 + u*h0)\nh2 = math.tanh(x2 + u*h1)\nL = 0.5*(h2 - 1.0)**2\ndLdy = h2 - 1.0\ndh1du = (1 - h1*h1)*h0\ndydirect = (1 - h2*h2)*h1\ndyvia = (1 - h2*h2)*u*dh1du\ndLdu = dLdy*(dydirect + dyvia)\nprint(f'{h1:.3f}')\nprint(f'{h2:.3f}')\nprint(f'{L:.3f}')\nprint(f'{dLdu:.3f}')\nprint(f'{dLdy*dydirect:.3f}')\nprint(f'{dLdy*dyvia:.3f}')",
+   "values": [
+    0.604,
+    0.802,
+    0.02,
+    -0.052,
+    -0.043,
+    -0.009
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Backpropagating only through the last step. BPTT sums every path from each L_t to W_hh, including paths through earlier hidden states.",
+  "Confusing δ_t = ∂L/∂h_t with the parameter gradient. δ_t includes future losses through J_{t+1}ᵀ δ_{t+1}.",
+  "Forgetting the tanh local derivative 1 − h_t² in J_t, or using W_hh alone as the Jacobian.",
+  "Treating truncated BPTT as ignoring the past in the forward pass. The hidden state is carried forward; only the gradient is cut at the chunk boundary.",
+  "Sign slip: ∂L/∂u = −0.052 means increasing u reduces L, so gradient descent adds a small positive update after subtracting the negative gradient."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does BPTT stand for, and on what graph does it run backpropagation?",
+   "marks": 2,
+   "a": "Backpropagation through time. It runs on the unfolded RNN graph, which has one cell copy per time step and shared weights."
+  },
+  {
+   "level": "understand",
+   "q": "Why is ∂L/∂W_hh a sum over time steps rather than a gradient for one step only?",
+   "marks": 3,
+   "a": "W_hh is shared by all steps. Every L_t depends on W_hh through h_t and through all earlier hidden states, so every contribution must be added."
+  },
+  {
+   "level": "apply",
+   "q": "In the worked example, h_1 = 0.604 and h_2 = 0.802. Compute the direct-path contribution to ∂L/∂u.",
+   "marks": 4,
+   "a": "dL/dh_2 = h_2 − 1 = −0.198. Direct derivative = (1 − h_2²)h_1 = 0.3566×0.604 = 0.2156. Contribution = −0.198×0.2156 ≈ −0.043."
+  },
+  {
+   "level": "analyze",
+   "q": "A truncated BPTT model uses chunk length 20. What gradient paths are lost, and what is gained?",
+   "marks": 5,
+   "a": "Paths longer than 20 steps across chunk boundaries are lost. Memory and compute are bounded, and the hidden state still carries long context forward, but the gradient cannot learn dependencies longer than the chunk."
+  },
+  {
+   "level": "remember",
+   "q": "Define the Jacobian J_t in an RNN.",
+   "marks": 2,
+   "a": "J_t = ∂h_t/∂h_{t-1}, a matrix whose (i,j) entry is ∂h_t[i]/∂h_{t-1}[j]."
+  },
+  {
+   "level": "apply",
+   "q": "If the spectral radius of J is 0.5, roughly what happens to a product of 10 Jacobians?",
+   "marks": 3,
+   "a": "The product shrinks like 0.5¹⁰ ≈ 0.001, so the gradient from 10 steps back is about one-thousandth as large: vanishing."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does gradient clipping not fix vanishing gradients?",
+   "marks": 4,
+   "a": "Clipping caps gradients that are too large. It cannot amplify gradients that are already tiny from a long product of contracting Jacobians."
+  }
+ ],
+ "beyond": "Not for the exam. Production sequence models often use truncated BPTT with chunks of tens to hundreds of steps, gradient checkpointing to trade compute for memory, and orthogonal or identity-like initialisation of W_hh to keep Jacobian products stable. Search for “truncated backpropagation through time”, “gradient checkpointing”, and “orthogonal RNN initialisation” to go deeper. Gated and attention-based models reduce the length of the Jacobian product but do not remove the need to think about gradient flow."
+}

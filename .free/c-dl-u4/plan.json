@@ -1,0 +1,520 @@
+{
+ "lead": "This unit explains how neural networks learn from ordered data: text, speech, sensor streams and video. You will trace a sequence through an RNN, train it with backpropagation through time, stabilise it with LSTM or GRU gates, and connect it to encoder-decoder translation, word embeddings and captioning. After the unit you can size a sequence model, compute one forward and backward pass by hand, and choose the right architecture for a sequence task.",
+ "about": "The unit starts with 4.1, which separates sequence classification, labelling and sequence-to-sequence tasks and shows how to window and batch variable-length data. 4.2 builds the recurrent cell and unfolds it in time; 4.3 turns that unfolded graph into backpropagation through time and explains vanishing and exploding gradients. 4.4 replaces the simple cell with LSTM and GRU gates. 4.5 couples an encoder and a decoder for translation-style problems. 4.6 adds word embeddings so tokens become trainable vectors. 4.7 applies the whole stack to language modelling, translation and image captioning. Each chapter uses small numeric examples so you can reproduce the arithmetic in the exam.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A sequence problem is defined by order and variable length: the model sees x₁ … x_T and predicts a label, a same-length tag sequence, or another sequence.",
+   "depth": "Cover sequential data in text, speech, sensor logs and video; define time step t, length T and variable length. Separate many-to-one classification, many-to-many labelling such as POS or NER, and many-to-many seq2seq such as translation; some syllabi call these sequence learning problems. Show sliding windows, padding, batching and time-based splits to avoid leakage. Mention that CNN+RNN video understanding and spatio-temporal action recognition are advanced topics; only a few universities teach them, so keep them to one line here and in 4.7. Leave HMM/CRF taggers to other courses.",
+   "figure": {
+    "type": "array",
+    "title": "Sliding windows",
+    "show_index": true,
+    "index_from": 1,
+    "rows": [
+     {
+      "label": "x",
+      "cells": [
+       "2",
+       "4",
+       "6",
+       "8",
+       "10"
+      ],
+      "marks": {
+       "3": "accent",
+       "4": "accent"
+      }
+     },
+     {
+      "label": "Win 1",
+      "cells": [
+       "2",
+       "4",
+       "6",
+       "→8",
+       ""
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent",
+       "2": "accent",
+       "3": "live"
+      }
+     },
+     {
+      "label": "Win 2",
+      "cells": [
+       "",
+       "4",
+       "6",
+       "8",
+       "→10"
+      ],
+      "marks": {
+       "1": "accent",
+       "2": "accent",
+       "3": "accent",
+       "4": "live"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 1,
+      "cell": 3,
+      "label": "target"
+     }
+    ],
+    "aria": "A five-step series with two length-three windows; the fourth and fifth values are the next-value targets."
+   },
+   "example": "A sensor records x = [2, 4, 6, 8, 10] at t = 1 … 5. Use windows of length 3 to predict the next value. List every (input window, target) pair. Answer: ([2, 4, 6] → 8) and ([4, 6, 8] → 10).",
+   "trap": "Randomly shuffling time steps or splitting a time series with random rows leaks future values into training; split by time and keep windows inside each split.",
+   "prereq": "Unit 1 for supervised learning and labels; Unit 3 for CNN features if video is mentioned.",
+   "leave": "HMM/CRF sequence labelling, attention and transformers go to other units; video CNN+RNN detail to 4.7 as a short advanced note."
+  },
+  {
+   "k": 2,
+   "idea": "An RNN shares one cell across time: the hidden state h_t carries information from earlier steps and is updated from the current input and the previous state.",
+   "depth": "Write the simple RNN equations h_t = tanh(W_xh x_t + W_hh h_{t-1} + b_h) and y_t = W_hy h_t + b_y; define every matrix and bias, and state shapes for a batch. Explain parameter sharing across time, hidden state as memory, and unfolding into a computation graph. Show one-to-many, many-to-one and many-to-many heads. Some syllabi call this a vanilla RNN. Add one line that bidirectional RNNs read both directions; this completes the subject. Leave training to 4.3 and gates to 4.4.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Unfolded RNN",
+    "nodes": [
+     {
+      "id": "hp",
+      "label": "h(t-1)",
+      "style": "muted"
+     },
+     {
+      "id": "h",
+      "label": "h(t)",
+      "note": "hidden state",
+      "style": "accent"
+     },
+     {
+      "id": "hn",
+      "label": "h(t+1)",
+      "style": "next"
+     },
+     {
+      "id": "x",
+      "label": "x(t)",
+      "style": "normal"
+     },
+     {
+      "id": "y",
+      "label": "y(t)",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "hp",
+      "to": "h",
+      "label": "U"
+     },
+     {
+      "from": "x",
+      "to": "h",
+      "label": "W"
+     },
+     {
+      "from": "h",
+      "to": "y",
+      "label": "V"
+     },
+     {
+      "from": "h",
+      "to": "hn",
+      "label": "U",
+      "style": "dashed"
+     }
+    ],
+    "aria": "The same hidden cell is reused at three time steps: x(t) and h(t-1) form h(t), which gives y(t) and passes to h(t+1)."
+   },
+   "example": "For a scalar RNN use h_t = tanh(1·x_t + 0.5·h_{t-1} + 0), y_t = h_t, h_0 = 0, x_1 = 1 and x_2 = 2. Compute h_1, h_2 and y_2 to two decimals. Answer: h_1 = tanh(1) = 0.76; h_2 = tanh(2 + 0.5×0.76) = tanh(2.38) = 0.98; y_2 = 0.98.",
+   "trap": "Do not treat h_t as a separate learned parameter at each time step; the same W_hh and W_xh are reused, and h_0 must be initialised, often to zeros.",
+   "prereq": "Unit 1 for tanh and matrix multiplication; 4.1 for sequence shapes.",
+   "leave": "Gradient derivation to 4.3, gate equations to 4.4, attention to Unit 5."
+  },
+  {
+   "k": 3,
+   "idea": "Backpropagation through time is ordinary backpropagation on the unfolded RNN graph: gradients from all time steps are summed into the shared weights.",
+   "depth": "Draw the unfolded graph and write the loss L = Σ_t L_t. Derive ∂L/∂W_hh as a sum over t of local Jacobians; define the Jacobian ∂h_t/∂h_{t-1}. Explain truncation, gradient clipping and the product of many Jacobians that causes vanishing or exploding gradients. Mention spectral radius intuition. Some syllabi call this BPTT. Leave optimizers to Unit 2 and gating to 4.4. Added: truncated BPTT completes the subject for long streams.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "BPTT graph",
+    "nodes": [
+     {
+      "id": "h0",
+      "label": "h0",
+      "style": "muted"
+     },
+     {
+      "id": "h1",
+      "label": "h1",
+      "style": "normal"
+     },
+     {
+      "id": "h2",
+      "label": "h2",
+      "style": "normal"
+     },
+     {
+      "id": "h3",
+      "label": "h3",
+      "style": "normal"
+     },
+     {
+      "id": "L",
+      "label": "Loss",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "h0",
+      "to": "h1"
+     },
+     {
+      "from": "h1",
+      "to": "h2"
+     },
+     {
+      "from": "h2",
+      "to": "h3"
+     },
+     {
+      "from": "h3",
+      "to": "L"
+     },
+     {
+      "from": "L",
+      "to": "h3",
+      "label": "dL/dh",
+      "style": "dashed"
+     },
+     {
+      "from": "h3",
+      "to": "h2",
+      "label": "back",
+      "style": "dashed"
+     },
+     {
+      "from": "h2",
+      "to": "h1",
+      "label": "back",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Forward hidden states h0 to h3 feed a loss; dashed arrows send gradients backward through the same shared weights."
+   },
+   "example": "Use h_t = tanh(x_t + u·h_{t-1}), y = h_2, L = 0.5(y − 1)², h_0 = 0.2, x_1 = x_2 = 0.5 and u = 1. Compute h_1, h_2, L and ∂L/∂u. Answer: h_1 = tanh(0.7) = 0.604, h_2 = tanh(1.104) = 0.801, L = 0.020, ∂L/∂u ≈ −0.052. The direct path gives −0.043 and the path through h_1 gives −0.009.",
+   "trap": "A common mistake is to backpropagate only through the last step; BPTT sums every path from each loss L_t to the shared parameter, including paths through earlier hidden states.",
+   "prereq": "4.2 for the RNN equations; Unit 1 for the chain rule; Unit 2 for gradient clipping.",
+   "leave": "LSTM/GRU gate design to 4.4; optimizer choice to Unit 2."
+  },
+  {
+   "k": 4,
+   "idea": "Gates let a recurrent cell keep or erase information over many steps: LSTM uses forget, input and output gates around an additive cell state.",
+   "depth": "Write LSTM equations f_t = σ(W_f x_t + U_f h_{t-1} + b_f), i_t = σ(...), c~_t = tanh(...), c_t = f_t⊙c_{t-1} + i_t⊙c~_t, o_t = σ(...), h_t = o_t⊙tanh(c_t); define σ, ⊙ and each gate. Explain why the additive cell path and a forget gate near 1 reduce vanishing gradients. Cover GRU update and reset gates; some syllabi call them gated recurrent units. Mention peephole LSTM as advanced; only a few universities teach it. Leave BPTT to 4.3 and seq2seq to 4.5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "LSTM cell",
+    "nodes": [
+     {
+      "id": "cp",
+      "label": "c(t-1)",
+      "style": "muted"
+     },
+     {
+      "id": "f",
+      "label": "Forget f",
+      "style": "accent"
+     },
+     {
+      "id": "i",
+      "label": "Input i",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "c(t)",
+      "note": "cell state",
+      "style": "live"
+     },
+     {
+      "id": "o",
+      "label": "Output o",
+      "style": "accent"
+     },
+     {
+      "id": "h",
+      "label": "h(t)",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cp",
+      "to": "f",
+      "label": "keep"
+     },
+     {
+      "from": "f",
+      "to": "c",
+      "label": "f*c"
+     },
+     {
+      "from": "i",
+      "to": "c",
+      "label": "i*c~"
+     },
+     {
+      "from": "c",
+      "to": "o"
+     },
+     {
+      "from": "o",
+      "to": "h",
+      "label": "tanh"
+     }
+    ],
+    "aria": "The previous cell state is multiplied by the forget gate, the input gate adds a candidate, and the output gate forms the hidden state."
+   },
+   "example": "An LSTM has f_t = 0.731, i_t = 0.622, c~_t = 0.762, c_{t-1} = 0.5 and o_t = 0.5. Compute c_t and h_t, using h_t = o_t·tanh(c_t). Answer: c_t = 0.731×0.5 + 0.622×0.762 = 0.839; h_t = 0.5×tanh(0.839) = 0.343.",
+   "trap": "Do not add the gates before multiplying; the forget gate multiplies the previous cell state and the input gate multiplies the candidate. Also do not apply tanh before the output gate multiplies.",
+   "prereq": "4.2 and 4.3 for recurrence and gradients; Unit 1 for sigmoid and tanh.",
+   "leave": "Full BPTT derivation to 4.3; attention/transformers to Unit 5; GRU detail stays short here."
+  },
+  {
+   "k": 5,
+   "idea": "An encoder-decoder model reads a source sequence into a context vector, then a decoder generates the target sequence one token at a time.",
+   "depth": "Cover encoder RNN final state or summary as context c; decoder conditional P(y_t | y_<t, c); teacher forcing in training, greedy and beam search in inference. Explain variable input/output lengths and the fixed-vector bottleneck. Some syllabi call this seq2seq or sequence-to-sequence. Mention scheduled sampling as added; it completes the subject. Leave attention and cross-attention to Unit 5; leave word embeddings to 4.6.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Seq2seq",
+    "nodes": [
+     {
+      "id": "src",
+      "label": "Source tokens",
+      "style": "normal"
+     },
+     {
+      "id": "enc",
+      "label": "Encoder RNN",
+      "style": "accent"
+     },
+     {
+      "id": "ctx",
+      "label": "Context c",
+      "note": "fixed vector",
+      "style": "live"
+     },
+     {
+      "id": "dec",
+      "label": "Decoder RNN",
+      "style": "accent"
+     },
+     {
+      "id": "tgt",
+      "label": "Target tokens",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "src",
+      "to": "enc"
+     },
+     {
+      "from": "enc",
+      "to": "ctx"
+     },
+     {
+      "from": "ctx",
+      "to": "dec"
+     },
+     {
+      "from": "dec",
+      "to": "tgt"
+     }
+    ],
+    "aria": "Source tokens enter the encoder, become one context vector, and the decoder emits target tokens from that vector."
+   },
+   "example": "A toy seq2seq model has encoder context c = [1, 0]. At decoder step 1 the scores for tokens a, b, c are [2, 1, 0]; at step 2 they are [0, 1, 2]. Use greedy decoding. What is the output sequence? Answer: step 1 picks b, step 2 picks c, so the output is [b, c].",
+   "trap": "The decoder must not see the true previous target at inference time unless you deliberately use teacher forcing; mixing training and inference inputs is a common exam error.",
+   "prereq": "4.2 for RNN cells; 4.1 for sequence tasks.",
+   "leave": "Attention, transformers and beam-search variants to Unit 5; embedding training to 4.6."
+  },
+  {
+   "k": 6,
+   "idea": "Word2vec learns dense word vectors by making a word predict its context or its context predict the word; similar words end up with similar vectors.",
+   "depth": "Define the distributional hypothesis, vocabulary V, embedding matrix E and context window m. CBOW: average context vectors, predict the centre word; skip-gram: use the centre word, predict each context word. Write softmax P(w|h) = exp(v_w·h) / Σ_j exp(v_j·h); define v_w and h. Mention negative sampling and GloVe as alternatives; keep GloVe short because some syllabi list it. Show cosine similarity. Some syllabi call these word vectors. Leave contextual embeddings and BERT to Unit 5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "CBOW",
+    "nodes": [
+     {
+      "id": "ctx",
+      "label": "Context words",
+      "style": "normal"
+     },
+     {
+      "id": "avg",
+      "label": "Average",
+      "style": "accent"
+     },
+     {
+      "id": "h",
+      "label": "Hidden h",
+      "note": "dense vector",
+      "style": "live"
+     },
+     {
+      "id": "sm",
+      "label": "Softmax",
+      "style": "accent"
+     },
+     {
+      "id": "tg",
+      "label": "Target word",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ctx",
+      "to": "avg"
+     },
+     {
+      "from": "avg",
+      "to": "h"
+     },
+     {
+      "from": "h",
+      "to": "sm"
+     },
+     {
+      "from": "sm",
+      "to": "tg"
+     }
+    ],
+    "aria": "Context words are averaged into one hidden vector, a softmax scores every vocabulary word, and the centre word is the target."
+   },
+   "example": "Vocabulary is {cat, dog, fish}. CBOW produces hidden h = [1, 0]; output vectors are cat [1, 0], dog [0, 1] and fish [−1, 0]. Using softmax, compute P(cat) and P(dog) to three decimals. Answer: scores are 1, 0 and −1; exp scores are 2.718, 1 and 0.368; the sum is 4.086; P(cat) = 0.665 and P(dog) = 0.245.",
+   "trap": "CBOW predicts the centre from the context; skip-gram predicts each context word from the centre. Reversing them is the common error, and the softmax denominator must sum over the whole vocabulary.",
+   "prereq": "4.1 for token sequences; Unit 1 for softmax.",
+   "leave": "Contextual embeddings, BERT and GPT to Unit 5; detailed GloVe derivation to a reading if needed."
+  },
+  {
+   "k": 7,
+   "idea": "The same recurrent stack powers language modelling, translation and image captioning; the task changes the input encoder and the output head, not the core idea of predicting the next token.",
+   "depth": "Language modelling: chain rule P(w1…wT) = ∏ P(wt | w_<t), training with cross-entropy, evaluation with perplexity. Translation: seq2seq from 4.5, with BLEU mentioned as a metric. Image captioning: CNN feature vector from Unit 3 fed as the first decoder input, then RNN/LSTM generates words. Sequence labelling POS/NER as a many-to-many head. Mention CNN+RNN video understanding, spatio-temporal models and action recognition as advanced; only a few universities teach them, so give one short paragraph. Leave pretrained LLMs to Unit 5 and CNN details to Unit 3.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Image captioning",
+    "nodes": [
+     {
+      "id": "img",
+      "label": "Image",
+      "style": "normal"
+     },
+     {
+      "id": "cnn",
+      "label": "CNN",
+      "style": "accent"
+     },
+     {
+      "id": "feat",
+      "label": "Feature",
+      "note": "fixed vector",
+      "style": "live"
+     },
+     {
+      "id": "rnn",
+      "label": "RNN decoder",
+      "style": "accent"
+     },
+     {
+      "id": "cap",
+      "label": "Caption",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "img",
+      "to": "cnn"
+     },
+     {
+      "from": "cnn",
+      "to": "feat"
+     },
+     {
+      "from": "feat",
+      "to": "rnn"
+     },
+     {
+      "from": "rnn",
+      "to": "cap"
+     }
+    ],
+    "aria": "An image goes through a CNN to a feature vector, and an RNN decoder turns that vector into caption words."
+   },
+   "example": "For the sentence 'the cat sat', a language model gives P(the) = 0.5, P(cat | the) = 0.4 and P(sat | the cat) = 0.2. Compute the sentence probability and its perplexity. Answer: P = 0.5×0.4×0.2 = 0.04; perplexity = exp(−(ln 0.04)/3) = 2.92.",
+   "trap": "Perplexity is exp of average negative log-likelihood, not the product of probabilities; and image captioning passes a CNN feature, not raw pixels, into the decoder.",
+   "prereq": "4.2–4.6; Unit 3 for CNN features.",
+   "leave": "Attention, transformers, BERT/GPT and LLM fine-tuning to Unit 5; CNN detection and segmentation to Unit 3."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "sequence shapes become RNN time steps"
+  ],
+  [
+   2,
+   3,
+   "unfolded cell gives the BPTT graph"
+  ],
+  [
+   3,
+   4,
+   "vanishing gradients motivate gates"
+  ],
+  [
+   4,
+   5,
+   "gated cells become encoder and decoder"
+  ],
+  [
+   5,
+   6,
+   "seq2seq tokens need embeddings"
+  ],
+  [
+   6,
+   7,
+   "embeddings feed language models and captioners"
+  ],
+  [
+   5,
+   7,
+   "seq2seq is the base for translation"
+  ],
+  [
+   2,
+   7,
+   "the RNN cell is the caption decoder"
+  ]
+ ]
+}

@@ -1,0 +1,248 @@
+{
+ "lead": "A word embedding turns each word into a short dense vector learned from text, so that words used in similar contexts get similar vectors. word2vec trains these vectors with one small prediction task: CBOW predicts the centre word from its neighbours, skip-gram predicts each neighbour from the centre. One matrix holds a vector per vocabulary word. The vectors are cheap to store, quick to compare with cosine similarity, and serve as the input layer for the recurrent models of this unit. Search ranking, review sentiment and text filters on UPI transaction notes all begin from such vectors.",
+ "prereq": "You need: <a href=\"#sequence-learning-problems-and-sequential-data\">4.1</a> for tokens and sequences, and Unit 1 for the softmax function.",
+ "sections": [
+  {
+   "h3": "Why words need vectors",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A neural network cannot read the word 'cricket'. It needs numbers. The simple encoding is one-hot: number the vocabulary V, of size |V|, and give word w a vector of length |V| holding a single 1. With |V| = 50,000 each vector is 50,000 long, and every pair of words is equally far apart. No meaning is stored."
+    },
+    {
+     "type": "p",
+     "text": "A word embedding replaces this with a short dense vector of d numbers, usually d = 100 to 300, learned from text. All vectors sit in one embedding matrix E of shape |V| × d; row i is the vector of the i-th word. Write u_w for the input vector of word w."
+    },
+    {
+     "type": "p",
+     "text": "The distributional hypothesis says words that appear in similar contexts tend to have similar meanings. 'Cricket' and 'IPL' both appear near 'match', 'score' and 'bat'. A model trained to predict words from their neighbours is forced to place such words close in vector space. word2vec is that prediction task."
+    }
+   ]
+  },
+  {
+   "h3": "CBOW: context predicts the centre word",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take a sentence and a centre position t. The context window of size m is the m words on each side: w<sub>t−m</sub> … w<sub>t−1</sub> and w<sub>t+1</sub> … w<sub>t+m</sub>. m is small, often 2 to 5."
+    },
+    {
+     "type": "p",
+     "text": "CBOW (continuous bag of words) hides the centre word and predicts it from the average of the context vectors, h = (1/2m) Σ<sub>k</sub> u<sub>t+k</sub>. 'Bag' means order inside the window is ignored."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Pick the 2m context words around position t.",
+      "Look up their input vectors u in E.",
+      "Average them into the hidden vector h.",
+      "Score every vocabulary word: s<sub>j</sub> = v<sub>j</sub> · h.",
+      "Softmax the scores over all of V.",
+      "Loss is −log P(w<sub>t</sub> | h); backpropagate into E and E′."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Scoring uses a second matrix E′ of output vectors. A candidate word w has output vector v_w; its score against h is the dot product v_w · h. The softmax turns scores into a probability over the whole vocabulary."
+    },
+    {
+     "type": "formula",
+     "text": "P(w | h) = exp(v_w · h) ÷ Σ<sub>j ∈ V</sub> exp(v_j · h)",
+     "where": "P(w | h) is the probability the model gives to word w as the centre word; v_w is the output vector of w, a row of E′; h is the hidden vector, the average of the context input vectors in CBOW; · is the dot product; the denominator sums over every word j of V."
+    },
+    {
+     "type": "p",
+     "text": "Skip-gram reverses the direction: from the centre vector u_c it predicts each context word separately, P(w<sub>t+k</sub> | u_c) for each k. A sentence of L words gives about L training pairs for CBOW but 2mL for skip-gram. More pairs means more updates for rare words, so skip-gram often gives better vectors for them, but it trains slower; CBOW is faster and slightly better on frequent words."
+    }
+   ]
+  },
+  {
+   "h3": "Negative sampling, GloVe and cosine similarity",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The softmax denominator sums over |V| words, which is 50,000 dot products per step when |V| = 50,000. Negative sampling avoids this: keep the true (context, centre) pair as a positive example, draw k random words (k = 5 to 20) as negatives, and train a logistic classifier to accept the positive pair and reject the negatives. Each step then touches only k + 1 output vectors."
+    },
+    {
+     "type": "p",
+     "text": "GloVe takes a different route. Count co-occurrences X<sub>ij</sub>, the number of times word j falls in the window of word i, then fit vectors so that v_i · v_j + b_i + b_j ≈ log X<sub>ij</sub>, weighting down very frequent pairs. It uses global counts once instead of streaming windows. Both methods give static embeddings: one vector per word, identical in every sentence."
+    },
+    {
+     "type": "formula",
+     "text": "cos(u, v) = (u · v) ÷ (‖u‖ ‖v‖)",
+     "where": "u and v are two word vectors; u · v is the dot product; ‖u‖ = √(u · u) is the Euclidean length; the value lies in [−1, 1], and 1 means the same direction."
+    },
+    {
+     "type": "p",
+     "text": "Cosine similarity also supports meaning arithmetic: v<sub>king</sub> − v<sub>man</sub> + v<sub>woman</sub> lands closest to v<sub>queen</sub> in a well-trained space. It works often, not always."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Method",
+      "Training signal",
+      "Cost"
+     ],
+     "rows": [
+      [
+       "CBOW",
+       "average context → centre",
+       "fast"
+      ],
+      [
+       "skip-gram",
+       "centre → each context word",
+       "slower, better on rare words"
+      ],
+      [
+       "GloVe",
+       "global co-occurrence counts",
+       "one pass over counts"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The context words are averaged into one hidden vector h = [1, 0]; a softmax over the whole vocabulary then scores every candidate centre word, and the training target is the true centre word.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "CBOW",
+   "nodes": [
+    {
+     "id": "ctx",
+     "label": "Context words",
+     "note": "dog, fish",
+     "style": "normal"
+    },
+    {
+     "id": "avg",
+     "label": "Average",
+     "note": "mean of vectors",
+     "style": "accent"
+    },
+    {
+     "id": "h",
+     "label": "Hidden h",
+     "note": "h = [1, 0]",
+     "style": "live"
+    },
+    {
+     "id": "sm",
+     "label": "Softmax",
+     "note": "scores for all V",
+     "style": "accent"
+    },
+    {
+     "id": "tg",
+     "label": "Target: cat",
+     "note": "P = 0.665",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ctx",
+     "to": "avg"
+    },
+    {
+     "from": "avg",
+     "to": "h"
+    },
+    {
+     "from": "h",
+     "to": "sm"
+    },
+    {
+     "from": "sm",
+     "to": "tg"
+    }
+   ],
+   "aria": "Context words are averaged into one hidden vector h of two numbers, a softmax scores every vocabulary word, and the true centre word cat is the target with probability 0.665."
+  }
+ },
+ "examples": [
+  {
+   "question": "A toy vocabulary is V = {cat, dog, fish} with d = 2. CBOW produces the hidden vector h = [1, 0]. The output vectors are v_cat = [1, 0], v_dog = [0, 1] and v_fish = [−1, 0]. Compute the score of each word, the softmax denominator, and P(cat | h), P(dog | h), P(fish | h) to three decimals.",
+   "steps": [
+    "Scores s_w = v_w · h. cat: 1×1 + 0×0 = 1. dog: 0×1 + 1×0 = 0. fish: (−1)×1 + 0×0 = −1.",
+    "Exponentiate: exp(1) = 2.718, exp(0) = 1.000, exp(−1) = 0.368.",
+    "Denominator Z = 2.718 + 1.000 + 0.368 = 4.086.",
+    "P(cat | h) = 2.718 ÷ 4.086 = 0.665.",
+    "P(dog | h) = 1.000 ÷ 4.086 = 0.245.",
+    "P(fish | h) = 0.368 ÷ 4.086 = 0.090.",
+    "Check: 0.665 + 0.245 + 0.090 = 1.000."
+   ],
+   "answer": "P(cat | h) = 0.665, P(dog | h) = 0.245 and P(fish | h) = 0.090, so h points most strongly at cat.",
+   "check": "import math\nh = [1, 0]\nout = {'cat': [1, 0], 'dog': [0, 1], 'fish': [-1, 0]}\nscore = {w: sum(a*b for a, b in zip(v, h)) for w, v in out.items()}\ne = {w: math.exp(s) for w, s in score.items()}\nZ = sum(e.values())\nprint(round(Z, 3))\nfor w in ['cat', 'dog', 'fish']:\n    print('%.3f' % (e[w] / Z))",
+   "values": [
+    4.086,
+    0.665,
+    0.245,
+    0.09
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Reversing the tasks: CBOW predicts the centre word from the context; skip-gram predicts each context word from the centre.",
+  "Putting only the window words in the softmax denominator. It sums over the whole vocabulary V, which is exactly why training is costly.",
+  "Treating the raw scores s_w = v_w · h as probabilities. They are unbounded; only after exp and division by Z are they probabilities.",
+  "Quoting the output matrix E′ as the word vectors. The vectors people use and compare are the input rows u_w of E.",
+  "Assuming one vector per meaning. word2vec gives one vector per word type, so 'bank' gets a single blended vector."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the distributional hypothesis.",
+   "marks": 2,
+   "a": "Words that occur in similar contexts tend to have similar meanings, so a model trained to predict context learns useful vectors."
+  },
+  {
+   "level": "remember",
+   "q": "In CBOW with window size m, how many context words are averaged and what is h?",
+   "marks": 2,
+   "a": "2m words, m on each side; h = (1/2m) Σ u_{t+k} is their average input vector."
+  },
+  {
+   "level": "understand",
+   "q": "Why does CBOW average the context vectors instead of joining them into one long vector?",
+   "marks": 3,
+   "a": "The average always has length d whatever m is, so the next layer has fixed size. Joining would give 2md inputs that change with m. The cost is that word order inside the window is lost."
+  },
+  {
+   "level": "understand",
+   "q": "Why does negative sampling speed up training?",
+   "marks": 3,
+   "a": "The full softmax normalises over all |V| words. Negative sampling trains a yes/no classifier on the true pair plus k noise words, so each step touches k + 1 output vectors instead of |V|."
+  },
+  {
+   "level": "apply",
+   "q": "With h = [0, 1] and v_cat = [1, 0], v_dog = [0, 1], v_fish = [−1, 0], compute P(dog | h) to three decimals.",
+   "marks": 4,
+   "a": "Scores are 0, 1, 0; exponents 1.000, 2.718, 1.000; Z = 4.718; P(dog | h) = 2.718 ÷ 4.718 = 0.576."
+  },
+  {
+   "level": "apply",
+   "q": "Find the cosine similarity of u = [1, 2] and v = [2, 1].",
+   "marks": 3,
+   "a": "u · v = 1×2 + 2×1 = 4; ‖u‖ = ‖v‖ = √5 = 2.236; cos = 4 ÷ 5 = 0.800."
+  },
+  {
+   "level": "analyze",
+   "q": "Skip-gram is slower than CBOW but often gives better vectors for rare words. Explain why.",
+   "marks": 5,
+   "a": "Every occurrence of a word is the centre in skip-gram and forms about 2m pairs, so a rare word gets many gradient updates of its own vector. In CBOW a rare word only enters as one averaged input, so its signal is diluted by frequent neighbours."
+  },
+  {
+   "level": "analyze",
+   "q": "'Bank' in 'bank interest rate' and 'river bank' receives one word2vec vector. What can and cannot that vector represent?",
+   "marks": 4,
+   "a": "It is a static vector, roughly a weighted blend of both senses, since the same row of E is used in every sentence. It can sit near both 'money' and 'river', but it cannot change per sentence; contextual vectors are needed for that, as in <a href=\"#applications-language-modeling-translation-and-image-captioning\">4.7</a>."
+  }
+ ],
+ "beyond": "Not for the exam. Subword versions such as fastText embed character n-grams, so they can build a vector for a word never seen in training, which helps with Hindi or Tamil morphology and with typos. In industry the same trick embeds products for recommenders and customers for churn models, not just words. Bias is the standing problem: trained on ordinary text, vectors inherit gender and caste stereotypes, so 'doctor' minus 'man' plus 'woman' can land near 'nurse'. Newer curricula move quickly from these static vectors to contextual ones. Search next: fastText subword embeddings, GloVe co-occurrence weighting, word embedding bias."
+}
