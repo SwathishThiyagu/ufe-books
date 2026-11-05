@@ -1,0 +1,197 @@
+{
+ "lead": "Video understanding adds time to image recognition. A model must read what the scene looks like and how it moves, then name an action. A video is a stack of frames; a clip is a short run of them. Action recognition labels a clip, and temporal action localisation also gives start and end times. This is used in sports highlights, surveillance alerts, gesture interfaces and video search. The central problem is representation: appearance alone is not enough, because actions like sitting down are defined by change over time.",
+ "prereq": "You need: <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a> for the per-frame CNN and <a href=\"#optical-flow-and-motion-estimation\">Optical flow and motion estimation</a> for the flow images.",
+ "sections": [
+  {
+   "h3": "Video as a stack of frames",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A video is a stack of T frames, each of size H×W×3. T is the number of frames; H and W are pixel height and width; 3 is the red, green and blue channels. Frame rate f is frames per second. A clip is a short run of L sampled frames. Frame sampling stride s is the step between kept frames: we keep frames 1, 1+s, 1+2s, … The number of sampled frames is N = ceil(T/s). Clip stride c is the step between the start positions of successive clips, counted in sampled frames. The number of clips of length L and clip stride c over N sampled frames is M = ⌊(N − L)/c⌋ + 1, for N ≥ L. Action recognition gives one label to a clip. Temporal action localisation gives a label and a start time and end time. Top-1 accuracy is the fraction of clips where the highest-scoring class is correct. This chapter uses the terms clip, frame, frame sampling stride and clip stride with these meanings throughout."
+    }
+   ]
+  },
+  {
+   "h3": "Three model families",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "3D convolution. A 2D kernel k×k slides over rows and columns. A 3D kernel k×k×k also slides over time, so one filter reads k consecutive frames, k rows and k columns. C3D uses 3×3×3 kernels and 3D pooling. The temporal receptive field is the number of input frames that can affect one output value; it grows with network depth. Two-stream. The spatial stream takes one RGB frame and a 2D CNN. The temporal stream takes a stack of optical flow images from <a href=\"#optical-flow-and-motion-estimation\">Optical flow and motion estimation</a>; each flow image stores horizontal and vertical displacement. The temporal stream has its own CNN. Each stream outputs a softmax score vector over C classes. Late fusion averages the two vectors: p = (p_spatial + p_temporal)/2. p is the final score vector, and its entries sum to 1. The label is argmax p. CNN + RNN. A CNN from <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a> extracts one feature vector per sampled frame. An LSTM reads the sequence x₁, x₂, ..., x_L; the last hidden state h_L goes to a classifier. Temporal pooling is cheaper: average the feature vectors over time and classify once. I3D inflates 2D filters into 3D filters. UCF-101 has 101 action classes; Kinetics has several hundred. The metric is top-1 accuracy. At test time, several clips are sampled and their score vectors are averaged."
+    }
+   ]
+  },
+  {
+   "h3": "Test-time clips and scores",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "One clip is a short view of a longer video. At test time, sample several clips with overlap across the video and average their class score vectors. This is clip sampling at test time. Average scores, not features or pixels; the class order must stay fixed. The temporal stream needs optical flow, which is costly; some systems compute flow at low resolution or use an RGB-only 3D CNN. Action recognition returns one label for the clip. Temporal action localisation also returns start and end times. The two tasks share features but have different outputs. For a new video, fix the frame rate, frame sampling stride, clip length, clip stride and number of test clips before comparing models. Those numbers change the reported top-1 accuracy. A model trained on 16-frame clips is normally tested with 16-frame clips, because the classifier learned to read motion over exactly that many frames; changing the clip length changes what the network sees. Overlapping test clips reduce the chance that an action falls between clip boundaries."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The clip splits into an RGB branch for appearance and an optical-flow branch for motion. Averaging the two score vectors before the label is late fusion.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Two-stream action recognition",
+   "nodes": [
+    {
+     "id": "clip",
+     "label": "Video clip",
+     "note": "300 frames, 30 fps",
+     "style": "normal"
+    },
+    {
+     "id": "rgb",
+     "label": "RGB frames",
+     "note": "appearance",
+     "style": "normal"
+    },
+    {
+     "id": "flow",
+     "label": "Optical flow stack",
+     "note": "motion",
+     "style": "normal"
+    },
+    {
+     "id": "scnn",
+     "label": "Spatial CNN",
+     "style": "accent"
+    },
+    {
+     "id": "tcnn",
+     "label": "Temporal CNN",
+     "style": "accent"
+    },
+    {
+     "id": "fuse",
+     "label": "Average scores",
+     "note": "late fusion",
+     "style": "live"
+    },
+    {
+     "id": "out",
+     "label": "Action label",
+     "note": "cricket shot",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "clip",
+     "to": "rgb",
+     "style": "solid"
+    },
+    {
+     "from": "clip",
+     "to": "flow",
+     "style": "solid"
+    },
+    {
+     "from": "rgb",
+     "to": "scnn",
+     "style": "solid"
+    },
+    {
+     "from": "flow",
+     "to": "tcnn",
+     "style": "solid"
+    },
+    {
+     "from": "scnn",
+     "to": "fuse",
+     "style": "solid"
+    },
+    {
+     "from": "tcnn",
+     "to": "fuse",
+     "style": "solid"
+    },
+    {
+     "from": "fuse",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "A video clip splits into an RGB branch and an optical-flow branch, each through its own CNN, and the two score vectors are averaged to give the action label."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 10-second clip at 30 frames per second. (a) How many frames? (b) If every 10th frame is kept, how many sampled frames? (c) With clip length 16 and clip stride 8 over the sampled frames, how many clips? (d) A spatial stream gives scores [0.7, 0.2, 0.1] and a temporal stream gives [0.4, 0.5, 0.1] for three actions. Which action wins after late fusion?",
+   "steps": [
+    "(a) Frames = duration × frame rate = 10 s × 30 frames/s = 300 frames.",
+    "(b) Sampling stride s = 10: sampled frames = ceil(300 / 10) = 30 frames.",
+    "(c) Number of clips M = ⌊(N − L)/c⌋ + 1 = ⌊(30 − 16)/8⌋ + 1 = ⌊14/8⌋ + 1 = 1 + 1 = 2 clips.",
+    "(d) Average scores per action: action 1 = (0.7 + 0.4)/2 = 0.55; action 2 = (0.2 + 0.5)/2 = 0.35; action 3 = (0.1 + 0.1)/2 = 0.1.",
+    "The largest averaged score is 0.55 for action 1, so action 1 wins."
+   ],
+   "answer": "300 frames, 30 sampled frames, 2 clips, and action 1 with averaged scores [0.55, 0.35, 0.1].",
+   "check": "frames = 10 * 30\nsampled = frames // 10\nclips = (sampled - 16) // 8 + 1\nscores = [(0.7 + 0.4) / 2, (0.2 + 0.5) / 2, (0.1 + 0.1) / 2]\nprint(frames)\nprint(sampled)\nprint(clips)\nfor score in scores:\n    print(score)",
+   "values": [
+    300,
+    30,
+    2,
+    0.55,
+    0.35,
+    0.1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Classifying single frames and voting is not action recognition: 'sit down' contains standing and sitting poses, so the answer depends on order and motion.",
+  "Action recognition gives one label per clip; temporal action localisation gives start and end times as well. Do not write a time interval when the question asks only for a class.",
+  "Clip stride is in sampled frames, not seconds. The clip-count formula is M = ⌊(N − L)/c⌋ + 1; forgetting the +1 loses the last clip. Frame sampling stride s is a separate number, used in N = ceil(T/s).",
+  "Late fusion averages score vectors, not feature maps. Averaging features from two different CNNs is not the two-stream late-fusion rule.",
+  "Top-1 accuracy uses the highest score only; top-5 accuracy is different. Read which metric is asked."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define frame rate and frame sampling stride for video input.",
+   "marks": 2,
+   "a": "Frame rate is frames per second. Frame sampling stride s is the step between kept frames: frames 1, 1+s, 1+2s, … are kept."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a single-frame classifier fail on the action 'sit down'?",
+   "marks": 3,
+   "a": "The action contains standing and sitting poses. Each pose alone may match another action, so the model needs order and motion, not only appearance."
+  },
+  {
+   "level": "apply",
+   "q": "A 4-second clip at 25 frames per second. Every 5th frame is kept. Clip length is 8 and clip stride is 4. How many clips?",
+   "marks": 3,
+   "a": "Frames = 4 × 25 = 100. Sampled = ceil(100 / 5) = 20. Clips = ⌊(20 − 8)/4⌋ + 1 = 3 + 1 = 4."
+  },
+  {
+   "level": "apply",
+   "q": "Spatial scores are [0.6, 0.3, 0.1] and temporal scores are [0.2, 0.6, 0.2]. Which action wins after late fusion?",
+   "marks": 4,
+   "a": "Average = [0.4, 0.45, 0.15]. Action 2 wins with score 0.45."
+  },
+  {
+   "level": "remember",
+   "q": "What does a 3×3×3 kernel span in a 3D CNN?",
+   "marks": 2,
+   "a": "It spans 3 consecutive frames, 3 rows and 3 columns."
+  },
+  {
+   "level": "understand",
+   "q": "What is top-1 accuracy in action recognition?",
+   "marks": 2,
+   "a": "The fraction of clips where the highest-scoring predicted class is the true class."
+  },
+  {
+   "level": "analyze",
+   "q": "Why average several clips at test time instead of using one clip?",
+   "marks": 3,
+   "a": "One clip may miss the action or catch only part of it. Averaging several overlapping clips reduces variance and covers the action over time."
+  }
+ ],
+ "beyond": "Not for the exam. Video transformers replace the fixed CNN plus LSTM pipeline with attention over space and time. Action detection adds start and end times to recognition, and self-supervised video pretraining reduces the need for labelled clips. On phones, models are compressed and run on short clips to save battery. Search next for video transformers, temporal action localisation and self-supervised video representation learning."
+}

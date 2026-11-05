@@ -1,0 +1,226 @@
+{
+ "lead": "Image captioning turns a picture into a sentence. Visual question answering (VQA) turns a picture plus a question into a short answer. Both put a language decoder after an image encoder: the encoder reads pixels, the decoder writes words or picks an answer. The same idea powers alt text for blind users, photo search in a phone gallery, and help desks that answer 'is the damage on the left side?'. Here is the encoder–decoder pipeline, soft attention, and why VQA is graded as classification.",
+ "prereq": "You need: <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a> for the CNN image encoder and a basic idea of sequence models; no other chapter is assumed.",
+ "sections": [
+  {
+   "h3": "Captioning: CNN encoder, word decoder",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A captioning model has two parts. The image encoder is a CNN such as ResNet from <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a>. It gives either one pooled vector, for example 2048 numbers for the whole image, or a grid of 7×7 region vectors. Each region vector has 2048 numbers, so the grid has 7×7 = 49 vectors. The decoder is a sequence model: an LSTM (long short-term memory) or a Transformer. It writes one word at a time."
+    },
+    {
+     "type": "p",
+     "text": "The decoder starts from a start token and stops when it emits an end token. At step t it reads the previous word's embedding and the image vector. It updates its hidden state h<sub>t</sub> and produces a score for every word in the vocabulary. A softmax turns the scores into probabilities."
+    },
+    {
+     "type": "formula",
+     "text": "p(w<sub>t</sub> | earlier words, v) = softmax(W h<sub>t</sub> + b)",
+     "where": "w<sub>t</sub> is the word at step t; v is the image feature; h<sub>t</sub> is the decoder state after reading v and the earlier words; W and b are learned weights and bias; softmax gives a probability for each vocabulary word."
+    },
+    {
+     "type": "p",
+     "text": "Training uses cross-entropy at every step. The true previous word is fed in, not the model's guess; this is teacher forcing. At test time the model uses its own past words. Greedy decoding takes the highest-probability word each step. Beam search keeps the best 3 to 5 partial sentences by total log-probability and returns the best finished sentence. Evaluation compares the generated sentence with reference sentences using BLEU, METEOR and CIDEr. BLEU counts matching word n-grams; METEOR adds recall and synonym matching; CIDEr weights n-grams by how informative they are across references."
+    }
+   ]
+  },
+  {
+   "h3": "Soft attention: where to look",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A single pooled image vector loses location. Soft attention keeps the 49 region vectors v<sub>1</sub> to v<sub>49</sub> and lets the decoder choose where to look at each step. At step t the decoder has a hidden state h<sub>t−1</sub>. It scores each region with a learned comparison, for example s<sub>i</sub> = h<sub>t−1</sub><sup>T</sup> W<sub>a</sub> v<sub>i</sub>."
+    },
+    {
+     "type": "formula",
+     "text": "α<sub>i</sub> = exp(s<sub>i</sub>) / Σ<sub>j</sub> exp(s<sub>j</sub>),  c = Σ<sub>i</sub> α<sub>i</sub> v<sub>i</sub>",
+     "where": "α<sub>i</sub> is the attention weight for region i; s<sub>i</sub> is its score; c is the context vector; v<sub>i</sub> is region vector i; the softmax makes α<sub>i</sub> ≥ 0 and Σα<sub>i</sub> = 1. c is a weighted average of region vectors."
+    },
+    {
+     "type": "p",
+     "text": "The context vector c is fed to the decoder along with the previous word. In a 'what colour is the shirt' question, weights move to the shirt region; in 'how many people', they spread over people. The weights are not a hard crop. They are a soft, differentiable average, so the whole model trains end to end."
+    }
+   ]
+  },
+  {
+   "h3": "Visual question answering",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "VQA input is an image plus a natural-language question. The image goes through a CNN to the same kind of features: one pooled vector or 49 region vectors. The question goes through word embeddings and an LSTM or Transformer to one question vector q, for example 1024 numbers."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Concatenation: [v; q], all numbers side by side.",
+      "Element-wise product: v ⊙ q, same length, shows matching dimensions.",
+      "Attention: q scores image regions, then c = Σα<sub>i</sub>v<sub>i</sub>; the question decides where to look."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "After combination, a small fully connected network and softmax classify the answer over a fixed answer vocabulary. The vocabulary has about one thousand to three thousand frequent answers, such as 'yes', 'no', 'two', 'red', 'left'. VQA is classification, not free generation. The model cannot produce a word outside that list."
+    },
+    {
+     "type": "p",
+     "text": "This design has a known weakness: language priors and dataset bias. A language prior is a guess from the question text alone. A model may learn 'grass is green' and answer 'green' even when the image shows a blue car. A balanced test set and questions that need the image reduce this. Vision-language transformer models join image and text pretraining in one network; only a few universities teach that part, and it is outside this chapter."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The image becomes 49 region vectors and the question becomes a 1024-number vector; attention and concatenation feed a softmax that chooses one answer from a fixed vocabulary.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Visual question answering",
+   "nodes": [
+    {
+     "id": "img",
+     "label": "Image",
+     "style": "normal"
+    },
+    {
+     "id": "cnn",
+     "label": "CNN features",
+     "note": "49 × 2048",
+     "style": "accent"
+    },
+    {
+     "id": "q",
+     "label": "Question",
+     "note": "text",
+     "style": "normal"
+    },
+    {
+     "id": "emb",
+     "label": "Embedding / LSTM",
+     "note": "1024-d",
+     "style": "accent"
+    },
+    {
+     "id": "att",
+     "label": "Attention + concat",
+     "note": "3072-d",
+     "style": "next"
+    },
+    {
+     "id": "fc",
+     "label": "FC + softmax",
+     "style": "normal"
+    },
+    {
+     "id": "ans",
+     "label": "Answer",
+     "note": "1 of 1000 answers",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "img",
+     "to": "cnn",
+     "style": "solid"
+    },
+    {
+     "from": "q",
+     "to": "emb",
+     "style": "solid"
+    },
+    {
+     "from": "cnn",
+     "to": "att",
+     "style": "solid"
+    },
+    {
+     "from": "emb",
+     "to": "att",
+     "style": "solid"
+    },
+    {
+     "from": "att",
+     "to": "fc",
+     "style": "solid"
+    },
+    {
+     "from": "fc",
+     "to": "ans",
+     "style": "solid"
+    }
+   ],
+   "aria": "The image goes through a CNN to 49 region vectors, the question goes through an embedding, and attention plus concatenation feeds a fully connected softmax that picks one answer."
+  }
+ },
+ "examples": [
+  {
+   "question": "A visual QA model uses 49 region vectors of 2048 numbers and a 1024-number question embedding. For one region, (a) what is the size of the concatenated vector used for the answer classifier? Three attention weights are 0.5, 0.3 and 0.2 over regions v<sub>1</sub> = (1, 0), v<sub>2</sub> = (0, 1), v<sub>3</sub> = (1, 1). (b) Compute the context vector. (c) What must the three weights sum to?",
+   "steps": [
+    "(a) The image part has 2048 numbers and the question part has 1024 numbers. Concatenation puts them side by side: 2048 + 1024 = 3072 numbers.",
+    "(b) Use c = Σα<sub>i</sub>v<sub>i</sub>. First component: 0.5×1 + 0.3×0 + 0.2×1 = 0.5 + 0 + 0.2 = 0.7. Second component: 0.5×0 + 0.3×1 + 0.2×1 = 0 + 0.3 + 0.2 = 0.5. So c = (0.7, 0.5).",
+    "(c) 0.5 + 0.3 + 0.2 = 1.0. Softmax guarantees this before the weights are used, so the context vector is a weighted average."
+   ],
+   "answer": "(a) 3072 numbers. (b) c = (0.7, 0.5). (c) The weights sum to 1.0.",
+   "check": "w1, w2, w3 = 0.5, 0.3, 0.2\nv1 = (1.0, 0.0)\nv2 = (0.0, 1.0)\nv3 = (1.0, 1.0)\nprint(2048 + 1024)\nc1 = w1*v1[0] + w2*v2[0] + w3*v3[0]\nc2 = w1*v1[1] + w2*v2[1] + w3*v3[1]\nprint(round(c1, 10))\nprint(round(c2, 10))\nprint(round(w1 + w2 + w3, 10))",
+   "values": [
+    3072,
+    0.7,
+    0.5,
+    1.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Attention weights are a softmax over locations, so they must sum to 1. A set that sums to 0.9 means the normalisation step was skipped.",
+  "VQA is graded by matching a short answer, not by how close a generated sentence looks.",
+  "Teacher forcing feeds the true previous word during training. At test time the model feeds its own past words, so a training-only habit can fail in inference.",
+  "A high BLEU score means n-gram overlap with references, not that the caption is true. A fluent generic sentence can score well and still miss the wrong detail.",
+  "Beam search with width 1 is greedy decoding. Width 3 to 5 keeps several partial sentences, but it does not guarantee the correct answer."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which two special tokens mark the start and stop of a caption decoder?",
+   "marks": 2,
+   "a": "A start token begins the sentence and an end token stops generation."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a softmax applied to attention scores?",
+   "marks": 3,
+   "a": "Softmax makes the weights non-negative and makes them sum to 1. The context vector is then a weighted average of region vectors."
+  },
+  {
+   "level": "apply",
+   "q": "Four regions have weights 0.4, 0.1, 0.2, 0.3 and vectors v<sub>1</sub> = (1, 0), v<sub>2</sub> = (0, 1), v<sub>3</sub> = (2, 0), v<sub>4</sub> = (0, 2). Compute the context vector and the weight sum.",
+   "marks": 4,
+   "a": "First component: 0.4×1 + 0.1×0 + 0.2×2 + 0.3×0 = 0.4 + 0.4 = 0.8. Second component: 0.4×0 + 0.1×1 + 0.2×0 + 0.3×2 = 0.1 + 0.6 = 0.7. c = (0.8, 0.7), and the weights sum to 1.0."
+  },
+  {
+   "level": "analyze",
+   "q": "A VQA model answers 'green' to 'what colour is grass?' when the image shows a blue car. What failure does this show?",
+   "marks": 5,
+   "a": "It shows a language prior or dataset bias. The model uses the question text and common training answers more than the image, so it ignores the visible car colour."
+  },
+  {
+   "level": "apply",
+   "q": "A model concatenates all 49 region vectors of 2048 numbers with one 1024-number question vector. How many numbers are in the concatenated vector?",
+   "marks": 4,
+   "a": "49×2048 = 100352 region numbers. Add 1024 question numbers: 100352 + 1024 = 101376 numbers."
+  },
+  {
+   "level": "understand",
+   "q": "How is VQA different from image captioning in output form?",
+   "marks": 3,
+   "a": "Captioning generates a word sequence. VQA picks one answer from a fixed answer vocabulary, so it is classification over answer classes."
+  },
+  {
+   "level": "analyze",
+   "q": "A caption model gets a high BLEU score but describes the wrong person in the photo. Explain how both can be true.",
+   "marks": 5,
+   "a": "BLEU measures overlap of word n-grams with reference sentences. A sentence can share many common words and still name the wrong detail. A human check or a metric that tests the specific detail is needed."
+  }
+ ],
+ "beyond": "Not for the exam. Modern systems often pretrain one transformer on paired images and text, then fine-tune for captioning or VQA. Search for CLIP, BLIP and visual instruction tuning to see how the encoder–decoder idea grows into multimodal models. In industry the same pipeline appears in accessibility tools, product search, and document question answering. The open problems are bias, counting, and answers that need outside knowledge."
+}

@@ -1,0 +1,873 @@
+{
+ "lead": "This unit is about turning pixels into decisions. It starts with the pattern-class view of recognition and three classic classifiers, then follows the deep networks that now handle classification, detection, segmentation, video, captioning and image generation. After it you can trace any modern vision pipeline from input tensor to output label and check its numbers by hand.",
+ "about": "The unit moves from the oldest idea in recognition to the newest. 6.1 sets up patterns, pattern classes and feature vectors, the vocabulary every later chapter uses. 6.2 fills that vocabulary with three decision rules: minimum distance, k-nearest neighbour and Bayes. 6.3 swaps hand-made features for learned ones and walks through AlexNet, VGG and ResNet. 6.4 and 6.5 add location, first with region proposals and then with single-pass detectors. 6.6 classifies every pixel, 6.7 adds time, 6.8 puts words on images, and 6.9 turns the pipeline around to generate images. Each chapter leans on the accuracy-versus-speed trade-off built by the chapter before it.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Recognition is the act of deciding which pattern class a measured feature vector belongs to.",
+   "depth": "Define pattern, pattern class, and the W classes ω₁, ω₂, …, ω_W. A pattern is described by a feature vector x = (x₁, x₂, …, x_n); each xᵢ is a measured number such as area in pixels or mean intensity; n is the dimension. The set of all possible x is the feature space. Recognisers are grouped into decision-theoretic methods, which use numbers and a decision function, and structural methods, which use the relations between parts (a string or a graph of sub-patterns). Cover training set, test set, supervised and unsupervised learning, and what makes two classes separable. Name the regional descriptors (area, perimeter, compactness, eccentricity) and topological descriptors (number of holes H, number of connected components C, Euler number E = C − H) only as the raw material for a feature vector. One case study, printed character or signature recognition, written as a short paragraph.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "From image to class label",
+    "nodes": [
+     {
+      "id": "img",
+      "label": "Image",
+      "note": "f(x, y)",
+      "style": "normal"
+     },
+     {
+      "id": "pre",
+      "label": "Preprocessing",
+      "note": "denoise, enhance",
+      "style": "normal"
+     },
+     {
+      "id": "seg",
+      "label": "Segmentation",
+      "note": "isolate the object",
+      "style": "normal"
+     },
+     {
+      "id": "desc",
+      "label": "Descriptors",
+      "note": "region, boundary",
+      "style": "normal"
+     },
+     {
+      "id": "vec",
+      "label": "Feature vector x",
+      "note": "n numbers",
+      "style": "accent"
+     },
+     {
+      "id": "clf",
+      "label": "Classifier",
+      "note": "decision rule",
+      "style": "normal"
+     },
+     {
+      "id": "lab",
+      "label": "Class label",
+      "note": "ω₁ … ω_W",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "img",
+      "to": "pre",
+      "style": "solid"
+     },
+     {
+      "from": "pre",
+      "to": "seg",
+      "style": "solid"
+     },
+     {
+      "from": "seg",
+      "to": "desc",
+      "style": "solid"
+     },
+     {
+      "from": "desc",
+      "to": "vec",
+      "style": "solid"
+     },
+     {
+      "from": "vec",
+      "to": "clf",
+      "style": "solid"
+     },
+     {
+      "from": "clf",
+      "to": "lab",
+      "style": "solid"
+     }
+    ],
+    "aria": "Flowchart from an input image through preprocessing, segmentation and descriptors to a feature vector, then a classifier and a class label.",
+    "caption": "The classifier never sees the image. It sees only the n-number vector built by the descriptor step, so a weak descriptor caps the accuracy of any classifier behind it."
+   },
+   "example": "A tomato-grading unit sorts fruit into ripe (ω₁) and unripe (ω₂) using two features: mean red intensity R and area A in pixels. Training samples are ω₁: (180, 40), (190, 42), (175, 38) and ω₂: (110, 41), (120, 39), (105, 43). (a) Write the pattern vector. (b) How many classes and what is n? (c) Does R alone separate the classes? Answer: (a) x = (R, A). (b) Two classes, W = 2, and n = 2. (c) The smallest ripe R is 175 and the largest unripe R is 120, so a single threshold near 150 on R separates all six samples perfectly. Area ranges overlap (38 to 43 in both classes), so A adds nothing here and could be dropped. The two classes are linearly separable in the (R, A) plane.",
+   "trap": "A pattern class is not the same as one sample; a class is a set of samples that share some property. Also, do not call the features a 'pattern' when the exam asks for the pattern vector.",
+   "prereq": "Unit 4 for segmentation and descriptors; Unit 1 for pixels and neighbourhoods.",
+   "leave": "Descriptor formulas and chain codes to Unit 4; the decision rules themselves to 6.2."
+  },
+  {
+   "k": 2,
+   "idea": "A classifier places a decision boundary in feature space using labelled samples, and minimum distance, k-NN and Bayes are three ways of placing it.",
+   "depth": "Minimum distance classifier: prototype m_j = (1/N_j) Σ x for class ω_j, where N_j is the number of training samples of that class. Assign x to the class with the smallest squared distance d_j² = ‖x − m_j‖² = xᵀx − 2m_jᵀx + m_jᵀm_j. Since xᵀx is common, the rule reduces to the largest value of g_j(x) = m_jᵀx − ½m_jᵀm_j, a linear discriminant. For two classes the boundary is the perpendicular bisector of the segment joining the prototypes. k-nearest neighbour: pick k (odd for two classes), find the k nearest training vectors by Euclidean or Manhattan distance, take a majority vote; k = 1 is the nearest neighbour rule. Stress feature scaling before k-NN and the cost of a large training set at test time. Bayes: decide ω_j that maximises the posterior P(ω_j|x) = p(x|ω_j) P(ω_j) / p(x); with 0-1 loss this is the rule that minimises error. For Gaussian classes with equal covariance matrices and equal priors the Bayes boundary becomes the minimum distance boundary; unequal priors shift it. Define discriminant g_j(x) = ln p(x|ω_j) + ln P(ω_j), Bayes error rate, confusion matrix.",
+   "figure": {
+    "type": "graph",
+    "directed": false,
+    "nodes": [
+     {
+      "id": "m1",
+      "label": "m₁",
+      "x": 0,
+      "y": 2,
+      "note": "ω₁ prototype",
+      "style": "accent"
+     },
+     {
+      "id": "m2",
+      "label": "m₂",
+      "x": 4,
+      "y": 2,
+      "note": "ω₂ prototype",
+      "style": "accent"
+     },
+     {
+      "id": "xt",
+      "label": "x",
+      "x": 1.2,
+      "y": 2,
+      "note": "test vector",
+      "style": "live"
+     },
+     {
+      "id": "b1",
+      "label": "b₁",
+      "x": 2,
+      "y": 0.5,
+      "style": "normal"
+     },
+     {
+      "id": "b2",
+      "label": "b₂",
+      "x": 2,
+      "y": 3.5,
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "m1",
+      "to": "xt",
+      "label": "d₁ = 1.2",
+      "style": "dashed"
+     },
+     {
+      "from": "m2",
+      "to": "xt",
+      "label": "d₂ = 2.8",
+      "style": "dashed"
+     },
+     {
+      "from": "b1",
+      "to": "b2",
+      "label": "boundary",
+      "style": "solid"
+     }
+    ],
+    "aria": "Two class prototypes in a two-dimensional feature space with a test point closer to the first, and a straight boundary line midway between the prototypes.",
+    "caption": "With equal priors and equal covariances the boundary is the perpendicular bisector of m₁m₂; the test point is on the ω₁ side because d₁ < d₂."
+   },
+   "example": "Training samples: ω₁ = (1, 2), (2, 3), (3, 3); ω₂ = (5, 4), (6, 5), (7, 5). Test vector x = (4, 3). (a) Apply the minimum distance classifier. (b) Apply 3-NN. Answer: (a) m₁ = (2, 2.67), m₂ = (6, 4.67). d₁² = (4−2)² + (3−2.67)² = 4 + 0.11 = 4.11, so d₁ = 2.03. d₂² = (4−6)² + (3−4.67)² = 4 + 2.78 = 6.78, so d₂ = 2.60. Smaller distance is to ω₁, so x → ω₁. (b) Distances to all six points: (1,2) 3.16, (2,3) 2.00, (3,3) 1.00, (5,4) 1.41, (6,5) 2.83, (7,5) 3.61. The three nearest are (3,3) at 1.00 and (2,3) at 2.00 from ω₁, and (5,4) at 1.41 from ω₂. Votes are 2 to 1, so x → ω₁ again.",
+   "trap": "Unnormalised features let one large-range feature dominate every distance in k-NN. Also never use an even k with two classes, because a tie needs a rule you probably were not given.",
+   "prereq": "6.1 for feature vectors and pattern classes.",
+   "leave": "The Gaussian density and its algebra to a probability course; the deep replacements for these rules to 6.3."
+  },
+  {
+   "k": 3,
+   "idea": "A convolutional network learns its own features, and depth with residual connections is what made it accurate.",
+   "depth": "Convolution layer: kernel size k, stride s, padding p, number of filters; the output side is ⌊(n + 2p − k)/s⌋ + 1. Cover channels, local receptive field, weight sharing, ReLU, 2×2 max pooling with stride 2, fully connected layers, softmax and cross-entropy loss. Show why features become hierarchical: edges, then parts, then objects. AlexNet: 5 convolution layers plus 3 fully connected layers, first kernel 11×11 with stride 4, ReLUs, dropout, heavy data augmentation, 1000-class ImageNet output. ZFNet in one line as the tuned-kernel follow-up. VGG: all 3×3 convolutions with stride 1 and 2×2 pooling, 16 or 19 weight layers, large parameter count in the first fully connected layer. ResNet: residual block y = F(x) + x with an identity shortcut, no extra parameters, batch normalisation, 34 to 152 layers, bottleneck blocks of 1×1, 3×3, 1×1 for the deeper versions; the shortcut fixes the degradation and vanishing-gradient problem. Inception/GoogLeNet and DenseNet in one line each. Add a short block on recognition versus verification: Siamese networks, contrastive loss, triplet loss with margin, ranking loss — define the triplet (anchor, positive, negative) and the loss max(0, d⁺ − d⁻ + margin). Vision Transformers and Swin Transformers: only a few universities teach this; one short paragraph on splitting the image into patches and self-attention, no derivation.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Residual block",
+    "nodes": [
+     {
+      "id": "x",
+      "label": "Input x",
+      "note": "C channels",
+      "style": "accent"
+     },
+     {
+      "id": "c1",
+      "label": "Conv 3×3",
+      "note": "64 filters",
+      "style": "normal"
+     },
+     {
+      "id": "b1",
+      "label": "Batch norm, ReLU",
+      "style": "normal"
+     },
+     {
+      "id": "c2",
+      "label": "Conv 3×3",
+      "note": "64 filters",
+      "style": "normal"
+     },
+     {
+      "id": "b2",
+      "label": "Batch norm",
+      "style": "normal"
+     },
+     {
+      "id": "add",
+      "label": "Add",
+      "note": "F(x) + x",
+      "style": "live"
+     },
+     {
+      "id": "rel",
+      "label": "ReLU",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "x",
+      "to": "c1",
+      "style": "solid"
+     },
+     {
+      "from": "c1",
+      "to": "b1",
+      "style": "solid"
+     },
+     {
+      "from": "b1",
+      "to": "c2",
+      "style": "solid"
+     },
+     {
+      "from": "c2",
+      "to": "b2",
+      "style": "solid"
+     },
+     {
+      "from": "b2",
+      "to": "add",
+      "style": "solid"
+     },
+     {
+      "from": "x",
+      "to": "add",
+      "label": "identity shortcut",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A residual block: input passes through two convolution and batch-norm stages to a sum node, which also receives the input directly over a dashed shortcut, then a ReLU.",
+    "caption": "The dashed shortcut carries x unchanged to the sum. The block only has to learn the correction F(x), which is why very deep stacks still train."
+   },
+   "example": "AlexNet layer 1: input 227×227×3, 96 filters of size 11×11, stride 4, no padding. (a) Find the output size. (b) Count the weights in this layer. (c) After a 3×3 max pool with stride 2, what is the map size? Answer: (a) ⌊(227 − 11)/4⌋ + 1 = ⌊216/4⌋ + 1 = 54 + 1 = 55, so the output is 55×55×96. (b) Each filter has 11 × 11 × 3 = 363 weights plus 1 bias, so 364 × 96 = 34,944 parameters. (c) ⌊(55 − 3)/2⌋ + 1 = 26 + 1 = 27, so 27×27×96.",
+   "trap": "Pooling uses a floor, not a round. And a residual shortcut cannot be added when the channel count changes; that case needs a 1×1 convolution projection, which the exam often forgets.",
+   "prereq": "Unit 2 for convolution and correlation; 6.1 and 6.2 for the classification frame.",
+   "leave": "Backpropagation algebra to a deep learning course; the detection and segmentation heads to 6.4 and 6.6."
+  },
+  {
+   "k": 4,
+   "idea": "Detection = localisation + classification, done by proposing a few hundred boxes and classifying each with a CNN.",
+   "depth": "Define the bounding box (x, y, w, h), ground truth, and intersection over union IoU = area of overlap ÷ area of union. Non-maximum suppression: sort boxes by score, keep the best, delete boxes with IoU above a threshold, repeat. R-CNN: selective search gives about 2000 proposals, each warped to 227×227, CNN features, one SVM per class, a linear box regressor, NMS; training is multi-stage and slow. Fast R-CNN: one convolution pass over the whole image, RoI pooling of each proposal to a fixed 7×7 grid, one network with a softmax head and a box head, multi-task loss L = L_cls + λ L_box with smooth L1 for the box part. Faster R-CNN: replace selective search with a region proposal network on the shared feature map; anchors at several scales and aspect ratios, an objectness score and a box regression per anchor, then the same RoI head. Mention the 4-step alternating training and RoI Align as the later fix for quantisation. Close with mAP, the mean over classes of average precision at a fixed IoU (usually 0.5). RetinaNet gets one line here and belongs to 6.5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Faster R-CNN",
+    "nodes": [
+     {
+      "id": "img",
+      "label": "Image",
+      "style": "normal"
+     },
+     {
+      "id": "bb",
+      "label": "Backbone CNN",
+      "note": "VGG or ResNet",
+      "style": "normal"
+     },
+     {
+      "id": "fm",
+      "label": "Feature map",
+      "note": "H × W × C",
+      "style": "accent"
+     },
+     {
+      "id": "rpn",
+      "label": "RPN",
+      "note": "anchors → proposals",
+      "style": "accent"
+     },
+     {
+      "id": "roi",
+      "label": "RoI pooling",
+      "note": "7 × 7 per box",
+      "style": "normal"
+     },
+     {
+      "id": "heads",
+      "label": "Two heads",
+      "note": "class + box offset",
+      "style": "normal"
+     },
+     {
+      "id": "nms",
+      "label": "NMS",
+      "note": "IoU 0.5",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "img",
+      "to": "bb",
+      "style": "solid"
+     },
+     {
+      "from": "bb",
+      "to": "fm",
+      "style": "solid"
+     },
+     {
+      "from": "fm",
+      "to": "rpn",
+      "style": "solid"
+     },
+     {
+      "from": "rpn",
+      "to": "roi",
+      "label": "proposals",
+      "style": "solid"
+     },
+     {
+      "from": "fm",
+      "to": "roi",
+      "label": "shared features",
+      "style": "dashed"
+     },
+     {
+      "from": "roi",
+      "to": "heads",
+      "style": "solid"
+     },
+     {
+      "from": "heads",
+      "to": "nms",
+      "style": "solid"
+     }
+    ],
+    "aria": "Block diagram of Faster R-CNN: image to backbone to a shared feature map, which feeds an RPN and also the RoI pooling stage; proposals go to the two heads and then NMS.",
+    "caption": "The feature map is computed once and used twice, for the proposals and for the per-box heads. That sharing is the speed gain over R-CNN."
+   },
+   "example": "A predicted box is (30, 40, 110, 140) and the ground truth is (50, 60, 130, 160), all in pixels as (x₁, y₁, x₂, y₂). (a) Compute the IoU. (b) Two boxes for the same class have scores 0.90 and 0.85 and IoU 0.6. With an NMS threshold of 0.5, what survives? Answer: (a) Overlap in x is 110 − 50 = 60, in y is 140 − 60 = 80, so intersection = 60 × 80 = 4800 px². Predicted area = 80 × 100 = 8000 px², ground-truth area = 80 × 100 = 8000 px². Union = 8000 + 8000 − 4800 = 11,200 px². IoU = 4800 / 11,200 = 0.43. (b) 0.6 > 0.5, so the lower-scoring box is suppressed; only the 0.90 box survives.",
+   "trap": "IoU uses areas, not centre distances, and NMS runs per class after scoring. IoU 0.43 is a poor localisation even though the boxes look close on a drawing.",
+   "prereq": "6.3 for the backbone; Unit 5 for feature maps and HOG-style descriptors that selective search uses.",
+   "leave": "Loss derivation for box regression to a deep learning course; one-stage detectors to 6.5; mask output to 6.6."
+  },
+  {
+   "k": 5,
+   "idea": "A single-stage detector predicts boxes and classes straight from a grid of the image in one forward pass, so it is fast.",
+   "depth": "YOLO: divide the image into an S×S grid (S = 7 in the first version). Each cell predicts B boxes (B = 2); every box carries 5 numbers x, y, w, h, confidence, where confidence = Pr(object) × IoU with the truth, and x, y are offsets inside the cell while w, h are relative to the whole image. Each cell also predicts C class probabilities (C = 20 on PASCAL VOC). The output tensor is S × S × (5B + C) = 7 × 7 × 30. Only the cell containing the object centre is responsible for it. The loss is a weighted sum of box, confidence and class terms, with λ_coord = 5 and λ_noobj = 0.5 to stop empty cells dominating. At test time threshold the confidence and run NMS. Later versions: anchor boxes, multi-scale prediction, better backbones; one line each. SSD: a base network plus extra feature maps at several scales (38×38, 19×19, 10×10, 5×5, 3×3, 1×1), default boxes of several aspect ratios at each location, per-location 4 offsets plus C + 1 scores, hard negative mining at about 3:1, then NMS. RetinaNet: one-stage with focal loss to handle the class imbalance. Close with a comparison: two-stage better on small objects and accuracy, one-stage better on speed and simpler to train.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "YOLO forward pass",
+    "nodes": [
+     {
+      "id": "in",
+      "label": "Input",
+      "note": "448 × 448 × 3",
+      "style": "normal"
+     },
+     {
+      "id": "net",
+      "label": "Conv layers",
+      "note": "24 conv + 2 FC",
+      "style": "normal"
+     },
+     {
+      "id": "tensor",
+      "label": "7 × 7 × 30",
+      "note": "S × S × (5B + C)",
+      "style": "accent"
+     },
+     {
+      "id": "dec",
+      "label": "Decode cells",
+      "note": "x, y, w, h, conf, class",
+      "style": "normal"
+     },
+     {
+      "id": "thr",
+      "label": "Threshold",
+      "note": "low confidence dropped",
+      "style": "normal"
+     },
+     {
+      "id": "nms",
+      "label": "NMS",
+      "note": "IoU 0.5",
+      "style": "live"
+     },
+     {
+      "id": "out",
+      "label": "Final boxes",
+      "note": "class + score",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "in",
+      "to": "net",
+      "style": "solid"
+     },
+     {
+      "from": "net",
+      "to": "tensor",
+      "style": "solid"
+     },
+     {
+      "from": "tensor",
+      "to": "dec",
+      "style": "solid"
+     },
+     {
+      "from": "dec",
+      "to": "thr",
+      "style": "solid"
+     },
+     {
+      "from": "thr",
+      "to": "nms",
+      "style": "solid"
+     },
+     {
+      "from": "nms",
+      "to": "out",
+      "style": "solid"
+     }
+    ],
+    "aria": "YOLO pipeline: a 448 by 448 image through convolution layers to a 7 by 7 by 30 tensor, then cell decoding, a confidence threshold, NMS and the final boxes.",
+    "caption": "There is no proposal stage: every number in the tensor is produced by one pass, and the grid cell holding an object's centre owns that object."
+   },
+   "example": "YOLO with S = 7, B = 2, C = 20 on 448×448 input. (a) Depth of the output tensor? (b) Total number of numbers in the tensor? (c) Total boxes predicted? (d) A cell contains an object and its best box has IoU 0.8 with the truth; that box's confidence is 0.8. What is the score used at test time for class 'dog' if the cell's dog probability is 0.9? Answer: (a) 5B + C = 10 + 20 = 30. (b) 7 × 7 × 30 = 1470 numbers. (c) 7 × 7 × 2 = 98 boxes. (d) Score = confidence × class probability = 0.8 × 0.9 = 0.72.",
+   "trap": "The tensor depth is 5B + C, not 5 + B·C. And x, y are offsets inside a cell, while w, h are fractions of the full image; mixing the two wrecks the box.",
+   "prereq": "6.3 for the backbone; 6.4 for IoU, NMS and the two-stage baseline.",
+   "leave": "Anchor design details to 6.4 where the RPN introduces them; instance masks to 6.6."
+  },
+  {
+   "k": 6,
+   "idea": "Semantic segmentation is classification at every pixel, done by making the network fully convolutional and then upsampling the coarse score map.",
+   "depth": "Distinguish semantic segmentation (class per pixel, no instances), instance segmentation and panoptic segmentation in two sentences each. FCN: replace the fully connected layers with 1×1 convolutions so the output is a C-channel score map (C classes plus background); the network is stride 32 at the deepest point, so the map is coarse. Upsample with a transposed convolution whose weights are learned, not a fixed filter. FCN-16s and FCN-8s add skip connections: element-wise add of the pool4 or pool3 score map before the final upsample, which restores boundary detail. Loss is per-pixel softmax cross-entropy, averaged over pixels. SegNet: encoder-decoder, the decoder uses the max-pooling indices saved by the encoder to unpool, so upsampling needs no learned parameters. U-Net: contracting path plus expanding path with concatenation skips, popular in medical imaging because it works with few labelled images. Mask R-CNN in one paragraph as the instance-segmentation extension of Faster R-CNN with a small mask branch and RoI Align. Metrics: pixel accuracy and mean IoU over classes, with IoU defined per class as intersection over union of predicted and true pixel sets.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "FCN-16s",
+    "nodes": [
+     {
+      "id": "in",
+      "label": "Input",
+      "note": "224 × 224 × 3",
+      "style": "normal"
+     },
+     {
+      "id": "enc",
+      "label": "Encoder",
+      "note": "pools to 7 × 7, stride 32",
+      "style": "normal"
+     },
+     {
+      "id": "score",
+      "label": "Score map",
+      "note": "7 × 7 × 21",
+      "style": "accent"
+     },
+     {
+      "id": "up1",
+      "label": "Upsample ×2",
+      "note": "14 × 14 × 21",
+      "style": "normal"
+     },
+     {
+      "id": "skip",
+      "label": "Add pool4 skip",
+      "note": "14 × 14 × 21",
+      "style": "next"
+     },
+     {
+      "id": "up2",
+      "label": "Upsample ×16",
+      "note": "224 × 224 × 21",
+      "style": "normal"
+     },
+     {
+      "id": "lab",
+      "label": "Label map",
+      "note": "class per pixel",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "in",
+      "to": "enc",
+      "style": "solid"
+     },
+     {
+      "from": "enc",
+      "to": "score",
+      "style": "solid"
+     },
+     {
+      "from": "score",
+      "to": "up1",
+      "style": "solid"
+     },
+     {
+      "from": "up1",
+      "to": "skip",
+      "style": "solid"
+     },
+     {
+      "from": "skip",
+      "to": "up2",
+      "style": "solid"
+     },
+     {
+      "from": "up2",
+      "to": "lab",
+      "style": "solid"
+     }
+    ],
+    "aria": "An encoder shrinks a 224 by 224 image to a 7 by 7 score map, which is upsampled twice and fused with the pool4 skip before a final upsample to a full-resolution label map.",
+    "caption": "The deep map knows what the object is but not exactly where its edge is; the pool4 skip supplies the missing spatial detail. FCN-8s adds one more skip from pool3."
+   },
+   "example": "An FCN uses a VGG backbone on 224×224×3 input and predicts 21 classes. (a) Size of the deepest feature map after five stride-2 pools? (b) Size of the score map after a 1×1 convolution to 21 classes? (c) Which transposed convolution turns 7×7 back to exactly 224×224 with stride 32? Answer: (a) 224 / 32 = 7, so 7×7×512. (b) 7×7×21. (c) Use H_out = (H_in − 1)s − 2p + k with H_in = 7 and s = 32, so H_out = 192 − 2p + k. Setting k = 64 and p = 16 gives 192 − 32 + 64 = 224, which matches. So a 64×64 kernel, stride 32, padding 16 works. FCN-16s instead upsamples by 2 to 14×14, adds the pool4 map, and then upsamples by 16.",
+   "trap": "A transposed convolution is a learned upsample, not the mathematical inverse of a convolution. Also element-wise addition needs equal channel counts, while concatenation needs equal spatial size.",
+   "prereq": "6.3 for convolutional backbones; Unit 4 for thresholding and region-based segmentation that FCNs replace.",
+   "leave": "Classical segmentation algorithms to Unit 4; video segmentation to 6.7; generative filling of missing pixels to 6.9."
+  },
+  {
+   "k": 7,
+   "idea": "Video adds a time axis, so a model must read appearance and motion together before it names an action.",
+   "depth": "Start with representation: a video is a stack of T frames of size H×W×3. Define frame rate in frames per second, sampling stride, clip length and the number of clips in a video. Action recognition (label for a short clip) versus temporal action localisation (start and end time plus label). Three model families. (1) 3D convolution: a k×k×k kernel that also spans time (C3D uses 3×3×3), with 3D pooling; the temporal receptive field grows with depth. (2) Two-stream: a spatial stream on a single RGB frame and a temporal stream on a stack of optical flow images (flow from Unit 5), each with its own CNN, fused by averaging softmax scores. (3) CNN + RNN: a CNN extracts one feature vector per sampled frame, an LSTM reads the sequence, and the last hidden state feeds a classifier; mention temporal pooling as the cheap alternative. Name spatio-temporal models such as I3D (2D filters inflated to 3D) in one line. Datasets UCF-101 and Kinetics, metric top-1 accuracy. Mention clip sampling at test time (several clips averaged).",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Two-stream action recognition",
+    "nodes": [
+     {
+      "id": "clip",
+      "label": "Video clip",
+      "note": "L frames, 30 fps",
+      "style": "normal"
+     },
+     {
+      "id": "rgb",
+      "label": "RGB frames",
+      "note": "appearance",
+      "style": "normal"
+     },
+     {
+      "id": "flow",
+      "label": "Optical flow stack",
+      "note": "motion",
+      "style": "normal"
+     },
+     {
+      "id": "scnn",
+      "label": "Spatial CNN",
+      "style": "accent"
+     },
+     {
+      "id": "tcnn",
+      "label": "Temporal CNN",
+      "style": "accent"
+     },
+     {
+      "id": "fuse",
+      "label": "Average scores",
+      "note": "late fusion",
+      "style": "live"
+     },
+     {
+      "id": "out",
+      "label": "Action label",
+      "note": "e.g. cricket shot",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "clip",
+      "to": "rgb",
+      "style": "solid"
+     },
+     {
+      "from": "clip",
+      "to": "flow",
+      "style": "solid"
+     },
+     {
+      "from": "rgb",
+      "to": "scnn",
+      "style": "solid"
+     },
+     {
+      "from": "flow",
+      "to": "tcnn",
+      "style": "solid"
+     },
+     {
+      "from": "scnn",
+      "to": "fuse",
+      "style": "solid"
+     },
+     {
+      "from": "tcnn",
+      "to": "fuse",
+      "style": "solid"
+     },
+     {
+      "from": "fuse",
+      "to": "out",
+      "style": "solid"
+     }
+    ],
+    "aria": "A video clip splits into an RGB branch and an optical-flow branch, each through its own CNN, and the two score vectors are averaged to give the action label.",
+    "caption": "The RGB stream sees what the scene looks like; the flow stream sees how it moves. Averaging the two score vectors is late fusion."
+   },
+   "example": "A 10-second clip at 30 frames per second. (a) How many frames? (b) If every 10th frame is kept, how many sampled frames? (c) With clip length 16 and stride 8 over the sampled frames, how many clips? (d) A spatial stream gives scores [0.7, 0.2, 0.1] and a temporal stream gives [0.4, 0.5, 0.1] for three actions. Which action wins after late fusion? Answer: (a) 10 × 30 = 300 frames. (b) 300 / 10 = 30 sampled frames. (c) ⌊(30 − 16)/8⌋ + 1 = ⌊14/8⌋ + 1 = 1 + 1 = 2 clips. (d) Average = [(0.7+0.4)/2, (0.2+0.5)/2, (0.1+0.1)/2] = [0.55, 0.35, 0.10], so action 1 wins.",
+   "trap": "Classifying single frames and voting is not action recognition: an action like 'sit down' looks like two different static poses. The temporal stream or a time axis is the whole point.",
+   "prereq": "6.3 for the per-frame CNN; Unit 5 for optical flow.",
+   "leave": "Optical flow estimation itself to Unit 5; captioning video to 6.8."
+  },
+  {
+   "k": 8,
+   "idea": "Captioning and visual question answering put a language decoder after an image encoder, so pixels become words or a short answer.",
+   "depth": "Captioning: encoder CNN (ResNet) gives either one pooled vector or a 7×7×2048 grid of 49 region vectors; decoder is an LSTM (or a Transformer) that emits one word at a time, starting from a start token and stopping at an end token. Each step takes the previous word embedding plus the image vector. Training uses cross-entropy at every step with teacher forcing; inference uses greedy decoding or beam search with width 3 to 5. Soft attention: at step t the decoder computes a weight αᵢ for each of the 49 locations from its previous hidden state, normalises with softmax so Σαᵢ = 1, and builds a context vector c = Σ αᵢ vᵢ that is fed to the decoder. Evaluation: BLEU, METEOR, CIDEr compare the generated sentence with references. VQA: the input is an image plus a natural-language question; embed the question (LSTM or word embeddings), combine with the image features by concatenation, element-wise product or attention, then a small classifier over a fixed answer vocabulary (order of a thousand to three thousand frequent answers). Treat VQA as classification, not generation, and mention language priors and dataset bias. Vision-language transformer models in one line; only a few universities teach this part.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Visual question answering",
+    "nodes": [
+     {
+      "id": "img",
+      "label": "Image",
+      "style": "normal"
+     },
+     {
+      "id": "cnn",
+      "label": "CNN features",
+      "note": "49 × 2048",
+      "style": "accent"
+     },
+     {
+      "id": "q",
+      "label": "Question",
+      "note": "text",
+      "style": "normal"
+     },
+     {
+      "id": "emb",
+      "label": "Embedding / LSTM",
+      "note": "1024-d",
+      "style": "accent"
+     },
+     {
+      "id": "att",
+      "label": "Attention + concat",
+      "note": "3072-d",
+      "style": "next"
+     },
+     {
+      "id": "fc",
+      "label": "FC + softmax",
+      "style": "normal"
+     },
+     {
+      "id": "ans",
+      "label": "Answer",
+      "note": "one of 1000 words",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "img",
+      "to": "cnn",
+      "style": "solid"
+     },
+     {
+      "from": "q",
+      "to": "emb",
+      "style": "solid"
+     },
+     {
+      "from": "cnn",
+      "to": "att",
+      "style": "solid"
+     },
+     {
+      "from": "emb",
+      "to": "att",
+      "style": "solid"
+     },
+     {
+      "from": "att",
+      "to": "fc",
+      "style": "solid"
+     },
+     {
+      "from": "fc",
+      "to": "ans",
+      "style": "solid"
+     }
+    ],
+    "aria": "The image goes through a CNN to 49 region vectors, the question goes through an embedding, and attention plus concatenation feeds a fully connected softmax that picks one answer.",
+    "caption": "The question vector decides where to look, so the same image gives different answers to 'what colour is the shirt' and 'how many people'."
+   },
+   "example": "A captioning model uses 49 image vectors of 2048 numbers and a 1024-number word embedding. (a) Size of the concatenated vector used for the answer classifier? (b) Three attention weights are 0.5, 0.3, 0.2 over regions v₁ = (1, 0), v₂ = (0, 1), v₃ = (1, 1). Compute the context vector. (c) What must the three weights sum to? Answer: (a) 2048 + 1024 = 3072 numbers. (b) c = 0.5(1, 0) + 0.3(0, 1) + 0.2(1, 1) = (0.5 + 0.2, 0.3 + 0.2) = (0.7, 0.5). (c) 0.5 + 0.3 + 0.2 = 1.0, which softmax guarantees before the weights are used.",
+   "trap": "Attention weights are a softmax over locations, so they must sum to 1; a set that sums to 0.9 means the normalisation step was skipped. Also VQA is graded by matching a short answer, not by how close the sentence looks.",
+   "prereq": "6.3 for the image encoder; a basic idea of recurrent networks from 6.7.",
+   "leave": "Transformer internals to a deep learning course; image synthesis to 6.9."
+  },
+  {
+   "k": 9,
+   "idea": "Generative models learn the image distribution itself, and inpainting is generation conditioned on the pixels that are still visible.",
+   "depth": "Contrast discriminative models p(y|x) with generative models p(x). GAN: a generator G maps noise z (say 100 numbers from a standard normal) to an image, a discriminator D maps an image to a probability of being real. Minimax objective min_G max_D E[log D(x)] + E[log(1 − D(G(z)))]. Explain the alternating updates: D learns to separate real from fake, G learns to fool D; in practice use the non-saturating generator loss −log D(G(z)). Failure modes: unstable training, mode collapse, and the fact that loss values do not measure image quality. DCGAN rules in one line (strided convolutions, batch norm, no pooling). Conditional GAN: feed the class label or a mask to both networks. VAE: encoder q(z|x) outputs μ and log σ², reparameterisation z = μ + σ ⊙ ε with ε ~ N(0, I), decoder p(x|z), loss = reconstruction term (binary cross-entropy or squared error) + KL divergence to N(0, I), where KL = −½ Σ (1 + log σ² − μ² − σ²) over dimensions. Mention blurrier samples than GANs and the β-VAE knob in one line. Inpainting: mask M marks missing pixels; a context encoder (encoder-decoder trained with reconstruction plus adversarial loss) fills the hole; partial convolution renormalises by the number of valid pixels so holes do not leak zeros. Applications: removing an object or a watermark, restoring old photographs, filling missing medical scan regions.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "GAN training loop",
+    "nodes": [
+     {
+      "id": "z",
+      "label": "Noise z",
+      "note": "100 numbers",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "Generator G",
+      "style": "accent"
+     },
+     {
+      "id": "fake",
+      "label": "Fake image",
+      "note": "G(z)",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Discriminator D",
+      "style": "accent"
+     },
+     {
+      "id": "real",
+      "label": "Real image x",
+      "note": "from the dataset",
+      "style": "normal"
+     },
+     {
+      "id": "loss",
+      "label": "Adversarial loss",
+      "style": "next"
+     },
+     {
+      "id": "upd",
+      "label": "Update weights",
+      "note": "G and D alternate",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "z",
+      "to": "g",
+      "style": "solid"
+     },
+     {
+      "from": "g",
+      "to": "fake",
+      "style": "solid"
+     },
+     {
+      "from": "fake",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "real",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "loss",
+      "style": "solid"
+     },
+     {
+      "from": "loss",
+      "to": "upd",
+      "style": "solid"
+     },
+     {
+      "from": "upd",
+      "to": "g",
+      "label": "gradient",
+      "style": "dashed"
+     },
+     {
+      "from": "upd",
+      "to": "d",
+      "label": "gradient",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A generator turns noise into a fake image, the discriminator scores fake and real images, the loss feeds an update step that sends gradients back to both networks in a cycle.",
+    "caption": "The cycle is the training: D improves at spotting fakes, G improves at making them, and the two are updated one after the other, never together in one step."
+   },
+   "example": "A VAE has one latent dimension. The encoder outputs μ = 0.5 and log σ² = −2, and the sampled noise is ε = 1.2. (a) Find σ and the latent sample z. (b) Compute the KL term for this dimension. (c) For the same batch a discriminator gives D(real) = 0.9 and D(fake) = 0.1. Compute the GAN objective value and the non-saturating generator loss. Answer: (a) σ² = e^(−2) = 0.135, σ = 0.368. z = μ + σ ε = 0.5 + 0.368 × 1.2 = 0.5 + 0.442 = 0.942. (b) KL = −½(1 + log σ² − μ² − σ²) = −½(1 − 2 − 0.25 − 0.135) = −½(−1.385) = 0.693. (c) Objective = log 0.9 + log 0.9 = −0.105 − 0.105 = −0.211. Generator loss = −log D(fake) = −log 0.1 = 2.303.",
+   "trap": "A small KL or a GAN loss near its ideal value does not prove good images; the two terms of the VAE loss pull in opposite directions and the GAN has no absolute scale. Report sample quality with FID or human inspection, not by the loss alone.",
+   "prereq": "6.3 for convolutional encoders and decoders; 6.6 for upsampling layers used by generators.",
+   "leave": "Diffusion models and normalising flows to an advanced course; dense prediction tasks back to 6.6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "feature vectors built here are the input to every classifier"
+  ],
+  [
+   2,
+   3,
+   "learned CNN features replace the hand-made descriptors"
+  ],
+  [
+   3,
+   4,
+   "the classification backbone becomes the detector's feature extractor"
+  ],
+  [
+   4,
+   5,
+   "the proposal stage of Faster R-CNN is removed in one-pass detectors"
+  ],
+  [
+   3,
+   6,
+   "backbone features are upsampled for a label at every pixel"
+  ],
+  [
+   6,
+   7,
+   "per-frame segmentation extends along the time axis"
+  ],
+  [
+   7,
+   8,
+   "video features also drive captioning and question answering"
+  ],
+  [
+   8,
+   9,
+   "the language decoder of captioning is itself a generative model"
+  ]
+ ]
+}

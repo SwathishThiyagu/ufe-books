@@ -1,0 +1,281 @@
+{
+ "lead": "A classifier names one object in an already-cropped image. Detection asks more: what objects are in the full picture, and where. The answer is a list of bounding boxes, each with a class label and a score. The family of models that made this practical proposes a few hundred candidate boxes, runs a CNN over them, and keeps the best after suppression. R-CNN, Fast R-CNN and Faster R-CNN are three steps of one idea, each removing one bottleneck of the step before. They sit behind face unlock, toll-gate number plates and shelf-audit apps.",
+ "prereq": "You need: <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a> for backbone CNNs and feature maps, and Unit 5, Histogram of oriented gradients (HOG), for the descriptor style that selective search builds on.",
+ "sections": [
+  {
+   "h3": "Boxes, IoU and non-maximum suppression",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A detector outputs a list. Each item is a bounding box, a class name and a confidence score between 0 and 1. A box has two common forms. In (x, y, w, h), the point (x, y) is the top-left corner in pixels, and w and h are the width and height in pixels. In (x₁, y₁, x₂, y₂), the same box is given by its top-left and bottom-right corners. The ground-truth box is the one a human drew around the object."
+    },
+    {
+     "type": "p",
+     "text": "To score a prediction we need a number saying how well it overlaps the ground truth. That number is intersection over union."
+    },
+    {
+     "type": "formula",
+     "text": "IoU = area(B_p ∩ B_g) ÷ area(B_p ∪ B_g)",
+     "where": "B_p is the predicted box and B_g is the ground-truth box, both in pixels; B_p ∩ B_g is the overlapping region and B_p ∪ B_g is the region covered by either box; area is in px². IoU is 0 when the boxes do not touch and 1 when they are identical."
+    },
+    {
+     "type": "p",
+     "text": "A detection is usually counted correct when its IoU with the ground truth is at least 0.5. Raise the threshold to 0.75 and you demand tighter boxes."
+    },
+    {
+     "type": "p",
+     "text": "A detector proposes hundreds of overlapping boxes around the same object. Non-maximum suppression (NMS) thins them down."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sort the predicted boxes of one class by score, highest first.",
+      "Keep the top box and move it to the output list.",
+      "Compute the IoU of every remaining box with the kept box.",
+      "Delete each remaining box whose IoU is above the threshold, usually 0.5.",
+      "Repeat from step 2 with the surviving boxes until none are left."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "NMS runs once per class, after scoring. Running it across all classes would delete a genuine object that overlaps another, such as a rider on a bicycle."
+    }
+   ]
+  },
+  {
+   "h3": "R-CNN and Fast R-CNN",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "R-CNN (2014) was the first to make this idea work. Selective search, a classical region merger that joins neighbouring pixels by colour, texture, size and fill similarity, produces about 2000 class-independent proposals per image. Each proposal is warped to 227×227 pixels and passed through AlexNet, giving a 4096-dimensional feature vector. On top of that sit one linear SVM per class, a linear box regressor, and NMS."
+    },
+    {
+     "type": "p",
+     "text": "Two problems. The CNN sees 2000 crops per image, mostly overlapping, so the same pixels are convolved many times. And training has stages: fine-tune the CNN, train the SVMs, train the regressors, each with features stored on disk."
+    },
+    {
+     "type": "p",
+     "text": "Fast R-CNN removes the first problem. One convolution pass over the whole image gives a feature map. For each proposal, RoI pooling crops that feature map at the proposal's coordinates, splits the crop into a fixed 7×7 grid, and takes the maximum in each cell. Every proposal becomes a fixed-size vector whatever its width and height. A single network then carries two heads."
+    },
+    {
+     "type": "p",
+     "text": "Head one is a softmax over C+1 classes: C object classes plus background. Head two gives 4 offset numbers per class, which move the proposal onto the object. Both heads train with one loss."
+    },
+    {
+     "type": "formula",
+     "text": "L = L_cls + λ · L_box",
+     "where": "L_cls is the cross-entropy log loss of the class head; L_box is the smooth L1 loss summed over the four box offsets; λ (often 1) balances the two terms."
+    },
+    {
+     "type": "formula",
+     "text": "smoothL1(x) = 0.5x² if |x| < 1, else |x| − 0.5",
+     "where": "x is one box offset error in pixels or in log-scale units; it is quadratic near zero and linear far away, so a few wild boxes do not dominate training."
+    },
+    {
+     "type": "p",
+     "text": "Fast R-CNN trains in one stage and is several times faster than R-CNN. But the proposals still come from selective search on the CPU, and that now takes most of the time."
+    }
+   ]
+  },
+  {
+   "h3": "Faster R-CNN and mAP",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Faster R-CNN (2015) removes selective search. The proposal step becomes a small network on the same feature map, the region proposal network (RPN)."
+    },
+    {
+     "type": "p",
+     "text": "The RPN slides a 3×3 window over the feature map. At every location it tests k anchor boxes. An anchor is a fixed reference box with a given scale and aspect ratio, typically 3 scales × 3 ratios = 9 anchors, from small squares to wide rectangles. For each anchor the RPN gives two objectness scores (object, background) and four offsets that move the anchor onto the object. That is 6k numbers per location."
+    },
+    {
+     "type": "p",
+     "text": "Anchors get labels by IoU: above 0.7 with a ground truth is positive, below 0.3 is negative, and the rest are ignored. The original paper trained in four alternating steps: train the RPN, train the Fast R-CNN heads on its proposals, freeze the shared layers and fine-tune the RPN alone, then fine-tune the heads alone. Later training schemes do it jointly in one pass."
+    },
+    {
+     "type": "p",
+     "text": "One fix arrived later. RoI pooling rounds box coordinates to whole pixels, so the crop drifts from the true box by a pixel or two. RoI Align samples four points inside each grid cell with bilinear interpolation instead of rounding. The error is small for boxes and large for pixel-accurate masks, which is why the segmentation chapter uses it — see <a href=\"#semantic-segmentation-with-fully-convolutional-networks\">6.6</a>."
+    },
+    {
+     "type": "p",
+     "text": "How is a detector scored? For one class, sort its detections by score and at each rank compute precision and recall. Average precision (AP) is the area under that precision-recall curve. Mean average precision (mAP) is the average of AP over all classes at a fixed IoU, usually 0.5."
+    },
+    {
+     "type": "p",
+     "text": "One-stage detectors drop proposals entirely and predict boxes straight from the image — see <a href=\"#single-stage-detectors-yolo-and-ssd\">6.5</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The feature map is computed once and used twice, for the proposals and for the per-box heads. That sharing is the speed gain over R-CNN.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Faster R-CNN",
+   "nodes": [
+    {
+     "id": "img",
+     "label": "Image",
+     "style": "normal"
+    },
+    {
+     "id": "bb",
+     "label": "Backbone CNN",
+     "note": "VGG or ResNet",
+     "style": "normal"
+    },
+    {
+     "id": "fm",
+     "label": "Feature map",
+     "note": "H × W × C",
+     "style": "accent"
+    },
+    {
+     "id": "rpn",
+     "label": "RPN",
+     "note": "anchors → proposals",
+     "style": "accent"
+    },
+    {
+     "id": "roi",
+     "label": "RoI pooling",
+     "note": "7 × 7 per box",
+     "style": "normal"
+    },
+    {
+     "id": "heads",
+     "label": "Two heads",
+     "note": "class + box offset",
+     "style": "normal"
+    },
+    {
+     "id": "nms",
+     "label": "NMS",
+     "note": "IoU 0.5",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "img",
+     "to": "bb",
+     "style": "solid"
+    },
+    {
+     "from": "bb",
+     "to": "fm",
+     "style": "solid"
+    },
+    {
+     "from": "fm",
+     "to": "rpn",
+     "style": "solid"
+    },
+    {
+     "from": "rpn",
+     "to": "roi",
+     "label": "proposals",
+     "style": "solid"
+    },
+    {
+     "from": "fm",
+     "to": "roi",
+     "label": "shared features",
+     "style": "dashed"
+    },
+    {
+     "from": "roi",
+     "to": "heads",
+     "style": "solid"
+    },
+    {
+     "from": "heads",
+     "to": "nms",
+     "style": "solid"
+    }
+   ],
+   "aria": "Block diagram of Faster R-CNN: image to backbone to a shared feature map, which feeds an RPN and also the RoI pooling stage; proposals go to the two heads and then NMS."
+  }
+ },
+ "examples": [
+  {
+   "question": "A detector predicts one box (30, 40, 110, 140) for the class 'car', and the ground-truth box is (50, 60, 130, 160). Both are (x₁, y₁, x₂, y₂) in pixels. (a) Compute the IoU. (b) Two boxes of the same class score 0.90 and 0.85, with IoU 0.6 between them. The NMS threshold is 0.5. Which boxes survive?",
+   "steps": [
+    "Predicted box area: width = 110 − 30 = 80 px, height = 140 − 40 = 100 px, area = 80 × 100 = 8000 px².",
+    "Ground-truth area: width = 130 − 50 = 80 px, height = 160 − 60 = 100 px, area = 80 × 100 = 8000 px².",
+    "Overlap in x: the shared span runs from max(30, 50) = 50 to min(110, 130) = 110, so 60 px.",
+    "Overlap in y: the shared span runs from max(40, 60) = 60 to min(140, 160) = 140, so 80 px.",
+    "Intersection area = 60 × 80 = 4800 px².",
+    "Union area = 8000 + 8000 − 4800 = 11,200 px².",
+    "IoU = 4800 ÷ 11,200 = 0.4286, about 0.43.",
+    "(b) Sort by score: 0.90 first, kept. Its IoU with the 0.85 box is 0.6, which is greater than the 0.5 threshold, so the 0.85 box is suppressed.",
+    "Survivors: only the box scoring 0.90."
+   ],
+   "answer": "IoU = 4800 ÷ 11,200 = 0.4286 (about 0.43), a weak match; and after NMS only the 0.90 box survives, because 0.6 > 0.5 suppresses the 0.85 box.",
+   "check": "x1p, y1p, x2p, y2p = 30, 40, 110, 140\nx1g, y1g, x2g, y2g = 50, 60, 130, 160\narea_p = (x2p - x1p) * (y2p - y1p)\narea_g = (x2g - x1g) * (y2g - y1g)\niw = min(x2p, x2g) - max(x1p, x1g)\nih = min(y2p, y2g) - max(y1p, y1g)\ninter = iw * ih\nunion = area_p + area_g - inter\niou = inter / union\nprint(area_p, area_g, inter, union)\nprint(round(iou, 4))\nscores = [0.90, 0.85]\npair_iou = 0.6\nkept = [scores[0]]\nif pair_iou <= 0.5:\n    kept.append(scores[1])\nprint(kept[0])",
+   "values": [
+    8000,
+    8000,
+    4800,
+    11200,
+    0.4286,
+    0.9
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "IoU uses areas, not centre distances. Boxes that look close on a sketch can still score 0.43, which is a poor localisation.",
+  "NMS runs per class, after scoring. Suppressing across classes deletes a real object that overlaps another.",
+  "mAP is the mean of average precision over classes, not a mean of IoU values. It is reported at a fixed IoU, usually 0.5.",
+  "Do not swap the input sizes: R-CNN warps each proposal to 227×227 pixels, while Fast R-CNN pools each proposal to a 7×7 feature grid.",
+  "The class head has C+1 outputs. Background is an extra class, and forgetting it makes the softmax the wrong size."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write a bounding box in both standard forms and name each term.",
+   "marks": 2,
+   "a": "(x, y, w, h): (x, y) is the top-left corner in pixels, w is width, h is height in pixels. (x₁, y₁, x₂, y₂): top-left corner and bottom-right corner, all in pixels."
+  },
+  {
+   "level": "understand",
+   "q": "Why is R-CNN slow compared with Fast R-CNN?",
+   "marks": 3,
+   "a": "R-CNN runs the CNN on about 2000 warped crops per image, so overlapping pixels are convolved many times, and it trains in separate stages with features on disk. Fast R-CNN convolves the full image once, then RoI-pools each proposal from that shared feature map."
+  },
+  {
+   "level": "apply",
+   "q": "Predicted box (0, 0, 10, 10), ground truth (5, 5, 15, 15), both in pixels. Compute the IoU.",
+   "marks": 3,
+   "a": "Each area = 10 × 10 = 100 px². Overlap = 5 px in x and 5 px in y, so intersection = 25 px². Union = 100 + 100 − 25 = 175 px². IoU = 25 ÷ 175 = 0.143."
+  },
+  {
+   "level": "apply",
+   "q": "Three boxes of one class score 0.90, 0.80 and 0.70. IoU(0.90, 0.80) = 0.3 and IoU(0.90, 0.70) = 0.7. NMS threshold is 0.5. What survives?",
+   "marks": 4,
+   "a": "Sort: 0.90 kept. 0.3 ≤ 0.5, so 0.80 is kept. 0.7 > 0.5, so 0.70 is suppressed. Survivors: the 0.90 and 0.80 boxes."
+  },
+  {
+   "level": "understand",
+   "q": "What does RoI pooling produce, and why is a fixed size needed?",
+   "marks": 3,
+   "a": "It crops the feature map at a proposal's coordinates and max-pools it into a 7×7 grid, giving a fixed-size vector. The following fully connected heads need a fixed input length, but proposals come in all sizes."
+  },
+  {
+   "level": "analyze",
+   "q": "Faster R-CNN and Fast R-CNN use the same RoI head. Why is Faster R-CNN faster then?",
+   "marks": 5,
+   "a": "Because the proposals no longer come from selective search on the CPU. The RPN is a small convolutional network running on the shared feature map, so proposal generation costs almost nothing extra and can run on the GPU with the rest of the network."
+  },
+  {
+   "level": "analyze",
+   "q": "Why are anchors needed in the RPN, and why several scales and ratios?",
+   "marks": 4,
+   "a": "The RPN must output boxes from a grid of positions alone. Anchors give each position a set of reference boxes, so the network only predicts offsets. Objects differ in size and shape, so several scales and aspect ratios are used; otherwise an anchor of one shape covers few objects and training labels become mostly negative."
+  }
+ ],
+ "beyond": "Not for the exam. In practice nobody writes these models from scratch: a few lines in a deep learning library give a pretrained Faster R-CNN with a ResNet backbone. Research moved on to anchor-free proposal heads such as FCOS and CenterNet, and to set-prediction detectors like DETR that drop anchors and NMS together. RoI Align from Mask R-CNN is now the default in every RoI head. Search next for feature pyramid networks, focal loss, and COCO mAP evaluation code."
+}

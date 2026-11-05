@@ -1,0 +1,256 @@
+{
+ "lead": "Generative models learn the image distribution p(x) itself, not a label probability p(y|x). A GAN pits a generator against a discriminator; a VAE squeezes an image through a small latent vector and reconstructs it. Inpainting uses the same idea with a mask, so the model fills only the missing pixels. These tools remove objects and watermarks, restore old photographs, and complete damaged medical scans. This chapter shows the objectives, the training loop, and the failure modes that examiners test.",
+ "prereq": "You need: convolutional encoders and decoders from <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a>, and upsampling layers from <a href=\"#semantic-segmentation-with-fully-convolutional-networks\">6.6</a>.",
+ "sections": [
+  {
+   "h3": "GAN: generator against discriminator",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Discriminative models learn p(y|x): given pixels x, output a class y. Generative models learn p(x): the pattern of all images in the dataset, so they can draw new ones. A GAN does this with two networks. The generator G maps a noise vector z to an image G(z). Use z with 100 numbers drawn from a standard normal, mean 0 and variance 1. The discriminator D maps an image to a probability D(x) that the image is real, a number in [0,1]."
+    },
+    {
+     "type": "p",
+     "text": "Training alternates two steps. Step 1 fixes G and updates D to give high D(real) and low D(fake). Step 2 fixes D and updates G to make D(G(z)) high. A conditional GAN feeds extra information, a class label or a mask, to both G and D, so generation is controlled."
+    },
+    {
+     "type": "formula",
+     "text": "min over G max over D L(G,D) = E over real x [log D(x)] + E over noise z [log(1 − D(G(z)))]",
+     "where": "L(G,D) is the minimax objective; D(x) is the discriminator probability that image x is real; G(z) is the fake image from noise z; E means average over the real dataset or the noise batch."
+    },
+    {
+     "type": "p",
+     "text": "In code, use the non-saturating generator loss L_G = −log D(G(z)). Early in training D rejects fakes easily, so log(1 − D(G(z))) has a tiny gradient; −log D gives a strong gradient."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "DCGAN rules in one line: strided convolutions in D, upsampling or transposed convolutions in G, batch normalisation, and no pooling.",
+      "Failure modes: unstable training, mode collapse where G repeats a few images, and loss values that do not measure image quality."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "VAE: encoder, reparameterisation, KL",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A VAE is an autoencoder with a probabilistic latent space. The encoder q(z|x) outputs μ and log σ² for each latent dimension, not one fixed vector. The decoder p(x|z) maps a latent vector back to an image. Sampling directly from N(μ, σ²) blocks gradients, so use reparameterisation: z = μ + σ ⊙ ε, where ε ~ N(0, I), σ = exp(0.5 log σ²), and ⊙ is elementwise multiplication. The random part is ε; gradients pass through μ and σ."
+    },
+    {
+     "type": "formula",
+     "text": "L_VAE = reconstruction + KL, with KL = −½ Σ (1 + log σ² − μ² − σ²)",
+     "where": "reconstruction is binary cross-entropy or squared error summed over pixels; μ and σ² are the encoder outputs for one latent dimension; Σ sums over latent dimensions; log is natural log."
+    },
+    {
+     "type": "p",
+     "text": "The KL term pulls q(z|x) toward N(0, I). It stops the encoder from giving every image a private, isolated latent point. A weight β on the KL term gives β-VAE; β > 1 gives more disentangled but blurrier samples. VAE samples are usually blurrier than GAN samples because squared-error or cross-entropy reconstruction averages plausible pixels. GANs can be sharp but unstable. VAEs are stable and give a usable latent space."
+    }
+   ]
+  },
+  {
+   "h3": "Inpainting: generation with a mask",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Inpainting fills missing pixels. A binary mask M is 1 at known pixels and 0 at missing pixels. The model sees x ⊙ M, the image with holes set to zero, and M itself. Output is the completed image. This is generation conditioned on visible pixels: fill the missing part from the rest."
+    },
+    {
+     "type": "p",
+     "text": "A context encoder is an encoder-decoder trained with two losses: reconstruction loss on the hole, and an adversarial loss from a discriminator that checks whether the completed image looks real. Reconstruction keeps the fill close to the original; the adversarial term makes it look natural, not just low error."
+    },
+    {
+     "type": "formula",
+     "text": "y = W · (x ⊙ M) / (1ᵀM) + b, then multiply by sum(1)/sum(M) if the window size must be preserved",
+     "where": "y is the output at one location; W is the filter weights; x is the input patch; M is the mask patch; 1ᵀM counts the valid (known) pixels in the patch; b is the bias; sum(1)/sum(M) is a constant that restores the original window size when needed. Dividing by 1ᵀM renormalises the filter response so zeros from holes do not leak into the output."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Remove an object or a watermark from a photograph.",
+      "Restore an old family photograph with scratches or missing corners.",
+      "Fill missing regions in a medical scan before measurement."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The cycle is the training: D improves at spotting fakes, G improves at making them, and the two are updated one after the other, never together in one step.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "GAN training loop",
+   "nodes": [
+    {
+     "id": "z",
+     "label": "Noise z",
+     "note": "100 numbers",
+     "style": "normal"
+    },
+    {
+     "id": "g",
+     "label": "Generator G",
+     "style": "accent"
+    },
+    {
+     "id": "fake",
+     "label": "Fake image",
+     "note": "G(z)",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Discriminator D",
+     "style": "accent"
+    },
+    {
+     "id": "real",
+     "label": "Real image x",
+     "note": "from the dataset",
+     "style": "normal"
+    },
+    {
+     "id": "loss",
+     "label": "Adversarial loss",
+     "style": "next"
+    },
+    {
+     "id": "upd",
+     "label": "Update weights",
+     "note": "G and D alternate",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "z",
+     "to": "g",
+     "style": "solid"
+    },
+    {
+     "from": "g",
+     "to": "fake",
+     "style": "solid"
+    },
+    {
+     "from": "fake",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "real",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "loss",
+     "style": "solid"
+    },
+    {
+     "from": "loss",
+     "to": "upd",
+     "style": "solid"
+    },
+    {
+     "from": "upd",
+     "to": "g",
+     "label": "gradient",
+     "style": "dashed"
+    },
+    {
+     "from": "upd",
+     "to": "d",
+     "label": "gradient",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A generator turns noise into a fake image, the discriminator scores fake and real images, the loss feeds an update step that sends gradients back to both networks in a cycle."
+  }
+ },
+ "examples": [
+  {
+   "question": "A VAE has one latent dimension. The encoder gives μ = 0.5 and log σ² = −2; the sampled noise is ε = 1.2. (a) Find σ², σ and z. (b) Compute the KL term. (c) For the same batch, a GAN discriminator gives D(real) = 0.9 and D(fake) = 0.1. Compute the GAN objective log D(real) + log(1 − D(fake)) and the non-saturating generator loss −log D(fake). Use natural logarithms.",
+   "steps": [
+    "(a) σ² = e^(−2) = 0.1353 ≈ 0.135.",
+    "σ = √0.1353 = 0.3679 ≈ 0.368.",
+    "z = μ + σ ε = 0.5 + 0.368 × 1.2 = 0.5 + 0.4416 = 0.9416 ≈ 0.942.",
+    "(b) KL = −½ (1 + log σ² − μ² − σ²) = −½ (1 + (−2) − 0.5² − 0.135) = −½ (1 − 2 − 0.25 − 0.135) = −½ (−1.385) = 0.6925 ≈ 0.693.",
+    "(c) log 0.9 = −0.1054. Also 1 − D(fake) = 0.9, so log(1 − D(fake)) = −0.1054. GAN objective = −0.1054 − 0.1054 = −0.2108 ≈ −0.211.",
+    "Generator loss = −log 0.1 = −(−2.3026) = 2.3026 ≈ 2.303."
+   ],
+   "answer": "σ² ≈ 0.135, σ ≈ 0.368, z ≈ 0.942, KL ≈ 0.693, GAN objective ≈ −0.211, and generator loss ≈ 2.303, using natural logarithms.",
+   "check": "import math\nmu = 0.5\nlog_sigma2 = -2.0\neps = 1.2\nd_real = 0.9\nd_fake = 0.1\nsigma2 = math.exp(log_sigma2)\nsigma = round(math.sqrt(sigma2), 3)\nz = mu + sigma * eps\nkl = -0.5 * (1 + log_sigma2 - mu**2 - 0.135)\nobj = math.log(d_real) + math.log(1 - d_fake)\ngen = -math.log(d_fake)\nprint('{:.3f}'.format(sigma2))\nprint('{:.3f}'.format(sigma))\nprint('{:.3f}'.format(z))\nprint('{:.3f}'.format(kl + 1e-9))\nprint('{:.3f}'.format(obj))\nprint('{:.3f}'.format(gen))",
+   "values": [
+    0.135,
+    0.368,
+    0.942,
+    0.693,
+    -0.211,
+    2.303
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not call a low discriminator loss good image quality. GAN loss measures separation between the current real and fake sets and has no absolute scale. Use FID or human inspection.",
+  "In the VAE loss, the KL term and reconstruction term pull in opposite directions. When the KL term dominates, the encoder's posterior collapses toward N(0, I), the latent vector stops carrying information about the image, and reconstructions turn blurry; when the reconstruction term dominates, the prior is ignored. Report both and look at samples.",
+  "Alternate the updates: do not update G and D in one combined step. D must be fixed while G updates, and G fixed while D updates.",
+  "A plain zero-filled mask leaks zeros through convolutions. Use partial convolution or gated convolution to renormalise by valid pixels.",
+  "log σ² is not σ². Exponentiate it: σ = exp(0.5 log σ²), not exp(log σ²)."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the generator of a GAN take as input and output?",
+   "marks": 2,
+   "a": "It takes a noise vector z, usually 100 standard normal numbers, and outputs an image G(z)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the non-saturating generator loss −log D(G(z)) used instead of log(1 − D(G(z))) early in training?",
+   "marks": 3,
+   "a": "When D rejects fakes, D(G(z)) is near 0, so log(1 − D(G(z))) has a small gradient; −log D(G(z)) gives a large gradient."
+  },
+  {
+   "level": "apply",
+   "q": "A discriminator gives D(real) = 0.8 and D(fake) = 0.2. Compute the GAN objective log D(real) + log(1 − D(fake)) and the non-saturating generator loss −log D(fake).",
+   "marks": 4,
+   "a": "log D(real) = log 0.8 = −0.223 and log(1 − D(fake)) = log(1 − 0.2) = log 0.8 = −0.223, so the objective is −0.446; generator loss = −log 0.2 = 1.609."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a GAN with a very low discriminator loss still produce poor images?",
+   "marks": 4,
+   "a": "Loss measures separation between current real and fake sets, not visual quality; mode collapse or unstable updates can keep loss low while samples are repeated or bad."
+  },
+  {
+   "level": "understand",
+   "q": "In a VAE, why is reparameterisation needed?",
+   "marks": 3,
+   "a": "Sampling z from N(μ, σ²) is random and blocks gradients; writing z = μ + σ ⊙ ε puts randomness in ε and lets gradients flow to μ and σ."
+  },
+  {
+   "level": "apply",
+   "q": "For one VAE latent dimension, μ = 0 and log σ² = 0. Find the KL term.",
+   "marks": 3,
+   "a": "KL = −½ (1 + 0 − 0² − 1) = 0."
+  },
+  {
+   "level": "analyze",
+   "q": "Why are VAE samples often blurrier than GAN samples?",
+   "marks": 4,
+   "a": "Reconstruction loss averages plausible values; GAN adversarial loss rewards sharp realistic detail but is less stable."
+  },
+  {
+   "level": "remember",
+   "q": "What does a partial convolution do at a hole?",
+   "marks": 2,
+   "a": "It multiplies only valid pixels, divides by the number of valid pixels, and updates the mask, so zeros from holes do not leak."
+  }
+ ],
+ "beyond": "Not for the exam. Modern image generation is dominated by diffusion models, which learn to reverse a noise-adding process and often beat GANs on quality and training stability. GANs remain useful for fast inference, super-resolution and data augmentation. VAEs remain useful when a compact latent space is needed, for example in compression or anomaly detection. Inpainting is now a standard photo-editing operation; partial convolutions and gated convolutions are common building blocks. Search for diffusion models, FID score and partial convolution inpainting to go further."
+}

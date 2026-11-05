@@ -1,0 +1,245 @@
+{
+ "lead": "A single-stage detector predicts boxes and class scores straight from the image in one forward pass. It does not propose regions first. YOLO cuts the image into a grid and lets each cell predict boxes; SSD predicts from feature maps at several scales; RetinaNet adds a loss that fixes the background imbalance. The speed makes these models common in live video, phone cameras, drones and CCTV, where a frame must be tagged before the next one arrives.",
+ "prereq": "You need <a href=\"#object-detection-with-r-cnn-fast-and-faster-r-cnn\">6.4</a> for IoU, NMS and two-stage detection, and <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a> for the convolutional backbone.",
+ "sections": [
+  {
+   "h3": "YOLO: one grid, one pass",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "YOLO divides the input into an S × S grid. In the first version S = 7, so the image is 7 cells across and 7 down. Each cell predicts B bounding boxes; B = 2. A box has five numbers: x, y, w, h and confidence. x and y are the box centre offsets inside that cell, scaled from 0 to 1. w and h are the box width and height as fractions of the whole image. The cell also gives C class probabilities, one per class. On PASCAL VOC, C = 20."
+    },
+    {
+     "type": "p",
+     "text": "Confidence is Pr(object) × IoU with the truth box. Pr(object) is 1 if the object centre lies in the cell and 0 otherwise. IoU is intersection over union, the overlap between predicted and true boxes."
+    },
+    {
+     "type": "formula",
+     "text": "tensor depth = 5B + C",
+     "where": "B is the number of boxes per cell; C is the number of classes. Total numbers = S × S × (5B + C). With S = 7, B = 2 and C = 20, the tensor is 7 × 7 × 30 and holds 1470 numbers."
+    },
+    {
+     "type": "p",
+     "text": "Only the cell whose area contains the object centre is responsible for that object. Other cells are trained as no-object. This stops many cells from claiming the same object."
+    },
+    {
+     "type": "p",
+     "text": "At test time, for each box multiply confidence by the class probability. Drop boxes below a confidence threshold. Apply non-maximum suppression, NMS, at IoU 0.5. NMS keeps the top score and removes overlapping boxes of the same class."
+    },
+    {
+     "type": "p",
+     "text": "The training loss adds box, confidence and class terms. λ_coord = 5 raises the box term. λ_noobj = 0.5 lowers the confidence term for empty cells, so the many empty cells do not dominate."
+    }
+   ]
+  },
+  {
+   "h3": "SSD: many feature maps, default boxes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SSD, Single Shot MultiBox Detector, also skips proposals. A base convolutional network produces a first feature map. Extra convolutional layers produce smaller maps: 38×38, 19×19, 10×10, 5×5, 3×3 and 1×1 in a common SSD300 design with 300×300 input. Each map cell predicts a fixed set of default boxes, also called anchor boxes. The boxes have several aspect ratios, such as 1:1, 2:1 and 1:2, and more than one scale."
+    },
+    {
+     "type": "p",
+     "text": "At each location, for each default box, the network outputs 4 offsets and C + 1 scores. The extra score is background. A 38×38 map with 4 default boxes and C = 20 gives 38×38×4 = 5776 box predictions at that scale alone."
+    },
+    {
+     "type": "p",
+     "text": "Most default boxes are background, so SSD uses hard negative mining: sort background boxes by loss, keep only about 3 negatives for every positive, about 3:1. Train with smooth L1 for offsets and softmax for scores. At test, threshold scores and run NMS."
+    },
+    {
+     "type": "p",
+     "text": "Early large maps catch small objects. Late small maps catch large objects."
+    }
+   ]
+  },
+  {
+   "h3": "RetinaNet and the speed-accuracy trade",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "RetinaNet is one-stage with feature pyramids. Its problem is class imbalance: a dense detector may see 1 object and 100000 background boxes. Focal loss reduces the loss of easy examples."
+    },
+    {
+     "type": "formula",
+     "text": "FL(p_t) = −α_t (1 − p_t)^γ log p_t",
+     "where": "p_t is the probability of the true class; γ = 2 focuses training on hard examples; α_t balances classes."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "YOLOv2 adds anchor boxes and batch normalisation.",
+      "YOLOv3 predicts at three scales.",
+      "Later YOLO versions use stronger backbones and better augmentation.",
+      "Two-stage detectors such as Faster R-CNN are better on small objects and accuracy, but slower.",
+      "One-stage detectors are faster, simpler to train, and weaker on very small objects unless they use multi-scale maps."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "There is no proposal stage: every number in the tensor is produced by one pass, and the grid cell holding an object's centre owns that object.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "YOLO forward pass",
+   "nodes": [
+    {
+     "id": "in",
+     "label": "Input",
+     "note": "448 × 448 × 3",
+     "style": "normal"
+    },
+    {
+     "id": "net",
+     "label": "Conv layers",
+     "note": "24 conv + 2 FC",
+     "style": "normal"
+    },
+    {
+     "id": "tensor",
+     "label": "7 × 7 × 30",
+     "note": "S × S × (5B + C)",
+     "style": "accent"
+    },
+    {
+     "id": "dec",
+     "label": "Decode cells",
+     "note": "x, y, w, h, conf, class",
+     "style": "normal"
+    },
+    {
+     "id": "thr",
+     "label": "Threshold",
+     "note": "low confidence dropped",
+     "style": "normal"
+    },
+    {
+     "id": "nms",
+     "label": "NMS",
+     "note": "IoU 0.5",
+     "style": "live"
+    },
+    {
+     "id": "out",
+     "label": "Final boxes",
+     "note": "class + score",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "in",
+     "to": "net",
+     "style": "solid"
+    },
+    {
+     "from": "net",
+     "to": "tensor",
+     "style": "solid"
+    },
+    {
+     "from": "tensor",
+     "to": "dec",
+     "style": "solid"
+    },
+    {
+     "from": "dec",
+     "to": "thr",
+     "style": "solid"
+    },
+    {
+     "from": "thr",
+     "to": "nms",
+     "style": "solid"
+    },
+    {
+     "from": "nms",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "YOLO pipeline: a 448 by 448 image through convolution layers to a 7 by 7 by 30 tensor, then cell decoding, a confidence threshold, NMS and the final boxes."
+  }
+ },
+ "examples": [
+  {
+   "question": "YOLO runs with S = 7, B = 2 and C = 20 on a 448×448 input. (a) What is the depth of the output tensor? (b) How many numbers are in the tensor? (c) How many boxes does the grid predict? (d) A cell contains an object and its best box has IoU 0.8 with the truth. That box's confidence is 0.8. What is the test-time score for class dog if the cell's dog probability is 0.9?",
+   "steps": [
+    "Depth = 5B + C = 5×2 + 20 = 10 + 20 = 30 numbers.",
+    "Total numbers = S × S × depth = 7 × 7 × 30 = 49 × 30 = 1470 numbers.",
+    "Total boxes = S × S × B = 7 × 7 × 2 = 49 × 2 = 98 boxes.",
+    "Test score = confidence × class probability = 0.8 × 0.9 = 0.72."
+   ],
+   "answer": "The tensor depth is 30, the tensor holds 1470 numbers, the grid predicts 98 boxes, and the dog score is 0.72.",
+   "check": "S = 7\nB = 2\nC = 20\ndepth = 5 * B + C\ntotal = S * S * depth\nboxes = S * S * B\nconf = 0.8\np_dog = 0.9\nscore = conf * p_dog\nprint(depth)\nprint(total)\nprint(boxes)\nprint(round(score, 2))",
+   "values": [
+    30,
+    1470,
+    98,
+    0.72
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The YOLO tensor depth is 5B + C, not 5 + B·C. With B = 2 and C = 20 the depth is 30, not 45.",
+  "x and y are offsets inside one cell; w and h are fractions of the full image. Mixing the two gives wrong boxes.",
+  "Only the cell holding the object centre is responsible for the object. Neighbouring cells stay no-object.",
+  "At test time use confidence × class probability, not confidence alone.",
+  "SSD scores are C + 1 because background is a class; hard negative mining keeps about 3 negatives per positive."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "For YOLO with S = 7, B = 2 and C = 20, what is the output tensor shape?",
+   "marks": 2,
+   "a": "7 × 7 × 30."
+  },
+  {
+   "level": "understand",
+   "q": "Why does YOLO use λ_noobj = 0.5?",
+   "marks": 3,
+   "a": "Empty cells are many. A lower weight stops their confidence loss from dominating training."
+  },
+  {
+   "level": "apply",
+   "q": "A YOLO cell has confidence 0.6 and dog probability 0.5. What is the test score for dog?",
+   "marks": 3,
+   "a": "0.6 × 0.5 = 0.30."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does SSD predict from several feature maps?",
+   "marks": 4,
+   "a": "Large early maps see small objects; small late maps see large objects. Multi-scale maps cover object sizes."
+  },
+  {
+   "level": "apply",
+   "q": "An SSD map is 38×38 and uses 4 default boxes per cell. How many box predictions are made at this scale?",
+   "marks": 3,
+   "a": "38 × 38 × 4 = 5776 box predictions."
+  },
+  {
+   "level": "understand",
+   "q": "What does focal loss do in RetinaNet?",
+   "marks": 4,
+   "a": "It down-weights easy negative examples so hard examples drive training."
+  },
+  {
+   "level": "analyze",
+   "q": "Give one reason a two-stage detector can beat a one-stage detector on small objects.",
+   "marks": 5,
+   "a": "The proposal stage re-samples regions at high resolution, so a small object gets a second focused look; a dense grid may have too few pixels per small object."
+  },
+  {
+   "level": "remember",
+   "q": "What is NMS used for at detector test time?",
+   "marks": 2,
+   "a": "It removes overlapping duplicate boxes, keeping the top-scoring box per class."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems deploy YOLO and SSD through TensorRT or NCNN on phones and Jetson boards. Anchor-free detectors such as FCOS and CenterNet remove default boxes. Search terms: focal loss, feature pyramid network, YOLOv8, SSD Lite, hard negative mining."
+}

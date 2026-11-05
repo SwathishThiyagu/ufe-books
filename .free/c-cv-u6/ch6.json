@@ -1,0 +1,211 @@
+{
+ "lead": "Semantic segmentation labels every pixel with a class: road, car, person, sky. A plain CNN classifier gives one label per image, so it loses location. A fully convolutional network keeps the spatial grid, replaces dense layers with 1×1 convolutions, and outputs a score for every class at every coarse cell. Upsampling then restores full resolution. It is used in self-driving lanes, medical scans, satellite land cover and phone background blur.",
+ "prereq": "You need <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a> for convolutional backbones and Unit 4 for classical thresholding and region segmentation that FCNs replace.",
+ "sections": [
+  {
+   "h3": "Three tasks, one pixel grid",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Semantic segmentation assigns one class label to every pixel. It does not separate two cars of the same class; both become one car region. Instance segmentation detects objects and returns a separate mask per object, so two cars get two masks. Panoptic segmentation gives every pixel a class and, for countable things, an instance id; it joins stuff such as road and sky with things such as car and person."
+    },
+    {
+     "type": "p",
+     "text": "A classifier CNN from <a href=\"#cnns-for-image-classification-alexnet-vgg-resnet\">6.3</a> ends with fully connected layers and outputs one vector per image. An FCN removes those layers. A 1×1 convolution with C output channels acts like a dense layer at every position. The output is an H×W×C score map, where H and W are grid height and width and C is classes plus background. For a 224×224 input and five stride-2 pools, the map is 7×7×21 for 20 object classes plus background. Each cell corresponds to a 32×32 pixel patch of the input (its true receptive field is far larger), so the map is coarse: it knows what is present but not the exact boundary."
+    }
+   ]
+  },
+  {
+   "h3": "Upsampling and skip connections",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Upsampling turns the coarse score map back to image size. FCNs use a transposed convolution, a learned upsample. It places a scaled copy of each input value through a kernel and sums overlaps. The side length follows H_out = (H_in − 1)s − 2p + k, where H_in and H_out are input and output side lengths, s is stride, p is padding and k is kernel side. For 7×7 to 224×224 with stride 32, k=64 and p=16 works: (7−1)×32 − 32 + 64 = 224."
+    },
+    {
+     "type": "p",
+     "text": "A direct ×32 upsample gives blocky edges. FCN-16s first upsamples ×2 to 14×14×21, adds the pool4 score map of the same shape, then upsamples ×16. FCN-8s adds a pool3 skip too. Addition needs equal channel counts; a 1×1 convolution can match them. Concatenation, used in U-Net, needs equal spatial size instead. SegNet is an encoder-decoder: the encoder saves max-pooling indices, and the decoder uses them to unpool, so upsampling has no learned parameters. U-Net concatenates encoder features into the decoder; this preserves detail and works with few labelled medical images."
+    }
+   ]
+  },
+  {
+   "h3": "Loss, instance masks and metrics",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Training uses per-pixel softmax cross-entropy, averaged over all N pixels: L = −(1/N) Σ_i log p(i, y_i). Here p(i, y_i) is the softmax probability the network gives to the true class y_i at pixel i. Every pixel contributes, including background. For a batch, average the image losses."
+    },
+    {
+     "type": "p",
+     "text": "Mask R-CNN extends Faster R-CNN (see <a href=\"#object-detection-with-r-cnn-fast-and-faster-r-cnn\">6.4</a>) for instance segmentation. It adds a small mask branch that predicts a binary mask for each proposal, and RoI Align samples features without rounding. Detection still supplies boxes and classes; the mask branch separates instances. The branch is small, so speed stays close to the detector."
+    },
+    {
+     "type": "p",
+     "text": "Two metrics matter. Pixel accuracy is correct pixels divided by total pixels. Mean IoU is the average over classes of IoU_c = |P_c ∩ G_c| ÷ |P_c ∪ G_c|, where P_c is the set of pixels predicted as class c and G_c is the true set. Pixel accuracy can look high when background dominates; mean IoU exposes small classes."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The deep map knows what the object is but not exactly where its edge is; the pool4 skip supplies the missing spatial detail. FCN-8s adds one more skip from pool3.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "FCN-16s",
+   "nodes": [
+    {
+     "id": "in",
+     "label": "Input",
+     "note": "224 × 224 × 3",
+     "style": "normal"
+    },
+    {
+     "id": "enc",
+     "label": "Encoder",
+     "note": "pools to 7 × 7, stride 32",
+     "style": "normal"
+    },
+    {
+     "id": "score",
+     "label": "Score map",
+     "note": "7 × 7 × 21",
+     "style": "accent"
+    },
+    {
+     "id": "up1",
+     "label": "Upsample ×2",
+     "note": "14 × 14 × 21",
+     "style": "normal"
+    },
+    {
+     "id": "skip",
+     "label": "Add pool4 skip",
+     "note": "14 × 14 × 21",
+     "style": "next"
+    },
+    {
+     "id": "up2",
+     "label": "Upsample ×16",
+     "note": "224 × 224 × 21",
+     "style": "normal"
+    },
+    {
+     "id": "lab",
+     "label": "Label map",
+     "note": "class per pixel",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "in",
+     "to": "enc",
+     "style": "solid"
+    },
+    {
+     "from": "enc",
+     "to": "score",
+     "style": "solid"
+    },
+    {
+     "from": "score",
+     "to": "up1",
+     "style": "solid"
+    },
+    {
+     "from": "up1",
+     "to": "skip",
+     "style": "solid"
+    },
+    {
+     "from": "skip",
+     "to": "up2",
+     "style": "solid"
+    },
+    {
+     "from": "up2",
+     "to": "lab",
+     "style": "solid"
+    }
+   ],
+   "aria": "An encoder shrinks a 224 by 224 image to a 7 by 7 score map, which is upsampled twice and fused with the pool4 skip before a final upsample to a full-resolution label map."
+  }
+ },
+ "examples": [
+  {
+   "question": "An FCN uses a VGG backbone on 224×224×3 input and predicts 21 classes. (a) Find the deepest feature-map size after five stride-2 pools. (b) Find the score-map size after a 1×1 convolution to 21 classes. (c) Find a transposed convolution that turns 7×7 back to exactly 224×224 with stride 32.",
+   "steps": [
+    "1. Five stride-2 pools multiply stride by 2⁵ = 32. 224 / 32 = 7, so the deepest map is 7×7×512 for VGG.",
+    "2. A 1×1 convolution changes only channels. The spatial size stays 7×7, so the score map is 7×7×21.",
+    "3. For a transposed convolution, H_out = (H_in − 1)s − 2p + k. With H_in=7 and s=32, H_out = 192 − 2p + k.",
+    "4. Set k=64 and p=16: 192 − 32 + 64 = 224. So a 64×64 kernel, stride 32, padding 16 gives 224×224.",
+    "5. FCN-16s instead upsamples ×2 to 14×14×21, adds the pool4 map, then upsamples ×16."
+   ],
+   "answer": "The deepest map is 7×7×512, the score map is 7×7×21, and a 64×64 transposed convolution with stride 32 and padding 16 produces 224×224.",
+   "check": "h = 224\ns = 32\nhdeep = h // s\nprint(hdeep)\nprint(512)\nprint(21)\nk = 64\np = 16\nprint((hdeep - 1) * s - 2 * p + k)\nprint(k)\nprint(s)\nprint(p)\n",
+   "values": [
+    7,
+    512,
+    21,
+    224,
+    64,
+    32,
+    16
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A transposed convolution is a learned upsample, not the mathematical inverse of a convolution; the name deconvolution is a misnomer.",
+  "Element-wise addition needs equal channel counts; concatenation needs equal spatial size. FCN skips use 1×1 convolutions to match channels when needed.",
+  "Semantic segmentation merges touching objects of the same class. Instance segmentation keeps them separate.",
+  "Pixel accuracy is misleading when one class dominates; mean IoU is the safer reported number.",
+  "The total upsample factor must equal the total stride: five stride-2 pools give a ×32 total, so FCN-16s uses ×2 then ×16 (still ×32 in total), not ×32 from the coarse map alone and never ×16 in total."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define semantic segmentation in one sentence. How does it differ from instance segmentation?",
+   "marks": 2,
+   "a": "It assigns one class label to every pixel, with no separate object identities. Instance segmentation returns a separate mask for each object, so two cars get two masks."
+  },
+  {
+   "level": "understand",
+   "q": "Why replace fully connected layers with 1×1 convolutions in an FCN?",
+   "marks": 3,
+   "a": "A 1×1 convolution is a dense layer applied at every spatial position. It keeps the H×W grid and outputs a C-channel score map instead of one vector per image."
+  },
+  {
+   "level": "apply",
+   "q": "A 256×256 input passes five stride-2 pools and a 1×1 convolution to 10 classes. Give the score-map shape.",
+   "marks": 3,
+   "a": "256 / 2⁵ = 256 / 32 = 8. The score map is 8×8×10."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does FCN-8s give sharper boundaries than FCN-32s?",
+   "marks": 4,
+   "a": "FCN-32s upsamples only the deep coarse map. FCN-8s adds pool3 and pool4 skip maps before the final upsample, so finer spatial detail survives."
+  },
+  {
+   "level": "remember",
+   "q": "What does SegNet's decoder reuse from the encoder?",
+   "marks": 2,
+   "a": "The saved max-pooling indices. The decoder unpools using those indices, so the upsampling step has no learned parameters."
+  },
+  {
+   "level": "apply",
+   "q": "For one class, the predicted set has 100 pixels, the true set has 80, and the intersection has 60. Find IoU.",
+   "marks": 3,
+   "a": "IoU = 60 / (100 + 80 − 60) = 60 / 120 = 0.5."
+  },
+  {
+   "level": "analyze",
+   "q": "A road-scene model reports 95% pixel accuracy but misses every pedestrian. Explain why and name a better metric.",
+   "marks": 4,
+   "a": "Background covers most pixels, so predicting background alone gives high accuracy. Mean IoU over classes gives the pedestrian class equal weight and exposes the failure."
+  }
+ ],
+ "beyond": "Not for the exam. Modern segmentation adds atrous (dilated) convolutions and conditional random fields, as in DeepLab, to keep resolution without many pools. Panoptic methods merge semantic and instance outputs and are scored by panoptic quality. Vision transformers now perform segmentation by token attention. Search terms: atrous convolution, DeepLab, panoptic quality, Mask R-CNN, U-Net."
+}
