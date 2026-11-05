@@ -1,0 +1,281 @@
+{
+ "lead": "A grammar says which strings are sentences; a parser proves that one particular string is a sentence and returns its trees. Trying rules blindly takes exponential time, so both standard algorithms use a table instead. CYK fills a triangular table of word spans, bottom-up, and needs the grammar in Chomsky normal form. Earley walks the sentence left to right carrying dotted rules and accepts any CFG. Both run in polynomial time.",
+ "prereq": "You need: <a href=\"#context-free-grammars-and-grammar-rules-for-english\">3.1</a> for CFG rules and trees, and <a href=\"#treebanks-and-normal-forms-for-grammars\">3.2</a> for Chomsky normal form, which CYK requires.",
+ "sections": [
+  {
+   "h3": "Recognition, trees, and three families of parser",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A context-free grammar is G = (N, Σ, P, S): N is the set of nonterminals such as NP, Σ is the set of terminal words, P is the set of rules, and S is the start symbol. Parsing answers two questions. Recognition asks whether a word string w = w₁w₂…wₙ is in L(G). Tree extraction asks for the parse trees themselves."
+    },
+    {
+     "type": "p",
+     "text": "The number of possible trees grows fast: 14 binary trees over 5 leaves, 4862 over 10. Testing them one by one is exponential, so every practical algorithm stores the answer to each subproblem once. That store is a chart: a table indexed by positions in the sentence."
+    },
+    {
+     "type": "p",
+     "text": "Top-down parsing starts at S and expands rules until the leaves match the words. Recursive descent writes one function per nonterminal and reads like the grammar. Its weakness is left recursion: a rule A → A α makes the function call itself on the same input forever. Rewriting the grammar to remove left recursion, or replacing recursion with an explicit stack and a loop, removes the loop."
+    },
+    {
+     "type": "p",
+     "text": "Bottom-up parsing starts at the words and joins them into nonterminals. CYK is a bottom-up chart parser over spans; Earley is a left-to-right chart parser over dotted rules. Shift-reduce parsing, a bottom-up method that uses a stack, is in <a href=\"#lexicalized-pcfgs-and-shift-reduce-parsing\">3.8</a>."
+    }
+   ]
+  },
+  {
+   "h3": "CYK: a triangular table of spans",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Cocke–Younger–Kasami algorithm assumes Chomsky normal form, so every rule is either A → B C or A → a. Conversion is in <a href=\"#treebanks-and-normal-forms-for-grammars\">3.2</a>."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "n is the number of words. Make one cell (i, j) for every pair with 1 ≤ i ≤ j ≤ n: n(n+1)/2 cells, a triangle.",
+      "Cell (i, j) holds the set of nonterminals that derive words i to j, both ends included.",
+      "Length 1: put A in (i, i) if the rule A → wᵢ exists.",
+      "Lengths L = 2 to n: for (i, j) with j = i + L − 1, try every split k from i to j − 1. If B is in (i, k), C is in (k+1, j), and A → B C is a rule, add A to (i, j).",
+      "Accept when S is in (1, n)."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "splits(n) = n(n−1)(n+1) / 6,   T(n) = O(n³ · |G|)",
+     "where": "n is the number of words; |G| is the number of grammar rules; splits(n) counts the (i, k, j) triples tried. For n = 5 that is 20."
+    },
+    {
+     "type": "p",
+     "text": "Each nonterminal is stored once per cell, even when two splits both produce it. That discarding of multiplicity keeps the run polynomial instead of exponential."
+    },
+    {
+     "type": "p",
+     "text": "Recognition is not a tree. To print one, store a back pointer whenever a nonterminal is added: the split k and the rule A → B C. Reading pointers back from (1, n) rebuilds the tree. For the best tree under a probability model see <a href=\"#probabilistic-cfgs-and-statistical-parsing\">3.5</a>; the loop is the same with a maximum in place of set union."
+    }
+   ]
+  },
+  {
+   "h3": "Earley: dotted rules read left to right",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An Earley state is a rule with a dot and an origin, written (A → α · β, i). The parser is working on A → αβ, has matched α, the dot sits before β, and i is the position where this rule started."
+    },
+    {
+     "type": "p",
+     "text": "There is one chart set per position, S₀ to Sₙ; a state in S_j has its dot after j words. S₀ starts with (S′ → · S, 0), where S′ is a fresh start symbol."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "PREDICTOR: a state (A → α · B β, i) in S_j predicts every rule of B: add (B → · γ, j) to S_j for each rule B → γ.",
+      "SCANNER: a state (A → α · a β, i) in S_j with a a word. If word j+1 is a, add (A → α a · β, i) to S_{j+1}.",
+      "COMPLETER: (B → γ ·, i) in S_j means B covers words i+1 to j. For each (A → α · B β, k) in S_i, add (A → α B · β, k) to S_j.",
+      "Accept when (S′ → S ·, 0) is in S_n."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Repeat the moves until no set grows; they are steps inside one pass, not three algorithms."
+    },
+    {
+     "type": "formula",
+     "text": "T(n) = O(n³) general,  O(n²) unambiguous grammar,  O(n) bounded-state grammar",
+     "where": "n is the number of words. A bounded-state grammar is one where no chart set S_j ever holds more than a fixed number of states, however long the sentence is; most programming-language grammars are of this kind."
+    },
+    {
+     "type": "p",
+     "text": "Earley accepts any CFG: left recursion, ε rules and unit rules need no rewriting. The price is bookkeeping: each set holds many states and each new state must be checked against those already present."
+    }
+   ]
+  },
+  {
+   "h3": "Which one to use",
+   "blocks": [
+    {
+     "type": "table",
+     "head": [
+      "",
+      "CYK",
+      "Earley"
+     ],
+     "rows": [
+      [
+       "Grammar form",
+       "CNF required",
+       "any CFG"
+      ],
+      [
+       "Direction",
+       "bottom-up over spans",
+       "left to right"
+      ],
+      [
+       "Worst-case time",
+       "O(n³ · |G|)",
+       "O(n³)"
+      ],
+      [
+       "Left recursion",
+       "possible in CNF; span order handles it, no rewriting needed",
+       "handled directly"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Use CYK when the grammar is already normalised, for a short program, or for the inside score of a probabilistic grammar. Use Earley when the grammar is written naturally: a hand-written English grammar, or a language grammar with long rules."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The highlighted cell (1,5) holds S, so the whole sentence is accepted. It is built at split k = 2 from NP in (1,2) and VP in (3,5).",
+  "spec": {
+   "type": "array",
+   "title": "CYK table, 'the boy ate the cake'",
+   "show_index": true,
+   "index_from": 1,
+   "aria": "A triangular CYK table where the cell for words 1 to 5 contains S, so the sentence is accepted.",
+   "rows": [
+    {
+     "label": "i=1",
+     "cells": [
+      "Det",
+      "NP",
+      "–",
+      "–",
+      "S"
+     ],
+     "marks": {
+      "1": "accent",
+      "5": "live"
+     }
+    },
+    {
+     "label": "i=2",
+     "cells": [
+      "–",
+      "N",
+      "–",
+      "–",
+      "–"
+     ]
+    },
+    {
+     "label": "i=3",
+     "cells": [
+      "–",
+      "–",
+      "V",
+      "–",
+      "VP"
+     ],
+     "marks": {
+      "5": "accent"
+     }
+    },
+    {
+     "label": "i=4",
+     "cells": [
+      "–",
+      "–",
+      "–",
+      "Det",
+      "NP"
+     ]
+    },
+    {
+     "label": "i=5",
+     "cells": [
+      "–",
+      "–",
+      "–",
+      "–",
+      "N"
+     ]
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 5,
+     "label": "S accepts"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Grammar in CNF: S → NP VP; NP → Det N; VP → V NP; Det → the; N → boy | cake; V → ate. Run CYK on 'the boy ate the cake' and say whether it is accepted. Count the split checks for n = 5.",
+   "steps": [
+    "Words: w₁ = the, w₂ = boy, w₃ = ate, w₄ = the, w₅ = cake. n = 5, so the table has 5·6/2 = 15 cells.",
+    "Length 1: (1,1) = {Det}; (2,2) = {N}; (3,3) = {V}; (4,4) = {Det}; (5,5) = {N}.",
+    "Length 2: (1,2) uses split k = 1, Det in (1,1) and N in (2,2), so NP. (2,3) and (3,4) are empty. (4,5) gives NP from Det in (4,4) and N in (5,5).",
+    "Length 3: (1,3) and (2,4) empty. (3,5) uses split k = 3, V in (3,3) and NP in (4,5), so VP. Split k = 4 gives nothing because (3,4) is empty.",
+    "Length 4: (1,4) and (2,5) both need a cell that is empty, so both stay empty.",
+    "Length 5: (1,5) with split k = 2 gives NP in (1,2) and VP in (3,5), so S from S → NP VP. Splits k = 1, 3, 4 add nothing.",
+    "Split checks: length 2 uses 4; length 3 uses 6; length 4 uses 6; length 5 uses 4. Total 20, matching 5·4·6/6."
+   ],
+   "answer": "S is in cell (1,5), so the sentence is accepted, and the run makes 20 split checks.",
+   "check": "grammar = {'S': [('NP','VP')], 'NP': [('Det','N')], 'VP': [('V','NP')]}\nlex = {'the':'Det', 'boy':'N', 'cake':'N', 'ate':'V'}\nwords = 'the boy ate the cake'.split()\nn = len(words)\ntable = {}\nfor i, w in enumerate(words, 1):\n    table[(i, i)] = {lex[w]}\nsplits = 0\nfor L in range(2, n + 1):\n    for i in range(1, n - L + 2):\n        j = i + L - 1\n        cell = set()\n        for k in range(i, j):\n            splits += 1\n            for A, rules in grammar.items():\n                for (B, C) in rules:\n                    if B in table[(i, k)] and C in table[(k + 1, j)]:\n                        cell.add(A)\n        table[(i, j)] = cell\nprint(splits)",
+   "values": [
+    20
+   ],
+   "output": "20"
+  }
+ ],
+ "traps": [
+  "Running CYK on a grammar that is not in CNF. A rule A → B C D or a unit rule A → B fills cells wrongly; convert first.",
+  "Reading cell (i, j) as words i to j−1. It is i to j inclusive, so (1, n) is the whole sentence and a span of length 1 has i = j.",
+  "Stopping at the first split k that fills a cell. Every split must be tried; a later split may add a different nonterminal and change whether S reaches (1, n).",
+  "Saying CYK is O(n²) because the table has O(n²) cells. Filling one cell costs O(n) splits, so the total is O(n³ · |G|)."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which normal form does CYK require, and which rule shapes does it allow?",
+   "marks": 2,
+   "a": "Chomsky normal form: A → B C with two nonterminals, or A → a with one terminal word, plus S → ε for the start symbol only, when the empty string must be generated."
+  },
+  {
+   "level": "understand",
+   "q": "What does the Earley state (VP → V · NP, 2) say?",
+   "marks": 2,
+   "a": "Rule VP → V NP is being applied, V is already matched, the dot is before NP, and the rule started at position 2, i.e. after two words."
+  },
+  {
+   "level": "apply",
+   "q": "For n = 7 words, how many cells has the CYK table and how many split checks are made?",
+   "marks": 3,
+   "a": "Cells = n(n+1)/2 = 7·8/2 = 28. Splits = n(n−1)(n+1)/6 = 7·6·8/6 = 56."
+  },
+  {
+   "level": "apply",
+   "q": "In the worked example, which cell holds NP for the words 'the boy', and from which two cells is it built?",
+   "marks": 3,
+   "a": "Cell (1,2), built at split k = 1 from Det in (1,1) and N in (2,2) using NP → Det N."
+  },
+  {
+   "level": "analyze",
+   "q": "Recursive descent loops forever on A → A α, but Earley does not. Why?",
+   "marks": 4,
+   "a": "Recursive descent calls the A function again at the same input position, so no word is consumed. Earley's predictor adds (A → · A α, j) to S_j with the same j; the second time it is produced the state is already in the set and is dropped."
+  },
+  {
+   "level": "analyze",
+   "q": "Earley is O(n³) in general but O(n²) for an unambiguous grammar. Why?",
+   "marks": 4,
+   "a": "In an unambiguous grammar each span has essentially one analysis, so the number of completing states over a span stays bounded. The completer then does quadratic work instead of paying a third factor for many pairings of the same span."
+  },
+  {
+   "level": "understand",
+   "q": "CYK reports only that S is in (1,5). What extra information turns this into a parse tree?",
+   "marks": 2,
+   "a": "Back pointers: for each nonterminal stored in a cell, record the split k and the rule A → B C that added it. Reading them back from (1, n) rebuilds the tree."
+  }
+ ],
+ "beyond": "Not for the exam. Real parsers store all parses of a span in a packed parse forest, so an exponential number of trees fits in polynomial space; an Earley parser with a shared packed parse forest is the standard form. Leo's optimization makes right recursion linear in Earley, and the same span table with a maximum instead of a set gives the Viterbi CYK used inside statistical machine translation. Search next for 'Earley SPPF', 'Viterbi CYK' and 'packed parse forest'."
+}
