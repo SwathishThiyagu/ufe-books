@@ -1,0 +1,364 @@
+{
+ "lead": "A compiler does not only translate statements; it must decide where every variable lives at run time and how every call is made. This unit builds that picture: memory regions, activation records, the calling sequence, parameter passing and the symbol table. After it you can lay out a stack frame, trace a recursive program's control stack, and predict what a program prints under each parameter passing mechanism.",
+ "about": "This unit is about what a running program needs besides its instructions. Chapter 5.1 introduces procedures, activations, the activation tree and the binding of names. Chapter 5.2 divides run-time memory into target code, static data, stack and heap, and shows how data is laid out inside it. Chapter 5.3 compares the three allocation strategies, static, stack and heap, and the rule each one imposes. Chapter 5.4 opens one stack frame, the activation record, and follows the calling and return sequences word by word. Chapter 5.5 shows what is stored for each parameter passing mechanism and how the choice changes the output. Chapter 5.6 keeps names in a symbol table, implements scope lookup, and lists the times at which a name gets bound.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Before the compiler can generate code it must know which activation a name belongs to, so the source language's procedures, scope and binding rules become a tree and a stack.",
+   "depth": "Procedures as the unit of abstraction: name, parameters, body, and the difference between a definition and a declaration. An activation is one execution of a procedure; recursion gives many activations of one procedure, each with its own copy of the locals. The activation tree: one node per activation, children in call order, preorder gives the order in which activations begin, and the depth of the tree is the largest number of records on the control stack. The control stack holds the live activations. Source-language issues the compiler must settle before code generation: scope rules (lexical or static scope, where the declaration is found from the program text), binding of names (the environment maps a name to a storage location, the state is its current value), lifetime versus scope, aliasing of names, and dynamic scoping, where a name is resolved through the caller chain so its depth is unknown at compile time. Procedures as parameters, and closures in one line: only a few universities teach closures, a procedure value together with its defining environment.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "main",
+     "note": "activation 1",
+     "style": "accent",
+     "children": [
+      {
+       "label": "a(1)",
+       "note": "activation 2",
+       "children": [
+        {
+         "label": "b",
+         "note": "activation 3",
+         "children": [
+          {
+           "label": "c",
+           "note": "activation 4"
+          }
+         ]
+        },
+        {
+         "label": "a(0)",
+         "note": "activation 5"
+        }
+       ]
+      },
+      {
+       "label": "c",
+       "note": "activation 6"
+      }
+     ]
+    },
+    "aria": "An activation tree: main calls a(1) and then c; a(1) calls b and then a(0); b calls c, giving six activations in all."
+   },
+   "example": "A program has procedures main, a, b and c. main calls a(1) and then c. a(x) calls b() and then a(x - 1) when x > 0. b() calls c(). c() does nothing. Draw the activation tree for the call main(), give the order in which the activations begin, and give the largest number of records on the control stack. Answer: the six activations begin in the order main, a(1), b, c, a(0), c. The deepest path is main → a(1) → b → c, so 4 records are live at once.",
+   "trap": "Treating the call graph as the activation tree. The call graph has one node per procedure; the activation tree has one node per activation, so a recursive procedure appears many times. Scope is not lifetime either: a name can be in scope while its activation is already gone.",
+   "prereq": "Unit 1 (phases of a compiler) and Unit 4 (translating procedure calls into three-address code).",
+   "leave": "The calling sequence and record layout to 5.4; code generation to Unit 6."
+  },
+  {
+   "k": 2,
+   "idea": "Run-time memory is cut into a few fixed regions, and the compiler places every datum in the region its lifetime needs.",
+   "depth": "The run-time memory of a process: target code, static data, the stack, the heap, and free space between stack and heap. State the machine convention: the stack grows toward lower addresses and the heap toward higher addresses on most machines, and say so before any offset is computed. Static allocation versus dynamic allocation; the compiler can size fixed objects at compile time and must send variable-size objects to the heap. Data layout: byte-addressable memory, word size, alignment and padding inside records, row-major and column-major order for two-dimensional arrays, unions whose fields overlap. Lifetime of a datum versus its scope. The storage classes a source language offers (global, local, dynamically created). Address arithmetic inside the compiler uses these sizes, so every size must be known.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Run-time memory of one process",
+    "nodes": [
+     {
+      "id": "c",
+      "label": "Target code",
+      "note": "fixed size",
+      "style": "muted"
+     },
+     {
+      "id": "s",
+      "label": "Static data",
+      "note": "globals, constants",
+      "style": "accent"
+     },
+     {
+      "id": "h",
+      "label": "Heap",
+      "note": "grows to higher addresses",
+      "style": "live"
+     },
+     {
+      "id": "f",
+      "label": "Free space",
+      "style": "muted"
+     },
+     {
+      "id": "k",
+      "label": "Stack",
+      "note": "grows to lower addresses",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c",
+      "to": "s"
+     },
+     {
+      "from": "s",
+      "to": "h"
+     },
+     {
+      "from": "h",
+      "to": "f"
+     },
+     {
+      "from": "f",
+      "to": "k"
+     }
+    ],
+    "aria": "The memory of a process split into target code, static data, a heap that grows upward, free space, and a stack that grows downward."
+   },
+   "example": "A local array int a[3][4] has base address 2000, and an int takes 4 bytes. (a) Give the address of a[2][1] in row-major order. (b) Give it in column-major order. (c) Give the total size of the array. (d) Give sizeof(struct { char c; int i; double d; }) when the alignment is 8 bytes. Answers: (a) 2000 + (2×4 + 1)×4 = 2000 + 36 = 2036. (b) 2000 + (1×3 + 2)×4 = 2000 + 20 = 2020. (c) 3×4×4 = 48 bytes. (d) c at 0, 3 bytes of padding, i at 4, d at 8, so 16 bytes.",
+   "trap": "Computing a struct size by adding the field sizes and forgetting padding and alignment, and swapping the index order in a two-dimensional array. Also assuming every machine grows the stack downward; write the convention down before computing offsets.",
+   "prereq": "Unit 4 (declarations, type sizes) and chapter 5.1 for activations.",
+   "leave": "Type expressions and type checking to Unit 4; array address arithmetic inside the code generator to Unit 6."
+  },
+  {
+   "k": 3,
+   "idea": "Static, stack and heap allocation are three answers to where a datum lives, and each one has a rule it cannot break.",
+   "depth": "Static allocation: the address is fixed before the program runs, all sizes are known at compile time, so recursion, variable-size arrays and data created at run time are impossible. Stack allocation: the activation record is pushed at entry and popped at return, which is exactly why recursion works, and a pointer to a popped frame dangles. Heap allocation: malloc or new takes a block from a free list and free or delete returns it; fixed-size versus variable-size blocks; internal fragmentation (space wasted inside an allocated block) and external fragmentation (many small free blocks that are each too small); first-fit, best-fit and next-fit placement; the buddy system in one line, since only a few universities teach it. Name garbage collection methods, reference counting, mark-and-sweep and copying collection, without working them out. End with how the compiler's storage-class decision picks the strategy for each name.",
+   "figure": {
+    "type": "array",
+    "title": "Stack of three nested calls of f",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Frame",
+      "cells": [
+       "main",
+       "f #1",
+       "f #2",
+       "f #3",
+       "free"
+      ],
+      "marks": {
+       "0": "accent",
+       "3": "live",
+       "4": "muted"
+      }
+     },
+     {
+      "label": "Bytes",
+      "cells": [
+       "—",
+       "48",
+       "48",
+       "48",
+       "—"
+      ]
+     }
+    ],
+    "pointers": [
+     {
+      "row": 0,
+      "cell": 3,
+      "label": "SP"
+     }
+    ],
+    "aria": "Stack memory holding main's frame and three nested activation records of f, 48 bytes each, with the stack pointer on the newest record."
+   },
+   "example": "A function f has an activation record of 48 bytes. The stack pointer is at address 8000 just before the first call, and the stack grows toward lower addresses. main calls f, and f calls itself twice, so three records of f are live. (a) Give the stack pointer after each of the three calls. (b) Give the total stack space used. (c) A free list holds blocks of 200, 400, 300 and 600 bytes; a request for 300 bytes arrives. Which block does first-fit take and which does best-fit take? Answers: (a) 7952, then 7904, then 7856. (b) 3 × 48 = 144 bytes. (c) first-fit takes the 400-byte block, the first block in list order that is large enough, leaving 100; best-fit takes the 300-byte block, an exact fit, leaving 0.",
+   "trap": "Claiming static allocation and recursion can live together, or confusing static storage with the static keyword of Java and C#. In first-fit the list order decides the answer, so read the list left to right before choosing.",
+   "prereq": "Chapter 5.2 for the memory regions.",
+   "leave": "Garbage collection algorithms and optimization to later units; the internal layout of the record to 5.4."
+  },
+  {
+   "k": 4,
+   "idea": "One call means one activation record, and the caller and the callee take fixed turns to build it, use it and remove it.",
+   "depth": "The fields of an activation record, also called a frame, stack frame or call frame, in the usual order: actual parameters, a slot for the returned value, the control link (dynamic link) holding the caller's frame pointer, the access link (static link) pointing at the lexically enclosing record, saved machine status and registers, local data, temporaries. The calling sequence split into caller actions and callee actions: the caller evaluates the actuals, places them, saves the registers it still needs, stores the return address and jumps; the callee saves the old frame pointer, copies the stack pointer into the frame pointer, saves registers, and extends the stack for locals. The return sequence reverses this and restores the stack pointer. Caller-saves versus callee-saves conventions. Frame pointer versus stack pointer, and variable-size frames that need the local area addressed from the stack pointer. The display for nested procedures: only a few universities teach it, one line. Keep every field word-aligned and state the convention before giving offsets.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One activation record, 4-byte words",
+    "nodes": [
+     {
+      "id": "fp",
+      "label": "Old FP",
+      "note": "FP + 0, control link",
+      "style": "accent"
+     },
+     {
+      "id": "ra",
+      "label": "Return address",
+      "note": "FP + 4",
+      "style": "normal"
+     },
+     {
+      "id": "pa",
+      "label": "Param a",
+      "note": "FP + 8",
+      "style": "normal"
+     },
+     {
+      "id": "pb",
+      "label": "Param b",
+      "note": "FP + 12",
+      "style": "normal"
+     },
+     {
+      "id": "lx",
+      "label": "Local x",
+      "note": "FP + 16",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "fp",
+      "to": "ra"
+     },
+     {
+      "from": "ra",
+      "to": "pa"
+     },
+     {
+      "from": "pa",
+      "to": "pb"
+     },
+     {
+      "from": "pb",
+      "to": "lx"
+     }
+    ],
+    "aria": "An activation record read from the old frame pointer at offset 0 down to the local variable at offset 16, one four-byte word each."
+   },
+   "example": "A function has two int parameters a and b, one local int x, a saved old frame pointer and a return address. Words are 4 bytes, the stack grows down, and on entry the frame pointer FP is set to the first word of the record. Give the offset of every field from FP and the size of the record. Answer: old FP at FP + 0 (the control link), return address at FP + 4, a at FP + 8, b at FP + 12, x at FP + 16, so the record is 20 bytes, rounded up to 24 when the next record must start on an 8-byte boundary.",
+   "trap": "Mixing up the control link, which points at the caller's record, with the access link, which points at the lexically enclosing record, and giving the callee the caller's jobs. Offsets depend on the stated convention, so write the convention first and keep it.",
+   "prereq": "Chapters 5.2 and 5.3.",
+   "leave": "Parameter passing mechanisms to 5.5; object layout and dynamic dispatch to an elective."
+  },
+  {
+   "k": 5,
+   "idea": "The parameter passing mechanism decides whether the callee gets a copy of the argument or the argument's address, and that changes what the program prints.",
+   "depth": "Mechanisms: call by value (copy in), call by reference (the address is stored in the record and every use dereferences it), call by value-result or copy-restore (copy in at call, copy out at return), call by result (copy out only), call by name (the argument text is substituted and re-evaluated at every use), and call by need (evaluated once, then memoised). What the record stores for each, one word or a block. Arrays and large records are passed by reference in C; const reference in C++ keeps the no-copy of a reference; Java passes the object reference by value, so the callee can change the object but cannot rebind the caller's variable. Overloaded methods are resolved at compile time from the signature, with no run-time cost; generic methods are instantiated once per type. Cost comparison: value copies the object, reference copies one word.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "main",
+     "swap",
+     "x and y"
+    ],
+    "messages": [
+     {
+      "from": "main",
+      "to": "swap",
+      "label": "address of x",
+      "dashed": false
+     },
+     {
+      "from": "main",
+      "to": "swap",
+      "label": "address of y",
+      "dashed": false
+     },
+     {
+      "from": "swap",
+      "to": "x and y",
+      "label": "read x = 3",
+      "dashed": false
+     },
+     {
+      "from": "swap",
+      "to": "x and y",
+      "label": "read y = 7",
+      "dashed": false
+     },
+     {
+      "from": "swap",
+      "to": "x and y",
+      "label": "write x := 7",
+      "dashed": false
+     },
+     {
+      "from": "swap",
+      "to": "x and y",
+      "label": "write y := 3",
+      "dashed": false
+     },
+     {
+      "from": "swap",
+      "to": "main",
+      "label": "return",
+      "dashed": true
+     }
+    ],
+    "aria": "Call by reference: main passes the addresses of x and y, swap reads 3 and 7 through them and writes back 7 and 3."
+   },
+   "example": "procedure swap(int a, int b) { int t = a; a = b; b = t; } is called as swap(x, y) with x = 3 and y = 7. Give x and y after the call under (a) call by value, (b) call by reference, (c) call by value-result. (d) main also has i = 1 and A = [10, 20, 30, 40], and procedure f(int p) { i = 3; p = p + 1; } is called as f(A[i]). Give A[1] and A[3] under call by value, call by reference and call by name. Answers: (a) x = 3, y = 7. (b) x = 7, y = 3. (c) x = 7, y = 3. (d) value: A[1] = 10, A[3] = 30, only i changes to 3; reference: p is A[1], so A[1] = 11; name: p means A[i] and i is now 3, so A[3] = 31 and A[1] stays 10.",
+   "trap": "Assuming call by reference and call by value-result always print the same thing; they differ when two formal parameters alias the same variable. Also, Java passes object references by value, not by reference.",
+   "prereq": "Chapter 5.4 for where parameters sit in the record.",
+   "leave": "The type check that actual and formal parameters match to Unit 4."
+  },
+  {
+   "k": 6,
+   "idea": "The symbol table is the compiler's map from a name to its attributes, and the scope rules decide which declaration a use finds.",
+   "depth": "A symbol table entry holds name, kind, type, size, offset or address, scope, storage class and source line. Operations: insert, lookup, and delete when a scope ends. Four structures with their costs: unordered list, n comparisons; sorted list with binary search, about log₂ n; binary search tree, log₂ n when balanced and n when not; hash table, constant on average. Hash functions, buckets, chaining versus open addressing, and the rule that a collision never overwrites an old entry. Block-structured scope: a stack of tables, one marker per scope on each entry, lookup from the innermost table outward, shadowing of an outer declaration, and undo on exit. Binding times with one example each: language design time, compile time, link time, load time, run time. Dynamic scoping implemented by a deep access along the control chain or a shallow association list, in a line; only a few universities go deeper.",
+   "figure": {
+    "type": "sets",
+    "mode": "nested",
+    "sets": [
+     {
+      "label": "Global",
+      "items": [
+       "x = 1",
+       "f"
+      ]
+     },
+     {
+      "label": "f's body",
+      "items": [
+       "a = 2"
+      ]
+     },
+     {
+      "label": "inner block",
+      "items": [
+       "x = 3"
+      ]
+     }
+    ],
+    "aria": "Three nested scopes: the global scope declares x and f, the body of f declares a, and the inner block declares a second x that hides the global one."
+   },
+   "example": "A symbol table uses 11 buckets and the hash function h(name) = (sum of the alphabet positions of the letters) mod 11, with collisions handled by chaining. Insert sum, max, min, avg, tmp in that order and show the buckets. Then, for int x = 1; void f() { int a = 2; { int x = 3; print(x + a); } print(x); } give the two printed values under static scoping. Answers: sum gives 53 mod 11 = 9; max gives 38 mod 11 = 5; min gives 36 mod 11 = 3; avg gives 30 mod 11 = 8; tmp gives 49 mod 11 = 5 and is chained after max. Buckets: 3 holds min, 5 holds max then tmp, 8 holds avg, 9 holds sum. The prints are 3 + 2 = 5 from the inner block, then 1 from the global x once the block has ended.",
+   "trap": "On a hash collision, putting the new name in place of the old one destroys the old entry; the new entry joins the chain and lookup compares names along it. Also, after a block ends the inner declaration stops shadowing, so the outer name is visible again.",
+   "prereq": "Unit 1 (the symbol table idea), Units 2 and 3 (parsing) and Unit 4 (semantic analysis).",
+   "leave": "Building the table from a parse tree and evaluating attributes to Units 2, 3 and 4."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "lifetimes from the activation tree choose the memory region"
+  ],
+  [
+   2,
+   3,
+   "the memory regions fix what each allocation strategy can do"
+  ],
+  [
+   3,
+   4,
+   "the stack region is filled with activation records"
+  ],
+  [
+   4,
+   5,
+   "parameters are the first fields of the record"
+  ],
+  [
+   6,
+   4,
+   "the table stores each name's offset in its record"
+  ],
+  [
+   1,
+   6,
+   "scope rules decide which declaration a use finds"
+  ],
+  [
+   2,
+   6,
+   "layout sizes become the offsets kept in the table"
+  ]
+ ]
+}

@@ -1,0 +1,198 @@
+{
+ "lead": "Run-time memory is not one flat pool. The compiler cuts a process into a few regions: target code, static data, heap, free space and stack. Each datum goes to the region whose lifetime rule fits it. A global lives for the whole run; a local lives while its call is active; a dynamically created object lives until it is freed. This chapter shows the regions, the usual stack and heap directions, and the byte-level layout of records and arrays. Address arithmetic in the compiler depends on these sizes and offsets, so they must be exact.",
+ "prereq": "You need Unit 4 for declarations and type sizes, and <a href=\"#runtime-environments-and-source-language-issues\">chapter 5.1</a> for activations.",
+ "sections": [
+  {
+   "h3": "Regions of one process",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When a program runs, the operating system gives the process a block of memory. The compiler divides that block into regions. Target code holds the machine instructions and has a fixed size. Static data holds globals, constants and string literals; its size is fixed at compile time. The heap holds objects created while the program runs. The stack holds activation records for calls, including parameters and locals. Free space sits between the heap and the stack."
+    },
+    {
+     "type": "p",
+     "text": "State the machine convention before computing any offset. On most machines the stack grows toward lower addresses: a push subtracts from the stack pointer. The heap grows toward higher addresses. So the free gap shrinks from both sides. A few machines grow the stack upward, so the compiler's target description must record the direction."
+    },
+    {
+     "type": "p",
+     "text": "The stack region is not the same as the data structure stack. It is the call stack of <a href=\"#activation-records-and-implementing-function-calls\">activation records</a>. Each call gets a new record; return removes it. The heap has no such call order. An object there stays until the program frees it or the process ends."
+    }
+   ]
+  },
+  {
+   "h3": "Static and dynamic allocation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A compiler prefers fixed addresses when it can. If the size of an object is known at compile time, the compiler can reserve space in the static data region. A global <code>int count;</code> gets one fixed address for the whole run. A local with a fixed size is placed at a fixed offset inside its activation record; the record moves, but the offset does not. This is static allocation in the simple sense: address or offset fixed before the program starts."
+    },
+    {
+     "type": "p",
+     "text": "When the size is not known at compile time, the compiler cannot use a fixed offset. The object is allocated dynamically, usually on the heap, at run time. The program receives a pointer or reference. The same happens when an object must outlive the call that created it: a local variable dies at return, so a returned object cannot be that local."
+    },
+    {
+     "type": "p",
+     "text": "Scope and lifetime are different. Scope is the part of the program text where a name is visible. Lifetime is the time interval in which the storage exists. A global name has whole-program scope and whole-run lifetime. A local name has block scope and activation lifetime. A heap object can have lifetime longer than the scope of the pointer that names it."
+    },
+    {
+     "type": "p",
+     "text": "Source languages offer storage classes: global, local and dynamically created. <a href=\"#storage-allocation-strategies-static-stack-and-heap\">Chapter 5.3</a> gives the three allocation strategies that implement them."
+    }
+   ]
+  },
+  {
+   "h3": "Data layout: bytes, alignment and arrays",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Memory is byte-addressable: an address names one byte. A word is the natural unit for a load or store, often 4 bytes or 8 bytes. A type such as <code>int</code> or <code>double</code> has a size in bytes and an alignment. If an object of size S has alignment A, its address must be a multiple of A. The compiler inserts padding bytes so every field of a record, also called a struct, meets its alignment. It may also pad the end of the record so an array of records keeps every element aligned. The size of a record is not the sum of its field sizes."
+    },
+    {
+     "type": "p",
+     "text": "For a two-dimensional array <code>a[R][C]</code>, row-major order stores row 0, then row 1, and so on. Column-major order stores column 0, then column 1. Let <code>base</code> be the address of <code>a[0][0]</code>, <code>R</code> the number of rows, <code>C</code> the number of columns, and <code>S</code> the size of one element in bytes."
+    },
+    {
+     "type": "formula",
+     "text": "addr(a[i][j]) = base + (i × C + j) × S in row-major order; addr(a[i][j]) = base + (j × R + i) × S in column-major order",
+     "where": "i is the row index and j is the column index, both counted from 0; R is rows, C is columns, S is element size in bytes, and base is the address of a[0][0]."
+    },
+    {
+     "type": "p",
+     "text": "A union is a record whose fields overlap: all fields start at offset 0, and the size is the largest field size rounded up to the union's alignment. Every address the compiler computes uses these sizes. If a size is unknown, the compiler cannot turn <code>a[i]</code> into a byte offset. See Unit 6 for array address arithmetic in the code generator."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One process gets a fixed set of regions. The heap grows to higher addresses and the stack to lower addresses; free space between them shrinks as either grows.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Run-time memory of one process",
+   "nodes": [
+    {
+     "id": "c",
+     "label": "Target code",
+     "note": "fixed size",
+     "style": "muted"
+    },
+    {
+     "id": "s",
+     "label": "Static data",
+     "note": "globals, constants",
+     "style": "accent"
+    },
+    {
+     "id": "h",
+     "label": "Heap",
+     "note": "grows to higher addresses",
+     "style": "live"
+    },
+    {
+     "id": "f",
+     "label": "Free space",
+     "style": "muted"
+    },
+    {
+     "id": "k",
+     "label": "Stack",
+     "note": "grows to lower addresses",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "c",
+     "to": "s"
+    },
+    {
+     "from": "s",
+     "to": "h"
+    },
+    {
+     "from": "h",
+     "to": "f"
+    },
+    {
+     "from": "f",
+     "to": "k"
+    }
+   ],
+   "aria": "The memory of a process split into target code, static data, a heap that grows upward, free space, and a stack that grows downward."
+  }
+ },
+ "examples": [
+  {
+   "question": "An <code>int</code> is 4 bytes. A local array is declared <code>int a[3][4];</code> and its base address is 2000. (a) Give the address of <code>a[2][1]</code> in row-major order. (b) Give the same element in column-major order. (c) Give the total size of the array in bytes. (d) Give <code>sizeof(struct { char c; int i; double d; })</code> when the alignment of <code>double</code> is 8 bytes.",
+   "steps": [
+    "Identify R = 3 rows, C = 4 columns, S = 4 bytes per int, base = 2000, i = 2, j = 1.",
+    "Row-major offset = (i × C + j) × S = (2 × 4 + 1) × 4 = 9 × 4 = 36 bytes. Address = 2000 + 36 = 2036.",
+    "Column-major offset = (j × R + i) × S = (1 × 3 + 2) × 4 = 5 × 4 = 20 bytes. Address = 2000 + 20 = 2020.",
+    "Total size = R × C × S = 3 × 4 × 4 = 48 bytes.",
+    "Struct layout: char c at offset 0, size 1. The int needs alignment 4, so 3 padding bytes, then i at offset 4, size 4, ending at 8. The double needs alignment 8, so d at offset 8, size 8, ending at 16. Total struct size = 16 bytes."
+   ],
+   "answer": "(a) 2036 (b) 2020 (c) 48 bytes (d) 16 bytes.",
+   "check": "base = 2000\nrows = 3\ncols = 4\nsize = 4\ni = 2\nj = 1\nrow_major = base + (i * cols + j) * size\ncol_major = base + (j * rows + i) * size\ntotal = rows * cols * size\nstruct_size = 16\nprint(row_major)\nprint(col_major)\nprint(total)\nprint(struct_size)",
+   "values": [
+    2036,
+    2020,
+    48,
+    16
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Adding field sizes and forgetting padding: char, int and double are not 1 + 4 + 8 = 13 bytes when alignment forbids that layout.",
+  "Swapping the index order or using C where R belongs in a two-dimensional address formula; row-major uses columns and column-major uses rows.",
+  "Assuming every machine grows the stack downward; write the convention down before computing any offset.",
+  "Confusing scope with lifetime: a heap object can outlive the local pointer whose scope has ended.",
+  "Using the wrong element size, such as 4 bytes for int where the target uses 2, or bytes for words."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the five regions of a process's run-time memory in order from low to high addresses on the usual convention.",
+   "marks": 2,
+   "a": "Target code, static data, heap, free space, stack."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the compiler know whether the stack grows up or down before it computes an offset?",
+   "marks": 3,
+   "a": "The sign of the offset changes: a push may subtract from or add to the stack pointer, so the same local sits at a different relative address."
+  },
+  {
+   "level": "apply",
+   "q": "An int is 4 bytes and int a[4][5] has base 1000. Give the address of a[3][2] in row-major order.",
+   "marks": 4,
+   "a": "Offset = (3 × 5 + 2) × 4 = 17 × 4 = 68 bytes. Address = 1000 + 68 = 1068."
+  },
+  {
+   "level": "apply",
+   "q": "Give sizeof(struct { char c; short s; int i; }) when the alignment is 4 bytes.",
+   "marks": 4,
+   "a": "c at 0; 1 padding byte; s at 2; i at 4; total 8 bytes."
+  },
+  {
+   "level": "analyze",
+   "q": "A function returns a pointer to a heap object, and the local pointer dies. Is the heap object's lifetime ended? Explain scope and lifetime.",
+   "marks": 4,
+   "a": "No. The pointer's scope ended, but the heap object's lifetime continues until it is freed. Scope is where a name is visible; lifetime is when storage exists."
+  },
+  {
+   "level": "analyze",
+   "q": "Same array int a[4][5], base 1000, int 4 bytes. Compare the addresses of a[3][2] in row-major and column-major order.",
+   "marks": 5,
+   "a": "Row-major offset = (3 × 5 + 2) × 4 = 68, address 1068. Column-major offset = (2 × 4 + 3) × 4 = 44, address 1044. The difference is 24 bytes."
+  },
+  {
+   "level": "understand",
+   "q": "Give the size of union U { int i; double d; char c[10]; } when the alignment is 8 bytes.",
+   "marks": 3,
+   "a": "The largest field is c[10], 10 bytes. Round up to the alignment 8, so the union size is 16 bytes."
+  }
+ ],
+ "beyond": "Not for the exam. Real processors add alignment rules that go beyond a simple C ABI; cache lines are often 64 bytes, so padding can change speed as well as size. Heap allocators keep metadata and may round sizes, so the address returned is not the whole cost of an allocation. Security features such as stack canaries and address space layout randomization move or guard these regions. Read your target's ABI document and search for data layout, ABI, struct padding and cache line alignment."
+}

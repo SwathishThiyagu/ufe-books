@@ -1,0 +1,237 @@
+{
+ "lead": "Every call needs a small private bundle of memory: arguments, the return point, saved registers, and the caller's frame pointer. That bundle is one activation record, also called a frame. One call means one record, pushed when the call starts and popped when it returns. C, C++ and Java compilers use this scheme. It explains stack overflow, debugger backtraces and why deep recursion crashes an app.",
+ "prereq": "You need: <a href=\"#storage-organization-and-runtime-data-layout\">Chapter 5.2</a> for run-time memory regions and <a href=\"#storage-allocation-strategies-static-stack-and-heap\">Chapter 5.3</a> for why call data goes on the stack.",
+ "sections": [
+  {
+   "h3": "What one activation record holds",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An activation record is the stack memory for one execution of a procedure. Other names are frame, stack frame and call frame. One call, one record: pushed at entry, popped at return."
+    },
+    {
+     "type": "p",
+     "text": "Fix the convention first. Here one word is 4 bytes, the stack grows towards lower addresses, and after the callee sets FP = SP, FP points at the saved old FP. Parameters sit at FP + 8 and above; locals sit at FP - 4 and below."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Actual parameters: caller evaluates these and places them at FP + 8 and above.",
+      "Return-value slot, unless the value comes back in a register.",
+      "Control link, also called dynamic link: caller's FP, saved by callee at FP + 0.",
+      "Access link, also called static link: FP of the lexically enclosing procedure's record. Present only when the language nests procedures.",
+      "Saved machine status: return address at FP + 4, plus registers and condition codes the callee must preserve.",
+      "Local data: variables declared in the body, at FP - 4 and below.",
+      "Temporaries: intermediate values the compiler needs while evaluating an expression, also below FP."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Keep every field word-aligned. A misaligned field costs extra loads and shifts every later offset."
+    }
+   ]
+  },
+  {
+   "h3": "Calling sequence: caller's turn, then callee's turn",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The work splits at a fixed line: caller prepares, callee builds and owns the frame. The agreement about who places what where and who saves which register is the calling convention. Code that ignores it cannot call library functions."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Caller evaluates every actual parameter and places each value in its slot or in a register, in the order the convention fixes.",
+      "Caller saves the caller-saved registers whose values it still needs after the call returns.",
+      "Caller stores the return address, the address of the next instruction, and jumps to the callee's entry point. On many machines one call instruction does both.",
+      "Callee decrements SP by one word and saves the old frame pointer there; this address becomes FP + 0 once FP is set.",
+      "Callee copies SP into FP. The frame no longer moves, so every local gets a fixed offset.",
+      "Callee saves the callee-saved registers it will use.",
+      "Callee moves SP down by the size of locals plus temporaries, reserving that space."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The callee fixes the frame before touching any local variable."
+    }
+   ]
+  },
+  {
+   "h3": "Return sequence and who saves which register",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The return sequence undoes the call in reverse."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Callee places the returned value in its slot or in the agreed register.",
+      "Callee restores the callee-saved registers, then reloads the old FP from FP + 0.",
+      "Callee sets SP to FP + 4, dropping old FP, locals and temporaries in one move, and jumps to the return address.",
+      "Caller restores its own saved registers and moves SP past the parameter slots, so its frame is exactly as before."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A register is caller-saved if a call may destroy its value, so the caller must save it first. A register is callee-saved if the callee must restore it before returning, so the caller may keep a value there across the call. Real machines have some of each. The split saves work: a value the caller never needs again is destroyed for free."
+    }
+   ]
+  },
+  {
+   "h3": "Frame pointer, stack pointer and variable-size frames",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "FP stays fixed for the whole body. A local's address is one addition away, and a debugger walks the chain of control links to print main called f called g without a symbol table."
+    },
+    {
+     "type": "p",
+     "text": "SP moves whenever the procedure pushes a temporary or calls another procedure. If the frame size is known at compile time, locals are addressed from FP and SP is only bookkeeping. If the frame size can change, as with alloca or a variable-length array, the growing area must be addressed from SP, and the compiler tracks the SP offset at every point in the body."
+    },
+    {
+     "type": "p",
+     "text": "Nested procedures need the access link. It points at the record of the lexically enclosing procedure, fixed by the scope rules of the source text, not by who called whom. A display is an array holding a pointer to the current record of each nesting level, so a non-local reference costs one array lookup instead of a walk along the links; only a few universities teach it."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Five words from FP + 12 down to FP - 4. The callee writes the control link first; the return sequence reads it to restore the caller's FP, and the final jump reads the return address last.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One activation record, 4-byte words",
+   "nodes": [
+    {
+     "id": "pb",
+     "label": "Param b",
+     "note": "FP + 12",
+     "style": "normal"
+    },
+    {
+     "id": "pa",
+     "label": "Param a",
+     "note": "FP + 8",
+     "style": "normal"
+    },
+    {
+     "id": "ra",
+     "label": "Return address",
+     "note": "FP + 4",
+     "style": "normal"
+    },
+    {
+     "id": "fp",
+     "label": "Old FP",
+     "note": "FP + 0, control link",
+     "style": "accent"
+    },
+    {
+     "id": "lx",
+     "label": "Local x",
+     "note": "FP - 4",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "pb",
+     "to": "pa"
+    },
+    {
+     "from": "pa",
+     "to": "ra"
+    },
+    {
+     "from": "ra",
+     "to": "fp"
+    },
+    {
+     "from": "fp",
+     "to": "lx"
+    }
+   ],
+   "aria": "An activation record with parameter b at FP + 12 at the top, then parameter a, the return address, the saved old FP at FP + 0, and local x at FP - 4 at the bottom."
+  }
+ },
+ "examples": [
+  {
+   "question": "A function f(int a, int b) has two int parameters, one local int x, a saved old frame pointer and a return address. Words are 4 bytes, the stack grows down, and after FP = SP, FP points at the saved old FP. Give the offset of every field from FP and the size of the record, rounded so that the next record starts on an 8-byte boundary.",
+   "steps": [
+    "Convention first: word = 4 bytes, stack grows down, FP points at the saved old FP. Parameters sit at positive offsets; locals sit at negative offsets.",
+    "The callee pushes the old FP first, so the control link is at FP + 0.",
+    "The return address, stored by the call, is one word above: FP + 4.",
+    "Parameter a, placed by the caller, is at FP + 8.",
+    "Parameter b is the next word: FP + 12.",
+    "The only local, x, is below FP: FP - 4.",
+    "Count the words: old FP, return address, a, b, x = 5 words. Size = 5 × 4 = 20 bytes.",
+    "Align: 20 is not a multiple of 8, so round up to 24 bytes. The 4 bytes of padding sit below x at FP - 8."
+   ],
+   "answer": "Old FP at FP + 0, return address at FP + 4, a at FP + 8, b at FP + 12, x at FP - 4. Fields total 20 bytes; the record is 24 bytes with 4 bytes of padding below x.",
+   "check": "def main():\n    word = 4\n    offsets = [0, 4, 8, 12, -4]\n    for off in offsets:\n        print(off)\n    size = 5 * word\n    print(size)\n    print(((size + 7) // 8) * 8)\n\nmain()",
+   "values": [
+    0,
+    4,
+    8,
+    12,
+    -4,
+    20,
+    24
+   ],
+   "output": "0\n4\n8\n12\n-4\n20\n24"
+  }
+ ],
+ "traps": [
+  "Swapping the control link and the access link. The control link follows the call chain and points at the caller's record; the access link follows the source text and points at the lexically enclosing record.",
+  "Giving the callee the caller's jobs, such as saying the callee evaluates the actual parameters or stores the return address.",
+  "Quoting offsets without stating the convention. A stack that grows up, or a different word size, changes every number.",
+  "Forgetting the return address when counting words, giving 16 bytes instead of 20 for the worked example."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the two links stored in an activation record and say in one line what each points to.",
+   "marks": 2,
+   "a": "The control (dynamic) link points to the caller's record, the record of the procedure that made the call. The access (static) link points to the record of the lexically enclosing procedure."
+  },
+  {
+   "level": "remember",
+   "q": "What does the callee do immediately after saving the old frame pointer?",
+   "marks": 2,
+   "a": "It copies the stack pointer into the frame pointer, fixing the frame. Then it saves any callee-saved registers and moves SP down for locals and temporaries."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the return address kept in the activation record rather than in one fixed register?",
+   "marks": 3,
+   "a": "Calls nest. f calls g calls h: each call must remember its own return point. A single register would hold only the latest one. Storing it in the record gives each activation its own copy, so returns unwind correctly."
+  },
+  {
+   "level": "understand",
+   "q": "Explain caller-saved and callee-saved registers with a small example.",
+   "marks": 3,
+   "a": "A caller-saved register may be destroyed by a call, so the caller saves it before jumping and restores it after. A callee-saved register must be restored by the callee before returning, so the caller can keep a loop counter there across calls. Each register is assigned to one class so both sides know the rule without inspecting the other's code."
+  },
+  {
+   "level": "apply",
+   "q": "A function has three int parameters, two int locals, 4-byte words, a downward stack, and FP at the control link. Give the offset of each field and the record size rounded to a multiple of 8.",
+   "marks": 4,
+   "a": "Old FP FP + 0, return address FP + 4, parameters FP + 8, FP + 12, FP + 16, locals FP - 4 and FP - 8. That is 7 words = 28 bytes; the next multiple of 8 is 32 bytes, so 4 bytes of padding below the locals."
+  },
+  {
+   "level": "analyze",
+   "q": "A procedure calls alloca partway through its body. Why must the growing area be addressed from SP?",
+   "marks": 5,
+   "a": "FP cannot change, otherwise every fixed offset for parameters and saved registers breaks. The block alloca returns has a size known only at run time, so the compiler cannot give it a fixed FP offset. It addresses it relative to the current SP instead, and keeps track of SP's value at each program point so the offset used is correct."
+  },
+  {
+   "level": "analyze",
+   "q": "A recursive function overflows the stack at depth 50000 while a loop doing the same work runs fine. Explain using activation records.",
+   "marks": 4,
+   "a": "Each call pushes a new record and none is popped until the call returns, so depth d means d live records. Total stack is d × record size, which is bounded. A loop reuses one record, so its stack use is constant. The fix is to reduce the record size or convert the recursion to iteration or an explicit heap stack."
+  }
+ ],
+ "beyond": "Not for the exam. x86-64 passes the first six integer arguments in registers and spills the rest to the stack. ARM keeps the return address in a link register; a leaf function need not spill it, so a leaf procedure may need no record at all. Unwinding tables let a debugger or exception handler walk frames without a frame pointer. Search for calling convention, stack unwinding and tail call optimisation."
+}

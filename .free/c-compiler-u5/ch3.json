@@ -1,0 +1,201 @@
+{
+ "lead": "Every datum in a running program needs an address, and the compiler must choose how that address is fixed. Static allocation fixes every address before the program starts. Stack allocation ties an address to a call and releases it at return. Heap allocation hands out blocks on demand and takes them back when the program asks. These three strategies answer different lifetime questions, so each forbids some programs and makes others easy. The choice is made name by name from the source language's storage rules.",
+ "prereq": "You need <a href=\"#storage-organization-and-runtime-data-layout\">Chapter 5.2</a> for the run-time memory regions.",
+ "sections": [
+  {
+   "h3": "Static allocation: fixed before the run",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Static allocation gives a name one address for the whole run. The compiler knows every size at compile time, so it can place globals, constants, string literals and fixed tables at fixed addresses. The linker fixes those addresses before execution. Code loads the address directly; no stack pointer or free list is involved."
+    },
+    {
+     "type": "p",
+     "text": "The rule cannot bend. A recursive procedure needs a new activation record for each live call. Under static allocation the second call would reuse the first call's address and overwrite its data. A variable-size array needs an address that depends on a run-time size. An object made by malloc or new needs space chosen while the program runs. None fits."
+    },
+    {
+     "type": "p",
+     "text": "Static allocation is cheap to address and expensive in space: a block stays reserved even when the program is not using it. Use it for data whose lifetime is the whole program and whose size is fixed."
+    }
+   ]
+  },
+  {
+   "h3": "Stack allocation: one frame per live call",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Stack allocation ties storage to calls. Each call pushes an activation record: the block holding parameters, locals and the return address. The stack pointer (SP) marks the current top. On entry the callee lowers SP by the record size; on return SP is restored to its old value, so the record is popped. The discipline is last-in, first-out."
+    },
+    {
+     "type": "p",
+     "text": "Recursion works because every live call has its own record. If f calls itself three times, three records of f exist; each call reads and writes its own locals. The figure shows this: main's record, then three 48-byte records of f, with SP on the newest."
+    },
+    {
+     "type": "p",
+     "text": "The same rule creates the dangling pointer. A pointer to a local variable points into a record. When the call returns, the record is popped and its bytes may be reused by the next call. The pointer still holds the old address, so using it is an error. The compiler cannot stop every such use; the language rules must."
+    },
+    {
+     "type": "p",
+     "text": "Stack allocation suits locals, parameters and compiler temporaries whose lifetime ends at return. See <a href=\"#activation-records-and-implementing-function-calls\">Chapter 5.4</a> for the record's internal layout."
+    }
+   ]
+  },
+  {
+   "h3": "Heap allocation: blocks on demand",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Heap allocation gives blocks whose lifetime is not tied to a call. The program calls malloc in C or new in C++ and Java when it needs an object at run time. The allocator takes a block from its free list, a list of free regions. free in C or delete in C++ returns the block; Java and similar languages use a garbage collector instead."
+    },
+    {
+     "type": "p",
+     "text": "Blocks may be fixed size or variable size. A fixed-size pool is simple and fast, but a request for a different size needs another pool. Variable-size allocation matches requests, but leaves fragmentation. Internal fragmentation is wasted space inside an allocated block, for example a 210-byte request rounded up to a 256-byte block. External fragmentation is many small free blocks that are each too small for a request, though their total is large. Coalescing adjacent free blocks helps external fragmentation."
+    },
+    {
+     "type": "p",
+     "text": "Placement picks which free block to use. First-fit takes the first block in list order that is large enough. Best-fit takes the smallest block that is large enough, which may leave a tiny remainder. Next-fit starts the search where the last placement stopped. The buddy system splits and merges power-of-two blocks, so a block and its buddy can coalesce."
+    },
+    {
+     "type": "p",
+     "text": "Automatic reclamation has three standard names: reference counting, mark-and-sweep and copying collection. Their algorithms belong to a later unit."
+    }
+   ]
+  },
+  {
+   "h3": "The compiler's decision for each name",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The compiler chooses a strategy for each name. Its symbol table records the storage class: static, automatic or heap. A global variable or a C static local gets static storage. A local whose address is not taken may live in a register; if its address is taken, it goes on the stack. A pointer variable may be automatic while the object it points to is on the heap."
+    },
+    {
+     "type": "p",
+     "text": "Language rules override simple names. In Java, an object made by new lives on the heap, while the reference that names it may be a stack local. A C static local keeps one fixed address across calls, so it behaves like a global for allocation but is visible only in its block. See <a href=\"#symbol-tables-scope-and-binding\">Chapter 5.6</a> for how the symbol table stores these attributes."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "main's frame is followed by three 48-byte records of f; the stack pointer sits on the newest record after the third call.",
+  "spec": {
+   "type": "array",
+   "title": "Stack of three nested calls of f",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Frame",
+     "cells": [
+      "main",
+      "f #1",
+      "f #2",
+      "f #3",
+      "free"
+     ],
+     "marks": {
+      "0": "accent",
+      "3": "live",
+      "4": "muted"
+     }
+    },
+    {
+     "label": "Bytes",
+     "cells": [
+      "—",
+      "48",
+      "48",
+      "48",
+      "—"
+     ]
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 3,
+     "label": "SP"
+    }
+   ],
+   "aria": "Stack memory holding main's frame and three nested activation records of f, 48 bytes each, with the stack pointer on the newest record."
+  }
+ },
+ "examples": [
+  {
+   "question": "A function f has an activation record of 48 bytes. The stack pointer is 8000 just before the first call, and the stack grows toward lower addresses. main calls f, and f calls itself twice, so three records of f are live. (a) Give SP after each of the three calls. (b) Give total stack space used by those three records. (c) A free list holds blocks of 200, 400, 300 and 600 bytes in that order; a request for 300 bytes arrives. Which block does first-fit take, and which does best-fit take? Give the remainder in each case.",
+   "steps": [
+    "One call subtracts 48 bytes: 8000 − 48 = 7952.",
+    "Second call: 7952 − 48 = 7904.",
+    "Third call: 7904 − 48 = 7856.",
+    "Three records use 3 × 48 = 144 bytes. The pointer values alone do not add; this is the f records only.",
+    "First-fit scans 200 (too small), 400 (large enough), so it takes 400 bytes and leaves 400 − 300 = 100 bytes.",
+    "Best-fit compares all blocks that are at least 300: 400, 300, 600. The smallest is 300, an exact fit, leaving 0 bytes."
+   ],
+   "answer": "SP after the calls is 7952, then 7904, then 7856; the three records use 144 bytes; first-fit takes 400 bytes leaving 100, and best-fit takes 300 bytes leaving 0.",
+   "check": "sp = 8000\nrec = 48\nsp1 = sp - rec\nsp2 = sp1 - rec\nsp3 = sp2 - rec\nblocks = [200, 400, 300, 600]\nreq = 300\nfirst = next(b for b in blocks if b >= req)\nremaining_first = first - req\nbest = min((b for b in blocks if b >= req), key=lambda b: (b - req, blocks.index(b)))\nremaining_best = best - req\ntotal = 3 * rec\nprint(sp1)\nprint(sp2)\nprint(sp3)\nprint(total)\nprint(first)\nprint(best)\nprint(remaining_first)\nprint(remaining_best)",
+   "values": [
+    7952,
+    7904,
+    7856,
+    144,
+    400,
+    300,
+    100,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not put recursion under static allocation. A recursive call needs a fresh activation record; one fixed address would be overwritten.",
+  "Static storage is not the same as the static keyword in C, C++ or Java. Here it means fixed before the run; a C static local is one example, a Java static field is another.",
+  "In first-fit, list order decides. Read the free list left to right; the first block large enough wins even if a later block is a better fit.",
+  "Internal fragmentation is wasted space inside an allocated block; external fragmentation is free space outside blocks that is too scattered to use.",
+  "A heap block is not freed when its pointer goes out of scope. free or delete must run, or a garbage collector must prove the block unreachable."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State two data objects that static allocation can hold and two that it cannot.",
+   "marks": 2,
+   "a": "Can hold: a global scalar or a fixed-size table. Cannot hold: a recursive call's fresh activation, a variable-size array, or an object created by malloc/new at run time."
+  },
+  {
+   "level": "understand",
+   "q": "Why does stack allocation make recursion possible, while static allocation does not?",
+   "marks": 3,
+   "a": "Each call pushes a new activation record, so every live call has private locals and return address. Static allocation gives one fixed address per name, so a second call would overwrite the first call's data."
+  },
+  {
+   "level": "apply",
+   "q": "SP is 5000 before a call. Each activation record is 32 bytes and the stack grows down. Two nested calls occur. Give SP after each call.",
+   "marks": 3,
+   "a": "5000 − 32 = 4968; 4968 − 32 = 4936."
+  },
+  {
+   "level": "analyze",
+   "q": "A function returns the address of its local int. Explain why the caller's use of that address is unsafe.",
+   "marks": 4,
+   "a": "The local lives in the function's activation record. On return the record is popped and SP moves; the next call can reuse those bytes. The address is a dangling pointer; the value there is not the local's value and may change without warning."
+  },
+  {
+   "level": "apply",
+   "q": "Free list in order: 100, 350, 220, 400 bytes. Request 200 bytes. What does first-fit take, and what does best-fit take? Give remainders.",
+   "marks": 3,
+   "a": "First-fit: 350, leaving 150. Best-fit: 220, leaving 20."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain internal and external fragmentation with a 210-byte request, a 256-byte block and two free blocks of 120 and 90 bytes.",
+   "marks": 4,
+   "a": "Internal: the 210-byte request is placed in a 256-byte block, so 46 bytes are wasted inside the allocated block. External: free blocks of 120 and 90 bytes total 210 but neither is large enough for the request, so the free space cannot be used as separate blocks."
+  },
+  {
+   "level": "understand",
+   "q": "For each name, choose static, stack or heap storage: a global int, a local int whose address is taken, an object created by new in Java.",
+   "marks": 4,
+   "a": "Global int: static. Local int with address taken: stack. Java object made by new: heap; the reference to it is usually a stack local."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems use free-list allocators and slab allocators, and garbage collectors such as mark-and-sweep and copying collectors, to manage the heap. Real-time systems often avoid heap allocation after start-up because allocator time is hard to bound. Rust moves part of the safety check to compile time with ownership, so a value is freed when its owner dies. Search for free-list allocator, slab allocator, mark-and-sweep, copying collector, and ownership."
+}

@@ -1,0 +1,227 @@
+{
+ "lead": "When main calls swap(x, y) with x = 3 and y = 7, one rule leaves x = 3 and another leaves x = 7. That rule is the parameter passing mechanism: it fixes what the callee's activation record holds for each parameter, and what a write inside the callee does to the caller's data. A language may copy the value, copy the address, or substitute the argument text. The choice costs words in the record, shows up in the program's output, and is fixed by the compiler at every call site.",
+ "prereq": "You need: <a href=\"#activation-records-and-implementing-function-calls\">Chapter 5.4</a> for where parameters sit in the activation record.",
+ "sections": [
+  {
+   "h3": "Copy or address: the two basics",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The caller evaluates each argument and places the result in the parameter slot of the callee's activation record. The mechanism decides what goes into that slot."
+    },
+    {
+     "type": "p",
+     "text": "In <b>call by value</b> the slot holds a copy of the argument's value. For an int that is one word; for a struct it is a whole block, copied before the call. Inside the callee the parameter is a fresh variable, so a = b changes the copy and the caller's variable is untouched. C does this for scalars."
+    },
+    {
+     "type": "p",
+     "text": "In <b>call by reference</b> the slot holds the address of the argument, so the caller must pass something that has an address: a variable or an array element. The compiler emits one extra load on every use. Reading the parameter means load the address, then load the word at it. Writing stores through the address, so the caller's variable changes. Only one word is copied per call."
+    },
+    {
+     "type": "p",
+     "text": "Cost rule: call by value copies the object, call by reference copies one word."
+    }
+   ]
+  },
+  {
+   "h3": "Copy-out, text and memo",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Call by value-result</b> (copy-restore): the value is copied in, the callee works on its own copy, and at return the final value is copied back into the caller's variable. Copy-in and copy-out both cost a block.",
+      "<b>Call by result</b>: nothing is copied in; the callee must assign the parameter before using it, and the value is copied out at return. A read before the first write sees an uninitialised word.",
+      "<b>Call by name</b>: the caller passes a thunk, a small piece of code that evaluates the argument text. Every use re-evaluates the text, so side effects repeat and the value can change between two uses. Jensen's device is the classic use: Sum(i, 1, n, a[i]) passes both the loop variable i and the term a[i] by name, so the callee's loop drives the caller's i and a[i] is re-evaluated for each value of i.",
+      "<b>Call by need</b>: like call by name, but the first evaluation is stored and later uses read the stored value. Haskell works this way; a use that never happens costs nothing.",
+      "With reference or value-result, two formals can name the same variable. For reference the order of the writes decides the answer; for value-result the order of the copy-outs at return decides it."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "What C, C++, Java and Python do",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "C passes every argument by value. For an array, the array name decays to the address of its first element, so passing it copies one word, a pointer, not the array; the callee can still change the elements through that pointer. A struct passed by value is copied in full. C++ adds const T&, a reference the callee cannot write through: no copy, and the write is blocked. Java passes primitives by value and object references by value, so the callee can change the object's fields but cannot rebind the caller's variable. Python passes the object reference by value in the same way."
+    },
+    {
+     "type": "p",
+     "text": "An overloaded method is resolved at compile time from the signature: the method name plus the parameter types. The call site gets a fixed entry point, so resolution costs nothing at run time. A C++ template method is instantiated once per type it is used with, one copy of the code for int and another for String. A Java generic method is erased instead: a single copy of the code serves all type arguments, with casts inserted at the call sites."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Mechanism",
+      "Record stores",
+      "Effect of a write"
+     ],
+     "rows": [
+      [
+       "value",
+       "copy of the value",
+       "copy only"
+      ],
+      [
+       "reference",
+       "one address",
+       "caller's variable"
+      ],
+      [
+       "value-result",
+       "copy, copied back",
+       "lands at return"
+      ],
+      [
+       "result",
+       "copy out only",
+       "lands at return"
+      ],
+      [
+       "name",
+       "thunk (code)",
+       "text re-evaluated"
+      ],
+      [
+       "need",
+       "thunk and cell",
+       "evaluated once"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Call by reference: swap receives the addresses of x and y, reads 3 and 7 through them, and writes back 7 and 3, so the caller's variables do change.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "main",
+    "swap",
+    "x and y"
+   ],
+   "messages": [
+    {
+     "from": "main",
+     "to": "swap",
+     "label": "address of x",
+     "dashed": false
+    },
+    {
+     "from": "main",
+     "to": "swap",
+     "label": "address of y",
+     "dashed": false
+    },
+    {
+     "from": "swap",
+     "to": "x and y",
+     "label": "read x = 3",
+     "dashed": false
+    },
+    {
+     "from": "swap",
+     "to": "x and y",
+     "label": "read y = 7",
+     "dashed": false
+    },
+    {
+     "from": "swap",
+     "to": "x and y",
+     "label": "write x := 7",
+     "dashed": false
+    },
+    {
+     "from": "swap",
+     "to": "x and y",
+     "label": "write y := 3",
+     "dashed": false
+    },
+    {
+     "from": "swap",
+     "to": "main",
+     "label": "return",
+     "dashed": true
+    }
+   ],
+   "aria": "Call by reference: main passes the addresses of x and y, swap reads 3 and 7 through them and writes back 7 and 3."
+  }
+ },
+ "examples": [
+  {
+   "question": "procedure swap(int a, int b) { int t = a; a = b; b = t; } is called as swap(x, y) with x = 3 and y = 7. Give x and y after the call under (a) call by value, (b) call by reference, (c) call by value-result. (d) main also has i = 1 and A = [10, 20, 30, 40], and procedure f(int p) { i = 3; p = p + 1; } is called as f(A[i]). Give A[1] and A[3] under call by value, call by reference and call by name.",
+   "steps": [
+    "(a) Call by value: a and b are copies, a = 3 and b = 7. t = 3, then a = 7, then b = 3. On return the copies are discarded, so x = 3 and y = 7.",
+    "(b) Call by reference: the slot for a holds the address of x and the slot for b holds the address of y. t = 3. The write a = b stores 7 into x, so x = 7. The write b = t stores 3 into y, so y = 3.",
+    "(c) Call by value-result: copy in a = 3, b = 7. The swap gives a = 7, b = 3 on the copies. Copy out at return: x = 7 and y = 3.",
+    "(d) Call by value: p = A[1] = 10. Then i = 3. Then p = 11. Nothing is copied back, so A[1] = 10 and A[3] = 30; only i changed, to 3.",
+    "(d) Call by reference: the address of A[1] is fixed at the call. Then i = 3. The write p = p + 1 stores 11 into A[1]. So A[1] = 11 and A[3] = 30.",
+    "(d) Call by name: p means the text A[i]. The statement p = p + 1 becomes A[i] = A[i] + 1, and by then i = 3, so A[3] = 30 + 1 = 31. A[1] stays 10."
+   ],
+   "answer": "(a) x = 3, y = 7. (b) x = 7, y = 3. (c) x = 7, y = 3. (d) value: A[1] = 10, A[3] = 30. reference: A[1] = 11, A[3] = 30. name: A[1] = 10, A[3] = 31.",
+   "check": "x, y = 3, 7\na, b = x, y\nt = a; a = b; b = t\nprint(x); print(y)\n\nmem = {'x': 3, 'y': 7}\nrefs = ['x', 'y']\nt = mem[refs[0]]\nmem[refs[0]] = mem[refs[1]]\nmem[refs[1]] = t\nprint(mem['x']); print(mem['y'])\n\nx, y = 3, 7\na, b = x, y\nt = a; a = b; b = t\nx, y = a, b\nprint(x); print(y)\n\nA = [None, 10, 20, 30, 40]\ni = 1\np = A[i]\ni = 3\np = p + 1\nprint(A[1]); print(A[3])\n\nA = [None, 10, 20, 30, 40]\ni = 1\nidx = i\ni = 3\nA[idx] = A[idx] + 1\nprint(A[1]); print(A[3])\n\nA = [None, 10, 20, 30, 40]\ni = 1\ni = 3\nA[i] = A[i] + 1\nprint(A[1]); print(A[3])",
+   "values": [
+    3,
+    7,
+    7,
+    3,
+    7,
+    3,
+    10,
+    30,
+    11,
+    30,
+    10,
+    31
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Call by reference and call by value-result print the same answer unless a formal aliases storage the callee also writes. Example: a global g and procedure f(int a) { g = 5; a = a + 1; } called as f(g) - by reference g = 6, by value-result g = (old g) + 1. When two formals alias one variable, as in p(x, x) with body a = 1; b = 2, the copy-out order decides the value. Call by name is the mechanism that changes swap(i, A[i]), because A[i] is re-evaluated after i changes.",
+  "Java passes an object reference by value: the callee may change the object's fields, but an assignment to the parameter does not rebind the caller's variable.",
+  "Call by name re-evaluates the argument text at every use, so a change to i between uses changes which array element is touched.",
+  "Overload resolution uses the signature, which includes the parameter types. Dropping them in your answer turns a compile-time choice into a guessed run-time one."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the activation record hold for a call-by-value parameter?",
+   "marks": 2,
+   "a": "A copy of the argument's value: one word for a scalar and a block for a struct or record."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a call-by-reference callee change the caller's variable?",
+   "marks": 3,
+   "a": "The slot holds the address of the variable, and every read and write in the callee goes through that address."
+  },
+  {
+   "level": "apply",
+   "q": "x = 3 and y = 7. swap(x, y) is called by reference. Give x and y after the call.",
+   "marks": 3,
+   "a": "x = 7 and y = 3, because both writes go through the addresses and land in the caller's variables."
+  },
+  {
+   "level": "apply",
+   "q": "In part (d) of the worked example, f is called by name and i is set to 3 before p is used. What is A[3]?",
+   "marks": 3,
+   "a": "A[3] = 30 + 1 = 31, because p is re-evaluated as A[i] with i = 3."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare call by reference, call by value-result and call by name for swap(i, A[i]) with i = 1 and A = [10, 20, 30, 40], and for f(A[i]) where f sets i = 3 then does p = p + 1. When do reference and value-result differ?",
+   "marks": 5,
+   "a": "Call by reference and call by value-result agree on swap(i, A[i]), because both fix the address of A[1] at the call. Both give i = 10 and A[1] = 1. Call by name differs in the f(A[i]) case: p = p + 1 becomes A[i] = A[i] + 1 with the new i. Reference and value-result differ when a formal aliases storage the callee also writes, e.g. with a global g, procedure f(int a) { g = 5; a = a + 1; } called as f(g): by reference g ends as 6, by value-result g ends as (old g) + 1."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does overload resolution add no run-time cost?",
+   "marks": 4,
+   "a": "The signature is known at compile time, so the compiler chooses one method and the call site holds a fixed entry point; the run-time call is an ordinary call."
+  }
+ ],
+ "beyond": "Not for the exam. Modern languages have moved toward passing by value with references, and the compiler checks what may be written and for how long. Rust's borrow checker rejects a call that would keep a mutable reference alive past the owner, and C++ move semantics pass a large object without copying it. Search 'borrow checker', 'call by need thunk' and 'Java is pass-by-value' to go further."
+}

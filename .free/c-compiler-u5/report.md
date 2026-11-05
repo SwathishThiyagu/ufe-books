@@ -1,0 +1,44 @@
+# c-compiler-u5: free-model run
+
+- Book: `books/cse/c-compiler/c-compiler-u5.html`
+- Status: ok
+- Model calls so far: 22 (81,437 tokens in, 193,662 out), 7.0 minutes
+
+## Checker
+
+```
+c-compiler-u5.html: 6 chapters, 12717 words, 7 figures, 125 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 3, 'Lifetime against scope': The example is backwards. When a C function returns, the local's name is not in scope anywhere in the caller — the caller cannot write that name at all. What survives is the pointer and the dead storage, not a visible name. As written the sentence teaches a false picture of scope.
+- ch 1 [high] Exam traps, trap 2: 'A name can be in scope after its activation has returned' is wrong. Once the activation returns, its local names are no longer visible in the text at all, so they are out of scope as well as dead.
+- ch 1 [high] Quiz, Q6 answer: 'The name stays in scope at the caller' is false — the local's name is not visible in the caller. The undefined behaviour comes from the dangling pointer and the reused record, which the rest of the answer already says correctly.
+- ch 1 [low] Section 3, 'Binding': 'computes the address without knowing which activation is running' can be read as: the address does not depend on the running activation. It does. What is fixed at compile time is the distance, not the address.
+- ch 1 [low] Section 1, first paragraph: 'A procedure ... takes parameters, does work and returns a result' excludes procedures that return nothing (void in C, a Fortran subroutine), which the same paragraph lists as procedures.
+- ch 2 [low] Section 2, first paragraph: The rule as written says that any object whose size is known at compile time can be reserved in the static data region. A student can read this as 'a local int whose size is known goes into static data', which is false: an ordinary local lives in the activation record on the stack. Compile-time-known size is necessary but not sufficient for static storage; the storage class (global, local, dynamic) decides the region.
+- ch 2 [low] Section 2, first paragraph, final sentence: Calling the fixed-offset placement of a local 'static allocation in the simple sense' clashes with standard usage, where a local in an activation record is stack allocation and 'static allocation' means a fixed storage location for the whole run (typically globals and statics).
+- ch 3 [low] Section 2: "If f calls itself three times, three records of f exist" is miscounted and clashes with the figure and Worked example 1, which both use f called once more, twice recursively, to get three records. Taken literally, f calling itself three times gives four live records of f.
+- ch 3 [low] Worked example 1, step 4: "The pointer values alone do not add" is not clear; a student may think the SP values (7952, 7904, 7856) should be summed.
+- ch 3 [low] Quiz Q4 answer: "The value there is not the local's value" is too strong. Until the bytes are overwritten, the old value may still sit in memory; the error is that reading it is undefined and it may change at any time.
+- ch 4 [high] Section 1, Figure, Worked example 1, Quiz Q5: The frame layout contradicts the stated convention that the stack grows towards lower addresses. If the callee pushes the old FP first, then sets FP = SP, then allocates locals, those locals sit at lower addresses than the saved old FP. So a local cannot be at FP + 16. With FP called the lowest-addressed word and locals at positive offsets, the local would overlap the caller's parameter area, and the 4 bytes of padding in the worked example would have to sit above FP inside the caller's frame. The figure and the numerical answers for the local offsets are therefore impossible for a downward-growing stack. Also, FP is not the lowest-addressed word of its own record: it points at the saved old FP, the first callee word, which is the highest address of the callee-allocated part.
+- ch 4 [low] Section 2, calling sequence: The step says the callee saves the old frame pointer at FP + 0, but FP is not set until the next step. A student may think FP already has the callee's value when the save happens.
+- ch 4 [low] Section 2, calling sequence: With a downward-growing stack, the callee does not extend SP by the size of locals and temporaries; it moves SP down (decreases it). 'Extends SP' can be read as increasing SP.
+- ch 4 [low] Figure caption: The caption says the return sequence reads the control link last. In the return sequence given in Section 3, the old FP is reloaded before the final jump, and the return address is the word used last to jump back.
+- ch 4 [low] Beyond: The sentence 'ARM uses a link register for the return address on leaf functions' suggests that non-leaf functions do not use the link register. ARM uses the link register for the return address of every call; a leaf function simply need not save it.
+- ch 5 [high] Quiz Q5: The answer is technically wrong for the example given. Under the standard copy-restore scheme the address of each actual is fixed at the call, so swap(i, A[i]) with i = 1 and A = [10,20,30,40] gives i = 10, A[1] = 1 under call by reference AND under call by value-result. The two copy-outs also go to different variables (i and A[1]), so 'the second copy-out overwrites the first' never happens here. The real divergence for swap(i, A[i]) is between call by name and call by reference, because the name parameter re-evaluates A[i] after i has changed.
+- ch 5 [high] Exam traps, trap 1: The example is wrong. swap(i, A[i]) is not an aliasing case (i and A[1] are different locations, both addresses are fixed at the call), so call by reference and call by value-result give the same answer there; only call by name differs. The sentence also says 'the order of the writes', but for value-result the callee's write order is irrelevant - the copy-out order is what matters.
+- ch 5 [high] Section 3, last paragraph (generics): The claim 'A generic method is instantiated once per type it is used with, one copy of the code for int and another for String' is true for C++ templates but false for Java, which this paragraph is describing. Java generics use type erasure: one copy of the method is compiled for all type arguments, and casts are inserted where needed.
+- ch 5 [low] Section 3, first sentence: 'C passes scalars by value and arrays by reference' contradicts the standard statement that C has only call by value. What is passed is a pointer to the first element, itself passed by value. The next clause gives the right mechanism, but the opening phrase is the one a student will memorise.
+- ch 5 [low] Section 2, call by name bullet (Jensen's device): Passing i as a name parameter is only half of Jensen's device. The summed expression a[i] must also be passed by name, otherwise the trick does not work: the callee's loop changes i, and the term re-evaluates with the current i.
+- ch 5 [low] Section 2, last bullet: 'The order of the writes then decides the answer' is right for call by reference but misleading for value-result, where the writes inside the callee touch private copies; it is the order of the copy-outs at return that decides.
+- ch 6 [low] Lead: The lead says the symbol table is used 'in every phase after lexical analysis'. The scanner itself also uses a table (keywords, and usually it creates or at least interns identifier entries), so the statement wrongly excludes the first phase.
+- ch 6 [low] Section 2: 'load factor' is used without being defined, which will stop readers whose first language is not English.
+- ch 6 [low] Section 2, hash formula: position(letter) is defined only for a–z, and a pure letter-sum hash ignores letter order, so anagrams such as sum and mus fall in the same bucket. Nothing warns the student about either limit.
+- ch 6 [low] Section 1: 'delete when a scope ends' is listed as a basic operation next to insert and lookup, but with the marker (stack) scheme used later in the chapter no individual delete is performed, so the two statements read as contradictory.

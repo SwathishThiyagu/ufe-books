@@ -1,0 +1,190 @@
+{
+ "lead": "A symbol table is the compiler's map from a name to its attributes. It answers: what is this name, what type, where does it live, and which declaration does this use mean? Scope and binding rules decide the answer. The table is used in every phase after lexical analysis: declaration processing, type checking, code generation and debugging. Without it, the compiler cannot tell a local variable from a global function, or an inner x from an outer x. Hash tables make lookup fast; a stack of tables handles nested blocks.",
+ "prereq": "You need: the symbol table idea from Unit 1, parsing from Units 2 and 3, semantic analysis from Unit 4, and the runtime picture in <a href=\"#runtime-environments-and-source-language-issues\">5.1</a> and <a href=\"#activation-records-and-implementing-function-calls\">5.4</a>.",
+ "sections": [
+  {
+   "h3": "Entries, operations and four structures",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "One symbol table entry holds the attributes of one declared name: name, kind (variable, function, type, label), type, size, offset or address, scope, storage class (automatic, static, extern), and source line. The source line helps error messages. A symbol table supports three operations: insert a declaration, lookup a use, and delete when a scope ends. Lookup returns the entry or a not-found result. For n entries, where n is the number of names stored, the structure decides the cost."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Structure",
+      "Lookup cost",
+      "Note"
+     ],
+     "rows": [
+      [
+       "Unordered list",
+       "n comparisons",
+       "simple, slow for many names"
+      ],
+      [
+       "Sorted list",
+       "about log₂ n",
+       "binary search; insert shifts entries"
+      ],
+      [
+       "Balanced BST",
+       "about log₂ n",
+       "n if it becomes a chain"
+      ],
+      [
+       "Hash table",
+       "O(1) average",
+       "needs a good hash and collision handling"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A binary search tree is balanced when its height stays near log₂ n; an unbalanced tree can become a list. The compiler chooses the structure by the language and the number of names. Small teaching compilers often use a list for clarity; production compilers use hash tables."
+    }
+   ]
+  },
+  {
+   "h3": "Hashing: buckets and collisions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Most compilers use a hash table. A hash function h(name) turns the name into an index from 0 to m−1, where m is the number of buckets. Each bucket holds a chain of entries. On insert, compute the bucket. If it is empty, store the new entry. If it is occupied, walk the chain and compare names. If no entry has the name, add the new entry at the end of the chain. Do not replace the old entry: a collision is not a duplicate."
+    },
+    {
+     "type": "formula",
+     "text": "h(name) = (Σ position(letter)) mod m",
+     "where": "position(a)=1, ..., position(z)=26; m is the number of buckets; h(name) is the bucket index."
+    },
+    {
+     "type": "p",
+     "text": "Lookup computes the same bucket and compares names along the chain. Open addressing is an alternative: on collision, probe other slots in a fixed order. It saves pointers but needs a load factor below 1 and careful deletion. Chaining is simpler and common in teaching compilers. A good hash spreads names evenly; a bad hash puts many names in one bucket and lookup degrades to a list."
+    }
+   ]
+  },
+  {
+   "h3": "Block scope, shadowing and binding times",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Block-structured languages use a stack of tables. When a block opens, push a new table or record a marker equal to the current table size. Insert its declarations. A use is looked up from the innermost table outward; the first match wins. This is static scoping, also called lexical scoping. An inner declaration shadows an outer declaration of the same name while the inner scope is active. When the block ends, delete entries back to the marker; the outer declaration becomes visible again. A simple compiler can also keep one table and store the scope depth in each entry. Visibility analysis asks which names are visible at a program point; scope resolution finds the matching declaration."
+    },
+    {
+     "type": "p",
+     "text": "Binding is the step that fixes a meaning to a name. Binding times: language design time fixes the meaning of built-in operators and types; compile time fixes a local variable's type and offset; link time fixes an external function's address; load time fixes a static variable's absolute address; run time fixes a local variable's location in an activation record and a virtual method's target. Dynamic scoping is the other rule: a use finds the declaration in the most recent active call. It can use deep access along the control chain or a shallow association list. Only a few universities go deeper."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Nested scopes from the worked example: the inner x hides the global x, and the body of f adds a.",
+  "spec": {
+   "type": "sets",
+   "mode": "nested",
+   "sets": [
+    {
+     "label": "Global",
+     "items": [
+      "x = 1",
+      "f"
+     ]
+    },
+    {
+     "label": "f's body",
+     "items": [
+      "a = 2"
+     ]
+    },
+    {
+     "label": "inner block",
+     "items": [
+      "x = 3"
+     ]
+    }
+   ],
+   "aria": "Three nested scopes: the global scope declares x and f, the body of f declares a, and the inner block declares a second x that hides the global one."
+  }
+ },
+ "examples": [
+  {
+   "question": "A symbol table uses m = 11 buckets and h(name) = (sum of alphabet positions of the letters) mod 11, with collisions handled by chaining. Insert sum, max, min, avg, tmp in that order and show the buckets. Then, for int x = 1; void f() { int a = 2; { int x = 3; print(x + a); } print(x); } give the two printed values under static scoping.",
+   "steps": [
+    "Use alphabet positions a=1, b=2, ..., z=26. The hash is the letter sum modulo 11.",
+    "sum: s=19, u=21, m=13; sum 19+21+13 = 53; 53 mod 11 = 9. Bucket 9 is empty, so store sum there.",
+    "max: m=13, a=1, x=24; sum 13+1+24 = 38; 38 mod 11 = 5. Bucket 5 is empty, so store max there.",
+    "min: m=13, i=9, n=14; sum 13+9+14 = 36; 36 mod 11 = 3. Bucket 3 is empty, so store min there.",
+    "avg: a=1, v=22, g=7; sum 1+22+7 = 30; 30 mod 11 = 8. Bucket 8 is empty, so store avg there.",
+    "tmp: t=20, m=13, p=16; sum 20+13+16 = 49; 49 mod 11 = 5. Bucket 5 already holds max, so chain tmp after max; do not overwrite max.",
+    "Buckets: 3 holds min; 5 holds max then tmp; 8 holds avg; 9 holds sum.",
+    "Under static scoping, print(x + a) uses the inner x = 3 and a = 2, so it prints 3 + 2 = 5.",
+    "After the inner block ends, its x is gone. The final print(x) uses the global x = 1, so it prints 1."
+   ],
+   "answer": "Buckets: 3 holds min, 5 holds max then tmp, 8 holds avg, 9 holds sum; the two printed values are 5 then 1.",
+   "check": "def h(name):\n    return sum(ord(c) - 96 for c in name) % 11\n\nfor name in [\"sum\", \"max\", \"min\", \"avg\", \"tmp\"]:\n    print(h(name))\nprint(3 + 2)\nprint(1)\n",
+   "values": [
+    9,
+    5,
+    3,
+    8,
+    5,
+    5,
+    1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "On a hash collision, putting the new name in place of the old one destroys the old entry; the new entry joins the chain and lookup compares names along it.",
+  "After a block ends the inner declaration stops shadowing, so the outer name is visible again.",
+  "Static scoping is decided from the program text, not from the call order; dynamic scoping follows the call chain.",
+  "A symbol table entry is not the variable's value; it stores attributes such as type, offset and scope.",
+  "Do not confuse binding time with lookup time: binding fixes a meaning, while lookup finds an entry during compilation."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List four attributes stored in a symbol table entry.",
+   "marks": 2,
+   "a": "Any four of: name, kind, type, size, offset or address, scope, storage class, source line."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a block-structured compiler use a stack of symbol tables instead of one flat table?",
+   "marks": 3,
+   "a": "A stack matches block entry and exit: inner declarations are visible only inside the block, and deleting back to the marker on exit restores outer names."
+  },
+  {
+   "level": "apply",
+   "q": "Using h(name) = (sum of alphabet positions) mod 11, find the bucket for data.",
+   "marks": 3,
+   "a": "d=4, a=1, t=20, a=1; sum = 26; 26 mod 11 = 4. Bucket 4."
+  },
+  {
+   "level": "analyze",
+   "q": "int x = 7; { int x = 2; print(x); } print(x); Under static scoping, what is printed?",
+   "marks": 4,
+   "a": "First print uses the inner x = 2. After the block ends, the inner x is gone; the second print uses the global x = 7. Output: 2 then 7."
+  },
+  {
+   "level": "apply",
+   "q": "Give the binding time for each: a local variable's offset, an external printf address, a virtual method's target.",
+   "marks": 4,
+   "a": "Local variable offset: compile time. External printf address: link time. Virtual method target: run time."
+  },
+  {
+   "level": "analyze",
+   "q": "Bucket 5 holds max then tmp in a chain. Describe the lookup of tmp.",
+   "marks": 4,
+   "a": "Compute h(tmp) = 5. Compare max first: names differ. Follow the chain to tmp: names match, so return tmp's entry."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between static and dynamic scoping.",
+   "marks": 3,
+   "a": "Static scoping resolves a name from the program text and enclosing blocks; dynamic scoping resolves it from the most recent active call."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers use hash tables with chaining or open addressing for symbol tables; LLVM and GCC have their own symbol table and scope structures. Debuggers read symbol tables to map an address back to a source name. Name mangling encodes scope and type into linker names. Python's name resolution follows the LEGB rule: local, enclosing, global, built-in. Search next for lexical scoping, scope resolution, symbol table implementation and name mangling."
+}
