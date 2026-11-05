@@ -141,7 +141,7 @@ def chapter_html(P, k, ch, ids):
         lv = lv if lv in LEVELS else ('analyze' if lv.startswith('anal') or lv == 'evaluate' else 'understand')
         try: mk = int(q.get('marks', 2))
         except (TypeError, ValueError): mk = 2
-        qs.append(f'<details class="q" data-level="{lv}"><summary><span class="lvl">{lv.capitalize()}</span> <span>{inline(q.get("q"), ids)}</span> <span class="marks">{mk} marks</span></summary><p>{inline(q.get("a"), ids)}</p></details>')
+        qs.append(f'<details class="q" data-level="{lv}"><summary><span class="lvl">{lv.capitalize()}</span> <span style="min-width:0;overflow-wrap:anywhere">{inline(q.get("q"), ids)}</span> <span class="marks">{mk} marks</span></summary><p>{inline(q.get("a"), ids)}</p></details>')
     out.append('<div class="quiz"><h4>Check yourself</h4>' + ''.join(qs) + '</div>')
     by = inline(ch.get('beyond'), ids)
     if 'not for the exam' not in by.lower(): by = 'Not for the exam. ' + by
@@ -218,7 +218,7 @@ def bank_html(P, us):
             try: mk = int(q.get('marks', 13))
             except (TypeError, ValueError): mk = 13
             outline = '; '.join(str(x).rstrip('.') for x in q.get('outline') or []) + '.'
-            out.append(f'<details data-level="{lv}"><summary><span class="lvl">{lv.capitalize()}</span> <span>{inline(q.get("q"))}</span> <span class="marks">{mk} marks</span></summary><p>{inline(outline)}</p></details>')
+            out.append(f'<details data-level="{lv}"><summary><span class="lvl">{lv.capitalize()}</span> <span style="min-width:0;overflow-wrap:anywhere">{inline(q.get("q"))}</span> <span class="marks">{mk} marks</span></summary><p>{inline(outline)}</p></details>')
         out.append('</div>')
     out.append('</section>')
     return ''.join(out)
