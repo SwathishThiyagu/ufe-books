@@ -30,6 +30,7 @@ Each task names **one unit**, for example `c-oop-u3`. Write that one book and no
 
 ## Pull request
 
+- If the environment cannot reach the GitHub API, do not wait for it: commit on a branch named `codex/<unit>-book`, push it, and put the hand-back in your final message instead. The maintainer merges branches directly.
 - Title: `<unit> book` (for example `c-oop-u3 book`).
 - Description: the hand-back from the end of `pack/WRITER.md`: the book path; chapters, words and figures (copy the checker's summary line); whether the check ran with `--render`; anything you could not verify; and any place where the universal syllabus or the packet's lists look wrong (a subtopic in the wrong unit, a list that belongs to another subject). Keep it under 15 lines.
 - If the task says the unit is the **first of its subject**, also audit that packet's data (subtopic order, missing or duplicated topics, a unit that belongs to another subject) and report what you find in the description.
