@@ -1,0 +1,231 @@
+{
+ "lead": "A crash loses whatever was only in memory. Checkpointing copies a process's state to stable storage at chosen moments; recovery loads a saved state and replays from there. In a distributed system the copies must fit together: no process may receive a message that the recovered run never sent. This chapter gives that rule, shows how independent checkpointing breaks it through the domino effect, and covers the two cures: coordinated checkpoints and message logging.",
+ "prereq": "You need Unit 4's global state and consistent snapshots, and the failure models of <a href=\"#consensus-and-agreement-under-failures\">5.4</a>.",
+ "sections": [
+  {
+   "h3": "Local checkpoints and the recovery line",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A local checkpoint C(i,k) is the k-th saved copy of process i's state: variables, program counter and open files, written to stable storage. Stable storage survives a crash, such as a disk or two disks in different rooms. After a crash the process loads C(i,k) and continues; work done after that point is lost."
+    },
+    {
+     "type": "p",
+     "text": "One checkpoint is not enough. A global state here is one local checkpoint chosen from each process. It is consistent when no message is shown as received inside the chosen set but not yet sent inside it. Such a message is an orphan: in the recovered run it arrives with no sender."
+    },
+    {
+     "type": "p",
+     "text": "The mirror case is a lost message: the sender's checkpoint is after the send, the receiver's before the receive. Replay re-sends it, costing time but breaking nothing."
+    },
+    {
+     "type": "formula",
+     "text": "C = {C(1,a₁), C(2,a₂), …, C(n,aₙ)} is consistent ⇔ for every message m: receive(m) ∈ C(i,aᵢ) ⟹ send(m) ∈ C(j,aⱼ)",
+     "where": "C(i,aᵢ) is the checkpoint chosen for process i; receive(m) ∈ C(i,aᵢ) means the receive of m happened before that checkpoint was taken; send(m) ∈ C(j,aⱼ) is the same for the send on process j; n is the number of processes."
+    },
+    {
+     "type": "p",
+     "text": "A consistent set is a recovery line. Restart from it and everything after is a legal execution: every delivered message has a sender. Finding the latest recovery line after a failure is the job of rollback recovery."
+    }
+   ]
+  },
+  {
+   "h3": "Independent checkpointing and the domino effect",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The simplest scheme lets each process checkpoint whenever it likes, with no coordination: independent, or uncoordinated, checkpointing. It adds no messages and no pause; its weakness shows at recovery time."
+    },
+    {
+     "type": "p",
+     "text": "The rollback rule: if process j's checkpoint contains the receive of a message m, and m was sent by process i after the checkpoint i has chosen, the recovered run has the receive but not the send. j's checkpoint holds an orphan and is invalid, so j rolls back to a checkpoint taken before it received m. That rollback can itself invalidate a checkpoint of a third process, and the chain continues."
+    },
+    {
+     "type": "p",
+     "text": "The cascade can reach the first checkpoint of every process and throw away hours of work: the domino effect. In the worst case a coordination-free scheme needs as many checkpoints per process as there are processes, to keep some consistent set available."
+    },
+    {
+     "type": "p",
+     "text": "Old checkpoints cost disk. A checkpoint that can never belong to a recovery line should be deleted; deciding which are useless is garbage collection. The worked example runs one full domino chain."
+    }
+   ]
+  },
+  {
+   "h3": "Coordinated checkpointing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Coordinated (synchronous) checkpointing makes the processes agree on when to checkpoint, so every set taken is consistent. There is no domino effect, one recovery line exists, and older checkpoints can be deleted at once."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "A coordinator sends CHECKPOINT REQUEST to all processes; each stops sending application messages.",
+      "Each takes a tentative checkpoint, writes it to stable storage, and replies.",
+      "When all replies arrive the coordinator broadcasts COMMIT; each makes its checkpoint permanent and resumes.",
+      "If a process fails during the round, the coordinator aborts and all discard their tentative checkpoints."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The price is blocking: the system freezes while checkpoints are written, and one slow disk slows everyone. Non-blocking protocols number checkpoints in rounds, so the round-r checkpoint of any process is consistent with the round-r checkpoints of the rest; they must still handle a failure in mid-round."
+    },
+    {
+     "type": "p",
+     "text": "Communication-induced checkpointing sends no extra control messages: each application message carries a few piggybacked numbers about its sender's checkpoints, and the receiver takes a forced checkpoint when delivery would otherwise make its latest checkpoint inconsistent. Quasi-synchronous protocols are one family within this class."
+    }
+   ]
+  },
+  {
+   "h3": "Log-based rollback recovery",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Logging solves the problem from the other side: instead of rolling processes back, replay the messages. Each process is piecewise deterministic: every nondeterministic event it meets is the reception of a message, and between two such events its execution is deterministic. A saved state plus the received messages in logged order therefore rebuilds the state exactly."
+    },
+    {
+     "type": "p",
+     "text": "Pessimistic logging writes every message to a stable log before delivery, and acknowledges it to the sender only after that. After a crash the process reloads its last checkpoint and replays its log. No other process rolls back; this is independent recovery. The cost is one stable write per message, which can dominate latency."
+    },
+    {
+     "type": "p",
+     "text": "Optimistic logging writes the message later, in the background. Normal operation stays fast, but a crash may find messages delivered and not yet logged. The recovering process must ask others for copies, and they may have to roll back to find them. Orphan detection and log garbage collection are the hard parts."
+    },
+    {
+     "type": "p",
+     "text": "Both styles depend on stable storage and garbage collection. Once a new recovery line is committed, older checkpoints and log records for applied messages can be deleted; keeping them fills the disk. Reliable logging groups are covered in <a href=\"#process-resilience-and-reliable-communication\">5.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Each bar is one checkpoint being written to stable storage. After P1 fails at t = 13 the only consistent set is the first checkpoint of every process, so the later checkpoints on all three lanes are discarded.",
+  "spec": {
+   "type": "gantt",
+   "unit": "t",
+   "lanes": [
+    {
+     "label": "P1",
+     "bars": [
+      {
+       "label": "C1,0",
+       "start": 1,
+       "end": 2.5,
+       "style": "accent"
+      },
+      {
+       "label": "C1,1",
+       "start": 7,
+       "end": 8.5,
+       "style": "muted"
+      }
+     ]
+    },
+    {
+     "label": "P2",
+     "bars": [
+      {
+       "label": "C2,0",
+       "start": 2,
+       "end": 3.5,
+       "style": "accent"
+      },
+      {
+       "label": "C2,1",
+       "start": 8,
+       "end": 9.5,
+       "style": "muted"
+      }
+     ]
+    },
+    {
+     "label": "P3",
+     "bars": [
+      {
+       "label": "C3,0",
+       "start": 3,
+       "end": 4.5,
+       "style": "accent"
+      },
+      {
+       "label": "C3,1",
+       "start": 11,
+       "end": 12.5,
+       "style": "muted"
+      }
+     ]
+    }
+   ],
+   "aria": "A timeline of six checkpoints on three processes; the first checkpoint of each process forms the recovery line, while the second checkpoints on P1, P2 and P3 are all abandoned after P1 crashes at t = 13."
+  }
+ },
+ "examples": [
+  {
+   "question": "P1 checkpoints at t = 1 and 7; P2 at 2 and 8; P3 at 3 and 11 (seconds). Messages: m1 from P1 at 4 to P2 at 5; m2 from P2 at 6 to P3 at 9; m3 from P3 at 5 to P1 at 6; m4 from P1 at 7.2 to P2 at 7.6. P1 crashes at t = 13 and restarts from its latest checkpoint. Find the recovery line, count rollbacks, and find the work lost.",
+   "steps": [
+    "P1 restarts from C1,1 at 7. A message P1 sent after 7 and recorded before another process's checkpoint is now an orphan.",
+    "m4 sent at 7.2, received by P2 at 7.6 before C2,1 at 8: C2,1 holds the receive but P1 holds no send. C2,1 is invalid; P2 rolls back to C2,0 at 2. Rollbacks: 1.",
+    "m2 sent by P2 at 6, received by P3 at 9 before C3,1 at 11. C3,1 invalid; P3 rolls back to C3,0 at 3. Rollbacks: 2.",
+    "m3 sent by P3 at 5, received by P1 at 6 before C1,1 at 7. C1,1 invalid; P1 rolls back to C1,0 at 1. Rollbacks: 3.",
+    "Check {C1,0 at 1, C2,0 at 2, C3,0 at 3}: every send (4, 5, 6, 7.2) is after its sender's checkpoint, every receive (5, 6, 7.6, 9) after its receiver's. No receive without a send, so the set is consistent.",
+    "Lost work from 13 s: P1 13 − 1 = 12 s, P2 13 − 2 = 11 s, P3 13 − 3 = 10 s. Total 33 s."
+   ],
+   "answer": "Recovery line C1,0, C2,0, C3,0 at 1, 2, 3 s; 3 rollbacks; 33 s lost.",
+   "check": "ckpt = {'P1': [1, 7], 'P2': [2, 8], 'P3': [3, 11]}\nmsgs = [('m1','P1',4,'P2',5), ('m2','P2',6,'P3',9),\n        ('m3','P3',5,'P1',6), ('m4','P1',7.2,'P2',7.6)]\ncrash = 13\nidx = {p: len(c)-1 for p, c in ckpt.items()}\nmoved = True\nwhile moved:\n    moved = False\n    for _, s, ts, r, tr in msgs:\n        if ts > ckpt[s][idx[s]] and tr < ckpt[r][idx[r]]:\n            idx[r] -= 1; moved = True\nline = {p: ckpt[p][idx[p]] for p in ckpt}\nprint(sum(idx[p] != len(ckpt[p])-1 for p in ckpt))\nprint(*[line[p] for p in ckpt])\nprint(sum(crash - line[p] for p in ckpt))",
+   "values": [
+    3,
+    1,
+    2,
+    3,
+    33
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Independent checkpointing causes the domino effect; coordination or logging removes it. The reverse scores zero.",
+  "Orphan: the receiver's checkpoint has the receive, the sender's not the send. A lost message is the opposite and costs only a retransmission.",
+  "The recovery line is the latest consistent set, not every process's latest checkpoint.",
+  "Checkpointing saves state; logging saves messages. Removing the domino effect accepts coordinated checkpoints or logging.",
+  "A checkpoint costs a stable write; in blocking two-phase checkpointing the system waits for it."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a local checkpoint and stable storage.",
+   "marks": 2,
+   "a": "C(i,k) is the k-th saved copy of process i's state. Stable storage survives a crash, such as a disk or two replicated disks."
+  },
+  {
+   "level": "remember",
+   "q": "What is an orphan message?",
+   "marks": 2,
+   "a": "A message whose receive is inside the chosen checkpoints but whose send is outside, so the recovered run receives a message never sent."
+  },
+  {
+   "level": "understand",
+   "q": "Why does uncoordinated checkpointing allow the domino effect?",
+   "marks": 3,
+   "a": "A process rolling back past the send of m invalidates any process whose checkpoint recorded the receive. That process rolls back further, and the chain can reach every first checkpoint."
+  },
+  {
+   "level": "apply",
+   "q": "P1 checkpoints at 3, P2 at 7. P1 sends m at 5, P2 receives at 6. Is {C1, C2} consistent? What must happen?",
+   "marks": 4,
+   "a": "No. The receive at 6 is before 7, so it is in C2, but the send at 5 is after 3, outside C1. m is an orphan; P2 must roll back before 6."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does blocking two-phase checkpointing avoid the domino effect, and what does it cost?",
+   "marks": 5,
+   "a": "No application message is sent between tentative checkpoint and commit, so no message straddles the set. Costs: a freeze, a coordinator, and an abort protocol."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare pessimistic and optimistic logging on latency and recovery effort.",
+   "marks": 4,
+   "a": "Pessimistic: a stable write before delivery raises latency, but recovery is local. Optimistic: low normal latency, but recovery may need copies from others and force their rollback."
+  }
+ ],
+ "beyond": "Not for the exam. CRIU freezes a group of Linux processes, dumps them to disk and restores them, letting some batch jobs survive preemption on clusters. Cloud virtual machines are snapshotted the same way before live migration. Databases use logging with undo and redo, in the style of ARIES: committed work is redone from the log and uncommitted work undone, instead of restoring a whole-database checkpoint. Some big-data engines checkpoint lineage, recomputing lost partitions from the recipe that made them. Search for CRIU, recovery line, Chandy-Lamport, message logging, and ARIES."
+}

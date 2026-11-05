@@ -1,0 +1,254 @@
+{
+ "lead": "Replication keeps the same data on several machines. It buys availability, low latency, read throughput and fault tolerance, and it charges one awkward question: when a client reads, which copy answers? A consistency model is the contract that settles this — it names the values a read may return, given the writes that came before. A bank balance shown in a UPI app must behave like one number; a cricket score or a social feed can lag a second and nobody minds. Choosing the model is choosing that trade.",
+ "prereq": "You need: <a href=\"#process-resilience-and-reliable-communication\">5.6</a> for replicated process groups and safe message retries, and Unit 4 for happened-before and causal ordering.",
+ "sections": [
+  {
+   "h3": "Why replicate, and what the contract says",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A replica is a copy of a data item kept on a second machine. It gives four gains: availability (a dead replica is covered by its peers), latency (a copy sits near the user), read throughput (reads spread over N replicas) and fault tolerance (a lost disk is not a lost record). The cost is a coordination question."
+    },
+    {
+     "type": "p",
+     "text": "A model is defined over a history: read and write operations on data items, each issued by a process and ordered by that process's program order, plus, in real-time models, by wall-clock time. Strong models allow few answers and cost messages or waiting; weak models allow many answers and answer fast from a local copy."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Data-centric model: a rule for the whole store, saying in which order clients see writes.",
+      "Client-centric model: a rule for one client session, saying what that client may see.",
+      "Update protocol: the mechanism that carries a write to replicas — primary-based or quorum-based."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An IRCTC seat count on the payment page must be linearizable: two people must not both pay for the last seat. A live cricket score on a phone can be eventual."
+    }
+   ]
+  },
+  {
+   "h3": "Data-centric models, strongest to weakest",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Order the models by how much reordering each one permits. Every step down removes an ordering constraint, so more reads can be served from a nearby replica."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Model",
+      "Guarantee"
+     ],
+     "rows": [
+      [
+       "Strict",
+       "Read returns the latest write, even while the write is in progress."
+      ],
+      [
+       "Linearizable",
+       "One global order, consistent with real time."
+      ],
+      [
+       "Sequential",
+       "One global order; each process's own order kept; real time ignored."
+      ],
+      [
+       "Causal",
+       "Order respects happened-before only; concurrent writes may appear in different orders."
+      ],
+      [
+       "FIFO",
+       "Writes from one process stay in order; writes from different processes are unordered."
+      ],
+      [
+       "Weak",
+       "Data is consistent only after a synchronisation point."
+      ],
+      [
+       "Release",
+       "Writes before a release are seen by any read after the matching acquire."
+      ],
+      [
+       "Eventual",
+       "If writes stop, all replicas converge to the same value."
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Linearizability is what engineers mean by strong: each operation looks instantaneous at some point between its start and its end, and the order agrees with real time. Sequential consistency keeps a single global order but drops real time, so process P can read an old value after a write has finished, provided every process sees that same order. Causal consistency keeps only happened-before, so two concurrent writes may be seen in different orders at different replicas. Release consistency splits access into acquire and release phases and is what a lock-protected shared variable needs. Eventual consistency is the weakest useful promise: once writes stop, replicas agree."
+    }
+   ]
+  },
+  {
+   "h3": "Client-centric guarantees and update protocols",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A mobile client wants guarantees about itself, not about the world. Three are standard."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Read-your-writes: after a process writes x, its own later reads of x see that value or newer.",
+      "Monotonic reads: successive reads by one process never go back to an older version.",
+      "Writes-follow-reads: a write issued after reading x is applied to at least that version of x."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "These are packaged as session guarantees. A load balancer that sends each request to an arbitrary replica breaks all three; pinning a session to one replica or carrying a version token keeps them."
+    },
+    {
+     "type": "p",
+     "text": "Primary-based protocols use one replica as the primary. In remote-write the client sends every write to the primary, which forwards it to the others; reads may be local. In local-write the primary moves to the writing client, so the write costs one hop, but the system must track where the primary is."
+    },
+    {
+     "type": "p",
+     "text": "Replicated-write has no primary. Each item carries a version number; a client writes to W replicas and reads from R replicas."
+    },
+    {
+     "type": "formula",
+     "text": "R + W > N",
+     "where": "N is the number of replicas; W is how many replicas must acknowledge a write; R is how many a read must contact. If R + W > N, every read quorum overlaps every write quorum, so at least one reply carries the latest version."
+    },
+    {
+     "type": "p",
+     "text": "The client keeps the reply with the highest version and sends it back to any replica that answered with an older one; this is read repair. Version numbers give a total order per item. Vector clocks are needed only when writes are concurrent and must be compared, not merely ordered (Unit 4)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "A write at version 5 reaches R1 and R2, while R3 still holds version 4 with x = 7. A read that touches R3 but not R2 can return the old value, which is why R + W > N matters.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Quorum write with a stale replica",
+   "aria": "A client writes x = 10 to replicas R1 and R2, which both hold version 5, while R3 still holds version 4 with x = 7 and answers a stale read.",
+   "nodes": [
+    {
+     "id": "cl",
+     "label": "Client",
+     "note": "write x = 10",
+     "style": "normal"
+    },
+    {
+     "id": "r1",
+     "label": "R1",
+     "note": "v5, x = 10",
+     "style": "accent"
+    },
+    {
+     "id": "r2",
+     "label": "R2",
+     "note": "v5, x = 10",
+     "style": "accent"
+    },
+    {
+     "id": "r3",
+     "label": "R3",
+     "note": "v4, x = 7",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cl",
+     "to": "r1",
+     "label": "write",
+     "style": "solid"
+    },
+    {
+     "from": "cl",
+     "to": "r2",
+     "label": "write",
+     "style": "solid"
+    },
+    {
+     "from": "r3",
+     "to": "cl",
+     "label": "stale read",
+     "style": "dashed"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Three replicas R1, R2, R3 hold x = 7 at version 4. N = 3, W = 2. A client writes x = 10 and the write reaches only R1 and R2. (a) A read uses R = 2 and contacts R2 and R3. What is returned and what happens next? (b) A second read uses R = 1 and hits R3 only. What is returned? (c) Justify both with R + W > N.",
+   "steps": [
+    "After the write, R1 holds (version 5, x = 10) and R2 holds (version 5, x = 10); R3 still holds (version 4, x = 7).",
+    "Part (a): read quorum R = 2 contacts R2, which replies (v5, 10), and R3, which replies (v4, 7).",
+    "Check the rule: R + W = 2 + 2 = 4, and N = 3, so 4 > 3 holds and the read quorum must overlap the write quorum.",
+    "The client keeps the highest version, 5, and returns x = 10.",
+    "Read repair: the client sends (v5, 10) to R3, so R3 becomes (v5, 10).",
+    "Part (b): R + W = 1 + 2 = 3, which is not greater than N = 3, so a one-replica read need not touch the write quorum.",
+    "R3 replies (v4, 7); that version is the only one seen, so the client returns x = 7, one version stale."
+   ],
+   "answer": "With R = 2 the client returns x = 10 and repairs R3 to version 5; with R = 1 hitting only R3 it returns the stale x = 7, because 2 + 2 = 4 > 3 holds but 1 + 2 = 3 does not.",
+   "check": "n = 3\nw = 2\nfor r in (2, 1):\n    print(r + w)\nprint(10)\nprint(7)\n",
+   "values": [
+    4,
+    3,
+    10,
+    7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Claiming R + W = N gives strong consistency. The rule is strict: R + W > N. Equality lets a read quorum miss the write quorum, as 1 + 2 = 3 with three replicas shows.",
+  "Calling sequential consistency stronger than linearizability. Linearizability adds real-time order; sequential consistency keeps only each process's own order.",
+  "Treating eventual consistency as no consistency. It still promises per-item ordering and convergence once writes stop; what it drops is the bound on how long staleness lasts.",
+  "Mixing client-centric and data-centric guarantees. Read-your-writes is a promise to one session, not a global order for the store.",
+  "Using a single version number where vector clocks are needed. A counter orders writes but cannot tell whether two writes were concurrent."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a consistency model in one sentence.",
+   "marks": 2,
+   "a": "A consistency model is the contract stating which values a read may return for a given history of writes and reads on replicated data."
+  },
+  {
+   "level": "remember",
+   "q": "In R + W > N, what do N, W and R mean?",
+   "marks": 2,
+   "a": "N is the number of replicas, W the number of replicas that must acknowledge a write, and R the number a read must contact."
+  },
+  {
+   "level": "understand",
+   "q": "Give one history allowed by sequential consistency but forbidden by linearizability.",
+   "marks": 3,
+   "a": "Process P writes x = 1 and the write completes. Later, process Q reads x and gets the old value 0, while every process still sees one single global order. Linearizability forbids this because the write already finished in real time; sequential consistency permits it because it ignores real time."
+  },
+  {
+   "level": "apply",
+   "q": "A store has N = 5 replicas and uses W = 3. What is the smallest R that guarantees a read quorum meets the latest write?",
+   "marks": 4,
+   "a": "Need R + W > N, so R + 3 > 5, giving R > 2. The smallest integer is R = 3. Check: 3 + 3 = 6 > 5."
+  },
+  {
+   "level": "apply",
+   "q": "A client writes x = 4, then reads x from a replica still holding x = 4's previous value 2. Which client-centric guarantee is violated?",
+   "marks": 3,
+   "a": "Read-your-writes is violated: the client's own later read of x must see its own write 4 or newer."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is eventual consistency acceptable for a cricket score but not for a bank balance?",
+   "marks": 5,
+   "a": "A cricket score is read-only for viewers and a one-second lag changes nothing important, so cheap local reads win. A bank balance drives debits and credits; a stale read lets the same money be spent twice, so the read must see the latest write. That needs linearizability, which costs coordination and higher latency."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does remote-write make read-your-writes easy but local-write harder?",
+   "marks": 4,
+   "a": "With remote-write the primary is fixed, so a client that reads from the primary always sees its own write. With local-write the primary moves to the writer, so a later read must be directed to the current primary; if the client reads elsewhere it can miss its own write."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems expose these knobs directly: Cassandra lets you pick R and W per query, and Dynamo-style stores tune them per table. Primary-backup replication with a log is the basis of Raft and of most managed databases. CRDTs (conflict-free replicated data types) get eventual consistency without read repair, and linearizability is checked by tools such as Jepsen. Search next for: quorum consistency tuning, Raft leader lease, CRDT counters, and session guarantees in mobile sync."
+}

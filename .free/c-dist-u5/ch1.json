@@ -1,0 +1,252 @@
+{
+ "lead": "One printer, one bank account, or one record in a replicated database can be touched by only one process at a time. Distributed mutual exclusion gives that guarantee when processes share no memory and talk only by messages. Each process asks with a timestamp. Lamport's algorithm uses REQUEST, REPLY and RELEASE; Ricart–Agrawala removes RELEASE: it replies at once to an older request (or whenever it is not requesting), and holds back the reply to a newer request until it leaves the critical section. The same idea guards cluster locks and replicated storage, where a double entry corrupts data.",
+ "prereq": "You need: message passing and Lamport logical clocks from Unit 4, especially the happened-before order that makes timestamps comparable.",
+ "sections": [
+  {
+   "h3": "The model and what must hold",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take N processes, P1 to PN. They talk only by messages over FIFO channels: messages from one sender to one receiver arrive in the order sent. There is no shared memory and no central lock server. Each process has a critical section (CS), code that must run alone, such as updating a balance. Outside the CS a process is idle or doing local work."
+    },
+    {
+     "type": "p",
+     "text": "A request carries a timestamp: a Lamport clock value plus the process id as tie-breaker. The pair (10, P2) is smaller than (10, P3), so all processes get one total order. Three properties are required."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Mutual exclusion (safety): at most one process is in the CS at any time.",
+      "No starvation (liveness): every process that asks eventually enters, if it stays up.",
+      "Timestamp order (fairness): a request with a smaller timestamp enters before a request with a larger one."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Both algorithms keep a local queue of requests ordered by timestamp. They differ in how many messages they spend to learn that the queue head is safe."
+    }
+   ]
+  },
+  {
+   "h3": "Lamport's algorithm",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each process keeps a queue Q of REQUEST messages, ordered by timestamp. Process Pi does these steps to enter the CS."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Send REQUEST(ts, i) to all other N−1 processes and put a copy in its own Q.",
+      "When a REQUEST(ts, j) arrives, put it in Q and send REPLY(j) at once. The reply only says 'I have recorded your request'.",
+      "Enter the CS when Pi's own request is at the head of its Q and it has REPLY from every other process.",
+      "On leaving, send RELEASE(i) to all others and remove its own request from Q.",
+      "When RELEASE(j) arrives, remove j's request from Q."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "C_Lamport = 3(N − 1)",
+     "where": "C_Lamport is the total number of messages exchanged for one CS entry; N is the number of processes."
+    },
+    {
+     "type": "p",
+     "text": "Why it works: if Pi and Pj both believe they may enter, each has all replies. The one with the smaller timestamp has its request ahead in the other's queue, because the other replied only after recording it. So the later request cannot be at the head. RELEASE is needed to remove stale requests; without it the queue never clears."
+    }
+   ]
+  },
+  {
+   "h3": "Ricart–Agrawala",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Ricart–Agrawala uses two message types, REQUEST and REPLY, and no RELEASE. A process wanting the CS sends REQUEST(ts, i) to all N−1 others and waits for N−1 replies. The reply rule is:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "If Pi is not requesting the CS, it sends REPLY at once.",
+      "If Pi is requesting with timestamp T_own, compare (T, j) with (T_own, i). If T_own is larger, Pi's own request is later, so send REPLY at once.",
+      "If T_own is smaller, Pi's own request is earlier, so defer the REPLY and store j in a deferred set.",
+      "On leaving the CS, Pi sends REPLY to every process in the deferred set and clears it."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A process enters when it has N−1 replies. No RELEASE is needed: the deferred replies sent on exit are the release signal."
+    },
+    {
+     "type": "formula",
+     "text": "C_Ricart = 2(N − 1)",
+     "where": "C_Ricart is the total number of messages exchanged for one CS entry; N is the number of processes."
+    },
+    {
+     "type": "p",
+     "text": "Correctness: the smaller timestamp gets an immediate reply from the larger, while the larger defers. Only the smallest outstanding request can collect all replies. Equal timestamps are broken by process id."
+    },
+    {
+     "type": "p",
+     "text": "Failure: if one process crashes after receiving a REQUEST, every requester that needs its REPLY waits forever. RA has no timeout. A real system adds a failure detector, group membership, or a lease; see <a href=\"#process-resilience-and-reliable-communication\">process resilience</a>. Some syllabi call both algorithms timestamp-based or non-token mutual exclusion, and put quorum-based sets in the same lecture. Token schemes avoid this by passing one object; see <a href=\"#token-based-mutual-exclusion-suzuki-kasami-algorithm\">token-based mutual exclusion</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Ricart–Agrawala with three processes: P2's timestamp 8 wins, then P1's 10, then P3's 12; notice the deferred replies sent on exit.",
+  "spec": {
+   "type": "sequence",
+   "aria": "Sequence diagram with P1, P2 and P3 exchanging REQUEST and REPLY messages; P2 with timestamp 8 gets replies first and enters the critical section before P1 timestamp 10 and P3 timestamp 12.",
+   "actors": [
+    "P1",
+    "P2",
+    "P3"
+   ],
+   "messages": [
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "REQUEST 10"
+    },
+    {
+     "from": "P1",
+     "to": "P3",
+     "label": "REQUEST 10"
+    },
+    {
+     "from": "P2",
+     "to": "P1",
+     "label": "REQUEST 8"
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "REQUEST 8"
+    },
+    {
+     "from": "P3",
+     "to": "P1",
+     "label": "REQUEST 12"
+    },
+    {
+     "from": "P3",
+     "to": "P2",
+     "label": "REQUEST 12"
+    },
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "REPLY 10>8"
+    },
+    {
+     "from": "P3",
+     "to": "P1",
+     "label": "REPLY 12>10"
+    },
+    {
+     "from": "P3",
+     "to": "P2",
+     "label": "REPLY 12>8"
+    },
+    {
+     "from": "P2",
+     "to": "P1",
+     "label": "REPLY on exit"
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "REPLY on exit"
+    },
+    {
+     "from": "P1",
+     "to": "P3",
+     "label": "REPLY on exit"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Three processes P1, P2 and P3 use Ricart–Agrawala. P1 requests the CS with timestamp 10, P2 with timestamp 8, and P3 with timestamp 12. All three send their requests before any reply is sent. List every message, state who enters first, second and third, and count the messages for the three entries.",
+   "steps": [
+    "N = 3, so N−1 = 2 replies are needed per entry.",
+    "Requests: P1 sends REQUEST(10) to P2 and P3. P2 sends REQUEST(8) to P1 and P3. P3 sends REQUEST(12) to P1 and P2. That is 6 REQUEST messages.",
+    "P1 receives P2's 8. P1's own 10 is larger, so P1 sends REPLY to P2.",
+    "P3 receives P2's 8. P3's own 12 is larger, so P3 sends REPLY to P2. P2 has 2 replies and enters first. P2 defers P1's 10 and P3's 12 because its own 8 is smaller.",
+    "P3 receives P1's 10. P3's own 12 is larger, so P3 sends REPLY to P1. P1 has one reply from P3 and defers P3's 12 because its own 10 is smaller.",
+    "P2 exits: it sends REPLY to P1 and P3. P1 now has 2 replies and enters second.",
+    "P1 exits: it sends REPLY to P3. P3 now has 2 replies and enters third.",
+    "Counts: 6 REQUEST plus 6 REPLY = 12 messages. Per entry 2(N−1) = 4; for 3 entries 3 × 4 = 12."
+   ],
+   "answer": "P2 enters first, P1 second, P3 third; 6 REQUEST and 6 REPLY messages, 12 in total, which is 2(N−1) = 4 per entry.",
+   "check": "N = 3\nreplies_needed = N - 1\nmessages_per_entry = 2 * replies_needed\ntotal_requests = N * (N - 1)\ntotal_replies = total_requests\ntotal_messages = total_requests + total_replies\nprint(replies_needed)\nprint(messages_per_entry)\nprint(total_requests)\nprint(total_replies)\nprint(total_messages)",
+   "values": [
+    2,
+    4,
+    6,
+    6,
+    12
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not swap the counts: Lamport needs 3(N−1) messages per entry, Ricart–Agrawala needs 2(N−1). For N = 3 that is 6 versus 4.",
+  "In Ricart–Agrawala a process that is not requesting must reply immediately; withholding the reply turns the algorithm into deadlock.",
+  "In Ricart–Agrawala defer only when your own timestamp is smaller. A larger own timestamp means reply now. Equal timestamps compare process id.",
+  "Lamport still needs RELEASE; without it earlier requests stay in queues and can block later entries.",
+  "Both algorithms assume processes do not crash. One crash can stop all requesters in RA because a REPLY never comes; this is a failure problem, not a mutual-exclusion bug."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which message types does Ricart–Agrawala use?",
+   "marks": 2,
+   "a": "REQUEST and REPLY only; there is no RELEASE."
+  },
+  {
+   "level": "remember",
+   "q": "State the three requirements of distributed mutual exclusion.",
+   "marks": 2,
+   "a": "Safety: at most one process in the CS. Liveness: no starvation. Fairness: smaller timestamp enters first."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Lamport's algorithm need RELEASE while Ricart–Agrawala does not?",
+   "marks": 3,
+   "a": "Lamport queues every request until told it is finished; RELEASE removes it. RA keeps no separate grant queue: a deferred REPLY is sent on exit, so the reply itself carries the release information."
+  },
+  {
+   "level": "apply",
+   "q": "Five processes use each algorithm. Compute the messages per CS entry.",
+   "marks": 4,
+   "a": "N = 5, so N−1 = 4. Lamport: 3 × 4 = 12 messages. Ricart–Agrawala: 2 × 4 = 8 messages."
+  },
+  {
+   "level": "apply",
+   "q": "In Ricart–Agrawala, P1 requests with timestamp 7 and P2 with timestamp 9. P2 receives P1's request while requesting. Does P2 reply now or defer? Who can enter first?",
+   "marks": 4,
+   "a": "P2 sends REPLY at once: its own timestamp 9 is larger, so P1's request with 7 is earlier and P2 has no objection. P1 enters first. (P2 waits for its own N−1 replies; it defers only requests whose timestamps are larger than 9.)"
+  },
+  {
+   "level": "analyze",
+   "q": "A process in Ricart–Agrawala crashes after receiving a REQUEST. What happens to a requester, and what fix is needed?",
+   "marks": 5,
+   "a": "The requester waits forever for the missing REPLY. RA alone has no failure detection; add a timeout, failure detector, group membership, or lease."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is timestamp order more than safety in these algorithms?",
+   "marks": 4,
+   "a": "Safety alone allows a later request to overtake an earlier one and starve it. Timestamp order makes the queue head predictable and gives bounded waiting when no process fails."
+  },
+  {
+   "level": "understand",
+   "q": "What does a REPLY mean in Lamport's algorithm and in Ricart–Agrawala?",
+   "marks": 3,
+   "a": "In Lamport it means 'I have recorded your request'. In RA it means 'I do not object; you may go ahead'."
+  }
+ ],
+ "beyond": "Not for the exam. Modern cloud systems rarely expose these exact algorithms. They build locks from leases, failure detectors and consensus services, because a crashed holder must lose the lock after a timeout. Ricart–Agrawala is still the clean mental model for permission-based locks. Search 'distributed lock service', 'lease-based mutual exclusion', 'Maekawa quorum', and 'failure detector' next."
+}

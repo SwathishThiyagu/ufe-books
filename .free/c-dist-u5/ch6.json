@@ -1,0 +1,202 @@
+{
+ "lead": "A process group is a set of processes that act as one service. Replication puts the same state on several members, so one crash need not stop the service. Reliable communication adds sequence numbers, acknowledgements and duplicate suppression, so a lost reply or repeated request does not corrupt state. Together they keep a wallet or bank balance correct over an unreliable network. Only a few universities teach this advanced chapter.",
+ "prereq": "You need: <a href=\"#consensus-and-agreement-under-failures\">5.4</a> for agreement, and <a href=\"#message-ordering\">the ordering chapter</a> for RPC, group communication and message ordering.",
+ "sections": [
+  {
+   "h3": "Process groups and replication",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process group is a named set of processes that act as one service. In a flat group members are equal. In a hierarchical group one coordinator sends work to members. A closed group admits only members; an open group also admits outside clients."
+    },
+    {
+     "type": "p",
+     "text": "Replication puts the same state on several members. In primary-backup replication, one primary executes each request and sends the update to backups. It replies after enough backups acknowledge, so a crash does not lose an acknowledged update. If the primary crashes, survivors agree on one new primary before a backup takes over."
+    },
+    {
+     "type": "p",
+     "text": "State machine replication is stricter. Every replica runs the same deterministic operations in the same order. Order matters when operations do not commute. Example: start at ₹1000, debit ₹700 and ₹500; if ₹700 is applied first, ₹500 is rejected at ₹300 left, final ₹300; if ₹500 is applied first, ₹700 is rejected, final ₹500. Different orders, different balances. Plain arithmetic debits do commute. Agreement on order, and on membership, is the consensus problem of <a href=\"#consensus-and-agreement-under-failures\">5.4</a>; serving reads is the consistency question of <a href=\"#consistency-models-and-replication\">5.7</a>."
+    },
+    {
+     "type": "p",
+     "text": "Survivors must agree on membership. A majority quorum is:"
+    },
+    {
+     "type": "formula",
+     "text": "q = ⌊n/2⌋ + 1",
+     "where": "q is the smallest number of members that must agree to form a majority (the quorum size); n is the group size; for n = 3, q = 2."
+    }
+   ]
+  },
+  {
+   "h3": "Reliable communication and RPC semantics",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An unreliable network can lose a message, deliver it twice, or reorder two messages. A sequence number is a counter in each message; the receiver uses it to order messages and spot repeats."
+    },
+    {
+     "type": "p",
+     "text": "Acknowledgement with timeout and retransmission gives at-least-once delivery: the sender repeats until an ack arrives, so the request arrives, but may arrive more than once. The receiver keeps a duplicate-suppression table of request ids already applied. On a repeat it returns the stored reply and does not apply the operation again. Exactly-once at the server means at-least-once delivery plus this table; the network itself cannot promise it."
+    },
+    {
+     "type": "p",
+     "text": "An idempotent operation can be repeated with the same effect, such as setting balance to ₹1500. A debit is not idempotent. Give each debit a unique request id, such as 77."
+    },
+    {
+     "type": "p",
+     "text": "At-most-once RPC sends once, never retries, and can lose the request without telling the client."
+    },
+    {
+     "type": "p",
+     "text": "Ordering has three useful levels, covered in <a href=\"#message-ordering\">the ordering chapter</a>. FIFO keeps each sender's messages in send order. Causal order also respects happened-before. Total order makes every receiver see the same sequence, which state machine replication needs."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The client sends debit 500 with id 77 to the primary; the primary copies the update to two backups; membership agrees the leader.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "nodes": [
+    {
+     "id": "c",
+     "label": "Client",
+     "note": "debit 500, id 77",
+     "style": "normal"
+    },
+    {
+     "id": "p",
+     "label": "Primary",
+     "note": "applies once",
+     "style": "accent"
+    },
+    {
+     "id": "b1",
+     "label": "Backup 1",
+     "note": "copy of state",
+     "style": "normal"
+    },
+    {
+     "id": "b2",
+     "label": "Backup 2",
+     "note": "copy of state",
+     "style": "normal"
+    },
+    {
+     "id": "m",
+     "label": "Membership",
+     "note": "agrees the leader",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "c",
+     "to": "p",
+     "label": "request",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "b1",
+     "label": "update",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "b2",
+     "label": "update",
+     "style": "solid"
+    },
+    {
+     "from": "b1",
+     "to": "p",
+     "label": "ack",
+     "style": "dashed"
+    },
+    {
+     "from": "m",
+     "to": "p",
+     "label": "leader",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A client sends one debit request to the primary, the primary copies the update to two backups, and a separate membership service decides which replica is primary."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three wallet replicas hold ₹2000. A client debits ₹500 with request id 77. The reply is lost; the client retries twice, so the server sees id 77 three times. Find the balance and duplicate table with suppression, then without it. How many replicas still form a majority after one crash?",
+   "steps": [
+    "B0 = ₹2000; debit a = ₹500; arrivals m = 3.",
+    "With suppression, first arrival applies one debit: B = 2000 − 500 = ₹1500. Table {77: reply}; next two are repeats; applied = 1.",
+    "Without suppression, all 3 apply: debited = 3 × 500 = ₹1500; B = 2000 − 1500 = ₹500; applied = 3.",
+    "n = 3; q = ⌊3/2⌋ + 1 = 2. One crash leaves 2, still a majority."
+   ],
+   "answer": "With suppression the balance is ₹1500 after one debit; without it ₹500 after three debits; 2 of 3 replicas remain a majority.",
+   "check": "b0 = 2000\namount = 500\narrivals = 3\nwith_suppression = b0 - amount\nwithout_suppression = b0 - amount * arrivals\napplied_with = 1\napplied_without = arrivals\nremaining = 2\nprint(with_suppression)\nprint(without_suppression)\nprint(applied_with)\nprint(applied_without)\nprint(remaining)",
+   "values": [
+    1500,
+    500,
+    1,
+    3,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Exactly-once delivery is impossible on an unreliable network; at the server it means at-least-once plus duplicate suppression.",
+  "At-most-once RPC can lose the request silently.",
+  "The duplicate table must survive failover, or a retry on the new primary applies the debit twice.",
+  "Three replicas need 2 for a majority, not 3; two primaries cause split brain."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a process group.",
+   "marks": 2,
+   "a": "Named processes acting as one service."
+  },
+  {
+   "level": "remember",
+   "q": "What does a sequence number detect?",
+   "marks": 2,
+   "a": "Reordering and duplicates."
+  },
+  {
+   "level": "understand",
+   "q": "Why must state machine replicas use the same order?",
+   "marks": 3,
+   "a": "Because operations that do not commute give a different final state when applied in a different order (for example a debit rejected for insufficient funds). Same order on every replica keeps the states identical."
+  },
+  {
+   "level": "understand",
+   "q": "At-most-once versus at-least-once RPC?",
+   "marks": 3,
+   "a": "Sends once and may lose; retries and may duplicate."
+  },
+  {
+   "level": "apply",
+   "q": "n = 5, one crash: quorum and remaining members?",
+   "marks": 2,
+   "a": "q = 3; 4 remain, a majority."
+  },
+  {
+   "level": "apply",
+   "q": "Balance ₹2000; debit ₹500 id 77; server sees id 77 twice with suppression. Final balance?",
+   "marks": 3,
+   "a": "₹1500; one debit."
+  },
+  {
+   "level": "analyze",
+   "q": "Primary replies before backups ack, then crashes. Problem?",
+   "marks": 4,
+   "a": "Acknowledged update may be lost; new primary lacks it."
+  }
+ ],
+ "beyond": "Not for the exam. Raft and Paxos drive replicated services; ZooKeeper and etcd expose membership and ordered updates. Payment APIs use idempotency keys, a client-chosen request id. Search next for Raft, idempotency keys and exactly-once semantics in Kafka."
+}

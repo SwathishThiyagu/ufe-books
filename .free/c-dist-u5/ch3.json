@@ -1,0 +1,233 @@
+{
+ "lead": "This chapter is about finding a cycle of processes that wait on each other when no single computer can see the whole picture. In a distributed system each site keeps only its local wait-for information, so a detector sends a small probe from site to site along waiting edges. When a probe returns to the process that started it, the waiting is circular and no process in the cycle can proceed. The idea is used in distributed databases, cluster job schedulers and message-based middleware that must break deadlocks without stopping the whole system.",
+ "prereq": "You need: message passing and global state from Unit 4, and the request and reply traffic of <a href=\"#distributed-mutual-exclusion-lamport-and-ricart-agrawala\">5.1</a>.",
+ "sections": [
+  {
+   "h3": "The global wait-for graph and four deadlock models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A distributed system has sites S1, S2, ..., SN. Each site runs processes and a resource manager, which records local waits. In the simple model a site runs one process; real sites run many, and the same bookkeeping applies per process. An edge Pi → Pj means process Pi is blocked waiting for a resource that process Pj holds. The wait-for graph (WFG) has a vertex for each process and a directed edge for each wait. A deadlock is a directed cycle in the WFG. No site sees the whole WFG, because edges cross site boundaries."
+    },
+    {
+     "type": "formula",
+     "text": "WFG = (P, E), E = { (Pi, Pj) : Pi is blocked and Pj holds a resource Pi needs }",
+     "where": "P is the set of processes; E is the set of wait-for edges; Pi and Pj are processes."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Model",
+      "Wait condition",
+      "Example"
+     ],
+     "rows": [
+      [
+       "AND",
+       "Pi proceeds only after every requested resource is granted.",
+       "A transaction needs two locks before commit."
+      ],
+      [
+       "OR",
+       "Pi proceeds when any one requested resource is granted.",
+       "A worker waits for any one replica to answer."
+      ],
+      [
+       "AND-OR",
+       "Some requests are all-or-nothing, others any-one.",
+       "A query needs all shards, but a quorum reply is enough for a read."
+      ],
+      [
+       "Communication",
+       "Processes wait for messages, not for held resources.",
+       "A server waits for a reply from a client that is itself waiting for a message from another server."
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Chandy–Misra–Haas edge chasing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Chandy–Misra–Haas algorithm detects cycles in the AND model without collecting the global WFG. A detector at process Pk sends a probe with three fields. The first field names a process Pi that is waiting; the second names the process Pj it waits for; the third names the initiator Pk that started the probe."
+    },
+    {
+     "type": "formula",
+     "text": "probe(i, j, k): Pi is blocked on Pj, and Pk started this probe",
+     "where": "i is the waiting process; j is the process it waits for; k is the initiator that began detection."
+    },
+    {
+     "type": "p",
+     "text": "Note the field order. Many textbooks write probe(initiator, sender, receiver); here the order is (waiting process, waited-on process, initiator). Read the fields as defined, not by position alone."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Pk starts detection when it becomes blocked. It sends probe(k, q, k) to the site of every process q that holds a resource Pk needs.",
+      "A site receiving probe(i, j, k) checks whether Pj is blocked. If Pj is not blocked, the probe dies; it reached a process that can run.",
+      "If Pj is blocked, the site forwards probe(j, r, k) to the site of every process r on which Pj waits. This follows every outgoing edge of Pj in the AND model.",
+      "If a forwarded probe reaches the initiator Pk, Pk receives probe(i, k, k): the second field is Pk and the third field equals the initiator.",
+      "Pk declares a deadlock involving itself. The returned probe names only the last sender and the initiator; listing every member of the cycle needs a variant where the probe carries the path it has travelled."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "In the OR model a blocked process needs only one requested resource, so its wait is a disjunction. The detector forwards the probe along one outgoing edge, not all. A single round can therefore miss a cycle that is reached through another edge; repeated rounds with different choices are needed."
+    },
+    {
+     "type": "p",
+     "text": "A message delay creates a phantom deadlock: the WFG changes while probes travel, and a returning probe may close a cycle that has already broken. Detectors use timeouts, sequence numbers or repeated passes to discard stale reports."
+    }
+   ]
+  },
+  {
+   "h3": "Cost, centralized and hierarchical detection",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A probe is one message, so message cost is also O(N·E) per round. The bound is loose because most probes die at unblocked processes. In the OR model the per-round cost falls, but detection may need several rounds."
+    },
+    {
+     "type": "formula",
+     "text": "probes per detection round = O(N × E)",
+     "where": "N is the number of processes; E is the number of wait-for edges in the global WFG; O gives the upper-bound growth rate."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Centralized detection: one site gathers local WFG fragments and searches for cycles. It is exact if reports are consistent, but adds a bottleneck and a single point of failure.",
+      "Hierarchical detection: sites form clusters. Each cluster detects internal cycles; cluster leaders exchange summaries and search for cycles that cross clusters.",
+      "Breaking a detected cycle is a separate policy; recovery and agreement under failures appear in <a href=\"#consensus-and-agreement-under-failures\">5.4</a>."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A three-process cycle under the AND model. Probes follow P1 → P2 → P3, and the return to P1 proves that the cycle is closed.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "P1",
+     "label": "P1",
+     "x": 0,
+     "y": 2,
+     "note": "initiator",
+     "style": "accent"
+    },
+    {
+     "id": "P2",
+     "label": "P2",
+     "x": 2,
+     "y": 2,
+     "note": "blocked",
+     "style": "normal"
+    },
+    {
+     "id": "P3",
+     "label": "P3",
+     "x": 1,
+     "y": 0,
+     "note": "blocked",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "probe 1",
+     "style": "accent"
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "probe 2",
+     "style": "accent"
+    },
+    {
+     "from": "P3",
+     "to": "P1",
+     "label": "probe 3",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A three-node wait-for cycle where probes travel P1 to P2 to P3 and the third probe returns to the initiator P1, which proves the deadlock."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three sites run Chandy–Misra–Haas under the AND model. P1 on site S1 is blocked waiting for P2 on S2; P2 is blocked waiting for P3 on S3; P3 is blocked waiting for P1. P1 starts detection. Write every probe and state how the algorithm decides.",
+   "steps": [
+    "P1 is the initiator, so the probe it starts carries third field P1. P1 waits for P2, so S1 sends probe(P1, P2, P1) to S2. This is probe number 1.",
+    "S2 receives probe(P1, P2, P1). P2 is blocked, and P2 waits for P3, so S2 forwards probe(P2, P3, P1) to S3. This is probe number 2.",
+    "S3 receives probe(P2, P3, P1). P3 is blocked, and P3 waits for P1, so S3 forwards probe(P3, P1, P1) back to S1. This is probe number 3.",
+    "S1 sees probe(P3, P1, P1). The second field is P1, and the third field is also P1. The probe has returned to its initiator, so the cycle P1 → P2 → P3 → P1 is closed.",
+    "P1 declares a deadlock. The detection used one probe per edge of the cycle, so the total is 3 probes."
+   ],
+   "answer": "P1 sends probe(P1, P2, P1), S2 forwards probe(P2, P3, P1), S3 returns probe(P3, P1, P1), and P1 declares a deadlock after 3 probes.",
+   "check": "cycle = [\"P1\", \"P2\", \"P3\"]\nprobes = len(cycle)\nprint(probes)\n",
+   "values": [
+    3
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A probe that merely reaches a blocked process proves nothing. Only a probe whose second field is the initiator, that is probe(i, Pk, Pk), proves a cycle.",
+  "Under the OR model a process forwards along a single edge, so one detection round may miss a real deadlock.",
+  "Message delay can produce a phantom deadlock: the reported cycle may have broken before the probe returns.",
+  "Wait-for edge direction matters: Pi → Pj means Pi waits and Pj holds. Reversing the arrow gives the wrong cycle.",
+  "O(N·E) is a per-round upper bound on probes, not a total for the whole run; N is processes and E is wait-for edges."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does an edge Pi → Pj mean in a wait-for graph?",
+   "marks": 2,
+   "a": "Process Pi is blocked waiting for a resource that process Pj holds."
+  },
+  {
+   "level": "understand",
+   "q": "Why can one site usually not detect a distributed deadlock from its local wait-for graph alone?",
+   "marks": 3,
+   "a": "The cycle may cross site boundaries. Each site sees only its local fragment of the WFG, so no site sees the closing edge unless probes or reports travel between sites."
+  },
+  {
+   "level": "apply",
+   "q": "In the AND model, P1 is blocked on P2, P2 on P3, P3 on P4, and P4 on P1. P1 starts Chandy–Misra–Haas detection. List the probes and give the total number.",
+   "marks": 4,
+   "a": "Probe 1: probe(P1, P2, P1). Probe 2: probe(P2, P3, P1). Probe 3: probe(P3, P4, P1). Probe 4: probe(P4, P1, P1). The second field of the last probe is P1, the initiator, so the cycle is closed and P1 declares a deadlock; total 4 probes."
+  },
+  {
+   "level": "analyze",
+   "q": "Why may one round of OR-model edge chasing miss a deadlock that AND-model edge chasing would find?",
+   "marks": 5,
+   "a": "In the OR model a process proceeds when any one request is granted, so its wait is a disjunction. The detector follows one outgoing edge per blocked process. If it chooses an edge outside the cycle, the probe dies or returns without closing the cycle; other choices in later rounds may find it."
+  },
+  {
+   "level": "remember",
+   "q": "What does the third field k name in probe(i, j, k)?",
+   "marks": 2,
+   "a": "It names the initiator, the process that started the detection round."
+  },
+  {
+   "level": "apply",
+   "q": "A WFG has N = 5 processes and E = 12 wait-for edges. Using the loose bound O(N·E), what is the upper bound on probes in one detection round?",
+   "marks": 4,
+   "a": "The loose upper bound is N × E = 5 × 12 = 60 probes in one round."
+  },
+  {
+   "level": "analyze",
+   "q": "What is a phantom deadlock, and give one practical way to reduce false reports.",
+   "marks": 5,
+   "a": "A phantom deadlock is a cycle reported by probes after the real WFG has changed, so the cycle no longer exists. Practical fixes include timeouts, sequence numbers or repeated detection passes before acting on a report."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems rarely run one detector per process; cluster managers and databases combine edge chasing with timeouts, priority inheritance and victim selection. Cloud job schedulers and distributed lock services use similar wait-for graphs to find stuck tasks. Newer work studies deadlock detection under partial synchrony and in geo-replicated systems, where message delay makes phantom reports common. Search terms: distributed deadlock detection, edge chasing, phantom deadlock, Chandy–Misra–Haas."
+}

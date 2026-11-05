@@ -1,0 +1,494 @@
+{
+ "lead": "This unit is about coordination: making many processes behave as one while messages are delayed and machines fail. After it you can trace Lamport's, Ricart–Agrawala's and Suzuki–Kasami's algorithms message by message, run a probe-based deadlock detector, state the consensus limits for crash and Byzantine faults, pick a checkpointing scheme, and choose a consistency model for a replicated store.",
+ "about": "Unit 5 covers the three jobs a distributed program must do that a single program never does: agree on who goes next, agree on one value, and survive a crash. Chapters 5.1 and 5.2 solve mutual exclusion with timestamps and then with a token. Chapter 5.3 finds a deadlock when the wait-for graph is spread over many sites. Chapter 5.4 turns 'everyone agrees' into a precise problem with known limits. Chapter 5.5 saves consistent recovery lines so a failure does not restart the world. Chapter 5.6 keeps processes and messages alive through replication and retries. Chapter 5.7 closes with the consistency contract that decides what a read on a replica may return.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Only one process may be inside its critical section at a time, and timestamped REQUEST and REPLY messages can give that guarantee with no central server.",
+   "depth": "Model: N processes, message passing only, FIFO channels, one critical section (CS). State the three requirements: mutual exclusion (safety), no starvation (liveness), and entry in timestamp order (fairness). Lamport's algorithm: a process sends REQUEST with its timestamp to all N−1 others, every receiver queues it and replies, the requester enters when it holds N−1 replies and its own request is at the head of its queue, then it broadcasts RELEASE. Cost 3(N−1) messages per entry. Ricart–Agrawala: two message types only, 2(N−1) messages per entry. On a REQUEST with timestamp T, a process replies at once if it is not requesting or if its own timestamp is larger; otherwise it defers, and sends the deferred replies when it leaves the CS, so RELEASE disappears. Sketch the correctness argument and the failure problem: if one process crashes, everyone waiting on its reply waits forever. Some syllabi call this timestamp-based or non-token mutual exclusion; some also list quorum-based (Maekawa) sets in the same lecture.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "P1",
+     "P2",
+     "P3"
+    ],
+    "messages": [
+     {
+      "from": "P1",
+      "to": "P2",
+      "label": "REQUEST ts = 10"
+     },
+     {
+      "from": "P1",
+      "to": "P3",
+      "label": "REQUEST ts = 10"
+     },
+     {
+      "from": "P2",
+      "to": "P1",
+      "label": "REQUEST ts = 8"
+     },
+     {
+      "from": "P1",
+      "to": "P2",
+      "label": "REPLY, 10 > 8"
+     },
+     {
+      "from": "P3",
+      "to": "P1",
+      "label": "REPLY, not asking"
+     },
+     {
+      "from": "P3",
+      "to": "P2",
+      "label": "REPLY, 12 > 8"
+     },
+     {
+      "from": "P2",
+      "to": "P1",
+      "label": "REPLY on exit"
+     }
+    ],
+    "aria": "Ricart–Agrawala with three processes: P2 holds the smallest timestamp 8, collects two replies and enters the critical section first, while P1 waits for P2's deferred reply."
+   },
+   "example": "Three processes P1, P2, P3 run Ricart–Agrawala. P1 asks for the critical section with timestamp 10, P2 with timestamp 8, P3 with timestamp 12. Give every message, say who enters first, and count the messages. Answer: P1 sends REQUEST(10) to P2 and P3; P2 sends REQUEST(8) to P1 and P3; P3 sends REQUEST(12) to P1 and P2. P1's 10 is larger than P2's 8, so P1 replies to P2 at once; P3 replying to P2 uses the same rule (12 > 8). P2's 8 is smaller than both, so P2 defers nothing and enters the CS with 2 = N−1 replies. On exit P2 replies to P1. P1 then has replies from P2 and P3 and enters; P3 enters last. Total 6 REQUEST plus 6 REPLY messages for the three entries, that is 2(N−1) = 4 per entry.",
+   "trap": "The message counts are usually swapped in answers: Lamport needs 3(N−1) messages per entry and Ricart–Agrawala 2(N−1). The second trap is forgetting that in Ricart–Agrawala a process which is not requesting must reply immediately; withholding the reply turns the algorithm into a deadlock.",
+   "prereq": "Unit 4: message passing, happened-before, Lamport logical clocks.",
+   "leave": "Vector clocks and consistent snapshots (Unit 4); token-based schemes (5.2); deadlock (5.3)."
+  },
+  {
+   "k": 2,
+   "idea": "A single token travels between processes, and holding the token is the right to enter the critical section.",
+   "depth": "Only a few universities teach this algorithm. The token carries a queue Q of requesting process ids, an array LN[1..N] holding the last request number granted for each process, and the holder's copy of RN[1..N], the largest sequence number seen from each process. A process wanting the CS increments its sequence number and broadcasts REQUEST(i, sn); every receiver sets RN[i] = max(RN[i], sn). When the token arrives, the process may enter if RN[i] = LN[i] + 1; it sets LN[i] = RN[i], uses the CS, then removes the head j from Q and sends the token to j. A holder that is not requesting passes the token on immediately. Cost: no messages while the token circulates unused, N messages per entry under full load (N−1 broadcast requests plus one token transfer), against 2(N−1) for Ricart–Agrawala. Token loss and duplicate tokens, and how sequence numbers detect them.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "nodes": [
+     {
+      "id": "p1",
+      "label": "P1",
+      "note": "token, Q = [2,4,3]",
+      "style": "accent"
+     },
+     {
+      "id": "p2",
+      "label": "P2",
+      "note": "enters, LN[2] = 1",
+      "style": "live"
+     },
+     {
+      "id": "p4",
+      "label": "P4",
+      "note": "enters, LN[4] = 1",
+      "style": "live"
+     },
+     {
+      "id": "p3",
+      "label": "P3",
+      "note": "enters last, Q empty",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p1",
+      "to": "p2",
+      "label": "token",
+      "style": "solid"
+     },
+     {
+      "from": "p2",
+      "to": "p4",
+      "label": "token",
+      "style": "solid"
+     },
+     {
+      "from": "p4",
+      "to": "p3",
+      "label": "token",
+      "style": "solid"
+     }
+    ],
+    "aria": "One token moves from P1 to P2, then P4, then P3, and each holder takes the next waiting process from the token's queue."
+   },
+   "example": "Four processes P1..P4 share one token. It starts at P1 with Q empty and RN = LN = [0,0,0,0]. P2, P4 and P3 ask for the critical section in that order, each with sequence number 1, and their requests reach P1 in the order P2, P4, P3. Show the token queue, the order of entry and LN after each entry. Answer: the three broadcasts set RN = [0,1,1,1]; P1, which is not requesting, builds Q = [2,4,3]. P1 sends the token to P2 with Q = [4,3] and LN[2] = 1. P2 enters, exits, sends the token to P4 with Q = [3] and LN[4] = 1. P4 enters, exits, sends it to P3 with Q empty and LN[3] = 1. Entry order is P2, P4, P3. Messages: 3 requests times 3 receivers = 9, plus 3 token transfers = 12, that is N = 4 per entry.",
+   "trap": "LN is updated by the process that has just used the token, never by the requester, and the test for entering is RN[i] = LN[i] + 1. Comparing RN[i] with LN[i] the wrong way round either grants the CS twice or blocks it forever.",
+   "prereq": "5.1 for the request and reply patterns; Unit 4 for sequence numbers.",
+   "leave": "Deadlock and token loss detection (5.3); quorum-based mutual exclusion."
+  },
+  {
+   "k": 3,
+   "idea": "A distributed deadlock is a cycle in the global wait-for graph, and because no site sees that whole graph, probes must chase the cycle from site to site.",
+   "depth": "System model: sites, one process per site, resource managers, and the wait-for graph (WFG) with an edge Pi → Pj when Pi waits for a resource held by Pj; a deadlock is a cycle in it. Models of deadlock: the AND model (a process waits for all it asked for), the OR model (it proceeds when any one arrives), the AND-OR model, and communication deadlock where processes wait for messages instead of resources. Chandy–Misra–Haas edge chasing: the initiator sends a probe (i, j, k) meaning 'Pi is blocked waiting for Pj, and this probe started at Pk'. A site forwards the probe along every outgoing edge of Pj in the AND model, along one edge in the OR model, and drops it if Pj is not blocked. If the probe arrives back at Pk, then Pk is deadlocked. Cost is O(N·E) probes per detection round; message delay produces phantom deadlocks. Two lines on centralized and hierarchical detection.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "P1",
+      "label": "P1",
+      "x": 0,
+      "y": 2,
+      "note": "initiator",
+      "style": "accent"
+     },
+     {
+      "id": "P2",
+      "label": "P2",
+      "x": 2,
+      "y": 2,
+      "note": "blocked",
+      "style": "normal"
+     },
+     {
+      "id": "P3",
+      "label": "P3",
+      "x": 1,
+      "y": 0,
+      "note": "blocked",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "P1",
+      "to": "P2",
+      "label": "probe 1",
+      "style": "accent"
+     },
+     {
+      "from": "P2",
+      "to": "P3",
+      "label": "probe 2",
+      "style": "accent"
+     },
+     {
+      "from": "P3",
+      "to": "P1",
+      "label": "probe 3",
+      "style": "live"
+     }
+    ],
+    "aria": "A three-node wait-for cycle where probes travel P1 to P2 to P3 and the third probe returns to the initiator P1, which proves the deadlock."
+   },
+   "example": "Three sites run Chandy–Misra–Haas under the AND model. P1 on site S1 is blocked waiting for P2 on S2; P2 is blocked waiting for P3 on S3; P3 is blocked waiting for P1. P1 starts detection. Write every probe and say how the algorithm decides. Answer: P1 sends probe(P1, P2, P1) to S2. S2 sees P2 blocked on P3 and forwards probe(P2, P3, P1) to S3. S3 sees P3 blocked on P1 and forwards probe(P3, P1, P1) back to S1. The third field is P1, the initiator itself, so P1 declares a deadlock. Three probes are sent, one per edge of the cycle.",
+   "trap": "A probe that merely reaches a blocked process proves nothing; only a probe whose third field equals its own initiator proves a cycle. Under the OR model a process forwards along a single edge, so one round may miss a real deadlock.",
+   "prereq": "Unit 4: message passing and global state; 5.1 for request and reply traffic.",
+   "leave": "Termination detection and global predicates; transactions and concurrency control → Unit 6."
+  },
+  {
+   "k": 4,
+   "idea": "Consensus asks every correct process to decide the same value, and how many failures you can survive depends only on the failure type and the timing model.",
+   "depth": "The agreement problem: each process proposes a value, all correct processes must decide one value. Three conditions: termination (every correct process eventually decides), agreement (no two correct processes decide differently), validity or integrity (the decided value was proposed). Models: crash failures against Byzantine (arbitrary) failures; synchronous (bounded delay) against asynchronous. Crash case: majority voting over f+1 rounds works when N ≥ 2f+1. Byzantine case: the oral-messages Byzantine generals algorithm needs N ≥ 3f+1 and f+1 rounds. FLP result: no deterministic asynchronous algorithm tolerates even one crash failure, so a system that always agrees must be synchronous or randomised. One line each on Paxos, Raft, two-phase commit and three-phase commit as practical constructions, and on failure detectors.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "C",
+     "L1",
+     "L2",
+     "L3"
+    ],
+    "messages": [
+     {
+      "from": "C",
+      "to": "L1",
+      "label": "attack = 1"
+     },
+     {
+      "from": "C",
+      "to": "L2",
+      "label": "attack = 1"
+     },
+     {
+      "from": "C",
+      "to": "L3",
+      "label": "attack = 1"
+     },
+     {
+      "from": "L1",
+      "to": "L2",
+      "label": "C said 1"
+     },
+     {
+      "from": "L1",
+      "to": "L3",
+      "label": "C said 1"
+     },
+     {
+      "from": "L2",
+      "to": "L1",
+      "label": "C said 1"
+     },
+     {
+      "from": "L2",
+      "to": "L3",
+      "label": "C said 1"
+     },
+     {
+      "from": "L3",
+      "to": "L1",
+      "label": "C said 0"
+     },
+     {
+      "from": "L3",
+      "to": "L2",
+      "label": "C said 0"
+     }
+    ],
+    "aria": "Two rounds of the Byzantine generals algorithm with four processes: the traitor L3 sends a false value 0, but the two loyal lieutenants still collect a majority of 1 and agree on attack."
+   },
+   "example": "Four generals: commander C and lieutenants L1, L2, L3. L3 is a traitor. C orders attack (value 1), but L3 tells the others that C said retreat (value 0). Run the oral-messages algorithm for f = 1 and say what L1 and L2 decide. Answer: round 1, C sends 1 to all three lieutenants. Round 2, each lieutenant forwards what it heard to the other two. L1 receives 1 from C, 1 from L2 and 0 from L3, majority 1. L2 receives 1 from C, 1 from L1 and 0 from L3, majority 1. Both loyal lieutenants decide attack, so agreement holds. Here N = 4 = 3f + 1 = 3(1) + 1; with N = 3 and f = 1 the same vote would fail.",
+   "trap": "Using N ≥ 2f+1 for Byzantine faults. That bound is only for crash faults; Byzantine faults need N ≥ 3f+1, that is f ≤ (N−1)/3. Also, FLP is about asynchronous deterministic systems only, not about every consensus algorithm.",
+   "prereq": "Unit 4: synchronous versus asynchronous models and message ordering.",
+   "leave": "Commit protocols inside transactions → Unit 6; failure detectors in depth."
+  },
+  {
+   "k": 5,
+   "idea": "A set of local checkpoints can be restarted only if it is globally consistent, and one badly placed checkpoint can drag every process back to the beginning.",
+   "depth": "Local checkpoint, global state, and consistent global checkpoint (the recovery line): a set of local checkpoints in which no member has recorded a message that another member sent after its own checkpoint. Orphan message and lost message. Uncoordinated (independent) checkpointing creates the domino effect; coordinated checkpointing avoids it, either blocking and two-phase (a coordinator collects checkpoints, then broadcasts commit) or non-blocking; communication-induced or quasi-synchronous checkpointing piggybacks control information on application messages. Log-based rollback recovery: pessimistic logging writes each message to stable storage before delivery, optimistic logging writes it later and may need replay. Stable storage and garbage collection of old checkpoints.",
+   "figure": {
+    "type": "gantt",
+    "unit": "t",
+    "lanes": [
+     {
+      "label": "P1",
+      "bars": [
+       {
+        "label": "C1,0",
+        "start": 1,
+        "end": 2.5,
+        "style": "accent"
+       },
+       {
+        "label": "C1,1",
+        "start": 7,
+        "end": 8.5,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "P2",
+      "bars": [
+       {
+        "label": "C2,0",
+        "start": 2,
+        "end": 3.5,
+        "style": "accent"
+       },
+       {
+        "label": "C2,1",
+        "start": 8,
+        "end": 9.5,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "P3",
+      "bars": [
+       {
+        "label": "C3,0",
+        "start": 3,
+        "end": 4.5,
+        "style": "accent"
+       },
+       {
+        "label": "C3,1",
+        "start": 11,
+        "end": 12.5,
+        "style": "accent"
+       }
+      ]
+     }
+    ],
+    "aria": "A timeline of six checkpoints on three processes, with the later checkpoints on P2 and P3 being abandoned after P1 crashes at t = 12."
+   },
+   "example": "Three processes checkpoint at these times: P1 at t = 1 and t = 7, P2 at t = 2 and t = 8, P3 at t = 3 and t = 11. Four messages cross: m1 from P1 at t = 4 to P2 at t = 5; m2 from P2 at t = 6 to P3 at t = 9; m3 from P3 at t = 5 to P1 at t = 6; m4 from P1 at t = 9 to P2 at t = 10. P1 crashes at t = 12. Find the recovery line. Answer: P1 restarts at C1,1 (t = 7). m4 was sent after C1,1 and received by P2 at t = 10, after C2,1, so C2,1 is out and P2 falls back to C2,0 (t = 2). Then m2, sent at t = 6 after C2,0, is an orphan for P3, which falls back from C3,1 to C3,0 (t = 3). Then m3, sent at t = 5 after C3,0, is an orphan for P1, which falls back from C1,1 to C1,0 (t = 1). The recovery line is C1,0, C2,0, C3,0 — all three processes roll back to their first checkpoint. This is the domino effect.",
+   "trap": "Independent checkpointing is what causes the domino effect, not what cures it. An orphan message is one that the receiving checkpoint state has already delivered but the sender's checkpoint state has not yet sent.",
+   "prereq": "Unit 4: global state and consistent snapshots.",
+   "leave": "Commit protocols and distributed transactions → Unit 6; stable-storage hardware."
+  },
+  {
+   "k": 6,
+   "idea": "Replicating a process into a group and retrying messages safely is what keeps a distributed system working when a process or a message is lost.",
+   "depth": "Only a few universities teach this chapter. Process groups: flat and hierarchical, closed and open. A group survives its failures only if the survivors agree on who is still a member, and that is the consensus problem of 5.4. Primary-backup replication and state machine replication, where every replica runs the same deterministic operations in the same order. Reliable communication: loss, duplication and reordering; sequence numbers, acknowledgement with timeout and retransmission, duplicate suppression; at-most-once, at-least-once and exactly-once RPC semantics; idempotent operations; FIFO, causal and total message ordering (Unit 4). Three replicas still form a majority of 2 after one crash.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "nodes": [
+     {
+      "id": "c",
+      "label": "Client",
+      "note": "debit 500, id 77",
+      "style": "normal"
+     },
+     {
+      "id": "p",
+      "label": "Primary",
+      "note": "applies once",
+      "style": "accent"
+     },
+     {
+      "id": "b1",
+      "label": "Backup 1",
+      "note": "copy of state",
+      "style": "normal"
+     },
+     {
+      "id": "b2",
+      "label": "Backup 2",
+      "note": "copy of state",
+      "style": "normal"
+     },
+     {
+      "id": "m",
+      "label": "Membership",
+      "note": "agrees the leader",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c",
+      "to": "p",
+      "label": "request",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "b1",
+      "label": "update",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "b2",
+      "label": "update",
+      "style": "solid"
+     },
+     {
+      "from": "b1",
+      "to": "p",
+      "label": "ack",
+      "style": "dashed"
+     },
+     {
+      "from": "m",
+      "to": "p",
+      "label": "leader",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A client sends one debit request to the primary, the primary copies the update to two backups, and a separate membership service decides which replica is primary."
+   },
+   "example": "A wallet server is replicated three times. A client asks to debit ₹500 with request id 77; the balance is ₹2000 and the server keeps a table of request ids it has already applied. The reply is lost and the client retries twice. Show the final balance and the table with duplicate suppression, then without it. Answer: with suppression the server sees id 77 three times, applies the debit once and stores 77 in its table; balance = ₹2000 − ₹500 = ₹1500. Without suppression it applies the debit three times; balance = ₹2000 − ₹1500 = ₹500. Three replicas with majority agreement still serve after one crash, because 2 of 3 remain.",
+   "trap": "Exactly-once delivery does not exist on an unreliable network. The network offers at-most-once or at-least-once; exactly-once means at-least-once delivery plus duplicate suppression at the server. Also, at-most-once RPC can lose the request silently and never tell the client.",
+   "prereq": "5.4 for agreement; Unit 4 for RPC, group communication and message ordering.",
+   "leave": "How the replicas stay consistent (5.7); transactions → Unit 6."
+  },
+  {
+   "k": 7,
+   "idea": "A consistency model is the contract that says which value a read may return when the same data lives on several replicas.",
+   "depth": "Why replicate: availability, latency, read throughput, fault tolerance. Data-centric models from strongest to weakest: strict, linearizable, sequential, causal, FIFO, weak, release, eventual — say for each one which reordering it allows. Client-centric models: read-your-writes, monotonic reads, writes-follow-reads. Update protocols: primary-based (remote-write and local-write) and replicated-write with quorums, where R + W > N guarantees that a read quorum touches the latest write, plus version numbers and read repair on the side. Indian context: a bank balance must be linearizable; a cricket score or a social feed is fine with eventual consistency.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "nodes": [
+     {
+      "id": "cl",
+      "label": "Client",
+      "note": "write x = 10",
+      "style": "normal"
+     },
+     {
+      "id": "r1",
+      "label": "R1",
+      "note": "v5, x = 10",
+      "style": "accent"
+     },
+     {
+      "id": "r2",
+      "label": "R2",
+      "note": "v5, x = 10",
+      "style": "accent"
+     },
+     {
+      "id": "r3",
+      "label": "R3",
+      "note": "v4, x = 7",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cl",
+      "to": "r1",
+      "label": "write",
+      "style": "solid"
+     },
+     {
+      "from": "cl",
+      "to": "r2",
+      "label": "write",
+      "style": "solid"
+     },
+     {
+      "from": "r3",
+      "to": "cl",
+      "label": "stale read",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A write at version 5 reaches two of three replicas, while the third still holds the older value 7 at version 4."
+   },
+   "example": "Three replicas R1, R2, R3 hold x = 7 at version 4. A client writes x = 10 with write quorum W = 2 and the write reaches R1 and R2 as version 5. A read uses R = 2 and reaches R2 and R3. What is returned? What if R = 1 and the read reaches only R3? Answer: with R = 2 the client sees version 5 (x = 10) and version 4 (x = 7), keeps the highest version, returns 10, and repairs R3 to version 5. With R = 1 hitting R3 it returns 7, a stale value. The check is R + W > N: 2 + 2 = 4 > 3 works, but 1 + 2 = 3 is not greater than 3, so a stale read is possible.",
+   "trap": "Setting R + W = N and claiming strong consistency; the rule needs R + W > N. The second trap is mixing linearizability (which respects real time) with sequential consistency (which respects only each process's own order).",
+   "prereq": "5.6 for replication and group communication; Unit 4 for causality and message ordering.",
+   "leave": "Distributed transactions and concurrency control → Unit 6; cache coherence in shared-memory machines → Unit 1."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "timestamped requests become the sequence numbers the token orders"
+  ],
+  [
+   2,
+   3,
+   "a lost token and a deadlock both look like a process that never gets a reply"
+  ],
+  [
+   1,
+   4,
+   "mutual exclusion is agreement on a single winner for one round"
+  ],
+  [
+   3,
+   4,
+   "deadlock detection is a distributed agreement about a global fact"
+  ],
+  [
+   4,
+   5,
+   "the survivors must agree on one recovery line before they restart"
+  ],
+  [
+   5,
+   6,
+   "rollback needs replicas that hold the checkpoint and messages that are retried"
+  ],
+  [
+   4,
+   6,
+   "group membership is itself a consensus problem"
+  ],
+  [
+   6,
+   7,
+   "replication only makes sense with a stated consistency contract"
+  ]
+ ]
+}
