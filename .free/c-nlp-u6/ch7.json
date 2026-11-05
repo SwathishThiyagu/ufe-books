@@ -1,0 +1,217 @@
+{
+ "lead": "Two tasks in this chapter look different and share one shape. Question answering takes a question and a passage and returns an answer — either a span copied from the passage or a sentence a model writes. Textual entailment takes a premise and a hypothesis and returns one label: entailment, contradiction or neutral. Both feed two texts into a single encoder and read a decision off the joint representation. Search engines, bank chatbots, helpline desks and fact-checking tools use them. This chapter gives the pipeline, the labels, and the two numbers that score question answering.",
+ "prereq": "You need: BERT fine-tuning and the [CLS] vector from <a href=\"#transformers-bert-and-gpt\">6.4</a>, and named entity recognition for entity-type answers from Unit 2.",
+ "sections": [
+  {
+   "h3": "Two texts in, one decision out",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Question answering and textual entailment are both <i>sentence-pair</i> tasks. One text is the question or the premise; the second is the passage or the hypothesis. The model reads both and produces a small output — a span, a generated sentence, or one label out of three."
+    },
+    {
+     "type": "p",
+     "text": "The recipe is the one from <a href=\"#transformers-bert-and-gpt\">6.4</a>. Join the two texts into one sequence with a separator token between them. Run the encoder. Read the decision from the joint representation — either the [CLS] vector at the front or the per-token vectors of the second text."
+    },
+    {
+     "type": "p",
+     "text": "Sharing one encoder is why these two tasks are taught together. The engineering is the same work every time: tokenise a pair, pad to one length, fine-tune, evaluate. Only the output head and the label set change."
+    }
+   ]
+  },
+  {
+   "h3": "Question answering: find, or generate",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A factoid question wants a short answer: a name, a date, a number. \"Who wrote the national anthem of India?\" wants a person. If you know the expected answer type in advance, named entity recognition from Unit 2 can filter candidate answers."
+    },
+    {
+     "type": "p",
+     "text": "In open-domain QA no passage is supplied. The system runs in two stages — retrieval, then reading. The retriever ranks passages from a large collection against the question (see <a href=\"#information-retrieval-and-cross-lingual-retrieval\">6.8</a>). The reader then looks inside the top few passages only."
+    },
+    {
+     "type": "p",
+     "text": "In reading comprehension the passage is given and the answer is usually a span copied out of it. SQuAD is the standard benchmark of this kind: people wrote questions against Wikipedia paragraphs and marked the answer as a character range inside the paragraph."
+    },
+    {
+     "type": "p",
+     "text": "Generative QA drops the span constraint. A large language model from <a href=\"#large-language-models-and-language-generation\">6.5</a> writes the answer in its own words, and those words may appear nowhere in the passage."
+    }
+   ]
+  },
+  {
+   "h3": "The extractive reader: score a start and an end",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An extractive reader treats the answer as a pair of positions in the passage. For every passage token the model produces a start logit and an end logit."
+    },
+    {
+     "type": "formula",
+     "text": "P_start(i) = softmax over passage tokens of (w<sub>s</sub> · h<sub>i</sub>)",
+     "where": "h<sub>i</sub> is the encoder output vector at passage token i; w<sub>s</sub> is a learned weight vector; the softmax runs across all passage tokens; P_end(j) uses a second vector w<sub>e</sub> in the same way."
+    },
+    {
+     "type": "p",
+     "text": "Training puts cross-entropy on the gold start index and on the gold end index. At test time you pick the pair (i, j) with i ≤ j that maximises P_start(i) × P_end(j). The tokens from i to j, joined back into a string, are the answer."
+    },
+    {
+     "type": "p",
+     "text": "Two numbers score that string. <b>Exact match</b> (EM) compares normalised strings and gives 1 or 0. <b>F1</b> compares tokens and gives partial credit."
+    },
+    {
+     "type": "formula",
+     "text": "F1 = 2 × P × R ÷ (P + R)",
+     "where": "P = overlap ÷ number of predicted tokens; R = overlap ÷ number of gold tokens; overlap is the number of token positions the two answers share; EM = 1 only when the normalised strings are identical, else 0."
+    }
+   ]
+  },
+  {
+   "h3": "Textual entailment: which way does support flow?",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Textual entailment, also called <b>natural language inference</b> (NLI), takes a <b>premise</b> and a <b>hypothesis</b> and asks whether a reader who accepts the premise must accept the hypothesis."
+    },
+    {
+     "type": "p",
+     "text": "There are three labels. <b>Entailment</b>: the hypothesis follows from the premise. <b>Contradiction</b>: the hypothesis cannot be true when the premise is true. <b>Neutral</b>: neither — the premise leaves the question open. SNLI pairs image captions with written hypotheses; MultiNLI does the same with text from several genres."
+    },
+    {
+     "type": "p",
+     "text": "The model is a sentence-pair classifier. Feed premise and hypothesis through BERT and put a three-way softmax on the [CLS] vector. Stronger designs add cross-attention, so each hypothesis word attends over the premise words and the comparison happens word by word."
+    },
+    {
+     "type": "p",
+     "text": "Direction matters. The premise entails the hypothesis, not the reverse. \"A dog is barking\" entails \"an animal is making a noise\"; the second does not entail the first. Some syllabi call the topic text entailment; the labels are the same."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The question comes first, a separator marks where the passage begins, and every passage token gets a start and an end score. The best-scoring pair of positions becomes the answer span, here tokens 7 to 9.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Extractive QA",
+   "nodes": [
+    {
+     "id": "qp",
+     "label": "Question + passage",
+     "note": "who wrote it?",
+     "style": "normal"
+    },
+    {
+     "id": "enc",
+     "label": "Encoder",
+     "note": "BERT layers",
+     "style": "accent"
+    },
+    {
+     "id": "sc",
+     "label": "Start / end scores",
+     "note": "one per token",
+     "style": "live"
+    },
+    {
+     "id": "ans",
+     "label": "Answer span",
+     "note": "tokens 7 to 9",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "qp",
+     "to": "enc",
+     "label": "token pairs"
+    },
+    {
+     "from": "enc",
+     "to": "sc",
+     "label": "per-token logits"
+    },
+    {
+     "from": "sc",
+     "to": "ans",
+     "label": "argmax span"
+    }
+   ],
+   "aria": "Extractive QA: question and passage are encoded, each passage token gets a start and an end score, and the best-scoring span is returned as the answer."
+  }
+ },
+ "examples": [
+  {
+   "question": "A reading-comprehension system returns the span <i>the cat</i>. The gold answer is <i>cat</i>. After normalisation (lower case, punctuation stripped), compute exact match and token-level F1, showing precision and recall.",
+   "steps": [
+    "Tokenise both strings. Gold: [cat] → 1 token. Predicted: [the, cat] → 2 tokens.",
+    "Find the overlap of token positions: the token cat appears in both, so overlap = 1.",
+    "Check exact match: the strings 'the cat' and 'cat' are not identical, so EM = 0.",
+    "Precision P = overlap ÷ predicted tokens = 1 ÷ 2 = 0.5.",
+    "Recall R = overlap ÷ gold tokens = 1 ÷ 1 = 1.0.",
+    "F1 = 2 × P × R ÷ (P + R) = 2 × 0.5 × 1.0 ÷ 1.5 = 1.0 ÷ 1.5 = 0.667."
+   ],
+   "answer": "EM = 0 and F1 = 0.667, so the system gets no exact-match credit but about two-thirds of the token credit.",
+   "check": "from collections import Counter\n\ngold = \"cat\".split()\npred = \"the cat\".split()\n\nem = 1 if gold == pred else 0\ncommon = Counter(gold) & Counter(pred)\noverlap = sum(common.values())\n\nprecision = overlap / len(pred)\nrecall = overlap / len(gold)\nf1 = 2 * precision * recall / (precision + recall)\n\nprint(em)\nprint(round(f1, 3))",
+   "values": [
+    0,
+    0.667
+   ],
+   "output": "0\n0.667"
+  }
+ ],
+ "traps": [
+  "EM is 1 only when the normalised strings match exactly; F1 gives partial credit for shared tokens. A system with F1 near 0.8 can still have a much lower EM. Report both and never call either one 'accuracy'.",
+  "Entailment is one-directional. Read the arrow from premise to hypothesis. 'A dog is barking' entails 'an animal is making a noise', but the reverse fails, and the reverse pair is not a contradiction either.",
+  "Neutral is not contradiction. If the premise does not entail the hypothesis, the pair may still be perfectly consistent. 'A man is playing guitar' and 'A man is playing a musical instrument' are compatible, so the label is entailment, not neutral; pick neutral only when the premise genuinely leaves it open.",
+  "In extractive QA the answer must be a span of the passage: the start index is at or before the end index, both lie inside the passage tokens, and neither is in the question. A model that points into the question has learned the wrong thing.",
+  "A generative QA model can answer with words that never occur in the passage. EM and F1 then compare strings, so a correct paraphrase may score 0 EM. Use a human or model-based judgement for generative answers."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In NLI, what are the two inputs called and what are the three labels?",
+   "marks": 2,
+   "a": "Inputs are the premise and the hypothesis. Labels: entailment (hypothesis follows from the premise), contradiction (hypothesis cannot be true when the premise is true), neutral (neither)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is entailment one-directional? Give a pair where one direction holds and the other fails.",
+   "marks": 3,
+   "a": "The premise carries the evidence; the hypothesis is the claim being tested. 'A dog is barking' entails 'an animal is making a noise', but 'an animal is making a noise' does not guarantee a dog, so the reverse fails. The classifier must be trained and read in the premise → hypothesis direction."
+  },
+  {
+   "level": "apply",
+   "q": "Gold answer: 'new york city'. Predicted answer: 'new york'. Both already normalised. Compute EM and token-level F1.",
+   "marks": 4,
+   "a": "Predicted tokens = 2, gold tokens = 3, overlap = 2. EM = 0 (strings differ). P = 2/2 = 1.0. R = 2/3 = 0.667. F1 = 2 × 1.0 × 0.667 ÷ 1.667 = 0.8. So EM = 0, F1 = 0.8."
+  },
+  {
+   "level": "analyze",
+   "q": "A system reports a pair as 'not entailed'. Explain why you cannot record that as contradiction without more evidence.",
+   "marks": 4,
+   "a": "'Not entailed' only says the hypothesis is not guaranteed. The pair may be neutral or it may be contradictory — these are separate labels. Marking every non-entailed pair as contradiction inflates that class and makes the confusion matrix meaningless; you must check whether the premise rules the hypothesis out, as in 'the cat is on the mat' against 'the cat is flying'."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an extractive reader need two score vectors, one for start and one for end, instead of a single label per token?",
+   "marks": 3,
+   "a": "The answer is a span, so the decision is about two boundary positions, not about each token on its own. Two vectors give one distribution over start positions and one over end positions; multiplying them and taking the best pair with start ≤ end returns the span directly."
+  },
+  {
+   "level": "apply",
+   "q": "An open-domain system must answer a question from 1,000 passages. Describe the two stages of the pipeline and say which stage is trained on labelled answer spans.",
+   "marks": 4,
+   "a": "Stage 1 is retrieval: score and rank the passages against the question, keep the top k. Stage 2 is reading: run the reader on each kept passage with the question. The reader is the stage trained on labelled answer spans; the retriever is trained on question–passage relevance, often with a ranking loss."
+  },
+  {
+   "level": "analyze",
+   "q": "When would you prefer F1 to EM when comparing two QA systems?",
+   "marks": 5,
+   "a": "When the answer boundary is ambiguous or the answer is long. 'the cat' and 'cat' are both correct to a human, but EM scores the first as 0 while F1 gives 0.667. On long answers many correct predictions differ from gold by a word or two, so EM collapses to near 0 and hides real differences; F1 keeps the graded signal. EM is still reported because it is the stricter, harder-to-game number."
+  }
+ ],
+ "beyond": "Not for the exam. Modern open-domain QA trains the retriever and the reader jointly, and dense retrievers score passages by vector similarity rather than word overlap. Retrieval-augmented generation attaches a retriever to a generator so the answer can be written from fetched passages instead of memory. NLI models are now used as a check on summarisers and chatbots: a summary sentence that contradicts the source document is caught as a contradiction pair. Adversarial NLI sets show that models latch on to word overlap instead of reasoning, and cross-lingual NLI tests whether the same labels survive translation. Search next for dense passage retrieval, retrieval-augmented generation, and the SNLI and MultiNLI benchmarks."
+}

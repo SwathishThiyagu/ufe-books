@@ -1,0 +1,263 @@
+{
+ "lead": "A search box takes a few words and returns documents that answer them. An information retrieval system indexes a fixed collection, scores each document against the query and puts the best first. Cross-lingual retrieval does the same when the query is in one language and the documents in another, for example a Tamil query over an English news archive. Web search, library catalogues and question answering all run on this machinery.",
+ "prereq": "TF-IDF and text features from Unit 5, Text Classification and Word Embeddings; tokenization and stemming from Unit 1, Foundations; and <a href=\"#transformers-bert-and-gpt\">6.4</a> for BERT and mBERT sentence vectors.",
+ "sections": [
+  {
+   "h3": "Boolean retrieval and the inverted index",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Boolean retrieval is the oldest design: query terms joined by AND, OR and NOT, and every document either matches or does not. Each document passes through an analyzer that tokenizes, lowercases, removes stop words and stems. The query must use the same analyzer, or a query term can fail to match the stored form of the same word."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Tokenize, normalize and stem each document.",
+      "Collect the terms into a dictionary of unique terms.",
+      "For each term, append the document id to its postings list, keeping ids sorted.",
+      "Store term frequency with each posting so scoring needs no second pass."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The index is inverted: each term points to a sorted postings list of the documents containing it. For <i>neural</i> AND <i>network</i>, merge-intersect the two sorted lists; the cost is proportional to the postings examined, |L1| + |L2|. Skip pointers cut this further. A forward index (document → its terms) would force a scan of every document for every query."
+    },
+    {
+     "type": "p",
+     "text": "Boolean matching returns an unordered set: a document with both query terms and one with a single term are equally matching. Ranking by a relevance score fixes this."
+    }
+   ]
+  },
+  {
+   "h3": "Scoring with TF-IDF and BM25",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Term frequency tf(t,d) is the number of times term t occurs in document d. Inverse document frequency is idf(t) = log₁₀(N ÷ df(t)), where N is the number of documents and df(t) the number containing t. A rare term gets a large idf; a term in every document gets idf = 0 and adds nothing."
+    },
+    {
+     "type": "formula",
+     "text": "score(q,d) = Σ<sub>t ∈ q</sub> tf(t,d) × idf(t)",
+     "where": "q is the query, d a document, t a query term, tf(t,d) the count of t in d, idf(t) = log₁₀(N ÷ df(t)), N the number of documents, df(t) the number of documents containing t."
+    },
+    {
+     "type": "p",
+     "text": "Two flaws remain. Term frequency grows without limit, so a document that repeats a term wins. Long documents contain more terms by accident. BM25 saturates the term frequency and normalizes for length."
+    },
+    {
+     "type": "formula",
+     "text": "score(q,d) = Σ<sub>t ∈ q</sub> idf(t) × [ tf(t,d) × (k₁ + 1) ] ÷ [ tf(t,d) + k₁ × (1 − b + b × |d| ÷ avgdl) ]",
+     "where": "k₁ (typically 1.2 to 2.0) controls how fast extra occurrences stop helping; b (0.75 is standard) controls length normalization; |d| is the length of d in tokens and avgdl the mean document length."
+    },
+    {
+     "type": "p",
+     "text": "With b = 0 length is ignored; with b = 1 it is applied fully. BM25 is the standard lexical baseline and is still hard to beat on keyword-heavy queries and exact names."
+    }
+   ]
+  },
+  {
+   "h3": "Measuring retrieval quality",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Evaluation needs judged documents: assessors mark which documents are relevant for each query, and scores are computed against those judgements."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Precision@k: relevant documents among the top k, divided by k. Of what I showed, how much was right?",
+      "Recall: relevant documents retrieved, divided by all judged relevant documents. Of what existed, how much did I show?",
+      "Mean average precision (MAP): for each query, take the precision at the rank of every retrieved relevant document, add them, divide by the number of judged relevant documents for that query (including ones never retrieved), then average over queries.",
+      "Mean reciprocal rank (MRR): mean of 1 ÷ rank of the first relevant document. Suits tasks with one right answer.",
+      "NDCG: DCG = Σᵢ relᵢ ÷ log₂(1 + i) over positions i = 1, 2, …, where relᵢ is the graded relevance at position i; NDCG = DCG ÷ the DCG of the ideal ordering of the same documents."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Precision and recall pull against each other. One correct document at rank 1 gives precision@1 = 1 while recall may be 0.1. Report both, and always state k."
+    }
+   ]
+  },
+  {
+   "h3": "Dense retrieval and cross-lingual retrieval",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Dense retrieval replaces term matching with vectors. A bi-encoder encodes the query and the document independently, with no cross-attention between them, so every document vector can be precomputed offline (see <a href=\"#transformers-bert-and-gpt\">6.4</a>). Relevance is the cosine similarity cos(q,d) = (q·d) ÷ (|q| × |d|): 1 for parallel vectors, 0 for perpendicular vectors, −1 for opposite vectors."
+    },
+    {
+     "type": "p",
+     "text": "Document vectors are stored in an index. At query time an approximate nearest-neighbour search — a graph such as HNSW, or inverted lists with IVF — returns the top k in milliseconds, trading a little recall for speed. Dense retrieval catches paraphrase; lexical retrieval catches exact names and codes. Many systems run both and merge the lists."
+    },
+    {
+     "type": "p",
+     "text": "Cross-lingual information retrieval (CLIR) is retrieval when the query and the documents are in different languages, for example a Tamil query over an English archive. Four standard routes exist."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Query translation: translate the query into the document language, then run monolingual retrieval. Cheap, but the translated query is short and error-prone.",
+      "Document translation: translate the whole collection offline. Expensive once, but the query stays in the user's own words.",
+      "Pivot language: with no direct translator, go query → English → document language; errors from two translations accumulate.",
+      "Multilingual embeddings: mBERT or XLM-R place many languages in one vector space, so query and document vectors compare directly with no translation step (see <a href=\"#machine-translation\">6.6</a>)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Translated queries are ambiguous: one Tamil word may map to several English words, and a name may be transliterated differently each time. Adding all translation candidates raises recall and adds noise. Score CLIR against a monolingual system on the same judged queries; the gap is the real cost of crossing languages."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The query is analyzed into terms, looked up in the postings lists of the inverted index, scored by TF-IDF or BM25, and the highest scorers come back as a ranked list. Analysis happens before any scoring, and the index holds candidates, not an answer.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Retrieval pipeline",
+   "aria": "An information retrieval pipeline: the query is analyzed into terms, looked up in an inverted index, ranked by TF-IDF or BM25, and the top-k documents are returned as a ranked list.",
+   "nodes": [
+    {
+     "id": "q",
+     "label": "Query",
+     "note": "user text",
+     "style": "normal"
+    },
+    {
+     "id": "an",
+     "label": "Analyzer",
+     "note": "tokenize, stem",
+     "style": "normal"
+    },
+    {
+     "id": "ix",
+     "label": "Inverted index",
+     "note": "postings per term",
+     "style": "accent"
+    },
+    {
+     "id": "rk",
+     "label": "Ranking",
+     "note": "TF-IDF or BM25",
+     "style": "live"
+    },
+    {
+     "id": "res",
+     "label": "Top-k documents",
+     "note": "ranked list",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "q",
+     "to": "an",
+     "label": "text"
+    },
+    {
+     "from": "an",
+     "to": "ix",
+     "label": "terms"
+    },
+    {
+     "from": "ix",
+     "to": "rk",
+     "label": "candidate docs"
+    },
+    {
+     "from": "rk",
+     "to": "res",
+     "label": "sort by score"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A collection has three documents: d1 = <i>neural network model</i>, d2 = <i>neural machine translation</i>, d3 = <i>cricket match</i>. The query is q = <i>neural network</i>. Using idf(t) = log₁₀(N ÷ df(t)) with N = 3 and raw term frequency, compute the TF-IDF score of each document and give the ranking.",
+   "steps": [
+    "df(<i>neural</i>) = 2 (d1, d2); df(<i>network</i>) = 1 (d1 only).",
+    "idf(<i>neural</i>) = log₁₀(3 ÷ 2) = 0.1761.",
+    "idf(<i>network</i>) = log₁₀(3 ÷ 1) = 0.4771.",
+    "Term frequencies: d1 has neural = 1, network = 1; d2 has neural = 1, network = 0; d3 has both at 0.",
+    "score(d1) = 1 × 0.1761 + 1 × 0.4771 = 0.6532.",
+    "score(d2) = 1 × 0.1761 + 0 × 0.4771 = 0.1761.",
+    "score(d3) = 0.0000.",
+    "Sort by score: d1 (0.6532), d2 (0.1761), d3 (0)."
+   ],
+   "answer": "The scores are d1 = 0.6532, d2 = 0.1761 and d3 = 0.0000, so the ranking is d1, d2, d3.",
+   "check": "import math\nN = 3\nidf_neural = round(math.log10(N / 2), 4)\nidf_network = round(math.log10(N / 1), 4)\nprint(idf_neural)\nprint(idf_network)\nprint(round(idf_neural + idf_network, 4))\nprint(round(idf_neural, 4))\nprint(0.0)\n",
+   "values": [
+    0.1761,
+    0.4771,
+    0.6532,
+    0.1761,
+    0.0
+   ],
+   "output": ""
+  },
+  {
+   "question": "A query has 4 judged relevant documents, at ranks 1, 3, 4 and 8 of the returned list. The list is evaluated in full. Compute recall and average precision for this query.",
+   "steps": [
+    "All 4 judged relevant documents appear, so recall = 4 ÷ 4 = 1.0.",
+    "Precision at each hit: rank 1 gives 1 ÷ 1 = 1.000; rank 3 gives 2 ÷ 3 = 0.6667; rank 4 gives 3 ÷ 4 = 0.750; rank 8 gives 4 ÷ 8 = 0.500.",
+    "Average precision = (1.000 + 0.6667 + 0.750 + 0.500) ÷ 4 = 2.9167 ÷ 4 = 0.7292.",
+    "The divisor 4 is the number of judged relevant documents, not the number retrieved."
+   ],
+   "answer": "Recall = 1.0 and average precision = 0.7292.",
+   "check": "hits = [(1, 1), (2, 3), (3, 4), (4, 8)]\nap = sum(r / rank for r, rank in hits) / 4\nprint(round(4 / 4, 4))\nprint(round(ap, 4))\n",
+   "values": [
+    1.0,
+    0.7292
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "IDF is zero for a term in every document, so that term adds nothing to the score. Students often keep giving it weight.",
+  "Precision and recall must be reported together with k. A system with precision@1 = 1 can have very low recall.",
+  "df(t) counts documents; tf(t,d) counts occurrences inside one document.",
+  "In BM25, b = 0 removes length normalization and b = 1 applies it fully; b is not a threshold and k₁ is not the number of documents.",
+  "In CLIR, a translated query may change meaning. Without a monolingual baseline on the same judged queries you cannot tell whether translation or retrieval caused the loss."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does an IDF value of 0 tell you about a term?",
+   "marks": 2,
+   "a": "The term appears in every document (df = N), so log₁₀(N ÷ df) = log₁₀(1) = 0 and the term carries no discriminating weight."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the query pass through exactly the same analyzer as the documents?",
+   "marks": 3,
+   "a": "The index stores stemmed, normalized forms. If the query is not reduced the same way, the string looked up differs from the stored term, for example runs versus run, and a relevant document is never retrieved."
+  },
+  {
+   "level": "apply",
+   "q": "A query has 5 judged relevant documents. The system returns 10 documents, of which 2 are relevant, at ranks 2 and 7. Give precision@10, precision@5 and recall.",
+   "marks": 4,
+   "a": "precision@10 = 2 ÷ 10 = 0.20. Only the rank-2 hit is inside the top 5, so precision@5 = 1 ÷ 5 = 0.20. recall = 2 ÷ 5 = 0.40."
+  },
+  {
+   "level": "apply",
+   "q": "For two queries the first relevant document sits at rank 1 and at rank 4. Compute the MRR.",
+   "marks": 3,
+   "a": "Reciprocal ranks are 1 ÷ 1 = 1 and 1 ÷ 4 = 0.25. MRR = (1 + 0.25) ÷ 2 = 0.625."
+  },
+  {
+   "level": "analyze",
+   "q": "A CLIR system translates an English query into Hindi and then retrieves. Explain two ways this can fail, and how you would show that it failed.",
+   "marks": 5,
+   "a": "A short query word may have several Hindi translations, so the chosen one may miss the sense the user wanted; and names or codes may be transliterated differently in the documents, so the term never matches. Run the same queries on a monolingual Hindi system over the same judged relevant documents and compare precision@k and recall; the gap measures loss from translation, not retrieval."
+  },
+  {
+   "level": "analyze",
+   "q": "A dense retriever misses a document containing an exact product code that a BM25 system finds. Explain why, and what you would build.",
+   "marks": 5,
+   "a": "The bi-encoder compresses the whole query into one vector, so a rare literal string carries little weight and can vanish; approximate nearest-neighbour search may also skip it. BM25 matches the literal term with a high idf. Build a hybrid: retrieve with both, merge the ranked lists, and rerank the merged candidates with a cross-encoder."
+  }
+ ],
+ "beyond": "Not for the exam. Two-stage search dominates in industry: a fast lexical or dense retriever returns a few hundred candidates, then a cross-encoder reranker scores each query-document pair jointly and reorders them. Late-interaction models keep one vector per token instead of one per document, which recovers exact-term matching inside a dense system. Worth searching next: hybrid search, cross-encoder reranking, and multilingual retrieval benchmarks with judged passages across many languages."
+}

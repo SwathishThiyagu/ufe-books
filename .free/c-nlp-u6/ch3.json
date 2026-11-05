@@ -1,0 +1,253 @@
+{
+ "lead": "A sequence-to-sequence model translates one sentence into another of a different length. An encoder RNN reads the source; a decoder RNN writes the target. In the plain version the encoder squeezes the whole source into one fixed vector, and long sentences suffer. Attention fixes this: at each output step the decoder weights every encoder state by relevance. The same idea runs translation, summarisation, dialogue and speech-to-text, and reappears in the transformer as cross-attention.",
+ "prereq": "You need the recurrent, LSTM and GRU cell from <a href=\"#rnn-lstm-and-gru-sequence-models\">6.2</a>, and word vectors from <a href=\"#word-embeddings-word2vec-glove-and-doc2vec\">5.6</a> for the first layer.",
+ "sections": [
+  {
+   "h3": "Seq2seq: an encoder reads, a decoder writes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Seq2seq uses two recurrent networks. The encoder reads the source, one token at a time; the decoder writes the target, one token at a time. The two sentences need not be the same length: a 12-word English sentence can become a 9-word Hindi one."
+    },
+    {
+     "type": "p",
+     "text": "The encoder runs over source tokens x₁, x₂, …, xₙ and produces a hidden state at every step: h₁, h₂, …, hₙ. In the original design only the last state hₙ is kept. That single vector is the context vector c — the encoder's whole summary of the source."
+    },
+    {
+     "type": "p",
+     "text": "The decoder is a second RNN. It starts from state s₀ = c, reads a start token ⟨s⟩, and predicts the first target word. That word is fed back as the next input, and so on until the model emits ⟨/s⟩ or hits a length limit. Each step is a softmax over the target vocabulary."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Run the encoder over all source tokens and store h₁ … hₙ.",
+      "Set the decoder's first state to the context vector and feed the start token.",
+      "At step t, compute s_t from s_{t−1} and the previous target token y_{t−1}.",
+      "Turn s_t into a score for every vocabulary word and pick one (argmax or beam search — see <a href=\"#machine-translation\">6.6</a>).",
+      "Feed that word back as y_t and repeat until ⟨/s⟩."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "During training the decoder is fed the gold previous token, not its own guess; this is teacher forcing. The loss is cross-entropy at every step against the gold next token, and gradients flow back through time across both networks. At test time no gold tokens exist, so the model feeds its own output back. It never practised recovering from its own errors; that mismatch is exposure bias."
+    }
+   ]
+  },
+  {
+   "h3": "The bottleneck, and how attention removes it",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "One fixed vector is a bottleneck: everything the decoder will ever know about the source must fit into, say, 256 numbers. On a long sentence early words are overwritten as the encoder keeps updating, and quality falls sharply with length."
+    },
+    {
+     "type": "p",
+     "text": "Attention removes the bottleneck. The decoder keeps all n encoder states and, at each step, decides which source positions matter now. The decoder state s_t is scored against every encoder state hᵢ to give eᵢ; a softmax turns the scores into weights αᵢ that are positive and sum to 1; the context is their weighted average of the encoder states. The decoder combines that context with its own state and the previous token to predict the next word."
+    },
+    {
+     "type": "formula",
+     "text": "eᵢ = score(s_t, hᵢ),   αᵢ = exp(eᵢ) / Σⱼ exp(eⱼ),   c_t = Σᵢ αᵢ hᵢ",
+     "where": "s_t is the decoder state at step t; hᵢ is encoder state i; eᵢ is the raw score for position i; αᵢ is the attention weight for position i (αᵢ ≥ 0 and Σᵢ αᵢ = 1); c_t is the context vector for step t, same dimension as hᵢ."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Score the current decoder state against every encoder state.",
+      "Softmax the scores into positive weights that sum to 1.",
+      "Form the context c_t = Σᵢ αᵢ hᵢ, a weighted average of encoder states.",
+      "Combine c_t with s_t and run the output layer to predict the next token.",
+      "Repeat at every step; the weights change from step to step."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The weights are readable. A high αᵢ means the decoder is looking hard at source position i. Plotted as source position against target position, the weights often form a diagonal: the model learned word alignment without anyone labelling it."
+    }
+   ]
+  },
+  {
+   "h3": "Bahdanau, Luong, and padding masks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Bahdanau attention is additive: eᵢ = vᵀ tanh(W_a s_{t−1} + U_a hᵢ), where W_a and U_a are learned matrices and v is a learned vector. It is flexible and costs one matrix multiply per source position per step."
+    },
+    {
+     "type": "p",
+     "text": "Luong attention is multiplicative: eᵢ = s_tᵀ hᵢ, or eᵢ = s_tᵀ W_a hᵢ with a learned matrix in between. The plain dot product is dot attention; the version with W_a is general attention. Both are cheaper than the additive form and work about as well. Transformers later parallelised scaled dot products; see <a href=\"#transformers-bert-and-gpt\">6.4</a>."
+    },
+    {
+     "type": "p",
+     "text": "Batches mix sentence lengths, so shorter sources are padded. Padded positions carry no information and must get weight zero. Before the softmax, set their score to −∞ — in code a large negative number such as −1e9. exp(−∞) = 0, so the padded weight becomes 0 and the real weights still sum to 1."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Forget the mask and the decoder wastes probability mass on pads; quality drops and the weights no longer sum to 1 over real words.",
+      "Attention is not only for translation: summarisation, dialogue and speech recognition use the same skeleton, and the same scores reappear inside the transformer as cross-attention."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The encoder reads the source tokens il fait beau into states; attention weighs all of them into a context vector that the decoder uses at each step to emit it is nice. The context is rebuilt at every decoder step, not fixed once.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Seq2seq with attention",
+   "nodes": [
+    {
+     "id": "src",
+     "label": "Source tokens",
+     "note": "il fait beau",
+     "style": "normal"
+    },
+    {
+     "id": "enc",
+     "label": "Encoder RNN",
+     "note": "states h₁…hₙ",
+     "style": "accent"
+    },
+    {
+     "id": "att",
+     "label": "Attention",
+     "note": "softmax weights α",
+     "style": "live"
+    },
+    {
+     "id": "dec",
+     "label": "Decoder RNN",
+     "note": "one step at a time",
+     "style": "accent"
+    },
+    {
+     "id": "tgt",
+     "label": "Target tokens",
+     "note": "it is nice",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "src",
+     "to": "enc",
+     "label": "read in order"
+    },
+    {
+     "from": "enc",
+     "to": "att",
+     "label": "all states"
+    },
+    {
+     "from": "att",
+     "to": "dec",
+     "label": "context vector"
+    },
+    {
+     "from": "dec",
+     "to": "tgt",
+     "label": "predict next"
+    }
+   ],
+   "aria": "An encoder reads the source tokens into states, attention weights them into a context vector for the decoder, and the decoder emits target tokens."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three encoder states are h₁ = [1, 0], h₂ = [0, 1], h₃ = [1, 1]. At decoding step t the decoder state scores them as e = [1, 2, 3]. Compute the attention weights α and the context vector c_t. (No padding, so no mask is needed.)",
+   "steps": [
+    "Exponentiate each score: exp(1) = 2.718, exp(2) = 7.389, exp(3) = 20.086.",
+    "Add them: 2.718 + 7.389 + 20.086 = 30.193, the softmax denominator.",
+    "Divide: α₁ = 0.090, α₂ = 0.245, α₃ = 0.665. They sum to 1.000.",
+    "First coordinate: 0.090 × 1 + 0.245 × 0 + 0.665 × 1 = 0.755.",
+    "Second coordinate: 0.090 × 0 + 0.245 × 1 + 0.665 × 1 = 0.910.",
+    "So c_t = [0.755, 0.910]. Position 3 dominates because exp grows fast: a score gap of 2 became a weight ratio of about 7.4."
+   ],
+   "answer": "α = [0.090, 0.245, 0.665] and the context vector is c_t = [0.755, 0.910].",
+   "check": "import math\nh = [[1, 0], [0, 1], [1, 1]]\ne = [1, 2, 3]\nex = [math.exp(x) for x in e]\ns = sum(ex)\na = [x / s for x in ex]\nprint(round(a[0], 3))\nprint(round(a[1], 3))\nprint(round(a[2], 3))\nctx = [sum(a[i] * h[i][d] for i in range(3)) for d in range(2)]\nprint(round(ctx[0], 3))\nprint(round(ctx[1], 3))\n",
+   "values": [
+    0.09,
+    0.245,
+    0.665,
+    0.755,
+    0.91
+   ],
+   "output": ""
+  },
+  {
+   "question": "Same three states, but a mask now marks position 3 as a pad token. Recompute the weights and the context.",
+   "steps": [
+    "Set e₃ = −1e9 before the softmax. exp(−1e9) = 0.",
+    "New denominator: 2.718 + 7.389 + 0 = 10.108.",
+    "α₁ = 0.269, α₂ = 0.731, α₃ = 0.",
+    "First coordinate: 0.269 × 1 + 0.731 × 0 + 0 × 1 = 0.269.",
+    "Second coordinate: 0.269 × 0 + 0.731 × 1 + 0 × 1 = 0.731.",
+    "The pad state contributes nothing and the real weights again sum to 1."
+   ],
+   "answer": "With the mask, α = [0.269, 0.731, 0] and c_t = [0.269, 0.731].",
+   "check": "import math\nh = [[1, 0], [0, 1], [1, 1]]\ne = [1, 2, -1e9]\nex = [math.exp(x) for x in e]\ns = sum(ex)\na = [x / s for x in ex]\nprint(round(a[0], 3))\nprint(round(a[1], 3))\nprint(round(a[2], 3))\nctx = [sum(a[i] * h[i][d] for i in range(3)) for d in range(2)]\nprint(round(ctx[0], 3))\nprint(round(ctx[1], 3))\n",
+   "values": [
+    0.269,
+    0.731,
+    0.0,
+    0.269,
+    0.731
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Attention weights are a softmax over source positions: positive, summing to 1. They are weights, not encoder states, and not the context vector.",
+  "Teacher forcing is training time only. At test time the decoder consumes its own predictions, which is where exposure bias comes from.",
+  "Plain seq2seq keeps only the last encoder state. Attention keeps all of them and builds a fresh context at every step.",
+  "Forgetting the padding mask lets pad positions share the probability mass, so weights do not sum to 1 over real words.",
+  "Bahdanau is additive (tanh of a sum of projections); Luong is multiplicative (dot product). Swapping the names is a favourite slip."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the context vector in plain seq2seq, and where does it come from?",
+   "marks": 2,
+   "a": "It is the encoder's final hidden state hₙ. It initialises the decoder state and is the decoder's only view of the source."
+  },
+  {
+   "level": "understand",
+   "q": "Why does attention improve translation of long sentences?",
+   "marks": 3,
+   "a": "Without attention all source information is compressed into one fixed vector, so early words fade. Attention keeps every encoder state and gives the decoder a weighted average over them, recomputed each step, so any source position stays reachable at full strength."
+  },
+  {
+   "level": "apply",
+   "q": "Two encoder states are h₁ = [1, 1] and h₂ = [0, 1]. The scores are e = [2, 0]. Compute α and the context vector.",
+   "marks": 4,
+   "a": "exp(2) = 7.389, exp(0) = 1, sum = 8.389. α₁ = 0.881, α₂ = 0.119. c = 0.881 × [1, 1] + 0.119 × [0, 1] = [0.881, 1.000]."
+  },
+  {
+   "level": "apply",
+   "q": "A source has 5 real tokens and 3 pads. A model without a mask gives the pad positions 0.4 of the total weight. What do the real weights sum to, and how does a mask fix it?",
+   "marks": 3,
+   "a": "The real weights sum to 0.6. Setting pad scores to −1e9 makes exp(−1e9) = 0, so the denominator counts only real positions and their weights sum to 1 again."
+  },
+  {
+   "level": "analyze",
+   "q": "A model has near-perfect training loss but poor test BLEU, and errors compound after one wrong word. Diagnose it and give two practical fixes.",
+   "marks": 5,
+   "a": "Exposure bias: teacher forcing means the decoder only sees gold prefixes, so at test time its own wrong token pushes it into unseen states. Fixes: scheduled sampling (mix gold and predicted tokens as inputs), and beam search or a stronger attention so single errors are less likely; more data and longer training help too."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is Luong attention usually cheaper than Bahdanau, and when does additive attention still earn its keep?",
+   "marks": 4,
+   "a": "Luong uses a dot product (sᵀh or sᵀWh), one vector product per source position; Bahdanau needs a tanh over a projected sum, so more matrix work per position per step. Additive attention wins when encoder and decoder state sizes differ, or when the score needs a nonlinear shape a dot product cannot express."
+  },
+  {
+   "level": "understand",
+   "q": "A trained model's attention grid is close to a diagonal. What has the model learned, and why is that useful?",
+   "marks": 3,
+   "a": "Word alignment: target position j puts most weight on its corresponding source position. No alignment labels were used, so the grid is free evidence of what the model attends to and a quick way to spot errors."
+  }
+ ],
+ "beyond": "Not for the exam. These scores are the direct parents of scaled dot-product attention, where the score becomes QKᵀ/√d and all positions are scored in parallel instead of one decoder step at a time. Pointer-generator summarisers keep a copy mechanism on top of attention so rare names are copied from the source instead of generated. Coverage vectors stop summarisers repeating a phrase by tracking how much attention each source word has already received. Multimodal models attend from text to image patches the same way. Search 'attention is all you need', 'pointer-generator network' and 'coverage mechanism summarisation' to go further."
+}

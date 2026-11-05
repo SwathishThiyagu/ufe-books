@@ -1,0 +1,612 @@
+{
+ "lead": "This unit turns text into vectors and then into predictions with neural networks, ending with the transformer models behind today's language tools. After it you can build and read a text classifier, explain how attention, BERT and GPT work, and evaluate machine translation, question answering and retrieval systems.",
+ "about": "Unit 6 moves from fixed-size text classifiers to models that read sequences, then to the transformer family and the applications built on it. Chapter 6.1 trains feedforward and convolutional classifiers on word vectors. Chapter 6.2 adds recurrence with RNN, LSTM and GRU cells. Chapter 6.3 joins two recurrent networks with attention for seq2seq tasks. Chapter 6.4 replaces recurrence with self-attention and introduces BERT and GPT. Chapter 6.5 scales these models into large language models and covers decoding and prompting. The last three chapters apply the machinery: 6.6 machine translation, 6.7 question answering and textual entailment, 6.8 information retrieval and cross-lingual retrieval.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A text classifier can be a fixed-size vector pushed through dense layers, or a 1D convolution that detects local n-gram patterns in the word-vector sequence.",
+   "depth": "Feedforward network for text classification: the input is one fixed vector (TF-IDF from Unit 5, or averaged word vectors), then one or two hidden layers with ReLU or tanh, a softmax output, cross-entropy loss and dropout. Then the 1D CNN: embed each token, slide filters of width 2, 3 and 4 (the width is the n-gram size), add a bias, apply ReLU, max-pool over token positions, concatenate the pooled values, pass through a dense layer to softmax. Some syllabi write iD CNN for 1D CNN. Use it for sentiment analysis and sentence classification; a window of tokens around each word can also do token classification such as named entity recognition, but the CRF layer stays in Unit 2. Mention document clustering and word vectors in one line and point to Unit 5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "1D CNN for sentiment",
+    "nodes": [
+     {
+      "id": "tok",
+      "label": "Tokens",
+      "note": "food was great",
+      "style": "normal"
+     },
+     {
+      "id": "emb",
+      "label": "Embeddings",
+      "note": "3-d vectors",
+      "style": "normal"
+     },
+     {
+      "id": "conv",
+      "label": "1D convolution",
+      "note": "width 2 filter",
+      "style": "accent"
+     },
+     {
+      "id": "pool",
+      "label": "Max-pool",
+      "note": "over positions",
+      "style": "live"
+     },
+     {
+      "id": "soft",
+      "label": "Softmax",
+      "note": "positive / negative",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "tok",
+      "to": "emb",
+      "label": "lookup"
+     },
+     {
+      "from": "emb",
+      "to": "conv",
+      "label": "slide"
+     },
+     {
+      "from": "conv",
+      "to": "pool",
+      "label": "ReLU first"
+     },
+     {
+      "from": "pool",
+      "to": "soft",
+      "label": "dense layer"
+     }
+    ],
+    "aria": "Pipeline from tokens through word embeddings, a width-2 one-dimensional convolution, max-pooling over positions, to a softmax over sentiment classes."
+   },
+   "example": "Classify <i>food was great</i> with 3-dimensional word vectors food = [1,0,1], was = [0,1,0], great = [1,1,0]. One filter has width 2 and weights w = [1,−1,0,0,1,−1], bias b = 0. Compute both window scores after ReLU and the max-pooled feature. Window 1 is concat(food, was) = [1,0,1,0,1,0], so the dot product is 1 − 0 + 0 + 0 + 1 − 0 = 2, ReLU gives 2. Window 2 is concat(was, great) = [0,1,0,1,1,0], dot product 0 − 1 + 0 + 1 + 0 − 0 = 0, ReLU gives 0. Max-pool = max(2, 0) = 2.",
+   "trap": "Filter width is the n-gram size, not the number of filters. Max-pooling runs over token positions, so a 20-token and a 5-token sentence give the same pooled size. Apply ReLU before pooling, not after the softmax.",
+   "prereq": "Unit 5 (TF-IDF, word vectors, classification metrics); Unit 1 (tokenization).",
+   "leave": "Backpropagation derivation and optimizers to a deep learning course; CRF tagging and NER features to Unit 2; recurrence to 6.2."
+  },
+  {
+   "k": 2,
+   "idea": "A recurrent network carries a hidden state through the sequence, so word order and earlier context affect the current prediction.",
+   "depth": "Vanilla RNN: hₜ = tanh(W<sub>x</sub>xₜ + W<sub>h</sub>hₜ₋₁ + b), plus an output layer; backpropagation through time; vanishing and exploding gradients and gradient clipping. LSTM: cell state cₜ and three gates — forget f, input i, output o — with sigmoid gates and a tanh candidate; write the four equations and say what each gate does. GRU: reset gate and update gate, no separate cell state, fewer parameters. Bidirectional and stacked RNNs. Uses: POS tagging and NER as sequence labeling (tag sets in Unit 2, model here), sentiment over a sentence, language modelling. State in one line that an RNN encoder is the input side of 6.3.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One RNN time step",
+    "nodes": [
+     {
+      "id": "x",
+      "label": "Input xₜ",
+      "note": "word vector",
+      "style": "normal"
+     },
+     {
+      "id": "cell",
+      "label": "RNN cell",
+      "note": "tanh of weighted sum",
+      "style": "accent"
+     },
+     {
+      "id": "h",
+      "label": "Hidden hₜ",
+      "note": "carried forward",
+      "style": "live"
+     },
+     {
+      "id": "y",
+      "label": "Output yₜ",
+      "note": "softmax scores",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "x",
+      "to": "cell",
+      "label": "W<sub>x</sub>xₜ"
+     },
+     {
+      "from": "cell",
+      "to": "h",
+      "label": "new state"
+     },
+     {
+      "from": "h",
+      "to": "y",
+      "label": "classify"
+     },
+     {
+      "from": "h",
+      "to": "cell",
+      "label": "next step",
+      "style": "dashed"
+     }
+    ],
+    "aria": "One time step of an RNN: input word vector and previous hidden state enter the cell, produce the new hidden state, which goes to the output and back into the next step."
+   },
+   "example": "A scalar RNN computes hₜ = tanh(0.5 hₜ₋₁ + xₜ) with h₀ = 0. The inputs are x₁ = 1, x₂ = 0.5, x₃ = −1. Find h₁, h₂, h₃. h₁ = tanh(0 + 1) = 0.762. h₂ = tanh(0.5 × 0.762 + 0.5) = tanh(0.881) = 0.706. h₃ = tanh(0.5 × 0.706 − 1) = tanh(−0.647) = −0.570. The negative input flips the state, but the earlier value still pulls it.",
+   "trap": "Gates use sigmoid (values 0 to 1) and the candidate uses tanh (−1 to 1); swapping them is the usual error. h₀ is a zero vector, not the first input. BPTT multiplies many Jacobians, which is why gradients vanish or explode.",
+   "prereq": "6.1 (embeddings, softmax, cross-entropy); Unit 2 (sequence labeling, HMM and CRF comparison).",
+   "leave": "Attention to 6.3; POS tag sets and CRF training to Unit 2; gradient derivations to a deep learning course."
+  },
+  {
+   "k": 3,
+   "idea": "Two networks — an encoder and a decoder — let the input and output have different lengths, and attention lets the decoder look at every encoder state instead of one fixed vector.",
+   "depth": "Seq2seq: the encoder RNN reads the source and its final state is the context vector; the decoder RNN produces target tokens one at a time. Teacher forcing during training, free running at test time, exposure bias; the fixed context vector is a bottleneck for long sentences. Attention: score each encoder state against the decoder state, softmax the scores into weights α that sum to 1, take the context as Σ αᵢhᵢ, then combine it with the decoder state. Bahdanau additive attention and Luong multiplicative or dot attention; padding masks so padded positions get zero weight. Keep beam search for 6.6.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Seq2seq with attention",
+    "nodes": [
+     {
+      "id": "src",
+      "label": "Source tokens",
+      "note": "il fait beau",
+      "style": "normal"
+     },
+     {
+      "id": "enc",
+      "label": "Encoder RNN",
+      "note": "states h₁…hₙ",
+      "style": "accent"
+     },
+     {
+      "id": "att",
+      "label": "Attention",
+      "note": "softmax weights α",
+      "style": "live"
+     },
+     {
+      "id": "dec",
+      "label": "Decoder RNN",
+      "note": "one step at a time",
+      "style": "accent"
+     },
+     {
+      "id": "tgt",
+      "label": "Target tokens",
+      "note": "it is nice",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "src",
+      "to": "enc",
+      "label": "read in order"
+     },
+     {
+      "from": "enc",
+      "to": "att",
+      "label": "all states"
+     },
+     {
+      "from": "att",
+      "to": "dec",
+      "label": "context vector"
+     },
+     {
+      "from": "dec",
+      "to": "tgt",
+      "label": "predict next"
+     }
+    ],
+    "aria": "An encoder reads the source tokens into states, attention weights them into a context vector for the decoder, and the decoder emits target tokens."
+   },
+   "example": "Three encoder states are h₁ = [1,0], h₂ = [0,1], h₃ = [1,1]. The decoder state scores them as e = [1,2,3]. Compute the attention weights and the context vector. exp(e) = [2.718, 7.389, 20.086] and the sum is 30.193, so α = [0.090, 0.245, 0.665]. Context = 0.090 × [1,0] + 0.245 × [0,1] + 0.665 × [1,1] = [0.755, 0.910].",
+   "trap": "Attention weights are a softmax over source positions and must sum to 1; they are not the encoder states. Teacher forcing feeds the gold previous token at training only. One context vector for a long sentence loses information — that is the problem attention solves.",
+   "prereq": "6.2 (RNN and LSTM encoder and decoder).",
+   "leave": "Transformer details to 6.4; BLEU and beam search details to 6.6."
+  },
+  {
+   "k": 4,
+   "idea": "Self-attention lets every position attend to every other position in parallel, and pretraining on unlabelled text gives BERT and GPT a general language model that is then fine-tuned.",
+   "depth": "Scaled dot-product attention: Attention(Q,K,V) = softmax(QKᵀ/√d<sub>k</sub>)V; define Q, K, V and d<sub>k</sub>. Multi-head attention: several parallel heads with learned projections, concatenated. Positional encoding: sinusoidal formula or learned vectors, added to embeddings because self-attention has no order. Encoder block: self-attention, residual, layer norm, feed-forward; decoder block adds masked self-attention and cross-attention. BERT: encoder-only, masked language modelling (about 15 percent of tokens masked) plus next-sentence prediction, [CLS] and [SEP], fine-tune by adding a classification head. GPT: decoder-only, causal mask, next-token prediction, fine-tune or prompt. Compare the two in a small table. Name RoBERTa and DistilBERT as variants in one line.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One transformer encoder layer",
+    "nodes": [
+     {
+      "id": "in",
+      "label": "Tokens + positions",
+      "note": "embeddings added",
+      "style": "normal"
+     },
+     {
+      "id": "mha",
+      "label": "Multi-head attention",
+      "note": "8 heads",
+      "style": "accent"
+     },
+     {
+      "id": "n1",
+      "label": "Add & Norm",
+      "note": "residual",
+      "style": "normal"
+     },
+     {
+      "id": "ffn",
+      "label": "Feed-forward",
+      "note": "per position",
+      "style": "normal"
+     },
+     {
+      "id": "n2",
+      "label": "Add & Norm",
+      "note": "residual",
+      "style": "normal"
+     },
+     {
+      "id": "out",
+      "label": "Contextual vectors",
+      "note": "one per token",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "in",
+      "to": "mha",
+      "label": "Q, K, V"
+     },
+     {
+      "from": "mha",
+      "to": "n1",
+      "label": "weighted sum"
+     },
+     {
+      "from": "n1",
+      "to": "ffn",
+      "label": "expand"
+     },
+     {
+      "from": "ffn",
+      "to": "n2",
+      "label": "project back"
+     },
+     {
+      "from": "n2",
+      "to": "out",
+      "label": "next layer"
+     }
+    ],
+    "aria": "A transformer encoder layer: embeddings plus positions go through multi-head self-attention, a residual add-and-normalise, a feed-forward network, another add-and-normalise, giving contextual vectors."
+   },
+   "example": "One query attends over two keys with d<sub>k</sub> = 2. q₁ = [1,0], k₁ = [1,0], k₂ = [0,1], v₁ = [1,1], v₂ = [0,1]. Compute the output. Scores: q₁·k₁ = 1 and q₁·k₂ = 0; divide by √2 to get [0.707, 0]. exp gives [2.028, 1] with sum 3.028, so the weights are [0.670, 0.330]. Output = 0.670 × [1,1] + 0.330 × [0,1] = [0.670, 1.000].",
+   "trap": "BERT is encoder-only and GPT is decoder-only; BERT cannot generate left to right. The scale √d<sub>k</sub> is inside the softmax, not outside. Positional encodings are added to embeddings, not concatenated. Masked self-attention is for the decoder, not the encoder.",
+   "prereq": "6.3 (attention), 6.1 (softmax), Unit 5 (embeddings).",
+   "leave": "Large-scale pretraining, prompting and decoding to 6.5; speech transformers to Unit 7."
+  },
+  {
+   "k": 5,
+   "idea": "Scaling a decoder-only transformer on huge text, then aligning it with instructions, gives a general generator whose output is produced one token at a time by a chosen decoding rule.",
+   "depth": "What makes a model large: parameters, data, compute; scaling behaviour in one line. Pretraining a decoder-only transformer on next-token prediction; byte-pair encoding tokenization. Prompting; in-context learning with zero, one or a few examples; instruction tuning; a one-line mention of reinforcement learning from human feedback. Decoding: greedy, beam search, temperature, top-k and top-p (nucleus) sampling; repetition and hallucination. Evaluation: perplexity, task accuracy, human preference. History from word vectors to RNNs to transformers to chat models; name GPT-3, GPT-4 and Llama as examples, with no dates. Chatbots and voice assistants appear in some syllabi; cover them in one line and leave speech to Unit 7.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Generation loop",
+    "nodes": [
+     {
+      "id": "p",
+      "label": "Prompt",
+      "note": "user instruction",
+      "style": "normal"
+     },
+     {
+      "id": "tk",
+      "label": "Tokenizer",
+      "note": "BPE pieces",
+      "style": "normal"
+     },
+     {
+      "id": "tr",
+      "label": "Transformer",
+      "note": "decoder-only",
+      "style": "accent"
+     },
+     {
+      "id": "sc",
+      "label": "Next-token scores",
+      "note": "one per vocabulary item",
+      "style": "normal"
+     },
+     {
+      "id": "sa",
+      "label": "Sampling",
+      "note": "temperature, top-p",
+      "style": "live"
+     },
+     {
+      "id": "ap",
+      "label": "Append token",
+      "note": "stop at end token",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p",
+      "to": "tk",
+      "label": "text"
+     },
+     {
+      "from": "tk",
+      "to": "tr",
+      "label": "token ids"
+     },
+     {
+      "from": "tr",
+      "to": "sc",
+      "label": "logits"
+     },
+     {
+      "from": "sc",
+      "to": "sa",
+      "label": "probabilities"
+     },
+     {
+      "from": "sa",
+      "to": "ap",
+      "label": "chosen token"
+     },
+     {
+      "from": "ap",
+      "to": "tr",
+      "label": "loop",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A generation loop: prompt to tokens to the transformer, whose next-token scores are sampled and appended, then fed back into the transformer."
+   },
+   "example": "Next-token logits are [2.0, 1.0, 0.5, −1.0]. Decode with temperature T = 0.5 and then keep the top 2 tokens. Divide by T: [4, 2, 1, −2]. exp gives [54.598, 7.389, 2.718, 0.135] with sum 64.840, so the probabilities are [0.842, 0.114, 0.042, 0.002]. Top-2 keeps the first two and renormalises: 0.842/0.956 = 0.881 and 0.114/0.956 = 0.119.",
+   "trap": "Temperature divides logits before the softmax; T = 0 means greedy, not a valid division. top-k keeps k tokens, top-p keeps the smallest set whose probability reaches p. Instruction tuning changes behaviour, not the tokenizer or the knowledge in the weights.",
+   "prereq": "6.4 (transformer decoder), 6.3 (seq2seq).",
+   "leave": "Chatbot frameworks (Rasa, Dialogflow) to project work; speech to Unit 7; retrieval-augmented generation to 6.8."
+  },
+  {
+   "k": 6,
+   "idea": "Machine translation maps a source sentence to a target sentence, and its quality is measured by comparing the output with reference translations using BLEU.",
+   "depth": "Three generations: rule-based transfer, statistical phrase-based (IBM alignment models, phrase tables), neural (seq2seq with attention, then transformers). Parallel corpora; subword tokenization with BPE or word pieces for rare words and open vocabulary. Training objective: cross-entropy on target tokens with teacher forcing; decoding with beam search. BLEU: clipped n-gram precision p<sub>n</sub>, brevity penalty BP, BLEU = BP × exp(Σ (1/N) log p<sub>n</sub>). Mention chrF and human evaluation in one line. Multilingual and low-resource translation; pivot languages connect to 6.8.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Neural machine translation",
+    "nodes": [
+     {
+      "id": "s",
+      "label": "Source text",
+      "note": "Hindi sentence",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Subword tokens",
+      "note": "BPE pieces",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Encoder",
+      "note": "transformer layers",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Decoder",
+      "note": "attention + beam",
+      "style": "accent"
+     },
+     {
+      "id": "t",
+      "label": "Target text",
+      "note": "English sentence",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "s",
+      "to": "b",
+      "label": "tokenize"
+     },
+     {
+      "from": "b",
+      "to": "e",
+      "label": "ids"
+     },
+     {
+      "from": "e",
+      "to": "d",
+      "label": "cross-attention"
+     },
+     {
+      "from": "d",
+      "to": "t",
+      "label": "detokenize"
+     }
+    ],
+    "aria": "A neural machine translation pipeline: source text becomes subword tokens, the encoder builds states, the decoder attends to them and emits target text."
+   },
+   "example": "Candidate translation: <i>the cat sat on the mat</i>. Reference: <i>the cat is on the mat</i>. Compute BLEU-2. Candidate bigrams: the cat, cat sat, sat on, on the, the mat. Matches with the reference: the cat, on the, the mat — 3 of 5, so p₂ = 0.6. Unigram matches: the, cat, on, the, mat — 5 of 6, so p₁ = 0.833. Both sentences have 6 words, so BP = 1. BLEU-2 = (0.833 × 0.6)<sup>1/2</sup> = √0.5 = 0.707.",
+   "trap": "BLEU is precision-only and uses clipped counts: a candidate word is counted at most as often as it appears in any reference. The brevity penalty falls below 1 only when the candidate is shorter. Corpus BLEU adds counts over the whole corpus, then takes the geometric mean.",
+   "prereq": "6.3 and 6.4 (seq2seq, attention, transformer); Unit 1 (tokenization); Unit 2 (n-gram counting).",
+   "leave": "CLIR to 6.8; speech translation and speech-to-text to Unit 7; full alignment model derivations to advanced courses."
+  },
+  {
+   "k": 7,
+   "idea": "Question answering finds an answer in a passage or generates one, and textual entailment decides whether a premise supports a hypothesis; both are sentence-pair classification problems over two texts.",
+   "depth": "QA types: factoid, open-domain, and reading comprehension such as SQuAD. The retrieval-then-read pipeline; an extractive model scores a start and an end position over passage tokens; generative QA from a large language model. Evaluation: exact match (EM) and token-level F1. Textual entailment, also called natural language inference (NLI): premise and hypothesis; labels entailment, contradiction and neutral, as in SNLI and MultiNLI. Model as a sentence-pair classifier on the BERT [CLS] vector, or with cross-attention between the two sentences. The direction matters: the premise entails the hypothesis, not the reverse. Some syllabi call it text entailment.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Extractive QA",
+    "nodes": [
+     {
+      "id": "qp",
+      "label": "Question + passage",
+      "note": "who wrote it?",
+      "style": "normal"
+     },
+     {
+      "id": "enc",
+      "label": "Encoder",
+      "note": "BERT layers",
+      "style": "accent"
+     },
+     {
+      "id": "sc",
+      "label": "Start / end scores",
+      "note": "one per token",
+      "style": "live"
+     },
+     {
+      "id": "ans",
+      "label": "Answer span",
+      "note": "tokens 7 to 9",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "qp",
+      "to": "enc",
+      "label": "token pairs"
+     },
+     {
+      "from": "enc",
+      "to": "sc",
+      "label": "per-token logits"
+     },
+     {
+      "from": "sc",
+      "to": "ans",
+      "label": "argmax span"
+     }
+    ],
+    "aria": "Extractive QA: question and passage are encoded, each token gets a start and an end score, and the best-scoring span is returned as the answer."
+   },
+   "example": "A gold answer is the span <i>cat</i>. The system predicts <i>the cat</i>. Compute exact match and F1. The strings differ, so EM = 0. Predicted tokens = 2, gold tokens = 1, overlap = 1. Precision = 1/2 = 0.5, recall = 1/1 = 1.0. F1 = 2 × 0.5 × 1.0 / (0.5 + 1.0) = 0.667.",
+   "trap": "EM is exact string match after normalisation; F1 is on tokens, so a partial span gets partial credit. Entailment is one-directional. Contradiction and neutral are different labels; not entailed does not mean contradiction.",
+   "prereq": "6.4 (BERT fine-tuning); Unit 2 (NER for entity answers).",
+   "leave": "Index building and passage retrieval to 6.8; full SQuAD training loop to the lab."
+  },
+  {
+   "k": 8,
+   "idea": "An information retrieval system ranks documents by relevance to a query, and cross-lingual retrieval does this when the query and documents are in different languages.",
+   "depth": "Boolean retrieval and the inverted index; tokenization and stemming from Unit 1. TF-IDF scoring, then BM25 with parameters k₁ and b (write the formula briefly). Evaluation: precision@k, recall, mean average precision, mean reciprocal rank, NDCG in one line. Dense retrieval: a bi-encoder maps the query and each document to vectors, cosine similarity ranks them, and approximate nearest-neighbour search finds the top ones. Cross-lingual information retrieval (CLIR): query translation, document translation, pivot language, and multilingual embeddings such as mBERT; ambiguous translated queries; always compare against a monolingual baseline on judged relevant documents.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Retrieval pipeline",
+    "nodes": [
+     {
+      "id": "q",
+      "label": "Query",
+      "note": "neural network",
+      "style": "normal"
+     },
+     {
+      "id": "an",
+      "label": "Analyzer",
+      "note": "tokenize, stem",
+      "style": "normal"
+     },
+     {
+      "id": "ix",
+      "label": "Inverted index",
+      "note": "postings per term",
+      "style": "accent"
+     },
+     {
+      "id": "rk",
+      "label": "Ranking",
+      "note": "TF-IDF or BM25",
+      "style": "live"
+     },
+     {
+      "id": "res",
+      "label": "Top-k documents",
+      "note": "ranked list",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "q",
+      "to": "an",
+      "label": "text"
+     },
+     {
+      "from": "an",
+      "to": "ix",
+      "label": "terms"
+     },
+     {
+      "from": "ix",
+      "to": "rk",
+      "label": "candidate docs"
+     },
+     {
+      "from": "rk",
+      "to": "res",
+      "label": "sort by score"
+     }
+    ],
+    "aria": "An information retrieval pipeline: the query is analyzed into terms, looked up in an inverted index, ranked by TF-IDF or BM25, and the top-k documents are returned."
+   },
+   "example": "Three documents: d1 = <i>neural network model</i>, d2 = <i>neural machine translation</i>, d3 = <i>cricket match</i>. Query: <i>neural network</i>. Use idf = log₁₀(N/df) with N = 3. For neural, df = 2, idf = log₁₀(1.5) = 0.176. For network, df = 1, idf = log₁₀(3) = 0.477. Scores: d1 = 0.176 + 0.477 = 0.653, d2 = 0.176, d3 = 0. Ranking: d1, d2, d3.",
+   "trap": "IDF gives rare terms more weight; a term in every document has IDF 0. A high-precision system can have low recall, so report both. In CLIR, translating the query can change its meaning; compare against a monolingual baseline.",
+   "prereq": "Unit 5 (TF-IDF), Unit 1 (normalization, stemming), 6.4 (BERT and mBERT embeddings).",
+   "leave": "Crawling and corpus building to Unit 1; learning-to-rank to advanced courses; translation models to 6.6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "fixed windows become ordered hidden states"
+  ],
+  [
+   2,
+   3,
+   "an encoder state feeds a decoder with attention"
+  ],
+  [
+   3,
+   4,
+   "attention over a sequence becomes self-attention"
+  ],
+  [
+   4,
+   5,
+   "scale the decoder-only transformer into an LLM"
+  ],
+  [
+   4,
+   6,
+   "transformers are the modern MT engine"
+  ],
+  [
+   5,
+   7,
+   "generative models answer questions"
+  ],
+  [
+   7,
+   8,
+   "retrieval supplies passages to the reader"
+  ],
+  [
+   8,
+   6,
+   "CLIR translates queries or documents"
+  ]
+ ]
+}

@@ -1,0 +1,211 @@
+{
+ "lead": "An RNN reads a sequence one word at a time. At each step it mixes the current word vector with a hidden state that carries earlier context, so the same word can get different predictions in different positions. The hidden state is updated by a tanh of a weighted sum, then an output layer makes a label or a next-word score. This idea powers part-of-speech tagging, named entity recognition, sentiment over a sentence and language modelling. LSTMs and GRUs add gates that decide what to keep, write and expose, which makes long-range context easier to learn.",
+ "prereq": "You need: <a href=\"#feedforward-and-convolutional-networks-for-text\">6.1</a> for word vectors and softmax, and Unit 2 for sequence labeling with HMM and CRF, which this chapter compares with neural taggers.",
+ "sections": [
+  {
+   "h3": "The RNN cell and BPTT",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A sequence is x<sub>1</sub>, ..., x<sub>T</sub>; each x<sub>t</sub> is a word vector of dimension d. The hidden state h<sub>t</sub> is a vector of dimension k. The vanilla RNN updates:"
+    },
+    {
+     "type": "formula",
+     "text": "h<sub>t</sub> = tanh(W<sub>x</sub>x<sub>t</sub> + W<sub>h</sub>h<sub>t-1</sub> + b)",
+     "where": "W<sub>x</sub> maps d to k; W<sub>h</sub> maps k to k; b is a k-vector; tanh is applied elementwise; h<sub>0</sub> is a zero vector."
+    },
+    {
+     "type": "p",
+     "text": "The output layer is y<sub>t</sub> = softmax(W<sub>y</sub>h<sub>t</sub> + b<sub>y</sub>) for classification, or a linear score for regression. The same W<sub>x</sub>, W<sub>h</sub>, b are used at every step, so the model works for any sequence length."
+    },
+    {
+     "type": "p",
+     "text": "Training uses backpropagation through time (BPTT). The network is unrolled over T steps, the loss at each step is added, and gradients flow backward through the chain of hidden states. Each step multiplies by a Jacobian that contains W<sub>h</sub> and a tanh derivative. Many multiplications make gradients shrink to zero (vanishing) or grow without bound (exploding)."
+    },
+    {
+     "type": "p",
+     "text": "Gradient clipping fixes exploding gradients: if the global norm of the gradient vector is above a threshold, scale the whole vector down to that threshold. Vanishing gradients need gates, which the next section gives."
+    }
+   ]
+  },
+  {
+   "h3": "LSTM: cell state and gates",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An LSTM adds a cell state c<sub>t</sub> that runs beside h<sub>t</sub>. Gates are sigmoid layers that output values from 0 to 1; 0 closes, 1 opens. The candidate is a tanh layer from -1 to 1."
+    },
+    {
+     "type": "formula",
+     "text": "f<sub>t</sub> = σ(W<sub>f</sub>[h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>f</sub>); i<sub>t</sub> = σ(W<sub>i</sub>[h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>i</sub>); c̃<sub>t</sub> = tanh(W<sub>c</sub>[h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>c</sub>); c<sub>t</sub> = f<sub>t</sub> ⊙ c<sub>t-1</sub> + i<sub>t</sub> ⊙ c̃<sub>t</sub>; o<sub>t</sub> = σ(W<sub>o</sub>[h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>o</sub>); h<sub>t</sub> = o<sub>t</sub> ⊙ tanh(c<sub>t</sub>)",
+     "where": "σ is sigmoid; ⊙ is elementwise product; [h,x] is concatenation; W and b are learned; c̃<sub>t</sub> is the candidate."
+    },
+    {
+     "type": "p",
+     "text": "The forget gate f<sub>t</sub> decides how much of the old cell c<sub>t-1</sub> survives. The input gate i<sub>t</sub> decides how much of the new candidate c̃<sub>t</sub> is written. The output gate o<sub>t</sub> decides how much of the cell is exposed as h<sub>t</sub>."
+    },
+    {
+     "type": "p",
+     "text": "Because the cell state is updated by addition and elementwise multiplication, gradients can flow along a shorter path. A forget gate near 1 keeps information for many steps. This is why LSTMs handle longer dependencies than a vanilla RNN."
+    }
+   ]
+  },
+  {
+   "h3": "GRU, bidirectional and stacked RNNs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A GRU drops the separate cell state and uses two gates. The reset gate r<sub>t</sub> controls how much old hidden state enters the candidate. The update gate z<sub>t</sub> mixes the old hidden state with the candidate."
+    },
+    {
+     "type": "formula",
+     "text": "r<sub>t</sub> = σ(W<sub>r</sub>[h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>r</sub>); z<sub>t</sub> = σ(W<sub>z</sub>[h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>z</sub>); h̃<sub>t</sub> = tanh(W<sub>h</sub>[r<sub>t</sub> ⊙ h<sub>t-1</sub>, x<sub>t</sub>] + b<sub>h</sub>); h<sub>t</sub> = (1 - z<sub>t</sub>) ⊙ h<sub>t-1</sub> + z<sub>t</sub> ⊙ h̃<sub>t</sub>",
+     "where": "r<sub>t</sub> and z<sub>t</sub> are sigmoid gates; h̃<sub>t</sub> is the candidate; ⊙ is elementwise product. A GRU has fewer parameters than an LSTM."
+    },
+    {
+     "type": "p",
+     "text": "A bidirectional RNN runs one RNN left-to-right and another right-to-left. At position t it concatenates the two hidden states, so the tag for a word sees both left and right context. This is standard for POS tagging and NER. A stacked RNN stacks layers: the hidden sequence from layer 1 becomes the input to layer 2."
+    },
+    {
+     "type": "p",
+     "text": "For sequence labeling, the output at each step is a tag from a tag set (see Unit 2 for tags and CRF training). For sentiment, the last hidden state or a pooled state feeds a classifier. For language modelling, y<sub>t</sub> gives the probability of the next word. The encoder side of <a href=\"#encoder-decoder-models-seq2seq-and-attention\">6.3</a> is an RNN of this kind."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One time step: the input word vector and the previous hidden state enter the cell; the new hidden state goes to the output and is carried to the next step.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One RNN time step",
+   "nodes": [
+    {
+     "id": "x",
+     "label": "Input xₜ",
+     "note": "word vector",
+     "style": "normal"
+    },
+    {
+     "id": "cell",
+     "label": "RNN cell",
+     "note": "tanh of weighted sum",
+     "style": "accent"
+    },
+    {
+     "id": "h",
+     "label": "Hidden hₜ",
+     "note": "carried forward",
+     "style": "live"
+    },
+    {
+     "id": "y",
+     "label": "Output yₜ",
+     "note": "softmax scores",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "x",
+     "to": "cell",
+     "label": "Wx·xt"
+    },
+    {
+     "from": "cell",
+     "to": "h",
+     "label": "new state"
+    },
+    {
+     "from": "h",
+     "to": "y",
+     "label": "classify"
+    },
+    {
+     "from": "h",
+     "to": "cell",
+     "label": "next step",
+     "style": "dashed"
+    }
+   ],
+   "aria": "One time step of an RNN: input word vector and previous hidden state enter the cell, produce the new hidden state, which goes to the output and back into the next step."
+  }
+ },
+ "examples": [
+  {
+   "question": "A scalar RNN computes h<sub>t</sub> = tanh(0.5 h<sub>t-1</sub> + x<sub>t</sub>) with h<sub>0</sub> = 0. The inputs are x<sub>1</sub> = 1, x<sub>2</sub> = 0.5, x<sub>3</sub> = -1. Find h<sub>1</sub>, h<sub>2</sub>, h<sub>3</sub> to three decimal places.",
+   "steps": [
+    "h<sub>1</sub> = tanh(0.5 × 0 + 1) = tanh(1) = 0.7616, so h<sub>1</sub> ≈ 0.762.",
+    "Weighted sum for step 2 = 0.5 × 0.7616 + 0.5 = 0.8808. h<sub>2</sub> = tanh(0.8808) = 0.7068, so h<sub>2</sub> ≈ 0.707.",
+    "Weighted sum for step 3 = 0.5 × 0.7068 - 1 = -0.6466. h<sub>3</sub> = tanh(-0.6466) = -0.5695, so h<sub>3</sub> ≈ -0.570."
+   ],
+   "answer": "h<sub>1</sub> ≈ 0.762, h<sub>2</sub> ≈ 0.707, h<sub>3</sub> ≈ -0.570.",
+   "check": "import math\nh = 0.0\nfor x in [1.0, 0.5, -1.0]:\n    h = math.tanh(0.5 * h + x)\n    print(f'{h:.3f}')",
+   "values": [
+    0.762,
+    0.707,
+    -0.57
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Gates use sigmoid and give values 0 to 1; the candidate uses tanh and gives -1 to 1. Swapping them is the usual error.",
+  "h<sub>0</sub> is a zero vector, not x<sub>1</sub>. The first hidden state uses x<sub>1</sub> plus h<sub>0</sub>.",
+  "BPTT multiplies many Jacobians. Repeated multiplication is why gradients vanish or explode; clipping addresses the explode side.",
+  "A forget gate value of 1 keeps the old cell; 0 drops it. Do not reverse the meaning.",
+  "A GRU has no separate cell state. Its update gate mixes old hidden state and candidate; it is not the same as the LSTM forget gate."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a vanilla RNN carry from step t-1 to step t?",
+   "marks": 2,
+   "a": "It carries the hidden state h<sub>t-1</sub>. The cell combines it with x<sub>t</sub> to make h<sub>t</sub>."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an RNN use the same W<sub>h</sub> at every time step?",
+   "marks": 3,
+   "a": "Parameter sharing lets one model process any sequence length and learn a recurrence. A separate matrix per step would need a fixed length and many more parameters."
+  },
+  {
+   "level": "apply",
+   "q": "A scalar RNN uses h<sub>t</sub> = tanh(2h<sub>t-1</sub> + x<sub>t</sub>) with h<sub>0</sub> = 0 and x<sub>1</sub> = 0.5. Find h<sub>1</sub>.",
+   "marks": 3,
+   "a": "h<sub>1</sub> = tanh(2 × 0 + 0.5) = tanh(0.5) ≈ 0.462."
+  },
+  {
+   "level": "analyze",
+   "q": "An LSTM forget gate outputs 0.1 and the old cell state is 4.0. What part of the old cell is retained before the input gate adds new content?",
+   "marks": 3,
+   "a": "The retained part is f<sub>t</sub> ⊙ c<sub>t-1</sub> = 0.1 × 4.0 = 0.4. The input gate then adds i<sub>t</sub> ⊙ c̃<sub>t</sub>."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between the LSTM cell state c<sub>t</sub> and hidden state h<sub>t</sub>.",
+   "marks": 4,
+   "a": "c<sub>t</sub> is the long-term memory line updated by forget and input gates. h<sub>t</sub> is the output exposed to the next layer, gated from tanh(c<sub>t</sub>) by the output gate."
+  },
+  {
+   "level": "apply",
+   "q": "A GRU has update gate z<sub>t</sub> = 0.8, old hidden state h<sub>t-1</sub> = 0.5 and candidate h̃<sub>t</sub> = -0.5. Find h<sub>t</sub> using h<sub>t</sub> = (1-z<sub>t</sub>)h<sub>t-1</sub> + z<sub>t</sub>h̃<sub>t</sub>.",
+   "marks": 3,
+   "a": "h<sub>t</sub> = 0.2 × 0.5 + 0.8 × (-0.5) = 0.1 - 0.4 = -0.3."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is a bidirectional RNN unsuitable for a real-time left-to-right language generator?",
+   "marks": 5,
+   "a": "The backward pass needs future words. At generation time future words do not exist, so the backward hidden state cannot be computed. Bidirectional models are used when the whole sentence is available, as in tagging."
+  },
+  {
+   "level": "remember",
+   "q": "What is gradient clipping?",
+   "marks": 2,
+   "a": "It caps the norm of the gradient vector at a threshold before the update, which stops exploding gradients in BPTT."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, LSTMs and GRUs still appear in time-series models, speech pipelines and small on-device taggers where a transformer is too heavy. Search next for BPTT, LSTM gates, GRU reset and update gates, gradient clipping and bidirectional RNNs. Many newer systems replace the recurrent encoder with self-attention, but the sequence-labeling output layer and the idea of carrying context remain the same."
+}

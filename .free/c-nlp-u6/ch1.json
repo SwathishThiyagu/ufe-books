@@ -1,0 +1,281 @@
+{
+ "lead": "A text classifier does not have to read words one at a time. Two simple neural designs work well. The first flattens a document into one fixed vector — a TF-IDF row or the average of its word vectors — and pushes it through one or two dense layers to a softmax. The second keeps word order, embeds each token, and slides small one-dimensional filters over the token sequence, so each filter reacts to a short pattern such as \"not good\". Both train fast on small datasets and both are the baseline before recurrent or transformer models.",
+ "prereq": "You need: TF-IDF feature vectors, word embeddings and softmax with cross-entropy from Unit 5, and tokenization from Unit 1.",
+ "sections": [
+  {
+   "h3": "Feedforward network on one fixed vector",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The input is one vector x of length d, where d is the number of features of the whole document. Unit 5 builds it two ways: a TF-IDF row, whose numbers are weighted word counts, or the average of the word vectors of all tokens. Either way the sentence length disappears."
+    },
+    {
+     "type": "p",
+     "text": "The vector goes through a hidden layer with k units, a weight matrix W₁ of shape k×d, and a bias vector b₁ of length k."
+    },
+    {
+     "type": "formula",
+     "text": "h = ReLU(W₁x + b₁)",
+     "where": "x is the d×1 input feature vector, W₁ is the k×d hidden weight matrix, b₁ is the k×1 bias, ReLU(t) = max(0, t) keeps positive values and sets negatives to zero, and h is the k×1 hidden activation. tanh works as an alternative."
+    },
+    {
+     "type": "p",
+     "text": "A second dense layer turns h into one score per class, and softmax turns the scores into probabilities that sum to 1."
+    },
+    {
+     "type": "formula",
+     "text": "p = softmax(W₂h + b₂),  L = −Σ_c y_c log p_c",
+     "where": "W₂ is the C×k output matrix for C classes, b₂ is the C×1 output bias, p_c is the predicted probability of class c, y_c is 1 for the true class and 0 for the others, and L is the cross-entropy loss for one document."
+    },
+    {
+     "type": "p",
+     "text": "Dropout is the regularizer between layers. In training each hidden unit is set to zero with probability 0.5 and the rest are scaled by 1/(1 − 0.5) = 2. At test time dropout is off and the full network is used. It stops the classifier from depending on one lucky feature."
+    },
+    {
+     "type": "p",
+     "text": "Why use it when logistic regression already classifies text? A linear model draws only a straight boundary in TF-IDF space. One hidden layer bends it, so \"refund\" together with \"not received\" can outvote either word alone. A common use is sorting UPI complaint tickets into fraud, delay and wrong-amount before a human reads them."
+    }
+   ]
+  },
+  {
+   "h3": "1D convolution over the token sequence",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The convolutional model keeps the order. Each token t_i is replaced by its embedding e_i, a vector of d numbers looked up from the embedding matrix E from Unit 5. A sentence of n tokens becomes an n×d matrix."
+    },
+    {
+     "type": "p",
+     "text": "A filter of width w covers w neighbouring tokens at a time, so <b>w is the n-gram size</b>. The filter has w·d weights and one bias b. Slide it from position 1 to position n−w+1 to get one score per position."
+    },
+    {
+     "type": "formula",
+     "text": "c_i = ReLU(W · x_{i:i+w−1} + b),  ĉ = max(c_1, …, c_{n−w+1})",
+     "where": "x_{i:i+w−1} is the concatenation of the embeddings of tokens i to i+w−1, a column of w·d numbers; W is that filter's weight vector of length w·d; b is its bias; c_i is the filter's score at position i; ĉ is the max-pooled feature, one number per filter."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Tokenize the sentence and look up one embedding per token, giving an n×d matrix.",
+      "Choose filter widths 2, 3 and 4, with m filters of each width. Width 3 means a 3-gram detector.",
+      "For every filter, slide over all positions, add the bias, apply ReLU. This gives one feature map per filter.",
+      "Max-pool each feature map over positions. Every sentence now gives m numbers per width, whatever its length.",
+      "Concatenate the pooled numbers, pass them through a dense layer, apply softmax, train with cross-entropy loss."
+     ]
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "Feedforward on a fixed vector",
+      "1D CNN on embeddings"
+     ],
+     "rows": [
+      [
+       "Input",
+       "One d-number document vector",
+       "n×d matrix, one row per token"
+      ],
+      [
+       "Sees word order",
+       "No",
+       "Yes, inside each filter window"
+      ],
+      [
+       "Fixed-size step",
+       "The input vector",
+       "Max-pooling over positions"
+      ],
+      [
+       "Typical use",
+       "Topic and spam classification",
+       "Sentiment, sentence classification"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Where each design is used, and its limits",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 1D CNN is the standard small model for sentiment and sentence classification. A width-2 filter on a Hindi-English review learns that \"nahi\" next to \"accha\" flips the polarity, and max-pooling keeps that signal wherever the phrase sits."
+    },
+    {
+     "type": "p",
+     "text": "Max-pooling runs over token positions, so a 20-token and a 5-token sentence give the same pooled vector size. That is why one classifier accepts reviews of any length. The cost is losing where the pattern was found: fine for sentiment, wrong when position matters."
+    },
+    {
+     "type": "p",
+     "text": "A window of tokens around each word can also do token classification such as named entity recognition, one label per position. The CRF layer that fixes illegal label sequences stays in Unit 2."
+    },
+    {
+     "type": "p",
+     "text": "Both designs read a bounded context: the feedforward net sees a bag of features, a CNN filter sees w tokens. Long-range dependencies need a state carried across the sentence, which is <a href=\"#rnn-lstm-and-gru-sequence-models\">6.2</a>, or attention over all positions, which is <a href=\"#transformers-bert-and-gpt\">6.4</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Tokens become vectors, a width-2 filter slides over neighbouring pairs, ReLU keeps the positive scores, max-pooling keeps the strongest one, and a dense layer with softmax gives the sentiment. The pooled output has one number per filter, not one per token.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "1D CNN for sentiment",
+   "nodes": [
+    {
+     "id": "tok",
+     "label": "Tokens",
+     "note": "food was great",
+     "style": "normal"
+    },
+    {
+     "id": "emb",
+     "label": "Embeddings",
+     "note": "3-d vectors",
+     "style": "normal"
+    },
+    {
+     "id": "conv",
+     "label": "1D convolution",
+     "note": "width 2 filter",
+     "style": "accent"
+    },
+    {
+     "id": "pool",
+     "label": "Max-pool",
+     "note": "over positions",
+     "style": "live"
+    },
+    {
+     "id": "soft",
+     "label": "Softmax",
+     "note": "positive / negative",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "tok",
+     "to": "emb",
+     "label": "lookup"
+    },
+    {
+     "from": "emb",
+     "to": "conv",
+     "label": "slide"
+    },
+    {
+     "from": "conv",
+     "to": "pool",
+     "label": "ReLU first"
+    },
+    {
+     "from": "pool",
+     "to": "soft",
+     "label": "dense layer"
+    }
+   ],
+   "aria": "Pipeline from tokens through word embeddings, a width-2 one-dimensional convolution, max-pooling over positions, to a softmax over sentiment classes."
+  }
+ },
+ "examples": [
+  {
+   "question": "Classify the review \"food was great\" with 3-dimensional word vectors food = [1,0,1], was = [0,1,0], great = [1,1,0]. One filter has width 2 and weights w = [1,−1,0,0,1,−1] with bias b = 0. Compute the score at each window after ReLU, and the max-pooled feature.",
+   "steps": [
+    "n = 3 tokens and width w = 2, so there are 3 − 2 + 1 = 2 windows.",
+    "Window 1 covers tokens 1 and 2: concat(food, was) = [1,0,1,0,1,0].",
+    "Dot product with w: 1 + 0 + 0 + 0 + 1 + 0 = 2.",
+    "Add bias and apply ReLU: ReLU(2 + 0) = 2.",
+    "Window 2 covers tokens 2 and 3: concat(was, great) = [0,1,0,1,1,0].",
+    "Dot product with w: 0 − 1 + 0 + 0 + 1 + 0 = 0.",
+    "Add bias and apply ReLU: ReLU(0 + 0) = 0.",
+    "Max-pool over the two positions: ĉ = max(2, 0) = 2."
+   ],
+   "answer": "The filter scores are 2 and 0, and the max-pooled feature for this filter is 2 (a pure number, no unit).",
+   "check": "food = [1, 0, 1]\nwas = [0, 1, 0]\ngreat = [1, 1, 0]\nw = [1, -1, 0, 0, 1, -1]\nb = 0\n\ndef relu(t):\n    return max(0, t)\n\nw1 = food + was\nw2 = was + great\nc1 = relu(sum(a * k for a, k in zip(w1, w)) + b)\nc2 = relu(sum(a * k for a, k in zip(w2, w)) + b)\nprint(c1)\nprint(c2)\nprint(max(c1, c2))",
+   "values": [
+    2,
+    0,
+    2
+   ],
+   "dry_run": {
+    "head": [
+     "window",
+     "concatenated input",
+     "dot product",
+     "after ReLU"
+    ],
+    "rows": [
+     [
+      "1 (food, was)",
+      "[1,0,1,0,1,0]",
+      "2",
+      "2"
+     ],
+     [
+      "2 (was, great)",
+      "[0,1,0,1,1,0]",
+      "0",
+      "0"
+     ]
+    ]
+   },
+   "output": "2\n0\n2"
+  }
+ ],
+ "traps": [
+  "Filter width is the n-gram size, not the number of filters. The filter count sets the pooled vector size.",
+  "Applying ReLU after max-pooling. The order is dot product, add bias, ReLU, then max-pool.",
+  "Max-pooling runs over token positions, not over filters. The pooled vector has one number per filter and is the same size for any sentence length.",
+  "Concatenating windows instead of embeddings: a width-2 filter takes 2·d numbers from two adjacent tokens, here 6.",
+  "Expecting the CNN to model long-range order. A width-2 filter only ever sees two adjacent tokens."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the width of a 1D convolution filter represent in text?",
+   "marks": 2,
+   "a": "The number of adjacent tokens it covers, that is the n-gram size. A width-3 filter sees three consecutive tokens."
+  },
+  {
+   "level": "understand",
+   "q": "Why is max-pooling used after the convolution layer in a text CNN?",
+   "marks": 3,
+   "a": "Each filter gives one score per window, so the number of scores depends on sentence length. Max-pooling keeps the strongest score per filter, giving a fixed-size vector, and catches a phrase such as \"was great\" wherever it appears."
+  },
+  {
+   "level": "apply",
+   "q": "Tokens a = [1,2], b = [0,1], c = [2,0] with a width-2 filter w = [1,1,−1,0] and bias b₀ = −1. Compute the two window scores after ReLU and the max-pooled value.",
+   "marks": 4,
+   "a": "Window 1: concat(a,b) = [1,2,0,1]; dot = 1 + 2 + 0 + 0 = 3; add bias −1 gives 2; ReLU = 2. Window 2: concat(b,c) = [0,1,2,0]; dot = 0 + 1 − 2 + 0 = −1; add bias −1 gives −2; ReLU = 0. Max-pool = max(2, 0) = 2."
+  },
+  {
+   "level": "analyze",
+   "q": "A feedforward classifier on averaged word vectors and a 1D CNN are trained on the same sentiment data. On which test sentence would the CNN most clearly win, and why?",
+   "marks": 4,
+   "a": "On \"the food was not good\". Averaging mixes \"not\" with \"good\", so the input vector looks positive. A width-2 filter on \"not good\" gives a strong negative score that max-pooling keeps."
+  },
+  {
+   "level": "understand",
+   "q": "What does dropout do during training, and what changes at test time?",
+   "marks": 3,
+   "a": "In training each hidden unit is dropped with probability p, commonly 0.5, and the survivors are scaled by 1/(1−p). At test time nothing is dropped and nothing scaled; the full network is used."
+  },
+  {
+   "level": "apply",
+   "q": "A TF-IDF document vector of length d = 5000 enters a hidden layer with k = 100 units, then an output layer for C = 3 classes. Count the weights and biases, ignoring embeddings.",
+   "marks": 3,
+   "a": "Hidden layer: 100 × 5000 = 500000 weights plus 100 biases. Output layer: 3 × 100 = 300 weights plus 3 biases. Total = 500000 + 100 + 300 + 3 = 500403."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the number of filters matter more than the filter width for the size of the final dense layer?",
+   "marks": 3,
+   "a": "Max-pooling reduces each filter to exactly one number, so the pooled vector length equals the total number of filters, whatever their widths. Filter count sets the dense layer input size; width only fixes which n-gram size each filter sees."
+  }
+ ],
+ "beyond": "Not for the exam. Character-level CNNs are still used for noisy short text such as SMS and social-media posts, because they cope with spelling variants without a large vocabulary, and dilated convolutions widen the window without adding parameters. Some newer curricula call these temporal convolutional networks. Search for \"text CNN Kim 2014\", \"dilated convolution\" and \"fastText n-gram classifier\" to reach the papers and open-source code. The habit worth keeping is the pipeline shape: lookup, local pattern detector, pooling, dense layer."
+}
