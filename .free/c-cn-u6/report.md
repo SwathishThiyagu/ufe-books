@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-cn/c-cn-u6.html`
 - Status: ok
-- Model calls so far: 38 (126,779 tokens in, 129,284 out), 6.9 minutes
+- Model calls so far: 42 (140,811 tokens in, 145,278 out), 10.3 minutes
 
 ## Checker
 
 ```
-c-cn-u6.html: 7 chapters, 10429 words, 8 figures, 122 KB
+c-cn-u6.html: 7 chapters, 10672 words, 8 figures, 126 KB
 OK
 ```
 
@@ -83,21 +83,20 @@ Make the shown output and any explanation match what the program really prints
    19 |     printf("Received: %s
       |           ^
 /tmp/tmp7ndr5glg/p.c:22:14: error: expected ‘;’ bef
-- chapter 2: the reviewer found 3 serious problem(s) and the revision did not pass the checks; read the review in the state folder
+- chapter 2: a c program does not run (the program did not finish within 10 seconds)
+- chapter 2: a c program's shown output was replaced by its real output; check the text around it
 
 ## Reviewer notes (after any revision)
 
 - ch 1 [high] Section 1 (formula): The round‑trip time formula RT = T_req + T_proc + T_resp omits propagation delay, so it underestimates the true RTT.
 - ch 1 [low] Lead: Sentence reads "peer‑to‑peer are the two main ways" which is grammatically incorrect.
 - ch 1 [low] Quiz Q3: Unit notation "kb" may be confused with kilobytes; the answer should specify kilobits.
-- ch 2 [high] Section 2, TCP server code: The printf string contains a literal line break ("Server received: %s
-" is written as "Server received: %s
-" with an actual newline), which is invalid C syntax.
-- ch 2 [high] Section 2, TCP server code: The code uses struct sockaddr_in but does not include the required header <netinet/in.h>. This will cause a compilation error on many systems.
-- ch 2 [high] Section 3, UDP example: Only a client program is shown, yet the displayed output "Received: Hi" assumes a server that echoes the message. No server code is provided, so the example is misleading.
-- ch 2 [low] Figure specification (three‑way handshake): The label for the fourth message uses an undefined variable "y" ("ACK, ack=y+1").
-- ch 2 [low] Section 2, TCP socket programming steps: The description of send() does not mention that it may send fewer bytes than requested, requiring a loop to ensure full transmission.
-- ch 2 [low] Section 2, TCP socket programming steps: The list of system calls omits the domain argument (AF_INET) for socket(), which is essential for beginners.
+- ch 2 [high] Section 3 UDP example code: The socket is never bound to port 5000, yet recvfrom() expects to receive a datagram on that port. No server is listening, so the shown output "Received: Hi" cannot occur.
+- ch 2 [high] Section 2 TCP server code: recv() return value is ignored and the buffer is terminated with buf[63] = '\0' regardless of how many bytes were actually read. This can cause missing null‑termination and garbage output.
+- ch 2 [high] Worked example 1 (UDP round‑trip): The code shown is the same one‑sided UDP program that does not send a reply, yet the description talks about Phone B replying and the answer assumes a 200 ms round‑trip. The code does not implement the reply, so the example is inconsistent.
+- ch 2 [low] Section 2 TCP socket programming steps: The client steps omit the required connect() system call.
+- ch 2 [low] Figure specification (three‑way handshake): The ACK label uses an undefined variable "y" ("ACK, ack=y+1").
+- ch 2 [low] Section 1 definition of socket(): The description mentions creating a socket of type SOCK_STREAM but does not specify the address family (e.g., AF_INET).
 - ch 3 [low] Section 2, bullet list: Root returns only NS records for the .in TLD. In practice the root also provides glue A records for those NS servers.
 - ch 3 [low] Section 3, cache eviction statement: It says "least‑recently‑used entries are evicted first" which is not true for all resolvers; some use size‑based or time‑based policies.
 - ch 3 [low] Exam traps, TTL cache entry bullet: The wording "many resolvers keep the stale entry until a new query is made" may suggest that stale data can be served, which is incorrect.

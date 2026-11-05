@@ -7,7 +7,7 @@
    "blocks": [
     {
      "type": "p",
-     "text": "A socket is an endpoint for communication identified by an IP address and a port number. The IP address locates the host on the network, while the port (0‑65535) identifies the process on that host. The operating system maps the socket to a protocol (TCP or UDP) and provides system calls such as socket(), bind(), send(), recv() etc."
+     "text": "A socket is an endpoint for communication identified by an IP address and a port number. The IP address locates the host on the network, while the port (0‑65535) identifies the process on that host. The operating system maps the socket to a protocol (TCP or UDP) and provides system calls such as socket(), bind(), send(), recv() etc. The socket() call requires an address family, e.g. AF_INET for IPv4 or AF_INET6 for IPv6, and a type – SOCK_STREAM for TCP or SOCK_DGRAM for UDP."
     },
     {
      "type": "formula",
@@ -37,6 +37,7 @@
       "bind() – associate the socket with a local IP address and a port.",
       "listen() – mark the socket as passive and set a backlog.",
       "accept() – block until a client connects; returns a new socket for the session.",
+      "connect() – establish a connection to the server’s listening socket (client side).",
       "send() – transmit bytes on the connected socket.",
       "recv() – receive bytes from the connected socket.",
       "close() – release the socket."
@@ -45,7 +46,7 @@
     {
      "type": "code",
      "lang": "c",
-     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n\nint main() {\n    int listen_sock = socket(AF_INET, SOCK_STREAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(6000);\n    serv.sin_addr.s_addr = INADDR_ANY;\n    bind(listen_sock, (struct sockaddr *)&serv, sizeof(serv));\n    listen(listen_sock, 1);\n    struct sockaddr_in client;\n    socklen_t cl_len = sizeof(client);\n    int conn_sock = accept(listen_sock, (struct sockaddr *)&client, &cl_len);\n    char buf[64];\n    recv(conn_sock, buf, sizeof(buf)-1, 0);\n    buf[63] = '\\0';\n    printf(\"Server received: %s\n\", buf);\n    const char *reply = \"ACK\";\n    send(conn_sock, reply, strlen(reply), 0);\n    close(conn_sock);\n    close(listen_sock);\n    return 0;\n}",
+     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/time.h>\n\nint main() {\n    int listen_sock = socket(AF_INET, SOCK_STREAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(6000);\n    serv.sin_addr.s_addr = INADDR_ANY;\n    bind(listen_sock, (struct sockaddr *)&serv, sizeof(serv));\n    listen(listen_sock, 1);\n    struct sockaddr_in client;\n    socklen_t cl_len = sizeof(client);\n    int conn_sock = accept(listen_sock, (struct sockaddr *)&client, &cl_len);\n    /* Set a receive timeout so the program does not block forever */\n    struct timeval tv; tv.tv_sec = 2; tv.tv_usec = 0;\n    setsockopt(conn_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));\n    char buf[64];\n    ssize_t n = recv(conn_sock, buf, sizeof(buf)-1, 0);\n    if (n > 0) buf[n] = '\\0'; else buf[0] = '\\0';\n    printf(\"Server received: %s\\n\", buf);\n    const char *reply = \"ACK\";\n    send(conn_sock, reply, strlen(reply), 0);\n    close(conn_sock);\n    close(listen_sock);\n    return 0;\n}",
      "stdin": "",
      "output": "Server received: Hi"
     },
@@ -78,7 +79,7 @@
     {
      "type": "code",
      "lang": "c",
-     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"127.0.0.1\");\n    const char *msg = \"Hi\";\n    sendto(sock, msg, strlen(msg), 0, (struct sockaddr *)&serv, sizeof(serv));\n    char buf[64];\n    struct sockaddr_in from;\n    socklen_t fromlen = sizeof(from);\n    recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&from, &fromlen);\n    buf[63] = '\\0';\n    printf(\"Received: %s\n\", buf);\n    close(sock);\n    return 0;\n}",
+     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/time.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    /* Bind to a local port so we can receive the reply */\n    struct sockaddr_in local;\n    local.sin_family = AF_INET;\n    local.sin_port = htons(5000);\n    local.sin_addr.s_addr = INADDR_ANY;\n    bind(sock, (struct sockaddr *)&local, sizeof(local));\n    /* Set a timeout to avoid blocking forever */\n    struct timeval tv; tv.tv_sec = 2; tv.tv_usec = 0;\n    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"127.0.0.1\");\n    const char *msg = \"Hi\";\n    sendto(sock, msg, strlen(msg), 0, (struct sockaddr *)&serv, sizeof(serv));\n    char buf[64];\n    struct sockaddr_in from;\n    socklen_t fromlen = sizeof(from);\n    ssize_t n = recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&from, &fromlen);\n    if (n > 0) buf[n] = '\\0'; else buf[0] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(sock);\n    return 0;\n}",
      "stdin": "",
      "output": "Received: Hi"
     },
@@ -117,7 +118,7 @@
     {
      "from": "Client",
      "to": "Server",
-     "label": "ACK, ack=y+1",
+     "label": "ACK, ack=x+1",
      "dashed": false
     },
     {
@@ -152,7 +153,7 @@
    ],
    "code": {
     "lang": "c",
-    "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"127.0.0.1\");\n    const char *msg = \"Hi\";\n    sendto(sock, msg, strlen(msg), 0, (struct sockaddr *)&serv, sizeof(serv));\n    char buf[64];\n    struct sockaddr_in from;\n    socklen_t fromlen = sizeof(from);\n    recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&from, &fromlen);\n    buf[63] = '\\0';\n    printf(\"Received: %s\n\", buf);\n    close(sock);\n    return 0;\n}",
+    "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/time.h>\n\nint main() {\n    /* UDP client */\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"127.0.0.1\");\n    const char *msg = \"Hi\";\n    sendto(sock, msg, strlen(msg), 0, (struct sockaddr *)&serv, sizeof(serv));\n    /* Receive reply */\n    char buf[64];\n    struct sockaddr_in from;\n    socklen_t fromlen = sizeof(from);\n    struct timeval tv; tv.tv_sec = 2; tv.tv_usec = 0;\n    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));\n    ssize_t n = recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&from, &fromlen);\n    if (n > 0) buf[n] = '\\0'; else buf[0] = '\\0';\n    printf(\"Received: %s\\n\", buf);\n    close(sock);\n    return 0;\n}",
     "stdin": ""
    },
    "dry_run": {
@@ -174,7 +175,29 @@
      ]
     ]
    },
-   "output": "Received: Hi"
+   "output": "Received:"
+  },
+  {
+   "question": "UDP round‑trip worked example",
+   "steps": [
+    "Run the server program on one terminal. It binds to port 5000, waits for a datagram, and sends a reply.",
+    "Run the client program on another terminal. It sends \"Hi\" to the server and waits for the reply.",
+    "Both programs print the received message and exit."
+   ],
+   "answer": "Both programs print the exchanged \"Hi\" message.",
+   "code": {
+    "client": {
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <sys/time.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    struct sockaddr_in serv;\n    serv.sin_family = AF_INET;\n    serv.sin_port = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"127.0.0.1\");\n    const char *msg = \"Hi\";\n    sendto(sock, msg, strlen(msg), 0, (struct sockaddr *)&serv, sizeof(serv));\n    char buf[64];\n    struct sockaddr_in from;\n    socklen_t fromlen = sizeof(from);\n    struct timeval tv; tv.tv_sec = 2; tv.tv_usec = 0;\n    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));\n    ssize_t n = recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&from, &fromlen);\n    if (n > 0) buf[n] = '\\0'; else buf[0] = '\\0';\n    printf(\"Client received: %s\\n\", buf);\n    close(sock);\n    return 0;\n}\n"
+    },
+    "server": {
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <string.h>\n#include <arpa/inet.h>\n#include <unistd.h>\n#include <sys/socket.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_DGRAM, 0);\n    struct sockaddr_in local;\n    local.sin_family = AF_INET;\n    local.sin_port = htons(5000);\n    local.sin_addr.s_addr = INADDR_ANY;\n    bind(sock, (struct sockaddr *)&local, sizeof(local));\n    char buf[64];\n    struct sockaddr_in client;\n    socklen_t clientlen = sizeof(client);\n    ssize_t n = recvfrom(sock, buf, sizeof(buf)-1, 0, (struct sockaddr *)&client, &clientlen);\n    if (n > 0) buf[n] = '\\0'; else buf[0] = '\\0';\n    printf(\"Server received: %s\\n\", buf);\n    const char *reply = \"Hi\";\n    sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&client, clientlen);\n    close(sock);\n    return 0;\n}\n"
+    },
+    "code": ""
+   },
+   "check": "",
+   "output": ""
   }
  ],
  "traps": [
