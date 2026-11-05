@@ -179,7 +179,12 @@ class Gemini:
             try:
                 data = parse_json(raw)
             except (json.JSONDecodeError, ValueError) as e:
-                p = prompt + f'\n\nYour last reply was not valid JSON ({e}). Reply with one JSON object only.'
+                self.log(f'  {task}: reply is not valid JSON ({e})')
+                if attempt == 0:
+                    p = prompt + f'\n\nYour last reply was not valid JSON ({e}). Reply with one complete JSON object only; keep tables short.'
+                else:   # ask the model to repair its own broken JSON instead of writing it all again
+                    p = ('The text below should be one JSON object but it is broken (' + str(e) + '). Some lines may be cut or missing. '
+                         'Return the same content as one valid, complete JSON object; rewrite any damaged part so it is whole and correct.\n\n' + raw)
                 continue
             probs = check(data) if check else []
             if not probs:
