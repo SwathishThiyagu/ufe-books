@@ -1,0 +1,502 @@
+{
+ "lead": "This unit is about proving who is on the network and protecting the protocols that carry our traffic. You will learn password and multi-factor authentication, Kerberos, IPsec, TLS/SSH, email security, DNSSEC, wireless security, NAC and VPNs, and web flaws. After it you can trace a login or a packet through the protocol that secures it and name the main attack each control stops.",
+ "about": "The unit starts with user authentication in 5.1: passwords, challenge-response and multi-factor. 5.2 shows how Kerberos issues tickets from a trusted KDC. 5.3 moves to the network layer with IPsec, and 5.4 covers TLS, HTTPS and SSH for secure channels. 5.5 and 5.6 protect email and DNS with PGP, S/MIME and DNSSEC. 5.7 then handles the open wireless medium, and 5.8 connects access control, EAP and VPNs. 5.9 closes at the application layer with web security and OWASP vulnerabilities. Each chapter builds on the authentication idea and the cryptographic tools from earlier units, so you can follow one login from password to protected packet.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Authentication proves an identity by checking a secret, a device, or a body trait, and a fresh challenge stops an old answer from being reused.",
+   "depth": "Cover password authentication with salted hashes such as bcrypt, PBKDF2 and Argon2, never plain text; include guessing, lockout and rate limits. Define entity authentication and message authentication, but leave MAC details to Unit 4. Challenge-response: server sends random nonce R, client returns H(password ‖ R) or a MAC; explain replay. Multi-factor: knowledge, possession with OTP, TOTP or hardware token, inherence with biometrics; 2FA vs MFA and step-up. Some syllabi call this user authentication or entity authentication. Only a few universities teach PAKE and FIDO2 internals; keep them to one line.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "Server"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "login: user"
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "nonce R = 913"
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "H(password‖R)"
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "accept"
+     }
+    ],
+    "aria": "A client logs in, receives nonce 913, returns a hash of the password and nonce, and the server accepts."
+   },
+   "example": "Server sends nonce R = 913. The client answers with H(password ‖ R), where H is a hash. An attacker records the answer for old nonce R = 512 and replays it. Does the server accept it? Answer: no. H(password ‖ 512) does not equal H(password ‖ 913), so the fresh nonce rejects the replay.",
+   "trap": "A password hash sent without a fresh challenge is a password equivalent and can be replayed. Two passwords are not two factors.",
+   "prereq": "Unit 4 hashing, MAC and digital signatures; Unit 1 replay and phishing attacks.",
+   "leave": "Kerberos ticket flow to 5.2; TLS client authentication to 5.4; biometric sensor hardware to advanced reading."
+  },
+  {
+   "k": 2,
+   "idea": "Kerberos uses a trusted KDC and time-limited symmetric tickets to prove identity without sending passwords.",
+   "depth": "Cover Kerberos V5: principals, realm, KDC with AS and TGS, TGT, service ticket, authenticator, session keys, mutual authentication, clock skew and pre-authentication. Explain why the client cannot read its TGT. Some syllabi call this Kerberos authentication. Public-key Kerberos and cross-realm details are advanced; only a few universities teach them.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "AS",
+     "TGS",
+     "Server"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "AS",
+      "label": "AS-REQ alice"
+     },
+     {
+      "from": "AS",
+      "to": "Client",
+      "label": "TGT + K(c,tgs)"
+     },
+     {
+      "from": "Client",
+      "to": "TGS",
+      "label": "TGT, TS=10:04"
+     },
+     {
+      "from": "TGS",
+      "to": "Client",
+      "label": "service ticket"
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "ticket, TS=10:04"
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "AP-REP"
+     }
+    ],
+    "aria": "A client gets a TGT from the AS, uses it at the TGS for a service ticket, then presents a fresh authenticator to the file server."
+   },
+   "example": "Client clock reads 10:04. File server clock reads 10:00. Kerberos allows clock skew of 5 minutes. The authenticator timestamp is 10:04. Is it accepted? Answer: yes, because 10:04 − 10:00 = 4 min ≤ 5 min. A timestamp of 10:06 would be rejected because 6 min > 5 min.",
+   "trap": "The TGT is encrypted with the TGS key; the client cannot read it. The authenticator, encrypted with the session key, proves freshness.",
+   "prereq": "Unit 3 symmetric encryption; Unit 4 key distribution; chapter 5.1 nonce and replay.",
+   "leave": "Password hashing to 5.1; public-key Kerberos to advanced; IPsec to 5.3."
+  },
+  {
+   "k": 3,
+   "idea": "IPsec protects IP packets at the network layer by authenticating and encrypting them under a security association.",
+   "depth": "Cover IPsec architecture: AH and ESP, transport and tunnel modes, security association with SPI, sequence number and algorithms, SPD, anti-replay, and IKEv1/IKEv2 for key exchange. Some syllabi call it IPSec. Explain that AH authenticates but does not encrypt; ESP can encrypt. IKEv2 mobility and NAT traversal details are advanced; only a few universities teach them. BGP security is a separate routing topic, not IPsec.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "ESP tunnel packet",
+    "nodes": [
+     {
+      "id": "outer",
+      "label": "Outer IP",
+      "note": "203.0.113.2→198.51.100.9",
+      "style": "accent"
+     },
+     {
+      "id": "esp",
+      "label": "ESP header",
+      "note": "SPI, seq",
+      "style": "normal"
+     },
+     {
+      "id": "inner",
+      "label": "Encrypted inner",
+      "note": "10.1.1.5→10.2.2.7",
+      "style": "live"
+     },
+     {
+      "id": "trail",
+      "label": "ESP trailer",
+      "note": "padding, next header",
+      "style": "normal"
+     },
+     {
+      "id": "auth",
+      "label": "ESP auth",
+      "note": "integrity check",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "outer",
+      "to": "esp",
+      "style": "solid"
+     },
+     {
+      "from": "esp",
+      "to": "inner",
+      "style": "solid"
+     },
+     {
+      "from": "inner",
+      "to": "trail",
+      "style": "solid"
+     },
+     {
+      "from": "trail",
+      "to": "auth",
+      "style": "solid"
+     }
+    ],
+    "aria": "A tunnel-mode ESP packet has a new outer IP header, ESP header, encrypted inner packet, ESP trailer and authentication data."
+   },
+   "example": "Host A at 10.1.1.5 sends TCP port 443 traffic to host B at 10.2.2.7. Two gateways use ESP tunnel mode with outer addresses 203.0.113.2 and 198.51.100.9. Which addresses does a router on the Internet see? Which addresses are hidden? Answer: the router sees 203.0.113.2 → 198.51.100.9. The inner 10.1.1.5 → 10.2.2.7 is encrypted.",
+   "trap": "AH authenticates but does not encrypt. ESP can encrypt. Transport mode keeps the original IP header; tunnel mode adds a new one.",
+   "prereq": "Unit 3 block ciphers and modes; Unit 4 MAC and HMAC; Unit 1 MITM and replay.",
+   "leave": "IKE details to 5.4 and Unit 4; remote-access VPNs to 5.8."
+  },
+  {
+   "k": 4,
+   "idea": "TLS and SSH create a secure channel over an unsafe network using a handshake, certificates or host keys, and symmetric record protection.",
+   "depth": "Cover SSL and TLS: record protocol, handshake, cipher suites, certificate validation, TLS 1.2 vs TLS 1.3, HTTPS, session resumption. Cover SSH: transport layer, user authentication, connection multiplexing, host keys, password vs public-key login. Some syllabi call this transport level security. QUIC and 0-RTT details are advanced; only a few universities teach them. Keep TLS as a secure channel, not an application security proof.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "Server"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "ClientHello C=0x11"
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "ServerHello S=0x22 cert"
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "E(PMS) 48 B"
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "Finished"
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "HTTP GET /"
+     }
+    ],
+    "aria": "A TLS 1.2 handshake with client random C, server random S, encrypted 48-byte pre-master secret, Finished, then an HTTPS request."
+   },
+   "example": "In TLS 1.2 RSA key exchange, client random is C = 0x11 and server random is S = 0x22. The client sends a 48-byte pre-master secret PMS encrypted under the server RSA public key. What does the server decrypt, and what is the master secret length? Answer: the server decrypts PMS, 48 bytes. Both sides compute a 48-byte master secret from PRF(PMS, 'master secret', C ‖ S).",
+   "trap": "TLS channel security does not give non-repudiation. SSH host key authenticates the server; the user still needs password or public-key auth.",
+   "prereq": "Unit 4 certificates and digital signatures; Unit 3 symmetric ciphers; chapter 5.1 authentication.",
+   "leave": "Web application bugs to 5.9; VPN to 5.8; email to 5.5."
+  },
+  {
+   "k": 5,
+   "idea": "Email security adds signatures and encryption at the message level because SMTP itself is plaintext and spoofable.",
+   "depth": "Cover email threats: spoofing, phishing, spam and replay of messages. PGP: key rings, web of trust, sign-then-encrypt, compression, radix-64, session keys. S/MIME: X.509 certificates, CMS, MIME. Brief DKIM, SPF and DMARC because they use DNS to stop sender forgery. Some syllabi call this secure email. PGP packet formats are advanced; only a few universities teach them.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "PGP sign then encrypt",
+    "nodes": [
+     {
+      "id": "msg",
+      "label": "Message",
+      "note": "Pay ₹500",
+      "style": "normal"
+     },
+     {
+      "id": "sign",
+      "label": "Hash + sign",
+      "note": "Alice private key",
+      "style": "accent"
+     },
+     {
+      "id": "comp",
+      "label": "Compress",
+      "style": "normal"
+     },
+     {
+      "id": "enc",
+      "label": "Encrypt",
+      "note": "Ks = 0x7A",
+      "style": "live"
+     },
+     {
+      "id": "wrap",
+      "label": "Wrap Ks",
+      "note": "Bob public key",
+      "style": "normal"
+     },
+     {
+      "id": "armor",
+      "label": "Radix-64",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "msg",
+      "to": "sign",
+      "style": "solid"
+     },
+     {
+      "from": "sign",
+      "to": "comp",
+      "style": "solid"
+     },
+     {
+      "from": "comp",
+      "to": "enc",
+      "style": "solid"
+     },
+     {
+      "from": "enc",
+      "to": "wrap",
+      "style": "solid"
+     },
+     {
+      "from": "wrap",
+      "to": "armor",
+      "style": "solid"
+     }
+    ],
+    "aria": "A PGP message is signed with Alice's private key, compressed, encrypted with session key 0x7A, has that key wrapped with Bob's public key, and is radix-64 encoded."
+   },
+   "example": "Alice signs the message Pay ₹500 with her private key. She encrypts it with session key Ks = 0x7A and wraps Ks with Bob's public key. Which keys does Bob use? Answer: Bob verifies Alice's signature with Alice's public key, decrypts Ks with Bob's private key, and decrypts the message with Ks.",
+   "trap": "Sign-then-encrypt hides the signature; encrypt-then-sign exposes it but has different meaning. PGP web of trust is not a CA hierarchy.",
+   "prereq": "Unit 4 RSA, hashes, signatures and certificates; Unit 3 symmetric encryption.",
+   "leave": "TLS for webmail to 5.4; detailed DNS sender policy to 5.6; spam filtering products to labs."
+  },
+  {
+   "k": 6,
+   "idea": "DNSSEC uses digital signatures in DNS records so a resolver can verify that an answer is authentic and unchanged.",
+   "depth": "Cover DNS resolution, cache poisoning and spoofing. DNSSEC records: DNSKEY, DS, RRSIG, NSEC and NSEC3. Explain the chain of trust from the root zone, signing vs validating resolvers, and what DNSSEC does not hide. Some syllabi call this secure DNS. NSEC3 details and DoH/DoT are advanced; only a few universities teach them in depth.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Root",
+     "note": "KSK",
+     "children": [
+      {
+       "label": ".in",
+       "note": "DS",
+       "edge": "delegation",
+       "children": [
+        {
+         "label": "bank.in",
+         "note": "DNSKEY",
+         "edge": "delegation",
+         "children": [
+          {
+           "label": "www",
+           "note": "A + RRSIG",
+           "edge": "signed"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A DNSSEC tree from root through .in and bank.in to the signed www record, showing the chain of trust."
+   },
+   "example": "A cache receives two answers for www.bank.in: A 203.0.113.7 with a valid RRSIG, and A 6.6.6.6 with no RRSIG. TTL is 300 s. Which answer does a validating resolver accept? Answer: 203.0.113.7, because the RRSIG validates under the bank.in DNSKEY and the DS chain. The unsigned 6.6.6.6 answer is bogus.",
+   "trap": "DNSSEC gives integrity and origin authentication, not confidentiality. It does not encrypt queries.",
+   "prereq": "Unit 4 digital signatures and hashes; Unit 1 spoofing and cache attacks.",
+   "leave": "DKIM and SPF email policy to 5.5; TLS for DNS to 5.4; BGP security is not covered."
+  },
+  {
+   "k": 7,
+   "idea": "Wireless security must fix the open medium by authenticating stations and deriving fresh per-session keys.",
+   "depth": "Cover 802.11 threats: open networks, rogue AP and evil twin, MAC filtering limits. WEP and its RC4/IV weakness, WPA/TKIP, WPA2 with CCMP/AES, WPA3 SAE. Explain the WPA2 4-way handshake and PTK derivation; PSK vs Enterprise 802.1X. Some syllabi call this wireless security. WPA3 SAE details are advanced; only a few universities teach them.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "AP"
+    ],
+    "messages": [
+     {
+      "from": "AP",
+      "to": "Client",
+      "label": "ANonce = 0xA1"
+     },
+     {
+      "from": "Client",
+      "to": "AP",
+      "label": "SNonce = 0xB2, MIC"
+     },
+     {
+      "from": "AP",
+      "to": "Client",
+      "label": "GTK, MIC"
+     },
+     {
+      "from": "Client",
+      "to": "AP",
+      "label": "ACK"
+     }
+    ],
+    "aria": "A WPA2 four-way handshake: the AP sends ANonce 0xA1, the client sends SNonce 0xB2 with a MIC, the AP sends GTK with a MIC, and the client acknowledges."
+   },
+   "example": "In the WPA2 4-way handshake, the AP sends ANonce = 0xA1 and the client sends SNonce = 0xB2. Both derive PTK = PRF(PMK, ANonce, SNonce, AP MAC, Client MAC). Why does a replayed first message not create the same PTK? Answer: the client chooses a fresh SNonce, so the PTK changes and the MIC check fails.",
+   "trap": "WEP is broken; hiding the SSID and MAC filtering are not security. WPA2-Personal uses a PSK, not per-user login; Enterprise uses 802.1X.",
+   "prereq": "Unit 3 RC4 and block ciphers; Unit 4 PRF and keys; chapter 5.8 EAP.",
+   "leave": "EAP and RADIUS details to 5.8; IPsec VPN to 5.3 and 5.8."
+  },
+  {
+   "k": 8,
+   "idea": "NAC decides whether a device may join a network, and VPNs extend a private network over the Internet with authentication and tunneling.",
+   "depth": "Cover 802.1X with supplicant, authenticator and authentication server; EAP, EAPOL and RADIUS; EAP-TLS, PEAP and EAP-TTLS; port states and VLAN assignment. Cover NAC and posture checks. Cover VPNs: remote access and site-to-site, IPsec vs SSL VPN, split tunneling, MFA. Some syllabi call this network access control. Posture assessment details are advanced; only a few universities teach them.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Supplicant",
+     "Switch",
+     "RADIUS"
+    ],
+    "messages": [
+     {
+      "from": "Supplicant",
+      "to": "Switch",
+      "label": "EAPOL-Start"
+     },
+     {
+      "from": "Switch",
+      "to": "Supplicant",
+      "label": "Identity?"
+     },
+     {
+      "from": "Supplicant",
+      "to": "Switch",
+      "label": "alice"
+     },
+     {
+      "from": "Switch",
+      "to": "RADIUS",
+      "label": "Access-Request"
+     },
+     {
+      "from": "RADIUS",
+      "to": "Switch",
+      "label": "Access-Accept VLAN 20"
+     },
+     {
+      "from": "Switch",
+      "to": "Supplicant",
+      "label": "Port open"
+     }
+    ],
+    "aria": "A supplicant starts 802.1X, gives identity alice, the switch asks RADIUS, RADIUS accepts with VLAN 20, and the port opens."
+   },
+   "example": "User alice connects to switch port Fa0/10. Before authentication the port is unauthorized. RADIUS returns Access-Accept with Tunnel-Private-Group-ID = 20. What changes? Answer: the port becomes authorized and carries VLAN 20 traffic. Before that, only EAPOL traffic is allowed.",
+   "trap": "The switch is the authenticator, not the authentication server. EAP alone has no encryption; PEAP and EAP-TTLS protect the inner method with TLS.",
+   "prereq": "Chapter 5.7 wireless 802.1X; chapter 5.3 IPsec; chapter 5.4 TLS; Unit 4 certificates.",
+   "leave": "RADIUS server configuration to lab; specific EAP packet formats to advanced; firewalls to Unit 6."
+  },
+  {
+   "k": 9,
+   "idea": "Web security protects browser-server interactions from injection, broken access control, session theft and related OWASP-class flaws.",
+   "depth": "Cover HTTP, cookies, sessions, same-origin policy and HTTPS. OWASP Top 10: broken access control, cryptographic failures, injection, insecure design, misconfiguration, vulnerable components, authentication failures, integrity failures, logging failures and SSRF. Explain SQL injection, XSS, CSRF, IDOR and file upload. Defences: parameterized queries, output encoding, CSRF tokens, secure cookies and CSP. Some syllabi call this web security. Tool-by-tool reviews are advanced; only a few universities teach them.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Attacker",
+     "Web app",
+     "DB"
+    ],
+    "messages": [
+     {
+      "from": "Attacker",
+      "to": "Web app",
+      "label": "user=' OR 1=1--"
+     },
+     {
+      "from": "Web app",
+      "to": "DB",
+      "label": "SELECT * FROM users"
+     },
+     {
+      "from": "DB",
+      "to": "Web app",
+      "label": "all rows"
+     },
+     {
+      "from": "Web app",
+      "to": "Attacker",
+      "label": "login as admin"
+     }
+    ],
+    "aria": "An attacker sends a SQL injection string, the web app queries the database, the database returns all rows, and the attacker is logged in as admin."
+   },
+   "example": "Login query is SELECT * FROM users WHERE user='$u' AND pass='$p'. The attacker sets u = ' OR '1'='1' -- and p = x. Write the resulting query and say why login succeeds. Answer: SELECT * FROM users WHERE user='' OR '1'='1' --' AND pass='x'. The OR condition is true and -- comments out the password check, so the first user row is returned.",
+   "trap": "Escaping input is not enough; use parameterized queries. XSS needs context-aware output encoding; CSRF needs tokens and SameSite cookies.",
+   "prereq": "Chapter 5.4 HTTPS and TLS; Unit 1 phishing and attacks; chapter 5.1 password storage.",
+   "leave": "Buffer overflow and malware to Unit 6; firewall and IDS to Unit 6; email phishing to 5.5."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "password login becomes a Kerberos ticket"
+  ],
+  [
+   2,
+   3,
+   "tickets and session keys lead to IPsec security associations"
+  ],
+  [
+   3,
+   4,
+   "network tunnels and TLS channels both use handshakes"
+  ],
+  [
+   4,
+   5,
+   "secure channel ideas reappear in signed email"
+  ],
+  [
+   4,
+   6,
+   "TLS protects transport but DNSSEC signs the data"
+  ],
+  [
+   4,
+   7,
+   "TLS protects enterprise wireless authentication"
+  ],
+  [
+   7,
+   8,
+   "wireless 802.1X uses EAP and RADIUS"
+  ],
+  [
+   4,
+   9,
+   "HTTPS is the base for web security"
+  ],
+  [
+   6,
+   5,
+   "DNS records carry email sender policy"
+  ]
+ ]
+}

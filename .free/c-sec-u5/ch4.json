@@ -1,0 +1,183 @@
+{
+ "lead": "TLS and SSH protect data sent over an unsafe network. Both first run a handshake that authenticates the server or host and agrees on fresh symmetric keys. Then a record or transport layer encrypts and integrity-protects every message with those keys, using fast ciphers such as AES. TLS secures HTTPS, banking and UPI web pages. SSH secures remote login and file copy on servers. The channel protects bytes in transit; it does not prove that the web application itself is free of bugs.",
+ "prereq": "You need: Unit 4 certificates and digital signatures, Unit 3 symmetric ciphers, and <a href=\"#user-authentication-passwords-challenge-response-multi-factor\">5.1 authentication</a>.",
+ "sections": [
+  {
+   "h3": "TLS record and handshake",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "TLS (Transport Layer Security; SSL is the older name; some syllabi call it transport-level security) runs above TCP and below the application. The handshake sets up keys. The record protocol protects each block of application data. A TLS record carries a content type, a version, a length, and a payload of at most 2<sup>14</sup> bytes (16,384 bytes). In TLS 1.2 the sender computes a MAC over a sequence number, type, version, length and payload, then encrypts payload and MAC. The sequence number stops record replay and reordering. Modern suites use AEAD (authenticated encryption with associated data), such as AES-GCM, which encrypts and authenticates in one operation."
+    },
+    {
+     "type": "p",
+     "text": "The TLS 1.2 handshake in the figure uses RSA key exchange. The client sends ClientHello with a random C = 0x11, a list of cipher suites and extensions. The server replies ServerHello with a random S = 0x22, the chosen cipher suite, and its certificate. The client validates the certificate, makes a 48-byte pre-master secret PMS, encrypts it with the server's RSA public key, and sends it. Both sides compute the master secret. They derive a key block. Both sides send Finished: verify_data = PRF(master_secret, \"client finished\" or \"server finished\", Hash(handshake messages)), sent encrypted under the new record keys. The client sends ChangeCipherSpec and Finished first, then the server replies with ChangeCipherSpec and Finished, and then application data follows."
+    },
+    {
+     "type": "formula",
+     "text": "master_secret = PRF(PMS, \"master secret\", C ‖ S); key_block = PRF(master_secret, \"key expansion\", S ‖ C)",
+     "where": "PRF is the TLS pseudo-random function; PMS is the 48-byte pre-master secret; C and S are the client and server randoms; ‖ means concatenation. The master secret is always 48 bytes. The key_block length depends on the chosen cipher suite; for example, TLS_RSA_WITH_AES_128_CBC_SHA needs 104 bytes (2 × 20-byte MAC keys, 2 × 16-byte AES keys, 2 × 16-byte IVs)."
+    }
+   ]
+  },
+  {
+   "h3": "Certificates, TLS versions and HTTPS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Certificate validation is the core of TLS server authentication. The client checks that the chain ends at a trusted root, that the leaf names the host contacted, that dates are valid, and that key usage allows server authentication. It may check revocation by CRL (certificate revocation list) or OCSP (online certificate status protocol). A valid signature for another hostname is not enough."
+    },
+    {
+     "type": "p",
+     "text": "A cipher suite names key exchange, authentication, bulk cipher, and MAC or AEAD. For example, TLS_RSA_WITH_AES_128_CBC_SHA in TLS 1.2 means RSA key transport, RSA certificate, AES-128-CBC, and HMAC-SHA1. A full TLS 1.3 handshake uses ephemeral (EC)DHE for forward secrecy; resumption can also run PSK-only or PSK with (EC)DHE. RSA key transport and CBC are removed. TLS 1.3 uses AEAD ciphers such as AES-GCM or ChaCha20-Poly1305, and encrypts most of the handshake. A full TLS 1.3 handshake takes one round trip (1-RTT). Ephemeral DH gives forward secrecy: stealing the server's long-term private key later does not decrypt past sessions."
+    },
+    {
+     "type": "p",
+     "text": "HTTPS is HTTP inside TLS, normally on TCP port 443. It protects passwords, cookies and page content in transit. It does not stop SQL injection, cross-site scripting (XSS) or broken access control; those are web application flaws, covered in <a href=\"#web-security-and-owasp-vulnerabilities\">5.9</a>."
+    },
+    {
+     "type": "p",
+     "text": "Session resumption avoids a full handshake. TLS 1.2 uses session IDs or tickets. TLS 1.3 uses pre-shared keys (PSK) from a previous session. Resumption saves CPU and latency, but ticket keys must be protected; a stolen ticket key can let an attacker resume sessions. TLS 1.3 0-RTT early data can be replayed; only some syllabi cover it."
+    }
+   ]
+  },
+  {
+   "h3": "SSH transport and user login",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SSH is a remote-login and file-transfer protocol, usually on TCP port 22. It has three layers. The transport layer runs a version exchange, a key exchange (often Diffie-Hellman), and server authentication with a host key. It then encrypts and MACs every packet; each binary packet has length, padding length, payload, random padding and a MAC. The user authentication layer proves the human or account. The connection layer multiplexes many channels over one SSH connection: a shell, an SFTP file transfer, or a forwarded port."
+    },
+    {
+     "type": "p",
+     "text": "The host key is the server's public key. The client stores it in known_hosts. On first contact the client may trust the key without proof (trust on first use); this is weak against a man-in-the-middle. A changed host key should raise an alarm. The host key authenticates the server; it does not log in the user."
+    },
+    {
+     "type": "p",
+     "text": "SSH user authentication has two common forms. Password login sends the password inside the encrypted transport, so it is not plaintext on the wire, but the server still sees it. Public-key login is stronger: the client proves possession of a private key by signing a session-specific challenge, and the server checks the matching public key in authorized_keys. Keyboard-interactive authentication can carry one-time passwords or OTP. After authentication, the connection layer opens channels with their own flow control. SSH protects interactive sessions and file copies. It is not a full VPN by itself, though port forwarding can tunnel traffic; see <a href=\"#network-access-control-eap-and-vpns\">5.8</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The handshake authenticates the server with its certificate, exchanges a 48-byte pre-master secret, and then sends encrypted HTTP. The client sends ChangeCipherSpec and Finished first, then the server does the same, and then application data follows.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Client",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "ClientHello C=0x11"
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "ServerHello S=0x22 cert"
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "E(PMS) 48 B"
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "ChangeCipherSpec, Finished"
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "ChangeCipherSpec, Finished"
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "HTTP GET /"
+    }
+   ],
+   "aria": "A TLS 1.2 handshake with client random C, server random S, encrypted 48-byte pre-master secret, client ChangeCipherSpec and Finished, server ChangeCipherSpec and Finished, then an HTTPS request."
+  }
+ },
+ "examples": [
+  {
+   "question": "In TLS 1.2 RSA key exchange, the client random is C = 0x11 and the server random is S = 0x22. The client sends a 48-byte pre-master secret PMS encrypted under the server's RSA public key. (a) What does the server decrypt? (b) What is the master secret length?",
+   "steps": [
+    "ClientHello carries the client random C = 0x11.",
+    "ServerHello carries the server random S = 0x22 and the server certificate.",
+    "The client encrypts PMS with the server's RSA public key; PMS is 48 bytes.",
+    "The server decrypts with its RSA private key and recovers PMS, which is 48 bytes.",
+    "Both sides compute master_secret = PRF(PMS, \"master secret\", C ‖ S). TLS fixes the master secret at 48 bytes."
+   ],
+   "answer": "The server decrypts a 48-byte pre-master secret; the master secret is 48 bytes.",
+   "check": "pms_bytes = 48\nmaster_bytes = 48\nprint(pms_bytes)\nprint(master_bytes)",
+   "values": [
+    48,
+    48
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "TLS gives channel confidentiality, integrity and server authentication. It does not give non-repudiation; a signature is needed for that.",
+  "The SSH host key authenticates the server only. The user still needs password, public-key or keyboard-interactive authentication.",
+  "Do not say TLS 1.3 uses RSA key transport. TLS 1.3 removed RSA key exchange and CBC; it uses ephemeral DH/ECDH and AEAD.",
+  "A certificate with a valid signature but the wrong hostname must fail validation. Always check the name and chain.",
+  "HTTPS does not fix application bugs such as SQL injection or XSS; those sit above TLS, see <a href=\"#web-security-and-owasp-vulnerabilities\">5.9</a>."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the two parts of TLS that protect an HTTPS session.",
+   "marks": 2,
+   "a": "The handshake sets up keys; the record protocol protects application data."
+  },
+  {
+   "level": "understand",
+   "q": "Why does TLS use a certificate instead of only a shared password for server authentication?",
+   "marks": 3,
+   "a": "A certificate binds the server's public key to its hostname through a trusted CA, so an unknown client can verify the server without a pre-shared secret."
+  },
+  {
+   "level": "apply",
+   "q": "A TLS 1.2 RSA handshake has C = 0x11, S = 0x22 and PMS = 48 bytes. What does the server decrypt, and what is the master secret length?",
+   "marks": 4,
+   "a": "The server decrypts the 48-byte PMS with its RSA private key. The master secret length is 48 bytes."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does TLS 1.3 remove RSA key transport?",
+   "marks": 5,
+   "a": "RSA key transport has no forward secrecy: an attacker who later steals the server's private key can decrypt the recorded PMS and past sessions. TLS 1.3 uses ephemeral DH/ECDH instead."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three SSH layers.",
+   "marks": 2,
+   "a": "Transport layer, user authentication layer, connection layer."
+  },
+  {
+   "level": "understand",
+   "q": "Why is an SSH host key not enough to log in a user?",
+   "marks": 3,
+   "a": "The host key proves the server's identity. It says nothing about the user's identity, so password, public-key or keyboard-interactive authentication is still needed."
+  },
+  {
+   "level": "apply",
+   "q": "In SSH public-key login, what does the client sign and what does the server check?",
+   "marks": 4,
+   "a": "The client signs a session-specific challenge with its private key. The server checks the signature with the matching public key in authorized_keys."
+  },
+  {
+   "level": "analyze",
+   "q": "What is the main risk of TLS session resumption tickets?",
+   "marks": 5,
+   "a": "If a ticket encryption key is stolen, an attacker can forge or resume sessions. Ticket keys must be protected and rotated."
+  }
+ ],
+ "beyond": "Not for the exam. QUIC runs TLS 1.3 over UDP and is used by HTTP/3. Certificate Transparency logs make rogue certificates public. SSH certificate authorities replace manual known_hosts entries in large fleets. Post-quantum hybrid key exchange is being added to TLS and SSH. Search for TLS 1.3, SSH transport layer, Certificate Transparency and post-quantum TLS."
+}

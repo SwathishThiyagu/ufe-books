@@ -1,0 +1,259 @@
+{
+ "lead": "Email was built for machines that trusted each other. SMTP carries every message in plaintext and lets any sender type any From address, so a mail that looks like it came from your bank may come from a stranger. Message-level security fixes this: the sender signs the message with a private key and encrypts it with the recipient's public key, so the text stays private even on the mail servers in between. PGP does this between individuals; S/MIME does it inside organisations using X.509 certificates.",
+ "prereq": "You need: Unit 4 for RSA, hashes, digital signatures and certificates, and Unit 3 for symmetric ciphers and block cipher modes.",
+ "sections": [
+  {
+   "h3": "What goes wrong with plain email",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SMTP, the protocol that moves mail between servers, has no way to check who really sent a message. The From: line is text the sender types. Nothing in the protocol ties it to the machine that opened the connection."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Spoofing</b>: the sender address is forged.",
+      "<b>Phishing</b>: a spoofed mail with a link to a fake login page (see Unit 1, social engineering).",
+      "<b>Spam</b>: bulk unsolicited mail sent through open relays.",
+      "<b>Eavesdropping</b>: copies of the message sit on relays and in backups.",
+      "<b>Modification</b>: a gateway or relay edits the body.",
+      "<b>Replay</b>: the same signed message is delivered again later."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Replay deserves care. A correctly signed note saying \"pay ₹500\" is still valid next month. PGP puts a creation time inside the signature and clients warn about old dates; applications also keep a message ID and reject duplicates."
+    },
+    {
+     "type": "p",
+     "text": "TLS between mail servers protects one hop only (see <a href=\"#ssl-tls-https-and-ssh\">5.4</a>). The message is decrypted at each server and stored in plaintext, so TLS does not give end-to-end privacy. Email security therefore works on the message itself, adding a signature and an encryption layer that only the two endpoints can remove."
+    },
+    {
+     "type": "p",
+     "text": "Two families do this. PGP is peer-to-peer and needs no authority. S/MIME is certificate-based and fits corporate mail."
+    }
+   ]
+  },
+  {
+   "h3": "PGP: key rings and sign-then-encrypt",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "PGP (Pretty Good Privacy) is peer-to-peer: two users secure mail without a server or authority between them. Each user holds a public-key pair for signing and for encryption (RSA for both, or DSA for signing with ElGamal for encryption), plus a set of supported symmetric ciphers (AES, CAST, IDEA) and hashes (SHA-256 and others). Each message names the cipher and hash it used in its header, so the receiver knows which to apply. A user also keeps two key rings. The <b>public key ring</b> holds other people's public keys. The <b>private key ring</b> holds the user's own private keys, each encrypted under a passphrase. Every key carries a short <b>key ID</b> so a message can say which key it used."
+    },
+    {
+     "type": "p",
+     "text": "PGP replaces the CA hierarchy with a <b>web of trust</b>. Alice checks Bob's key fingerprint face to face and signs his public key with her own private key. Anyone who trusts Alice then treats Bob's key as partly trustworthy. Trust levels and introducers decide how far that carries. The question is \"who vouches for this key\", not \"which CA issued it\"."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Hash the message; sign the hash with Alice's private key.",
+      "Join the signature to the message.",
+      "Compress the pair. This shortens the ciphertext and removes repetition.",
+      "Pick a random session key Ks, for example 0x7A.",
+      "Encrypt the compressed data under Ks with a symmetric cipher. Symmetric work is fast for a long message.",
+      "Encrypt Ks with Bob's public key and attach it.",
+      "Encode the whole thing in radix-64."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Radix-64 (base64) turns every 3 bytes into 4 printable characters, so the output is about 33% longer, plus a CRC line. Old mail systems could not carry raw binary, so this armour keeps the message inside plain ASCII."
+    }
+   ]
+  },
+  {
+   "h3": "S/MIME and the DNS sender checks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "MIME already lets one message carry several parts: text, images, attachments. S/MIME wraps a part in <b>CMS</b> (Cryptographic Message Syntax, the successor of PKCS#7) and labels it. A message marked multipart/signed carries the readable text plus a signature; application/pkcs7-mime carries enveloped, encrypted data. Keys come from X.509 certificates issued by CAs, and the mail address appears in the certificate, so S/MIME trusts a hierarchy rather than a web."
+    },
+    {
+     "type": "table",
+     "head": [
+      "",
+      "PGP",
+      "S/MIME"
+     ],
+     "rows": [
+      [
+       "Trust",
+       "Web of trust",
+       "X.509 CA hierarchy"
+      ],
+      [
+       "Key format",
+       "PGP key ring",
+       "X.509 certificate"
+      ],
+      [
+       "Typical user",
+       "Individuals, journalists",
+       "Companies, government"
+      ],
+      [
+       "Client support",
+       "Add-on",
+       "Built into many mail clients"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "DNS gives a second, cheaper defence against forgery. <b>SPF</b> publishes the IP addresses allowed to send for a domain in a TXT record, and the receiver compares them with the connecting IP. The record belongs to the envelope-sender domain, the one in MAIL FROM / Return-Path, not the From: header the reader sees. <b>DKIM</b> has the domain sign chosen headers and a body hash; the public key sits in DNS, so the receiver can verify it. <b>DMARC</b> adds alignment: the envelope-sender domain or the DKIM signing domain must match the From: header domain, and the published policy (none, quarantine, reject) applies when neither aligned check passes, along with reports back to the owner. These check a domain, not a person, and give no encryption. DNS security itself is in <a href=\"#dns-security-and-dnssec\">5.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "A PGP message is signed with Alice's private key, compressed, encrypted under session key 0x7A, and that key is wrapped with Bob's public key before radix-64 encoding. Notice the signature sits inside the encryption, so Bob must decrypt before he can verify.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "PGP sign then encrypt",
+   "nodes": [
+    {
+     "id": "msg",
+     "label": "Message",
+     "note": "Pay ₹500",
+     "style": "normal"
+    },
+    {
+     "id": "sign",
+     "label": "Hash + sign",
+     "note": "Alice private key",
+     "style": "accent"
+    },
+    {
+     "id": "comp",
+     "label": "Compress",
+     "style": "normal"
+    },
+    {
+     "id": "enc",
+     "label": "Encrypt",
+     "note": "Ks = 0x7A",
+     "style": "live"
+    },
+    {
+     "id": "wrap",
+     "label": "Wrap Ks",
+     "note": "Bob public key",
+     "style": "normal"
+    },
+    {
+     "id": "armor",
+     "label": "Radix-64",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "msg",
+     "to": "sign",
+     "style": "solid"
+    },
+    {
+     "from": "sign",
+     "to": "comp",
+     "style": "solid"
+    },
+    {
+     "from": "comp",
+     "to": "enc",
+     "style": "solid"
+    },
+    {
+     "from": "enc",
+     "to": "wrap",
+     "style": "solid"
+    },
+    {
+     "from": "wrap",
+     "to": "armor",
+     "style": "solid"
+    }
+   ],
+   "aria": "A PGP message is signed with Alice's private key, compressed, encrypted with session key 0x7A, has that key wrapped with Bob's public key, and is radix-64 encoded."
+  }
+ },
+ "examples": [
+  {
+   "question": "Alice sends Bob a PGP message. She signs the text \"Pay ₹500\" with her private key, compresses it, generates session key Ks = 0x7A, encrypts the compressed data under Ks, and encrypts Ks with Bob's public key. (a) What is Ks in decimal? (b) How many separate key operations does Bob perform while reading and checking the message, and which key does each use?",
+   "steps": [
+    "Ks = 0x7A = 7 × 16 + 10 = 122. The one-byte value is only so the arithmetic fits on one line. A real PGP session key is 128 or 256 bits, for example a random AES-256 key.",
+    "Alice's side: hash the text, sign the hash with Alice's private key, compress, encrypt under Ks = 122, wrap 122 with Bob's public key (n_B, e_B).",
+    "Bob operation 1: RSA-decrypt the wrapped key with Bob's private key d_B. He recovers Ks = 122.",
+    "Bob operation 2: symmetric-decrypt the body under Ks = 122. He recovers the compressed signed text.",
+    "Bob operation 3: decompress, then verify the signature with Alice's public key. Accept or reject.",
+    "Count the operations: Bob's private key, the session key Ks, and Alice's public key. That is 3."
+   ],
+   "answer": "Ks = 122 in decimal, and Bob performs 3 key operations: his private key to recover Ks, Ks to decrypt the body, and Alice's public key to verify the signature.",
+   "check": "ks = int(\"7A\", 16)\nprint(ks)\nops = [\"decrypt Ks with Bob's private key\", \"decrypt body with Ks\", \"verify signature with Alice's public key\"]\nprint(len(ops))",
+   "values": [
+    122,
+    3
+   ],
+   "code": {
+    "lang": "python",
+    "code": "ks = int(\"7A\", 16)\nprint(ks)\nprint(3)",
+    "stdin": ""
+   },
+   "output": "122\n3"
+  }
+ ],
+ "traps": [
+  "Sign-then-encrypt and encrypt-then-sign are not the same. PGP signs first, so the signature is hidden inside the ciphertext and only Bob sees it. Encrypt-then-sign leaves the signature outside, readable by anyone, but then it covers the ciphertext, not the plaintext.",
+  "The PGP web of trust is not a CA hierarchy. Signing someone's key means \"I checked this key\", not \"an authority certified this identity\", and there is no root certificate anywhere.",
+  "PGP and S/MIME leave the outer From, To, Date and routing headers in clear, because the mail servers need them to deliver the message; the Subject leaks only if the client does not hide it. S/MIME enveloped data (application/pkcs7-mime with smime-type=enveloped-data) and PGP/MIME (multipart/encrypted) can carry the whole MIME entity, Subject included, inside the encryption, and many clients do hide it. Others still copy the Subject to the outer header in clear. Write \"headers leak; the Subject leaks only if the client does not hide it\", never \"the Subject is never protected\".",
+  "SPF, DKIM and DMARC authenticate the sending domain, not the human. A phished mailbox at a correctly configured domain passes all three, and none of them encrypts anything."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a PGP key ring, and why are there two of them?",
+   "marks": 2,
+   "a": "A key ring is a file of keys. The public ring stores other people's public keys; the private ring stores the user's own private keys, each encrypted under a passphrase."
+  },
+  {
+   "level": "understand",
+   "q": "Why does PGP compress the message before encrypting it, and not after?",
+   "marks": 3,
+   "a": "Compression makes the data smaller and removes repetition, so the ciphertext is shorter and carries fewer patterns for a cryptanalyst. It must come before encryption because ciphertext is close to random and cannot be compressed."
+  },
+  {
+   "level": "apply",
+   "q": "A compressed PGP message is 2400 bytes. How long is its radix-64 output, ignoring the CRC line?",
+   "marks": 4,
+   "a": "Radix-64 turns every 3 bytes into 4 characters: 2400 ÷ 3 = 800 groups, and 800 × 4 = 3200 characters, roughly 33% longer than the input."
+  },
+  {
+   "level": "apply",
+   "q": "Alice sends the same confidential note to Bob and Carol using PGP. How many session keys does she generate, and how many times is the session key wrapped?",
+   "marks": 4,
+   "a": "One session key. It is wrapped twice, once with Bob's public key and once with Carol's public key, so each recipient can recover the same Ks with their own private key."
+  },
+  {
+   "level": "understand",
+   "q": "Bob receives a PGP message from Alice. Which keys does he use, and in what order?",
+   "marks": 3,
+   "a": "Bob's private key decrypts the wrapped session key; the session key decrypts the body; Alice's public key verifies her signature after decompression."
+  },
+  {
+   "level": "analyze",
+   "q": "An attacker records Alice's signed PGP message \"pay ₹500\" and delivers it to Bob again next week. Does the signature stop this? What does?",
+   "marks": 5,
+   "a": "No. The signature stays valid because it covers the content, not the delivery. Bob needs a creation time inside the signature and a check that it is recent, plus an application-level message ID that rejects duplicates; otherwise the same instruction is executed twice."
+  },
+  {
+   "level": "analyze",
+   "q": "A phishing mail reaches you from a domain whose SPF and DKIM both pass. How is that possible, and which layer should catch it?",
+   "marks": 5,
+   "a": "The attacker either owns that domain or has taken over a real mailbox, so the mail is legitimately sent and signed. SPF and DKIM authenticate the domain, not the intent. Content filtering, DMARC policy with reporting, and user checks on links must catch it; encryption would not help because the mail is not secret."
+  }
+ ],
+ "beyond": "Not for the exam. In practice the DNS checks won the deployment race: almost all large mail providers now evaluate SPF, DKIM and DMARC before a message reaches the inbox, and PGP and S/MIME stayed niche because key exchange and key loss are painful for ordinary users. Newer work adds MTA-STS and DANE to protect the SMTP hop itself, and ARC to preserve authentication results across forwarding. Search for key transparency, which borrows certificate-transparency logs to make public-key lookups auditable, and for post-quantum migration plans that affect both PGP and CMS."
+}

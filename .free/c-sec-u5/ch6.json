@@ -1,0 +1,199 @@
+{
+ "lead": "DNS is the Internet's name-to-record lookup service: a resolver asks the root, then a top-level domain, then an authoritative server, and caches the answer for a time-to-live (TTL). Early DNS has no authentication, so an attacker who spoofs a reply can poison a cache. DNSSEC adds digital signatures to DNS records. A validating resolver checks that each answer came from the named zone and was not changed. Banks, governments and public resolvers use DNSSEC to make name lookup trustworthy.",
+ "prereq": "You need: <a href=\"#digital-signatures-and-rsa-signatures\">Unit 4 digital signatures and hashes</a>; <a href=\"#network-attacks-dos-ddos-mitm-replay-port-scanning\">Unit 1 spoofing and cache attacks</a>.",
+ "sections": [
+  {
+   "h3": "DNS resolution and cache poisoning",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A stub resolver on your phone asks a recursive resolver, often run by your ISP or a public service. The recursive resolver walks the DNS tree. It asks a root server for .in, asks the .in server for bank.in, and asks bank.in's authoritative server for www.bank.in. Each answer carries a TTL in seconds; the resolver may cache it until the TTL reaches zero. Caching cuts delay and load, but a cached wrong answer is served to many users."
+    },
+    {
+     "type": "p",
+     "text": "DNS mostly uses UDP port 53. A reply has a 16-bit transaction ID and a source port, but an off-path attacker can guess both and race the real server. An on-path attacker can read the query and spoof a reply. A fake A record for bank.in can send users to an attacker's server. This is cache poisoning or DNS spoofing. DNSSEC does not stop the race. It makes a forged answer detectable, because a forged answer cannot carry a valid signature for the zone."
+    }
+   ]
+  },
+  {
+   "h3": "DNSSEC records and the chain of trust",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "DNSSEC signs resource record sets (RRsets), not single records. An RRset is all records of one name and type. The zone owner creates a public/private key pair. The private key signs the RRset. The public key is published in a DNSKEY record. The signature is published in an RRSIG record. The RRSIG identifies the signer, the key tag, the inception time and the expiration time. A validator checks the signature over the canonical RRset. The signature proves origin and integrity; it does not encrypt the RRset."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Record",
+      "Where it lives",
+      "Job"
+     ],
+     "rows": [
+      [
+       "DNSKEY",
+       "child zone",
+       "public key that verifies RRSIG"
+      ],
+      [
+       "DS",
+       "parent zone",
+       "hash of child DNSKEY"
+      ],
+      [
+       "RRSIG",
+       "with signed RRset",
+       "signature over that RRset"
+      ],
+      [
+       "NSEC/NSEC3",
+       "signed zone",
+       "proves a name does not exist"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Trust starts at a trust anchor: the root zone's public key, configured in the validating resolver. The root publishes a DS record for .in. That DS is a hash of .in's DNSKEY. The .in zone publishes a DS for bank.in; bank.in publishes its DNSKEY; bank.in signs the www A record with its private key. A validator builds a chain: root DNSKEY → DS for .in → DNSKEY for .in → DS for bank.in → DNSKEY for bank.in → RRSIG on www A. If any link fails, the answer is bogus."
+    },
+    {
+     "type": "p",
+     "text": "A signing resolver or authoritative server holds private keys and adds signatures. A validating resolver holds only public trust anchors and checks signatures; it does not sign. A non-validating resolver just caches. NSEC and NSEC3 records are themselves signed, so the zone can prove that a name does not exist. An attacker cannot invent a not-found answer, because it would need a valid signature from the zone. NSEC3 hashes names and is an advanced option."
+    }
+   ]
+  },
+  {
+   "h3": "What DNSSEC protects and what it does not",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "DNSSEC gives data integrity and origin authentication for DNS answers. A validating resolver accepts a signed answer only if the chain is valid and the RRSIG is inside its validity time. For a signed zone, the resolver rejects an unsigned or altered answer as bogus. For a zone with no DS in its parent, the answer is marked insecure and accepted, because nothing in the chain says that zone is signed. This stops cache poisoning from redirecting bank.in to 6.6.6.6. It also stops an attacker from replaying an old signed answer after the RRSIG expires, because the expiration time is part of the signed data."
+    },
+    {
+     "type": "p",
+     "text": "DNSSEC does not give confidentiality. Queries and answers still travel in plaintext unless a separate protocol such as DNS over HTTPS (DoH) or DNS over TLS (DoT) wraps them. DNSSEC does not hide which names you look up; an observer still sees the query. It does not protect the web server after the lookup: a valid A record can point to a server with a weak TLS setup. It also does not sign every operational detail; it signs RRsets in signed zones. For a bank, DNSSEC plus HTTPS is stronger than either alone."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The root is the trust anchor and signs the DS for .in; .in signs the DS for bank.in; bank.in signs the www A record. A validating resolver follows this chain before accepting 203.0.113.7 and rejects an unsigned 6.6.6.6 reply.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "aria": "A DNSSEC tree from root through .in and bank.in to the signed www record, showing the chain of trust.",
+   "root": {
+    "label": "Root",
+    "note": "KSK",
+    "style": "accent",
+    "children": [
+     {
+      "label": ".in",
+      "note": "DNSKEY",
+      "edge": "delegation",
+      "style": "normal",
+      "children": [
+       {
+        "label": "bank.in",
+        "note": "DNSKEY",
+        "edge": "delegation",
+        "style": "normal",
+        "children": [
+         {
+          "label": "www",
+          "note": "A + RRSIG",
+          "edge": "signed",
+          "style": "live",
+          "_d": 3,
+          "children": [],
+          "_x": 360.0,
+          "_y": 264
+         }
+        ],
+        "_d": 2,
+        "_x": 360.0,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 360.0,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   }
+  }
+ },
+ "examples": [
+  {
+   "question": "At time t = 0 s, a validating resolver receives two replies for www.bank.in. Reply A: A 203.0.113.7 with a valid RRSIG and TTL = 300 s. Reply B: A 6.6.6.6 with no RRSIG. The resolver caches only validated answers. (a) Which reply is accepted? (b) At t = 240 s, how many seconds remain before the accepted cached answer expires? (c) What happens at t = 300 s?",
+   "steps": [
+    "Validate Reply A: the RRSIG on the A RRset checks under the bank.in DNSKEY, and the DS from .in links that DNSKEY to the root chain. Accept 203.0.113.7.",
+    "Validate Reply B: it has no RRSIG, so it has no chain to the root. Mark 6.6.6.6 as bogus and discard it.",
+    "TTL = 300 s. At t = 240 s, elapsed time = 240 s. Remaining time = 300 - 240 = 60 s. The cache time is min(TTL, RRSIG expiration time minus now). Here the RRSIG is valid for long enough, so the TTL of 300 s decides.",
+    "At t = 300 s, remaining time = 300 - 300 = 0 s. The cache entry expires, so the resolver queries again and validates a fresh answer."
+   ],
+   "answer": "Accept 203.0.113.7; at t = 240 s, 60 s remain; at t = 300 s the cache entry expires and the resolver re-queries.",
+   "check": "ttl_s = 300\nelapsed_s = 240\nremaining_s = max(0, ttl_s - elapsed_s)\nprint(remaining_s)",
+   "values": [
+    60
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "DNSSEC gives integrity and origin authentication, not confidentiality. It does not encrypt queries or answers.",
+  "An RRSIG on a DNS A record is not a TLS certificate. It signs DNS data, not the web server's HTTPS key.",
+  "The DS record lives in the parent zone and the DNSKEY lives in the child zone. Swapping them breaks the chain.",
+  "A correctly signed but expired RRSIG is bogus. The validator checks the expiration time, not only the signature math.",
+  "NSEC proves non-existence but can allow zone walking; NSEC3 hashes names. NSEC3 details are advanced for most syllabi."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does an RRSIG record contain?",
+   "marks": 2,
+   "a": "A digital signature over an RRset, plus metadata such as the signer name, key tag, inception time and expiration time."
+  },
+  {
+   "level": "understand",
+   "q": "Why does DNSSEC need a chain of trust from the root?",
+   "marks": 3,
+   "a": "A validator must link a zone's DNSKEY to a configured trust anchor. The parent DS hashes the child DNSKEY, so each delegation is authenticated up to the root."
+  },
+  {
+   "level": "apply",
+   "q": "A signed A record has TTL = 600 s and is cached at t = 0 s. At t = 450 s, how many seconds remain before it expires?",
+   "marks": 3,
+   "a": "Remaining = 600 - 450 = 150 s."
+  },
+  {
+   "level": "analyze",
+   "q": "An attacker sends a validating resolver an unsigned A record for bank.in. Why is it rejected?",
+   "marks": 4,
+   "a": "bank.in is a signed zone: the .in zone publishes a DS for it, so the resolver expects a valid RRSIG. The unsigned record has no RRSIG to check under bank.in's DNSKEY and no chain to the root, so it is bogus and is discarded."
+  },
+  {
+   "level": "remember",
+   "q": "Which record in the parent zone delegates trust to a child zone?",
+   "marks": 2,
+   "a": "The DS record."
+  },
+  {
+   "level": "understand",
+   "q": "Does DNSSEC hide which domain names a user queries?",
+   "marks": 3,
+   "a": "No. DNSSEC signs answers but does not encrypt queries. An observer can still see the queried name unless DoH or DoT is used."
+  },
+  {
+   "level": "apply",
+   "q": "An RRSIG has inception 10:00 and expiration 11:00. A validator checks at 10:30 and again at 11:05. What is the result each time?",
+   "marks": 4,
+   "a": "At 10:30 the time is inside the validity window, so the signature can validate. At 11:05 it is past expiration, so the answer is bogus."
+  }
+ ],
+ "beyond": "Not for the exam. DNSSEC operation at scale needs automated key rollover, because a zone that forgets to re-sign records after expiration goes bogus. The root zone uses a key-signing key ceremony with witnesses and hardware security modules; search root KSK ceremony. Multi-signer DNSSEC lets several operators sign one zone. NSEC3 parameter choices, DoH and DoT, and DNSSEC with quantum-safe signatures are active areas. Start with RFC 4033, 4034 and 4035, then read your resolver's DNSSEC validation test page."
+}

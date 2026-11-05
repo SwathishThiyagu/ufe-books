@@ -1,0 +1,255 @@
+{
+ "lead": "Authentication proves that a person or a device is who it claims to be. The system checks something you know (a password), something you have (a phone or token), or something you are (a fingerprint). Passwords alone are weak: people reuse them and servers leak them, so servers store salted slow hashes and demand a fresh random challenge at every login. Multi-factor authentication combines two or more kinds of proof. Bank apps, UPI payments and office VPNs all use these checks.",
+ "prereq": "You need hash functions and MACs (Unit 4, Public Key Cryptography and Hashing), plus replay and phishing attacks (Unit 1, Foundations).",
+ "sections": [
+  {
+   "h3": "Entity authentication and the three factors",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Entity authentication proves that a live party is who it claims to be, right now, in this session. Message authentication proves that one specific message came from the claimed sender and was not altered; MACs and digital signatures do that job (Unit 4). A login screen performs entity authentication; every request after login should carry message authentication."
+    },
+    {
+     "type": "p",
+     "text": "Proof comes from one of three categories, called factors. Knowledge: something you know, such as a password or PIN. Possession: something you hold, such as a phone or smart card. Inherence: something you are, such as a fingerprint. Two secrets from the same category still count as one factor."
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi call this topic user authentication; the names cover the same material."
+    }
+   ]
+  },
+  {
+   "h3": "Storing passwords: salt and slow hashes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A server never stores plaintext passwords: one leaked database exposes every account, and reuse spreads the damage. A fast hash such as SHA-256 is not enough either, because the attacker hashes a wordlist once or uses precomputed tables."
+    },
+    {
+     "type": "p",
+     "text": "A salt is a random value generated per user and stored in plain view beside the hash. The server keeps (salt, H(salt ‖ password)), where H is a hash function and ‖ means concatenation. Two users with the same password get different hashes, so precomputation fails and the attacker must guess separately for each account."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Generate a random 16-byte salt for this user at registration.",
+      "Compute h = H(salt ‖ password) with a slow password hash.",
+      "Store the user id, salt, h and algorithm parameters.",
+      "At login, read the salt, recompute h' from the typed password, compare in constant time.",
+      "On failure, return the same error whether the user exists or not."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Three slow hashes dominate: bcrypt, PBKDF2 and Argon2, each with a tunable work factor. In bcrypt the cost is a power of two, so cost 12 means 2¹² = 4096 rounds of key setup. PBKDF2 takes an iteration count, often several hundred thousand. Argon2 takes memory, iterations and parallelism; being memory-hard it hurts GPU farms. Tune so one login costs about 0.1 to 0.5 s, and raise the parameters as hardware improves."
+    },
+    {
+     "type": "p",
+     "text": "Online guessing hits the server and is stopped by rate limits, exponential backoff and CAPTCHA. Lockout after five failures works, but a permanent lock lets anyone deny service to a user, so lock for a fixed time. Offline guessing happens after a leak and is limited only by hash cost and password length."
+    }
+   ]
+  },
+  {
+   "h3": "Challenge-response: the fresh nonce",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "If the client sends the stored password hash to log in, that hash is a password equivalent: an attacker who records one login can replay it. A challenge-response exchange removes this. The server sends a fresh random number and the client's answer depends on it."
+    },
+    {
+     "type": "formula",
+     "text": "Answer = H(password ‖ R)",
+     "where": "H is a hash function such as SHA-256, password is the shared secret, R is the server's random nonce, at least 128 bits, and ‖ means concatenation. The answer differs at every login because R differs."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The client sends the login name and a request id, so two logins never share a nonce.",
+      "The server picks R from a cryptographic random generator and ties it to that session.",
+      "The client computes H(password ‖ R) and sends the answer.",
+      "The server recomputes the expected answer, compares, then discards R."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Replay fails on freshness. Suppose R = 913. An attacker holds H(password ‖ 512) from an earlier session and sends it; the server computes H(password ‖ 913), sees a mismatch and rejects. With a MAC the answer is MAC_K(R), where K is a key derived from the password."
+    },
+    {
+     "type": "p",
+     "text": "The server needs the password in usable form to verify such an answer, so this exchange normally runs inside TLS (see <a href=\"#ssl-tls-https-and-ssh\">5.4</a>). PAKE protocols such as SPAKE2 and OPAQUE avoid that need; FIDO2 keys sign the challenge with a private key instead."
+    }
+   ]
+  },
+  {
+   "h3": "Multi-factor: OTP, TOTP and hardware tokens",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An OTP (one-time password) is valid once and expires in minutes. Sent by SMS it is weak, because SIM swap and network interception exist, but it is still better than a password alone. An app-based TOTP avoids the SMS channel entirely."
+    },
+    {
+     "type": "formula",
+     "text": "T = ⌊t / 30⌋,  code = Truncate(HMAC(K, T)) mod 10⁶",
+     "where": "t is Unix time in seconds, 30 is the time step in seconds, T is the step counter, K is the shared seed, HMAC uses SHA-1 or SHA-256, and truncation keeps 31 bits so the six-digit code is the remainder modulo 10⁶."
+    },
+    {
+     "type": "p",
+     "text": "The server accepts the current step and usually one step either side for clock drift, and refuses a code already accepted in that window. The code space is only 10⁶, about 2²⁰, so rate-limiting the verification endpoint matters as much as the number of digits."
+    },
+    {
+     "type": "p",
+     "text": "Hardware tokens and passkeys (FIDO2, WebAuthn) keep a private key inside the device and sign the server's challenge. The key never leaves the device and the signature is bound to the site's origin, so a phishing copy of the page gains nothing. Only a few syllabi go into those internals."
+    },
+    {
+     "type": "p",
+     "text": "2FA means exactly two factors from different categories; MFA means two or more. Password plus OTP is 2FA. Password plus a security question is one factor asked twice. Step-up authentication adds a factor when risk rises: browse with a password, but demand an OTP to add a payee or move a large amount."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The server sends a fresh nonce 913, the client answers with a hash of the password and that nonce, and the server accepts. An answer recorded under another nonce is useless here.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A client logs in, receives nonce 913, returns a hash of the password and nonce, and the server accepts.",
+   "actors": [
+    "Client",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "login: user"
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "nonce R = 913"
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "H(password‖R)"
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "accept"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A server uses the toy hash H(s) = (sum of ASCII codes of s) mod 1000, chosen only so you can compute it by hand, and the user's password is \"kite\". Today's nonce is R = 913. (a) Compute the client's answer H(password ‖ R). (b) An attacker recorded the answer for an earlier nonce R = 512. Does the server accept it? Give both hash values.",
+   "steps": [
+    "ASCII codes of \"kite\": 107, 105, 116, 101; sum = 429.",
+    "ASCII codes of \"913\": 57, 49, 51; sum = 157.",
+    "H(\"kite913\") = (429 + 157) mod 1000 = 586. The client sends 586.",
+    "ASCII codes of \"512\": 53, 49, 50; sum = 152.",
+    "H(\"kite512\") = (429 + 152) mod 1000 = 581. This is the recorded answer.",
+    "The server expects 586 but receives 581, so the comparison fails and the login is rejected."
+   ],
+   "answer": "The client answers 586, and the replayed 581 is rejected because the fresh nonce 913 changed the expected answer.",
+   "check": "def h(s):\n    return sum(ord(c) for c in s) % 1000\n\npw = \"kite\"\nprint(h(pw + \"913\"))\nprint(h(pw + \"512\"))\n",
+   "values": [
+    586,
+    581
+   ],
+   "dry_run": {
+    "head": [
+     "part",
+     "ASCII sum",
+     "running total mod 1000"
+    ],
+    "rows": [
+     [
+      "kite",
+      "429",
+      "429"
+     ],
+     [
+      "913",
+      "157",
+      "586"
+     ],
+     [
+      "512",
+      "152",
+      "581"
+     ]
+    ]
+   },
+   "output": ""
+  },
+  {
+   "question": "A TOTP app uses a 30 s time step. At Unix time t = 1799 s, which step counter T does the client use?",
+   "steps": [
+    "Divide the time by the step: 1799 / 30 = 59.97.",
+    "Take the floor: T = ⌊59.97⌋ = 59.",
+    "The next step starts at t = 60 × 30 = 1800 s, so at 1799 s the counter is still 59."
+   ],
+   "answer": "The client uses step counter T = 59.",
+   "check": "import math\nprint(math.floor(1799 / 30))\n",
+   "values": [
+    59
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Sending H(password) with no fresh challenge makes the hash a password equivalent; a recorded answer logs in again.",
+  "Password plus OTP is 2FA; password plus security question is one factor counted twice. Two passwords are never two factors.",
+  "A salt is public and does not slow a targeted guess. It stops precomputation; the slow hash parameters do the slowing.",
+  "A six-digit OTP has only 10⁶ values, about 20 bits. Without rate limiting the endpoint falls to brute force in minutes.",
+  "A permanent lockout is a denial-of-service gift to an attacker. Use short temporary locks with backoff, and compare secrets in constant time."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define entity authentication and message authentication, with one example of each.",
+   "marks": 2,
+   "a": "Entity authentication proves the identity of a live party in the current session, for example a login with password plus OTP. Message authentication proves a given message came from the claimed sender unaltered, for example a MAC on a document."
+  },
+  {
+   "level": "remember",
+   "q": "What is a salt, and where is it stored?",
+   "marks": 2,
+   "a": "A random value generated per user, stored in plain view beside the hash as the pair (salt, H(salt ‖ password)). It makes the same password give different hashes for different users."
+  },
+  {
+   "level": "understand",
+   "q": "Why is plain SHA-256 a poor way to store passwords, and what fixes it?",
+   "marks": 3,
+   "a": "SHA-256 is fast, so an attacker with a leaked file tests billions of candidates per second and precomputed tables cover common passwords. The fix is a per-user salt plus a deliberately slow hash such as bcrypt, PBKDF2 or Argon2, tuned to 0.1 to 0.5 s per login."
+  },
+  {
+   "level": "apply",
+   "q": "Same toy hash H(s) = (sum of ASCII codes of s) mod 1000, password \"kite\", nonce R = 913. Compute the answer the client sends.",
+   "marks": 4,
+   "a": "ASCII of \"kite\" sums to 429, ASCII of \"913\" sums to 157. H = (429 + 157) mod 1000 = 586. The client sends 586."
+  },
+  {
+   "level": "apply",
+   "q": "A TOTP scheme uses a 30 s step. The server accepts the current step and one step either side. At t = 1799 s, which step counters are accepted?",
+   "marks": 3,
+   "a": "Current step T = ⌊1799/30⌋ = 59. The server accepts 58, 59 and 60, and rejects a code already used inside that window."
+  },
+  {
+   "level": "analyze",
+   "q": "A bank sends OTPs by SMS. Give two reasons it is weaker than an app-based TOTP, and one control that reduces the risk.",
+   "marks": 5,
+   "a": "SMS crosses the signalling network, where interception is possible, and the number can be hijacked by SIM swap, so the possession factor passes to the attacker. TOTP codes are computed locally from a seed and never cross the network. Controls: single-use short validity, rate limits on verification, and binding the OTP to the exact amount and payee."
+  },
+  {
+   "level": "analyze",
+   "q": "A site locks an account permanently after five wrong passwords. Explain the security problem and give a better design.",
+   "marks": 4,
+   "a": "Anyone who knows a username can lock the owner out, a denial of service against a legitimate user. Better: temporary lockout with exponential backoff, per-IP and per-account rate limits, CAPTCHA, user alerts, and a recovery path that needs a second factor."
+  }
+ ],
+ "beyond": "Not for the exam. Password-authenticated key exchange (SPAKE2, OPAQUE) lets a client prove knowledge of a password without the server holding a usable password equivalent, and standards bodies now describe it for TLS. FIDO2/WebAuthn passkeys replace the shared secret with a per-site public key pair in a secure element, removing phishing and server-side password files together. NIST SP 800-63B guides current practice: no forced periodic rotation, screening against breach lists, and long passphrases allowed."
+}

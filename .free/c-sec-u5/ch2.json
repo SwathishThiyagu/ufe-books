@@ -1,0 +1,203 @@
+{
+ "lead": "Kerberos is a network authentication protocol built around one trusted server, the Key Distribution Center (KDC). A user proves identity once, and the KDC hands out time-limited encrypted tickets. Each ticket is a small blob that a service can decrypt and trust without calling the KDC or asking for a password, so passwords never travel on the wire. It is used where many users share many servers inside one organisation: campus logins, Active Directory domains, NFS file shares, Hadoop clusters. This chapter follows Kerberos V5, the version still in use.",
+ "prereq": "You need: <a href=\"#user-authentication-passwords-challenge-response-multi-factor\">5.1</a> for challenge–response and freshness, and Unit 3 symmetric encryption for block ciphers and key distribution.",
+ "sections": [
+  {
+   "h3": "Principals, realms and the KDC",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Kerberos starts with a counting problem. If M users must talk to N servers with shared secret keys, every pair needs its own key, so roughly M × N keys must be created and stored. Kerberos adds one trusted third party, the Key Distribution Center (KDC). Each user shares one long-term key with the KDC, and each server shares one long-term key with the KDC. That is M + N keys instead."
+    },
+    {
+     "type": "formula",
+     "text": "keys = M + N",
+     "where": "M is the number of user principals, each sharing one long-term key with the KDC; N is the number of service principals, each sharing one long-term key with the KDC."
+    },
+    {
+     "type": "p",
+     "text": "A principal is any named entity Kerberos authenticates. A user principal looks like alice@CSE.AC.IN. A service principal looks like nfs/host1.cse.ac.in@CSE.AC.IN, with an optional instance after the slash. A realm is the set of principals run by one KDC, written in uppercase, for example CSE.AC.IN. A ticket issued in another realm needs cross-realm trust, which is advanced material."
+    },
+    {
+     "type": "p",
+     "text": "The long-term key comes from the user's password through a string-to-key function, or from a keytab file for a service. The KDC keeps a copy of every principal's long-term key. A session key is a fresh random symmetric key for one client–server conversation, alive only as long as its ticket."
+    },
+    {
+     "type": "p",
+     "text": "The KDC runs two logical services, both on port 88. The Authentication Server (AS) issues the Ticket Granting Ticket (TGT). The Ticket Granting Server (TGS) issues service tickets."
+    }
+   ]
+  },
+  {
+   "h3": "Three exchanges: AS, TGS, AP",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The client talks to the KDC twice and to the server once. Each exchange uses a different key, and each reply is mostly a blob the client cannot read."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "AS-REQ (client → AS): client name, the TGS name, a nonce (a random number used once). When the KDC requires pre-authentication (common policy, not a core V5 requirement), the first request is refused with KDC_ERR_PREAUTH_REQUIRED and the client resends with a pre-authenticator: the current timestamp encrypted under its long-term key.",
+      "AS-REP (AS → client): two parts. Part one is encrypted under the client's long-term key and carries the session key K(c,tgs), the TGT lifetime and the nonce. Part two is the TGT itself, encrypted under the TGS's long-term key, holding the client name, K(c,tgs) and the ticket lifetime.",
+      "The client decrypts part one with its password-derived key, recovers K(c,tgs), and stores the TGT unread.",
+      "TGS-REQ (client → TGS): the TGT, the wanted service name, a nonce, and an authenticator — client name plus current timestamp, encrypted under K(c,tgs).",
+      "TGS-REP (TGS → client): the TGS decrypts the TGT with its own key, recovers K(c,tgs), decrypts the authenticator, and checks the timestamp and its replay cache. It replies with a service ticket encrypted under the server's long-term key and holding K(c,s), plus K(c,s) encrypted under K(c,tgs).",
+      "AP-REQ (client → server): the service ticket plus a fresh authenticator encrypted under K(c,s).",
+      "AP-REP (server → client): the server decrypts the ticket with its own key, gets K(c,s), decrypts the authenticator, and checks timestamp and replay cache. An optional reply carries the authenticator timestamp plus one, encrypted under K(c,s)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The AP-REP gives mutual authentication: only the real server can read K(c,s) and return the incremented timestamp. The ticket is reusable until it expires; the authenticator is made fresh for every request."
+    }
+   ]
+  },
+  {
+   "h3": "Timestamps, clock skew and the opaque TGT",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Kerberos uses time instead of a challenge nonce between client and server. A server accepts an authenticator when |t_client − t_server| ≤ skew, where t_client is the timestamp inside the authenticator, t_server is the server's clock at arrival, and skew is the allowed difference, 5 minutes by default. Outside the window the server returns a clock skew too great error."
+    },
+    {
+     "type": "p",
+     "text": "Replay is the risk. An attacker who copies an AP-REQ can resend it inside the window. Servers keep a replay cache of authenticators seen within the window and drop duplicates. The window also bounds how long that cache must be kept."
+    },
+    {
+     "type": "p",
+     "text": "The client cannot read its TGT because it is encrypted under the TGS's long-term key, which only the KDC knows. The client carries it as an opaque token. This is deliberate: the ticket is self-protecting, so the TGS trusts its contents without a database lookup, and the client cannot change the session key or stretch the lifetime. The client holds K(c,tgs) separately in the readable AS-REP part."
+    },
+    {
+     "type": "p",
+     "text": "Pre-authentication guards the AS exchange. Without it, anyone could send an AS-REQ naming alice, receive a blob encrypted under alice's key, and guess passwords offline. In V5 pre-authentication is an extensible framework, not a core requirement: many KDCs first answer an AS-REQ without a pre-authenticator with KDC_ERR_PREAUTH_REQUIRED, and only the resent request carries the encrypted timestamp. A wrong password fails at once and the attempt can be logged."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The client authenticates once to the AS, then reuses the TGT at the TGS to obtain a service ticket. Each request carries its own authenticator; 10:04 is the stamp in both messages only because both requests happen in the same minute, and the file server checks only the stamp in the AP-REQ authenticator.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A client gets a TGT from the AS, uses it at the TGS for a service ticket, then presents a fresh authenticator to the file server.",
+   "actors": [
+    "Client",
+    "AS",
+    "TGS",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "AS",
+     "label": "AS-REQ alice"
+    },
+    {
+     "from": "AS",
+     "to": "Client",
+     "label": "TGT + K(c,tgs)"
+    },
+    {
+     "from": "Client",
+     "to": "TGS",
+     "label": "TGT, TS=10:04"
+    },
+    {
+     "from": "TGS",
+     "to": "Client",
+     "label": "service ticket"
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "ticket, TS=10:04"
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "AP-REP"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "The file server's clock reads 10:00. The realm's clock skew limit is 5 minutes. (a) The client sends an authenticator stamped 10:04 by its own clock. Is it accepted? (b) A later request carries 10:06. Is it accepted? (c) What is the latest client timestamp the server would still accept?",
+   "steps": [
+    "Convert all times to minutes after midnight. Server: 10 × 60 + 0 = 600 min. First client timestamp: 10 × 60 + 4 = 604 min. Second client timestamp: 10 × 60 + 6 = 606 min.",
+    "Case (a): |t_client − t_server| = |604 − 600| = 4 min.",
+    "Compare with the limit: 4 min ≤ 5 min, so the authenticator is accepted.",
+    "Case (b): |606 − 600| = 6 min.",
+    "6 min > 5 min, so the server rejects it with a clock skew error.",
+    "Case (c): the largest accepted timestamp satisfies t_client − t_server ≤ 5 min, so t_client ≤ 600 + 5 = 605 min = 10:05."
+   ],
+   "answer": "(a) Accepted, the difference is 4 minutes, within the 5-minute limit. (b) Rejected, the difference is 6 minutes. (c) The latest accepted client timestamp is 10:05.",
+   "check": "skew_limit = 5  # minutes\nserver = 10 * 60\nclient_a = 10 * 60 + 4\nclient_b = 10 * 60 + 6\nd1 = abs(client_a - server)\nd2 = abs(client_b - server)\nlatest_offset = skew_limit\nprint(d1)\nprint(d2)\nprint(latest_offset)\nprint(d1 <= skew_limit)\nprint(d2 <= skew_limit)",
+   "values": [
+    4,
+    6,
+    5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The client never reads its own TGT: it is encrypted under the TGS's long-term key. Only the AS-REP part under the client's key is readable.",
+  "A ticket is not an authenticator. The ticket is reusable and encrypted under the target's long-term key; the authenticator is fresh per request and encrypted under the session key.",
+  "The timestamp check is loose in both directions and uses ≤, not <. A timestamp exactly 5 minutes away from the server clock is still accepted.",
+  "Ticket lifetime and clock skew are different numbers. Skew is about unsynchronised clocks; lifetime is about how long the ticket stays valid.",
+  "Pre-authentication is not the same as mutual authentication. Pre-auth protects the AS exchange from offline password guessing; the AP-REP proves the server knows the session key."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define principal and realm in Kerberos V5.",
+   "marks": 2,
+   "a": "A principal is any named entity Kerberos can authenticate, such as alice@CSE.AC.IN or nfs/host1@CSE.AC.IN. A realm is the set of principals administered by one KDC, written in uppercase, for example CSE.AC.IN."
+  },
+  {
+   "level": "remember",
+   "q": "Name the two services inside the KDC and say what each one issues.",
+   "marks": 2,
+   "a": "The Authentication Server (AS) issues the Ticket Granting Ticket (TGT). The Ticket Granting Server (TGS) issues service tickets for individual servers."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the AS-REP contain two parts encrypted under different keys?",
+   "marks": 3,
+   "a": "One part is encrypted under the client's long-term key so only the client can read K(c,tgs) and the nonce. The other part is the TGT, encrypted under the TGS's long-term key so only the TGS can read the client name and session key. Two recipients, two keys."
+  },
+  {
+   "level": "understand",
+   "q": "Why can the client not read its own TGT, and why is that not a problem for the client?",
+   "marks": 3,
+   "a": "The TGT is encrypted under the TGS's long-term key, which the client does not hold. The client does not need to read it; it only forwards the blob to the TGS, and it already received its session key separately in the part encrypted under its own key."
+  },
+  {
+   "level": "apply",
+   "q": "The server clock reads 09:58 and the skew limit is 5 minutes. An authenticator arrives stamped 10:04. Is it accepted?",
+   "marks": 4,
+   "a": "Server = 598 min, client = 604 min. |604 − 598| = 6 min. 6 > 5, so the server rejects it with a clock skew error."
+  },
+  {
+   "level": "apply",
+   "q": "Which key encrypts the service ticket in the TGS-REP, and which key encrypts the authenticator in the AP-REQ?",
+   "marks": 4,
+   "a": "The service ticket is encrypted under the server's long-term key so only that server can open it. The authenticator in the AP-REQ is encrypted under the client–server session key K(c,s) taken from the ticket."
+  },
+  {
+   "level": "analyze",
+   "q": "What attack does pre-authentication prevent, and why does the defence work?",
+   "marks": 5,
+   "a": "Without pre-authentication anyone can send an AS-REQ for a named user and receive a blob encrypted under that user's password-derived key, then guess passwords offline at high speed. Requiring the client to encrypt a timestamp under its key first means a wrong password produces a blob the KDC cannot decrypt, so the AS fails the request at once and can log or rate-limit the attempt."
+  },
+  {
+   "level": "analyze",
+   "q": "An attacker gains full control of the KDC. What can the attacker do, and what limits the damage?",
+   "marks": 6,
+   "a": "The KDC holds every principal's long-term key, so the attacker can forge TGTs and service tickets for any user or server, and impersonate the TGS. The real bounds: already-issued tickets expire; short lifetimes limit abuse. The attacker must stay hidden or re-forge after expiry. Recovery works by rotating keys — the krbtgt key and every principal's key — which invalidates everything the attacker minted. Detection and hardening are the practical controls."
+  }
+ ],
+ "beyond": "Not for the exam. Real deployments rarely stop at plain V5: Active Directory, Hadoop and NFS all run Kerberos underneath, with extensions layered on top. Public-key Kerberos lets a client authenticate with a certificate instead of a password-derived key, and cross-realm referrals let one realm's KDC point a client to another realm's KDC. Armoring wraps the AS exchange in a protected tunnel to defeat offline dictionary attacks on weak passwords, and constrained delegation lets a service act for a user only towards named targets. Search for the Kerberos V5 specification (RFC 4120), PKINIT, and Kerberos delegation if you meet this in industry."
+}
