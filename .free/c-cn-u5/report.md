@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-cn/c-cn-u5.html`
 - Status: ok
-- Model calls so far: 31 (103,724 tokens in, 97,143 out), 4.2 minutes
+- Model calls so far: 35 (118,575 tokens in, 112,560 out), 7.6 minutes
 
 ## Checker
 
 ```
-c-cn-u5.html: 8 chapters, 10500 words, 9 figures, 131 KB
+c-cn-u5.html: 8 chapters, 10544 words, 9 figures, 134 KB
 OK
 ```
 
@@ -22,7 +22,7 @@ OK
 compilation terminated.
 - chapter 3: a c program's shown output was replaced by its real output; check the text around it
 - chapter 6: a c program's shown output was replaced by its real output; check the text around it
-- chapter 8: the reviewer found 5 serious problem(s) and the revision did not pass the checks; read the review in the state folder
+- chapter 8: a c program does not run (compile error: /tmp/tmp65kfg118/p.c:1:10: fatal error: netinet/sctp.h: No such f)
 
 ## Reviewer notes (after any revision)
 
@@ -52,10 +52,11 @@ compilation terminated.
 - ch 7 [high] Exam trap Q5 (list of reasons for loss): First reason says "the EF queue is empty, causing packets to be dropped," which is incorrect; an empty queue cannot cause drops.
 - ch 7 [low] Section 3 – core router scheduling description: Statement "Core routers schedule packets using weighted‑fair queuing (WFQ) based on class" may mislead because EF traffic is normally given strict priority, not WFQ.
 - ch 7 [low] Section 1 – delay‑sensitive bullet list: Interactive gaming, which is delay‑sensitive, is omitted from the list.
-- ch 8 [high] Section 1: The term "Association ID" is not defined in the SCTP standard. SCTP uses a 32‑bit Verification Tag, not an Association ID, to identify an association.
-- ch 8 [high] Section 2: The handshake description uses the TCP term "Initial Sequence Number (ISN)". SCTP does not have an ISN; it uses an Initiate Tag.
-- ch 8 [high] Section 2: It states that the COOKIE‑ACK carries the association ID. COOKIE‑ACK only acknowledges the cookie; it does not contain an association identifier.
-- ch 8 [high] Section 2: The description of the cookie says it is a MAC of the client’s IP address, the ISN and a timestamp. The ISN is incorrect; the cookie is computed over the Initiate Tag (and other parameters).
-- ch 8 [high] Quiz Q2: The answer says COOKIE‑ACK carries the secret cookie, which is wrong. The cookie is first sent in INIT‑ACK and then echoed back in COOKIE‑ECHO.
-- ch 8 [low] Code example: The socket is created with SOCK_STREAM, which is less common for SCTP examples and may confuse students who expect SOCK_SEQPACKET.
-- ch 8 [low] Section 1: The sentence "The protocol guarantees that a transmitted chunk arrives intact or is retransmitted" could be misread as guaranteeing no loss at all.
+- ch 8 [high] Section 1, term definition: The term "Association ID" is defined as a 32‑bit identifier assigned by the server after the handshake. SCTP does not have an "Association ID"; the 32‑bit field is the Verification Tag used in the SCTP header.
+- ch 8 [high] Section 2, handshake example: The example uses "ISN" (Initial Sequence Number) for the INIT chunk. SCTP uses an Initial Transmission Sequence Number (Initial TSN), not an ISN.
+- ch 8 [high] Section 2, handshake example: The SERVER → CLIENT line shows "COOKIE‑ACK, assoc‑id = 100". SCTP does not send an association ID; COOKIE‑ACK contains the Verification Tag, not an ID.
+- ch 8 [high] Section 2, cookie description: The cookie is said to contain a MAC of the client’s IP address, the ISN and a timestamp. The correct term is Initial TSN, not ISN.
+- ch 8 [high] Quiz Q2: Answer states that COOKIE‑ACK carries the secret cookie. The cookie is actually sent in INIT‑ACK and echoed back in COOKIE‑ECHO; COOKIE‑ACK only acknowledges receipt.
+- ch 8 [low] C code example: The socket is created with SOCK_STREAM. For SCTP’s message‑oriented usage, SOCK_SEQPACKET is the typical choice.
+- ch 8 [low] Worked example 1: It states a fixed maximum payload of 500 bytes per SCTP data chunk without context, which may mislead students since the actual limit depends on path MTU and protocol overhead.
+- ch 8 [low] Section 1: The Verification Tag, a core SCTP field, is not defined anywhere.

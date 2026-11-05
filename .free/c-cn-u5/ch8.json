@@ -13,7 +13,7 @@
      "type": "bullets",
      "items": [
       "Association – the term for an SCTP connection between two endpoints.",
-      "Association ID – a 32‑bit identifier assigned by the server after the handshake.",
+      "Verification Tag – a 32‑bit value placed in the SCTP header to identify the association and protect against stale packets.",
       "Stream – an ordered sub‑channel inside an association; each stream has its own sequence numbers.",
       "Multi‑homing – each endpoint may advertise several IP addresses; the association can switch to a backup address if the primary fails."
      ]
@@ -29,20 +29,20 @@
    "blocks": [
     {
      "type": "p",
-     "text": "SCTP does not use the three‑way handshake of TCP. Instead it performs a four‑step handshake that protects the server from SYN‑flood attacks. The client first sends an <code>INIT</code> chunk containing its Initial Sequence Number (ISN). The server replies with <code>INIT‑ACK</code> and a secret <i>cookie</i>. The client returns the cookie in a <code>COOKIE‑ECHO</code> chunk. If the cookie is valid, the server sends <code>COOKIE‑ACK</code> together with the association ID. After this exchange the association is established and data may be sent."
+     "text": "SCTP does not use the three‑way handshake of TCP. Instead it performs a four‑step handshake that protects the server from SYN‑flood attacks. The client first sends an <code>INIT</code> chunk containing its Initial Transmission Sequence Number (Initial TSN). The server replies with <code>INIT‑ACK</code> and a secret <i>cookie</i>. The client returns the cookie in a <code>COOKIE‑ECHO</code> chunk. If the cookie is valid, the server sends <code>COOKIE‑ACK</code> together with the Verification Tag. After this exchange the association is established and data may be sent."
     },
     {
      "type": "steps",
      "items": [
-      "Client → Server: <code>INIT, ISN = 5000</code>",
+      "Client → Server: <code>INIT, Initial TSN = 5000</code>",
       "Server → Client: <code>INIT‑ACK, cookie = 0x9A</code>",
       "Client → Server: <code>COOKIE‑ECHO, cookie = 0x9A</code>",
-      "Server → Client: <code>COOKIE‑ACK, assoc‑id = 100</code>"
+      "Server → Client: <code>COOKIE‑ACK, Verification Tag = 0x1A2B3C4D</code>"
      ]
     },
     {
      "type": "p",
-     "text": "The cookie contains a cryptographic MAC of the client’s IP address, the ISN and a timestamp. The server does not allocate resources until the cookie is returned, which prevents it from being overwhelmed by bogus <code>INIT</code> requests."
+     "text": "The cookie contains a cryptographic MAC of the client’s IP address, the Initial TSN and a timestamp. The server does not allocate resources until the cookie is returned, which prevents it from being overwhelmed by bogus <code>INIT</code> requests."
     }
    ]
   },
@@ -67,9 +67,13 @@
     {
      "type": "code",
      "lang": "c",
-     "code": "#include <netinet/sctp.h>\n#include <stdio.h>\n#include <string.h>\nint main() {\n    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);\n    struct sockaddr_in serv = {0};\n    serv.sin_family = AF_INET;\n    serv.sin_port   = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"192.0.2.10\");\n    sctp_initmsg initmsg = {0};\n    initmsg.sinit_num_ostreams = 4;   // four streams\n    initmsg.sinit_max_instreams = 4;\n    setsockopt(sock, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg));\n    connect(sock, (struct sockaddr *)&serv, sizeof(serv));\n    const char *msg = \"Hello\";\n    sctp_sendmsg(sock, msg, strlen(msg), NULL, 0, 0, 0, 1, 0, 0);\n    printf(\"Sent on stream 1\\n\");\n    return 0;\n}\n",
+     "code": "#include <netinet/sctp.h>\n#include <arpa/inet.h>\n#include <stdio.h>\n#include <string.h>\n\nint main() {\n    int sock = socket(AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP);\n    struct sockaddr_in serv = {0};\n    serv.sin_family = AF_INET;\n    serv.sin_port   = htons(5000);\n    serv.sin_addr.s_addr = inet_addr(\"192.0.2.10\");\n\n    struct sctp_initmsg initmsg = {0};\n    initmsg.sinit_num_ostreams = 4;   // four outbound streams\n    initmsg.sinit_max_instreams = 4; // four inbound streams\n    setsockopt(sock, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg));\n\n    connect(sock, (struct sockaddr *)&serv, sizeof(serv));\n    const char *msg = \"Hello\";\n    sctp_sendmsg(sock, msg, strlen(msg), NULL, 0, 0, 0, 1, 0, 0);\n    printf(\"Sent on stream 1\\n\");\n    return 0;\n}\n",
      "stdin": "",
      "output": "Sent on stream 1"
+    },
+    {
+     "type": "p",
+     "text": "Note: The 500 byte payload limit used in examples is only illustrative. Real maximum payload size depends on the path MTU minus SCTP and IP header overhead."
     }
    ]
   }
@@ -88,7 +92,7 @@
     {
      "from": "Client",
      "to": "Server",
-     "label": "INIT, ISN=5000",
+     "label": "INIT, Initial TSN=5000",
      "dashed": false
     },
     {
@@ -106,7 +110,7 @@
     {
      "from": "Server",
      "to": "Client",
-     "label": "COOKIE‑ACK, assoc‑id=100",
+     "label": "COOKIE‑ACK, Verification Tag=0x1A2B3C4D",
      "dashed": false
     },
     {
@@ -167,7 +171,7 @@
  "traps": [
   "Assuming SCTP provides a single ordered stream like TCP; forgetting that each stream has independent ordering leads to wrong head‑of‑line blocking analysis.",
   "Treating the cookie as a permanent secret; it is generated per association and expires after a timeout.",
-  "Confusing the association ID with a port number; the ID is assigned after the handshake and is not used for demultiplexing on the host."
+  "Confusing the Verification Tag with a port number; the Tag is used only inside SCTP packets and is not part of the host's socket address."
  ],
  "quiz": [
   {
@@ -180,7 +184,7 @@
    "level": "remember",
    "q": "Which SCTP chunk carries the secret value used to verify the client during the handshake?",
    "marks": 2,
-   "a": "COOKIE‑ACK (the cookie is sent earlier in INIT‑ACK and echoed back in COOKIE‑ECHO)."
+   "a": "INIT‑ACK (contains the cookie) and COOKIE‑ECHO (echoes the cookie)."
   },
   {
    "level": "understand",
