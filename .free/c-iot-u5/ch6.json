@@ -1,0 +1,299 @@
+{
+ "lead": "Software defined networking (SDN) takes the decisions about where packets should go out of the network devices and puts them in one program called the controller. The devices only forward. IoT sites need this because they have many cheap gateways that cannot run full routing software, and because a site manager wants to change paths and policies for all of them from one place. SDN is used in campus and data-centre networks, in telecom backhaul, and now in sensor gateways and fog nodes.",
+ "prereq": "You need: Unit 3 network layer basics (packets, addressing, routing), <a href=\"#cloud-computing-for-iot-and-sensor-clouds\">Chapter 5.1</a> for the cloud side, and <a href=\"#web-of-things-and-iot-middleware\">Chapter 5.5</a> for where middleware sits.",
+ "sections": [
+  {
+   "h3": "Control plane, data plane, and why to split them",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In an ordinary router two jobs sit in the same box. The control plane works out where packets should go: it runs routing protocols, builds a map of the network, and picks paths. The data plane does the fast, simple part: it looks at each arriving packet and sends it out of a port."
+    },
+    {
+     "type": "p",
+     "text": "SDN separates them. The control plane moves to one program, the SDN controller, which sees the whole network as a graph. The forwarding devices keep only the data plane. They hold no routing intelligence; they hold a table of rules handed to them."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Application plane: programs that state intent, for example \"alerts from the wards must reach the cloud even when the video feed is busy\".",
+      "Control plane: the controller, which turns that intent into rules.",
+      "Data plane: the gateways, which only match and forward."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two interfaces join the planes. The northbound API sits between the application plane and the controller, usually a REST API, and it is what a programmer writes against. The southbound API sits between the controller and the devices; OpenFlow is the best-known one. The controller speaks southbound to every gateway and northbound to every application."
+    },
+    {
+     "type": "p",
+     "text": "Why bother for IoT? A site may have hundreds of cheap gateways that cannot run routing protocols. One controller with a global view programs them all, and the whole site's behaviour changes by editing one program."
+    }
+   ]
+  },
+  {
+   "h3": "Flow tables: match, then act",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A flow is a set of packets that share some header values: same source, same destination, same application. A gateway's flow table has one row per flow, and each row has four parts."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Match: header fields to compare, such as ingress port, source and destination MAC address, EtherType, VLAN id, IP address, and TCP or UDP port.",
+      "Priority: which row wins when several rows match.",
+      "Counters: packets and bytes seen, used for accounting.",
+      "Actions: forward out a port, drop, rewrite a header field, flood, or send the packet to the controller."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Lookup is match-then-act. A packet arrives; the gateway finds the highest-priority row whose match fields all fit the packet; it runs that row's actions. Nothing else is decided locally."
+    },
+    {
+     "type": "p",
+     "text": "A new flow has no row at first. A table-miss entry at priority zero matches everything and sends such packets to the controller. The controller decides, installs a rule, and the packet is forwarded. The first packet takes the slow path; every later packet of that flow matches in the table. Known traffic can also be given static rules in advance."
+    },
+    {
+     "type": "formula",
+     "text": "M = R × s",
+     "where": "M is the rule memory in bytes; R is the number of installed flow rules; s is the storage per rule in bytes, tens of bytes on a small gateway. This memory, not the payload, is the real cost on constrained devices."
+    }
+   ]
+  },
+  {
+   "h3": "What SDN gives IoT, and what it costs",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "Central policy: one place states which sensors may reach which cloud service and blocks the rest. Network rules and security rules live together (see <a href=\"#iot-security-and-privacy\">Chapter 5.4</a>).",
+      "Traffic engineering: when one gateway is congested, the controller moves some flows to its neighbours; the example below computes this.",
+      "Slicing: shared gateways and backhaul are cut into isolated virtual networks, one for hospital devices and one for building fans, each with its own rules and bandwidth. A slice behaves like a private network on shared wires.",
+      "Fast reroute: when a link or gateway dies, the controller installs an alternate path in milliseconds, where classical routing needs seconds to converge.",
+      "Cheaper devices: a gateway needs only a flow table, not a full routing stack. A Raspberry Pi (Unit 4) running Open vSwitch makes a lab for a few thousand rupees."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The limits are equally examinable. Controller scaling is one: a single controller handling thousands of gateways and flow setups per second becomes the bottleneck, so large sites use a hierarchy of controllers. A single controller is a single point of failure; if it dies, no new flow can be set up, though installed rules keep forwarding, which is why controllers are replicated. Latency matters when the controller sits in the cloud, because the first packet of a flow pays a round trip; placing the controller at a fog node reduces it. Finally, 6LoWPAN frames (Unit 3) are tiny, so a full OpenFlow header does not fit, and lightweight southbound protocols are used."
+    },
+    {
+     "type": "p",
+     "text": "In IoT, SDN usually lives in sensor gateways, fog nodes and the backhaul between site and cloud, not on the battery-powered sensor itself."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The controller pushes flow rules down to five gateways, and the gateways forward sensor data up to the cloud application. The downward links carry rules, not payload.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "aria": "One SDN controller sends flow rules to five IoT gateways, and the gateways forward data to a cloud application.",
+   "nodes": [
+    {
+     "id": "C",
+     "label": "SDN controller",
+     "x": 2,
+     "y": 3,
+     "note": "global view",
+     "style": "accent"
+    },
+    {
+     "id": "G1",
+     "label": "Gateway 1",
+     "x": 0,
+     "y": 1,
+     "note": "28 flows",
+     "style": "live"
+    },
+    {
+     "id": "G2",
+     "label": "Gateway 2",
+     "x": 1,
+     "y": 1,
+     "note": "43 flows",
+     "style": "normal"
+    },
+    {
+     "id": "G3",
+     "label": "Gateway 3",
+     "x": 2,
+     "y": 1,
+     "note": "43 flows",
+     "style": "normal"
+    },
+    {
+     "id": "G4",
+     "label": "Gateway 4",
+     "x": 3,
+     "y": 1,
+     "note": "43 flows",
+     "style": "normal"
+    },
+    {
+     "id": "G5",
+     "label": "Gateway 5",
+     "x": 4,
+     "y": 1,
+     "note": "43 flows",
+     "style": "normal"
+    },
+    {
+     "id": "A",
+     "label": "Cloud app",
+     "x": 2,
+     "y": 0,
+     "note": "traffic policy",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "C",
+     "to": "G1",
+     "label": "flow rules",
+     "style": "dashed"
+    },
+    {
+     "from": "C",
+     "to": "G2",
+     "label": "flow rules",
+     "style": "dashed"
+    },
+    {
+     "from": "C",
+     "to": "G3",
+     "label": "flow rules",
+     "style": "dashed"
+    },
+    {
+     "from": "C",
+     "to": "G4",
+     "label": "flow rules",
+     "style": "dashed"
+    },
+    {
+     "from": "C",
+     "to": "G5",
+     "label": "flow rules",
+     "style": "dashed"
+    },
+    {
+     "from": "G1",
+     "to": "A",
+     "label": "data",
+     "style": "solid"
+    },
+    {
+     "from": "G2",
+     "to": "A",
+     "label": "data",
+     "style": "solid"
+    },
+    {
+     "from": "G3",
+     "to": "A",
+     "label": "data",
+     "style": "solid"
+    },
+    {
+     "from": "G4",
+     "to": "A",
+     "label": "data",
+     "style": "solid"
+    },
+    {
+     "from": "G5",
+     "to": "A",
+     "label": "data",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A site has 200 sensor flows spread over 5 equal gateways. Static routing sends 40 flows to each gateway. The SDN controller moves 30% of the flows of one congested gateway to the other four, equally. Find the final number of flows on each gateway and verify the total.",
+   "steps": [
+    "Initial flows per gateway = 200 ÷ 5 = 40 flows.",
+    "Flows moved out of the congested gateway = 0.30 × 40 = 12 flows.",
+    "Congested gateway after the move = 40 − 12 = 28 flows.",
+    "Flows added to each of the other four gateways = 12 ÷ 4 = 3 flows.",
+    "Each other gateway = 40 + 3 = 43 flows.",
+    "Check the total = 28 + 4 × 43 = 28 + 172 = 200 flows, which matches the original count."
+   ],
+   "answer": "The congested gateway ends with 28 flows and each of the other four gateways ends with 43 flows, totalling 200 flows.",
+   "check": "n = 200\ng = 5\nfrac = 0.30\ninitial = n / g\nmoved = frac * initial\ncongested = initial - moved\nadded = moved / (g - 1)\nother = initial + added\ntotal = congested + (g - 1) * other\nprint(initial)\nprint(moved)\nprint(congested)\nprint(other)\nprint(total)\n",
+   "values": [
+    40.0,
+    12.0,
+    28.0,
+    43.0,
+    200.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Mixing up the planes: the controller decides and the gateway forwards. The controller never carries sensor payload.",
+  "Treating the SDN controller as the cloud application. The application states policy through the northbound API; the controller converts that policy into flow rules.",
+  "Counting flow rules as data. Rules are instructions about handling packets; adding rule bytes to payload throughput is wrong.",
+  "Swapping northbound and southbound. Northbound faces applications (often REST); southbound faces devices (OpenFlow).",
+  "Forgetting the table-miss entry. The favourite question is how the first packet of a new flow is handled: it goes to the controller, which installs a rule, and later packets match in the table."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three planes of an SDN architecture and say what each does in one line.",
+   "marks": 2,
+   "a": "Application plane states policy; control plane (the controller) turns policy into rules; data plane (switches and gateways) matches and forwards packets."
+  },
+  {
+   "level": "remember",
+   "q": "OpenFlow belongs to which API of an SDN controller?",
+   "marks": 2,
+   "a": "The southbound API, the interface between the controller and the forwarding devices."
+  },
+  {
+   "level": "understand",
+   "q": "Why can an IoT gateway be simpler and cheaper when SDN is used?",
+   "marks": 3,
+   "a": "It keeps only the data plane: a flow table with match fields and actions. Routing protocols, topology discovery and path choice move to the controller, so the gateway needs less memory, less CPU and no routing software."
+  },
+  {
+   "level": "understand",
+   "q": "Explain match-then-act lookup in a flow table.",
+   "marks": 3,
+   "a": "The gateway compares the packet's header fields with each row's match fields, takes the highest-priority row that fits entirely, and applies that row's actions such as forward, drop or rewrite. If no row matches, the table-miss entry sends the packet to the controller."
+  },
+  {
+   "level": "apply",
+   "q": "A site has 240 sensor flows over 6 equal gateways. The controller moves 25% of the flows of one congested gateway equally to the other five. Find the final flows per gateway and the total.",
+   "marks": 4,
+   "a": "Initial per gateway = 240 ÷ 6 = 40. Moved = 0.25 × 40 = 10. Congested gateway = 40 − 10 = 30. Added per other gateway = 10 ÷ 5 = 2. Each other gateway = 42. Total = 30 + 5 × 42 = 240 flows."
+  },
+  {
+   "level": "apply",
+   "q": "A small gateway stores 120 flow rules and each rule takes 48 bytes. Find the rule memory M in bytes and in kilobytes (1 KB = 1024 bytes).",
+   "marks": 4,
+   "a": "M = R × s = 120 × 48 = 5760 bytes, which is 5760 ÷ 1024 = 5.625 KB."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare placing the SDN controller in the cloud with placing it at a fog node for a factory with 500 gateways.",
+   "marks": 5,
+   "a": "Cloud placement gives one global controller that is easy to manage and replicate, but every new flow pays a wide-area round trip before it is forwarded, and a WAN failure cuts control. Fog placement cuts setup latency and keeps control local during a WAN outage, but there are many fog controllers to keep consistent and secure. A common answer is a hierarchy: a fog controller per site, a cloud controller above it."
+  },
+  {
+   "level": "analyze",
+   "q": "A campus shares one gateway pool between a hospital block and a hostel block. Explain how network slicing helps, and what could still go wrong.",
+   "marks": 4,
+   "a": "Slicing gives each block its own set of flow rules and reserved bandwidth on the shared gateways, so hostel video streaming cannot starve hospital alerts, and rules can block hostel devices from hospital services. It can still fail if the controller itself is overloaded or lost, or if a rule error in one slice is copied into the other."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, SDN ideas now appear as SD-WAN for branch offices and inside 5G core networks, where network slices are configured by software. Research directions include P4, a language for programming exactly how a switch parses and matches packets, and intent-based networking, where the controller continuously verifies that the network satisfies the stated policy. Lightweight SDN for low-power wireless sensor networks, often called SD-WSN, is an active area, because OpenFlow is too heavy for those links. Useful search terms: SDN architecture, OpenFlow flow table, SD-WAN, P4 language, SDN for wireless sensor networks."
+}
