@@ -1,0 +1,264 @@
+{
+ "lead": "A VR headset must show a new picture every few milliseconds, and the machine behind it must finish all the work for that picture inside that time. That time is the frame budget. A computing architecture for VR is the arrangement of CPU, GPU, memory and network that makes the work fit. Wired PC headsets, untethered headsets and multi-machine VR rooms each use a different arrangement. This chapter covers the two jobs the machine does, how machines are arranged, and the latency chain that decides whether a frame arrives on time.",
+ "prereq": "You need: the rendering pipeline in <a href=\"#graphics-and-rendering-pipeline\">Chapter 4.5</a> and the load-reduction ideas in <a href=\"#level-of-detail-culling-and-large-environments\">Chapter 4.6</a>.",
+ "sections": [
+  {
+   "h3": "Two jobs: scene update and rendering",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every VR frame is two kinds of work, done by two different processors."
+    },
+    {
+     "type": "p",
+     "text": "The <b>CPU</b>, the general-purpose processor, does the <i>scene update</i>. It reads the newest head and hand tracker samples, runs the physics step of <a href=\"#physical-modeling-collision-detection-and-force-computation\">Chapter 4.3</a>, recomputes world transforms from the hierarchy of <a href=\"#kinematics-modeling-transformation-matrices-and-object-hierarchi\">Chapter 4.2</a>, applies behaviour rules, and decides which objects survive culling and level of detail. It ends by handing the GPU a list of draw commands."
+    },
+    {
+     "type": "p",
+     "text": "The <b>GPU</b>, the graphics processor, does the <i>rendering</i>. It runs the pipeline of <a href=\"#graphics-and-rendering-pipeline\">Chapter 4.5</a>: transform vertices, clip, rasterize, shade pixels, once for the left eye and once for the right."
+    },
+    {
+     "type": "p",
+     "text": "The split exists because the two jobs suit different hardware. The CPU runs a few complicated tasks full of decisions and scattered memory access. The GPU runs one simple operation over millions of vertices and pixels at the same time."
+    },
+    {
+     "type": "p",
+     "text": "Stereo adds load but not independence. Both eyes show the same scene, so the scene update is done once and shading twice. That is why VR costs roughly double the drawing work of the same scene on a flat screen."
+    }
+   ]
+  },
+  {
+   "h3": "Workstation-based, distributed and standalone systems",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <b>workstation-based</b> VR system keeps all the work in one desktop machine: a fast CPU, a discrete GPU, and a cable to the headset. It is the simplest arrangement and gives the shortest path from tracker to display, because nothing crosses a network. Design reviews, surgical planning and driving simulators often use it."
+    },
+    {
+     "type": "p",
+     "text": "A <b>distributed</b> VR system spreads the work over several machines. One common pattern is a render server that draws the frame plus a display client that only shows it. Others are one GPU per eye, one PC per wall in a room-scale projection setup, or the physics step on a separate node. Distribution scales past the power of one machine, but every network hop adds delay, and the nodes must be synchronised so both eyes and all walls show the same instant of the scene."
+    },
+    {
+     "type": "p",
+     "text": "A <b>standalone</b> headset goes the other way: one system-on-chip with a mobile GPU and shared memory. It is designed for watts and heat, not peak speed, so the scene is simplified to fit the power budget."
+    },
+    {
+     "type": "p",
+     "text": "Inside any of these, <b>parallel processing</b> fills the frame. Several CPU cores take physics, culling and scripting at once, and the GPU shades millions of pixels per frame, thousands at a time per pass, or splits the screen into tiles."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Arrangement",
+      "Where the compute sits",
+      "Strength",
+      "Cost"
+     ],
+     "rows": [
+      [
+       "Workstation",
+       "one desktop, wired to headset",
+       "lowest latency",
+       "fixed to one room"
+      ],
+      [
+       "Distributed",
+       "several networked machines",
+       "scales past one machine",
+       "network delay, sync needed"
+      ],
+      [
+       "Standalone",
+       "one system-on-chip",
+       "untethered",
+       "tight power and heat limit"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Frame budget and motion-to-photon latency",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The <b>frame budget</b> is the time allowed for one frame."
+    },
+    {
+     "type": "formula",
+     "text": "B = 1000 ÷ f",
+     "where": "B is the frame budget in milliseconds; f is the display refresh rate in hertz, which is the same number as frames per second."
+    },
+    {
+     "type": "p",
+     "text": "At 90 Hz the budget is 11.1 ms. At 120 Hz it is 8.3 ms."
+    },
+    {
+     "type": "p",
+     "text": "The stages run in series: tracker sample, CPU scene update, GPU render, then display scan-out and pixel response. Their sum is the <b>motion-to-photon latency</b>, the delay from a real head movement to the photons leaving the screen. When that sum is larger than B, the frame misses its slot, and the user sees judder plus a lag between head and image."
+    },
+    {
+     "type": "p",
+     "text": "Three ideas buy time. <i>Pipelining</i>: while the GPU draws frame n, the CPU prepares frame n+1, so the stages overlap. <i>Late latching and reprojection</i>: sample the tracker as late as possible, and if a frame is late, warp the previous image with the newest orientation instead of drawing from scratch. <i>Load reduction</i>: culling, level of detail and cheaper shading."
+    },
+    {
+     "type": "p",
+     "text": "With no overlap the frames come out one after another, and the sustained rate is f_max = 1000 ÷ T, where T is the whole chain in milliseconds. With pipelining the stages overlap, so the display can be fed once every slowest-stage time. In the chain below the slowest stage is the GPU at 5 ms, so a pipelined system can feed the panel at up to 200 Hz. Each image is still 12 ms old. At 90 Hz the panel is therefore fed on time, and the cost appears as about 12 ms of lag, not as a fall to 83 frames per second."
+    },
+    {
+     "type": "p",
+     "text": "Parallelism cannot beat one limit. The display refreshes on its own clock, so scan-out time is fixed, and a frame that is not ready when the scan begins waits for the next refresh."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The series chain for one frame: 2 ms tracking, 3 ms CPU update, 5 ms GPU render and 2 ms display add to 12 ms, more than the 11.1 ms a 90 Hz display allows.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Latency chain",
+   "nodes": [
+    {
+     "id": "tr",
+     "label": "Tracker",
+     "note": "2 ms",
+     "style": "normal"
+    },
+    {
+     "id": "cpu",
+     "label": "CPU update",
+     "note": "3 ms",
+     "style": "normal"
+    },
+    {
+     "id": "gpu",
+     "label": "GPU render",
+     "note": "5 ms",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Display",
+     "note": "2 ms",
+     "style": "normal"
+    },
+    {
+     "id": "tot",
+     "label": "Total",
+     "note": "12 ms",
+     "style": "accent"
+    },
+    {
+     "id": "bud",
+     "label": "90 Hz budget",
+     "note": "11.1 ms",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "tr",
+     "to": "cpu",
+     "style": "solid"
+    },
+    {
+     "from": "cpu",
+     "to": "gpu",
+     "style": "solid"
+    },
+    {
+     "from": "gpu",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "tot",
+     "style": "solid"
+    },
+    {
+     "from": "tot",
+     "to": "bud",
+     "label": "exceeds",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Serial latency chain of 2 milliseconds tracking, 3 milliseconds CPU update, 5 milliseconds GPU render and 2 milliseconds display, giving 12 milliseconds total, which exceeds an 11.1 millisecond 90 hertz budget."
+  }
+ },
+ "examples": [
+  {
+   "question": "A VR system targets 90 Hz. One frame takes 2 ms of tracking, 3 ms of CPU scene update, 5 ms of GPU rendering and 2 ms of display scan-out and response. Does it meet its frame budget? What is the highest sustained frame rate, without and with pipelining?",
+   "steps": [
+    "Budget: B = 1000 ÷ f = 1000 ÷ 90 = 11.1 ms per frame.",
+    "Total latency: T = 2 + 3 + 5 + 2 = 12 ms.",
+    "Compare: 12 ms > 11.1 ms, so a frame misses its slot by 12 − 11.1 = 0.9 ms.",
+    "No overlap: f_max = 1000 ÷ T = 1000 ÷ 12 = 83.3 frames per second.",
+    "Pipelined: stages overlap, so frames leave at the slowest-stage rate, the GPU's 5 ms, i.e. up to 200 Hz. Each image is still 12 ms old."
+   ],
+   "answer": "In a series chain it misses the budget: 12 ms against 11.1 ms, sustaining only 83.3 frames per second. Pipelined, it can feed the 90 Hz panel on time at up to 200 Hz, but every image lags by 12 ms.",
+   "check": "f = 90\nt_tr, t_cpu, t_gpu, t_disp = 2, 3, 5, 2\nbudget = 1000 / f\ntotal = t_tr + t_cpu + t_gpu + t_disp\nseries_rate = 1000 / total\npipe_rate = 1000 / max(t_tr, t_cpu, t_gpu, t_disp)\nprint(round(budget, 1))\nprint(round(total, 1))\nprint(round(series_rate, 1))\nprint(round(pipe_rate, 1))\n",
+   "values": [
+    11.1,
+    12.0,
+    83.3,
+    200.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Unit slip: 90 Hz gives about 11.1 ms per frame, not 90 ms. Convert hertz to milliseconds with 1000 ÷ f.",
+  "Latency is not frame rate. Pipelining raises the frame rate without shortening any single frame's delay from movement to photons.",
+  "Stereo does not double the CPU scene update. The scene is updated once and shaded twice, so the extra cost falls on the GPU.",
+  "Parallel processing does not shorten display scan-out. The panel refreshes on its own clock and that floor stays fixed.",
+  "Distributed rendering does not reduce latency. It adds network delay and needs synchronisation, so it is chosen for scale, not for speed."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define frame budget and write its formula.",
+   "marks": 2,
+   "a": "The time allowed for one frame: B = 1000 ÷ f milliseconds, where f is the refresh rate in hertz."
+  },
+  {
+   "level": "remember",
+   "q": "Name the two processors in a VR computing architecture and the job each does.",
+   "marks": 2,
+   "a": "The CPU does the scene update: tracker input, physics, transforms, culling, draw commands. The GPU renders: vertex transform, clipping, rasterization, shading, once per eye."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the GPU given the shading work and not the CPU?",
+   "marks": 3,
+   "a": "Shading is one short operation repeated over millions of pixels, which suits the GPU's many parallel cores. The CPU is built for a few complex tasks with branches and irregular memory access, which is what the scene update contains."
+  },
+  {
+   "level": "apply",
+   "q": "A headset refreshes at 120 Hz. One frame takes 1.5 ms tracking, 2.5 ms CPU update, 4 ms GPU render and 2 ms display. Does it meet its budget, and what is its maximum sustained frame rate with and without pipelining?",
+   "marks": 4,
+   "a": "Budget = 1000 ÷ 120 = 8.3 ms. Latency = 1.5 + 2.5 + 4 + 2 = 10 ms, so the series chain misses by 1.7 ms and sustains 1000 ÷ 10 = 100 frames per second. Pipelined, frames leave at the slowest stage, the GPU at 4 ms, up to 250 Hz, so the 120 Hz panel can be fed on time with about 10 ms of lag."
+  },
+  {
+   "level": "analyze",
+   "q": "A lab replaces one workstation with a render server plus a display client on a network. Explain the effect on latency and on the size of scene the lab can run.",
+   "marks": 5,
+   "a": "Scene size can grow, because the render server can be far more powerful than one workstation. Latency grows by the network hop and any compression, and the two machines must be synchronised. If the extra delay pushes the chain past the budget, the lab gains scene size and loses comfort."
+  },
+  {
+   "level": "analyze",
+   "q": "Reprojection warps the previous frame with the newest head orientation instead of drawing a new one. Why does this help, and what goes wrong?",
+   "marks": 4,
+   "a": "It removes much of the perceived lag from head movement, because the image matches the current orientation without waiting for a full render. Moving objects and parallax are wrong, since old positions are reused, and repeated warping blurs edges. It hides a missed frame rather than fixing it."
+  },
+  {
+   "level": "understand",
+   "q": "Why do standalone headsets run simpler scenes than wired workstations?",
+   "marks": 3,
+   "a": "The system-on-chip shares memory with the GPU and works inside a power and heat limit, so peak speed is lower. Scene detail is cut to keep the latency chain inside the frame budget."
+  }
+ ],
+ "beyond": "Not for the exam. Latency work is moving into the headset: asynchronous timewarp and late latching run on the headset's own processor, patching a dropped frame before it reaches the panel. Foveated rendering shades the centre of gaze fully and the edges cheaply, which is a computing-architecture decision as much as a graphics one. Cloud and edge VR stream rendered frames over a network, making network delay the dominant term and pushing research into prediction and compression."
+}

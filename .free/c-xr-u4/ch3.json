@@ -1,0 +1,256 @@
+{
+ "lead": "Physical modeling adds a layer that answers two questions: are two objects touching, and what force results? Collision detection finds contact. Force computation turns that contact into a push, a spring force, or a surface change. In VR this layer lets a hand push a virtual door, a tool press into a soft organ, or a haptic device resist your fingers. The computation must be fast enough for every frame, often within a few milliseconds. This chapter covers the detection stages, bounding volumes, penetration depth, penalty springs, mass-spring surfaces, and force smoothing.",
+ "prereq": "You need: <a href=\"#geometric-modeling-object-shape-and-visual-appearance\">Chapter 4.1</a> for shape data and <a href=\"#kinematics-modeling-transformation-matrices-and-object-hierarchi\">Chapter 4.2</a> for world transforms.",
+ "sections": [
+  {
+   "h3": "Broad phase and narrow phase",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Collision detection runs in two stages. The broad phase is a cheap reject test. It compares simple bounding volumes around each body. A sphere has centre C and radius r. An axis-aligned bounding box (AABB) has edges parallel to the world axes. An oriented bounding box (OBB) rotates with the object, so it fits a long tilted object more tightly. The broad phase may report extra pairs; that is safe. It must not miss a true pair. Spatial hashing and sweep-and-prune are common broad-phase methods."
+    },
+    {
+     "type": "p",
+     "text": "Only pairs that pass broad phase go to narrow phase. Narrow phase uses the real geometry. For two spheres, let C1 and C2 be centres in metres and r1 and r2 be radii in metres. The centre distance is d. A collision exists when d < r1 + r2. The contact normal is the unit vector n = (C2 − C1)/d. It points from body 1 to body 2. The penetration depth is x = (r1 + r2) − d. Positive x means overlap. Zero or negative x means no contact."
+    },
+    {
+     "type": "formula",
+     "text": "d = √((X2−X1)² + (Y2−Y1)² + (Z2−Z1)²),  x = (r1 + r2) − d",
+     "where": "C1=(X1,Y1,Z1) and C2=(X2,Y2,Z2) are sphere centres in metres; r1 and r2 are radii in metres; d is centre distance in metres; x is penetration depth in metres; contact exists when x > 0."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Transform each body to world space with the hierarchy from Chapter 4.2.",
+      "Build a bounding volume for each body and run the broad-phase test.",
+      "Run the exact narrow-phase test only on candidate pairs.",
+      "If overlap exists, output the contact point, unit normal n, and penetration x."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Penetration depth and penalty force",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A penalty method treats overlap as a spring. The spring is not drawn; it is a mathematical force. Hooke's law gives the force magnitude F = k x. Here k is spring stiffness in newtons per metre (N/m), x is penetration depth in metres, and F is force in newtons (N). The force vector on body 2 is F2 = k x n. The force on body 1 is F1 = −k x n. This pair obeys Newton's third law: equal and opposite. The force acts only while x > 0."
+    },
+    {
+     "type": "formula",
+     "text": "F = k x,  F2 = k x n,  F1 = −k x n",
+     "where": "k is stiffness in N/m; x is penetration in m; F is force magnitude in N; n is the unit contact normal from body 1 to body 2; F1 and F2 are force vectors in N."
+    },
+    {
+     "type": "p",
+     "text": "An impulse method is an alternative. It changes velocity at impact and then separates the bodies. A penalty method is simpler and lets small overlap remain. It can feel springy if k is low. Large k needs small time steps or the simulation can become unstable. The choice depends on the scene."
+    },
+    {
+     "type": "p",
+     "text": "Raw force can jump when contact starts or ends. Force smoothing reduces this. A first-order low-pass filter is F_smooth(t) = α F(t) + (1−α) F_smooth(t−1). α is a number from 0 to 1. A small α gives heavy smoothing and more delay. A large α follows the raw force closely. The smoothed value is then scaled and clamped to the haptic device's force range. That mapping step belongs here; device hardware is covered in Unit 3, Haptic displays and force feedback devices."
+    }
+   ]
+  },
+  {
+   "h3": "Deformable surfaces and haptic force output",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Soft objects need surface change, not only rigid push. A mass-spring model represents the surface as particles at mesh vertices. Springs connect neighbouring particles. For one spring between particles A and B, let L be current length, L0 rest length, and u the unit vector from A to B. The elastic force on A is FA = −k_s (L − L0) u. k_s is spring stiffness in N/m. If L > L0, the force pulls A toward B. Damping c can be added using relative velocity. The simulator integrates these forces over a small time step to move the vertices."
+    },
+    {
+     "type": "formula",
+     "text": "FA = −k_s (L − L0) u",
+     "where": "k_s is spring stiffness in N/m; L is current spring length in m; L0 is rest length in m; u is the unit vector from particle A to particle B; FA is the force on particle A in N."
+    },
+    {
+     "type": "p",
+     "text": "Penalty springs and mass-spring meshes can work together. The penalty force stops a tool from sinking too far. The mass-spring mesh spreads the deformation over nearby vertices. A surgical trainer may use this for a virtual liver. A seat prototype may use it for cushion compression."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Broad phase: build candidate pairs.",
+      "Narrow phase: compute contact point, normal n, and penetration x.",
+      "Force: use a penalty spring or impulse to compute vector F.",
+      "Smooth: apply the low-pass filter to force magnitude.",
+      "Clamp and map: scale to device limits and send to haptic output.",
+      "Respond: update rigid motion or deform the surface."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The same pipeline runs for every simulated frame. Detection alone is not response; the force or deformation step must follow."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The chain from two spheres to a smoothed haptic force and a surface response. The numbers show a 0.1 m overlap producing 20 N with a 200 N/m penalty spring.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Collision to force",
+   "nodes": [
+    {
+     "id": "s",
+     "label": "Two spheres",
+     "note": "r=0.5 m each",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Broad phase",
+     "note": "distance test",
+     "style": "normal"
+    },
+    {
+     "id": "n",
+     "label": "Narrow phase",
+     "note": "distance 0.9 m",
+     "style": "normal"
+    },
+    {
+     "id": "p",
+     "label": "Penetration",
+     "note": "0.1 m",
+     "style": "accent"
+    },
+    {
+     "id": "k",
+     "label": "Penalty spring",
+     "note": "k=200 N/m",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "Force",
+     "note": "F=20 N",
+     "style": "accent"
+    },
+    {
+     "id": "sm",
+     "label": "Smooth and map",
+     "note": "haptic output",
+     "style": "normal"
+    },
+    {
+     "id": "r",
+     "label": "Deform/respond",
+     "note": "surface change",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "s",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "n",
+     "style": "solid"
+    },
+    {
+     "from": "n",
+     "to": "p",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "k",
+     "style": "solid"
+    },
+    {
+     "from": "k",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "sm",
+     "style": "solid"
+    },
+    {
+     "from": "sm",
+     "to": "r",
+     "style": "solid"
+    }
+   ],
+   "aria": "Flow from two spheres of radius 0.5 metres, distance 0.9 metres, penetration 0.1 metres, spring stiffness 200 newtons per metre, force 20 newtons, to smoothing and response."
+  }
+ },
+ "examples": [
+  {
+   "question": "Two spheres each of radius 0.5 m have centres 0.9 m apart. A penalty spring with k = 200 N/m acts along the centre line. Find the penetration depth and the force magnitude.",
+   "steps": [
+    "Sum of radii R = r1 + r2 = 0.5 m + 0.5 m = 1.0 m.",
+    "Centre distance d = 0.9 m.",
+    "Penetration x = R − d = 1.0 m − 0.9 m = 0.1 m.",
+    "Force magnitude F = k x = 200 N/m × 0.1 m = 20 N.",
+    "The force acts along the contact normal, the line from one centre to the other. If C1=(0,0,0) and C2=(0.9,0,0) m, n=(1,0,0). The force on body 1 is 20 N in the −x direction; the force on body 2 is 20 N in the +x direction."
+   ],
+   "answer": "Penetration depth is 0.1 m and force magnitude is 20 N along the contact normal.",
+   "check": "r = 0.5\nd = 0.9\nk = 200.0\nR = r + r\nx = R - d\nF = k * x\nprint(f\"{x:g}\")\nprint(f\"{F:g}\")\n",
+   "values": [
+    0.1,
+    20
+   ],
+   "output": "0.1\n20"
+  }
+ ],
+ "traps": [
+  "Use the sum of both radii. In the worked example, using only one radius gives 0.5 m instead of 1.0 m.",
+  "Force is a vector along the contact normal. The sign tells which body is pushed; magnitude alone is not the full answer.",
+  "Collision detection alone is not collision response. Narrow phase reports contact; a penalty force, impulse or deformation must still be applied.",
+  "Broad-phase false positives are acceptable; false negatives are not. The bounding volume must fully enclose the object.",
+  "Keep units consistent: k in N/m and x in m give F in N. Mixing cm or mm changes the force by a factor of 100 or 1000."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the broad phase in collision detection?",
+   "marks": 2,
+   "a": "A cheap reject stage that compares bounding volumes and produces candidate pairs for narrow phase. It may include false positives but must not miss true contacts."
+  },
+  {
+   "level": "remember",
+   "q": "Define penetration depth for two spheres.",
+   "marks": 2,
+   "a": "x = (r1 + r2) − d, where d is the centre distance and r1, r2 are radii. Positive x means overlap, measured in metres."
+  },
+  {
+   "level": "understand",
+   "q": "Why can an AABB give more false positives than an OBB?",
+   "marks": 3,
+   "a": "AABB edges stay parallel to world axes, so a rotated long object needs a larger box. An OBB rotates with the object and fits tighter, reducing candidate pairs but costing more per test."
+  },
+  {
+   "level": "understand",
+   "q": "Why smooth a haptic force?",
+   "marks": 3,
+   "a": "Raw penalty force can jump at contact start or end. A low-pass filter reduces sudden changes that feel like vibration and keeps output within device limits."
+  },
+  {
+   "level": "apply",
+   "q": "Two spheres of radii 0.3 m and 0.4 m have centres 0.6 m apart. A penalty spring has k = 150 N/m. Find the penetration depth and force magnitude.",
+   "marks": 4,
+   "a": "R = 0.3 + 0.4 = 0.7 m. x = 0.7 − 0.6 = 0.1 m. F = 150 × 0.1 = 15 N."
+  },
+  {
+   "level": "analyze",
+   "q": "A fast tool passes through a thin wall even though the narrow-phase code is correct. Give one likely cause and one fix.",
+   "marks": 5,
+   "a": "Large time step: the tool is before the wall in one frame and after it in the next, so no frame shows overlap. Fix with continuous collision detection, a smaller time step, or a thicker proxy."
+  },
+  {
+   "level": "analyze",
+   "q": "A penalty spring with k = 200 N/m gives 20 N at x = 0.1 m. If the same overlap is entered as 10 cm and used directly with k in N/m, what goes wrong?",
+   "marks": 4,
+   "a": "Using x = 10 instead of 0.1 m gives F = 200 × 10 = 2000 N, 100 times too large. Convert all lengths to metres before multiplication."
+  }
+ ],
+ "beyond": "Not for the exam. Production engines use these same stages, but add continuous collision detection, constraints and sleeping bodies to stay fast. Position-based dynamics is common for cloth and soft tissue because it is stable at large time steps. Signed distance fields give smooth contact for complex shapes. Haptic rendering research focuses on stability when a stiff virtual wall meets a real device. Search terms: continuous collision detection, position-based dynamics, signed distance field contact, haptic stability."
+}

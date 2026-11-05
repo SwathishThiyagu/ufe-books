@@ -1,0 +1,236 @@
+{
+ "lead": "A VR headset must hand a new frame to each eye about 90 times a second. That gives roughly 11 ms per frame for everything. A large world may hold a hundred thousand objects and billions of triangles, far more than any GPU can draw in that time. So the renderer stops being honest: it draws only the objects the user can see, and only at the detail the eye can resolve. This chapter covers those two savings, level of detail and culling, and how together they let a large environment run in real time.",
+ "prereq": "You need: <a href=\"#graphics-and-rendering-pipeline\">chapter 4.5</a> for the order of pipeline stages, and <a href=\"#behavior-modeling-and-model-management\">chapter 4.4</a> for the model records that carry several LOD versions of one object.",
+ "sections": [
+  {
+   "h3": "Level of detail: paying for detail only where it shows",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A triangle smaller than a pixel is wasted work. A bench 3 m away needs its slats modelled. The same bench 60 m away covers a few dozen pixels, and a flat box looks the same. Level of detail (LOD) stores one object as several models at different triangle counts and picks one at draw time. LOD0 is the full model, LOD1 might be half the triangles, LOD2 a quarter."
+    },
+    {
+     "type": "p",
+     "text": "Discrete LOD switches sharply at a distance threshold. The switch is cheap but visible as a pop. Two fixes are standard: switch at slightly different distances in each direction (hysteresis), or blend two neighbouring levels over a short range so the shape morphs."
+    },
+    {
+     "type": "p",
+     "text": "Continuous LOD stores no copies. A progressive mesh records the ordered list of edge collapses that simplify the full model, so the renderer rebuilds any triangle count between the finest and the coarsest by replaying part of that list."
+    },
+    {
+     "type": "p",
+     "text": "Choose the level by screen size, not raw distance, because pixel size also depends on resolution and field of view."
+    },
+    {
+     "type": "formula",
+     "text": "s = (h × H) ÷ (2 d tan(θ ÷ 2))",
+     "where": "s is the object's height on screen in pixels, h its real height in metres, H the viewport height in pixels, d the distance from the camera in metres, and θ the vertical field of view in degrees."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Read the object's bounding sphere centre and radius from its model record.",
+      "Project the radius to pixels with the formula above.",
+      "Pick the coarsest level whose projected size is at least the threshold, say 40 px.",
+      "Keep the current level until the size falls below 0.8 × the threshold, so the switch does not flicker."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Culling: dropping what cannot be seen",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The view frustum is the volume the camera can see. It is a pyramid with its top cut off, bounded by six planes: near, far, left, right, top and bottom. Test each object's bounding sphere, centre c and radius r, against the six planes. The sphere is outside when, for at least one plane, the signed distance from c to that plane is less than −r. That is six dot products and no triangles touched."
+    },
+    {
+     "type": "p",
+     "text": "Backface culling drops triangles that face away from the camera. Take front faces as counter-clockwise on screen, the usual OpenGL convention. A triangle that winds clockwise on screen is then a back face. The convention is set by the graphics API, so state it before using the rule. On a closed mesh this removes about half the triangles, and in VR it pays twice because each eye needs its own image."
+    },
+    {
+     "type": "p",
+     "text": "Frustum culling keeps the building in front of you even when a nearer wall hides it. Occlusion culling removes what something nearer blocks. Three ways to do it: cells and portals, a precomputed potentially visible set (PVS) per cell, and hardware occlusion queries that ask the GPU how many samples of a bounding box would pass the depth test, that is, how much of it is actually visible."
+    },
+    {
+     "type": "p",
+     "text": "Do per-object frustum culling on the CPU first, before submitting anything to be drawn. Backface culling then costs nothing extra because the hardware does it during rasterisation. Issue occlusion queries last, because each one costs a round trip to the GPU."
+    }
+   ]
+  },
+  {
+   "h3": "Cells, portals and large environments",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A building splits into cells (rooms) joined by portals (doors and windows). From the camera's cell, only cells reachable through a chain of visible portals can be seen. Each hop clips the portal to its parent's screen rectangle; when the rectangle is empty the walk stops, and every cell beyond it is never drawn."
+    },
+    {
+     "type": "p",
+     "text": "Outdoors there are no portals, so terrain is tessellated into square tiles, each carrying its own LOD. A quadtree subdivides a tile only while its estimated screen error exceeds a threshold, so the ground near the feet is fine and the far hills are coarse. This quadtree terrain scheme is a form of chunked LOD. Geomipmapping is a related scheme: a fixed grid of square patches, each patch drawn at one of a few discrete levels, with neighbouring patch edges stitched so no cracks appear."
+    },
+    {
+     "type": "p",
+     "text": "Memory follows the same rule. Only LODs near the head stay resident; a streaming manager loads tiles and models as the user moves and evicts the rest. Each model record from <a href=\"#behavior-modeling-and-model-management\">chapter 4.4</a> carries its LOD list and bounding volume, so the scene database answers \"what is in this cell\" quickly."
+    },
+    {
+     "type": "p",
+     "text": "Static geometry merges into one buffer, and repeated objects draw with instancing, which keeps the count of draw calls small. Every culling and LOD saving is repeated for the second eye, so each removed object saves twice in a headset."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Culling shrinks 10,000 objects to 1,500, and LOD then cuts their triangles by 60 percent. Notice that culling removes whole objects while LOD reduces triangles per object.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Culling and LOD",
+   "nodes": [
+    {
+     "id": "o",
+     "label": "10,000 objects",
+     "note": "start",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "Frustum cull",
+     "note": "30% remain",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Occlusion cull",
+     "note": "50% remain",
+     "style": "accent"
+    },
+    {
+     "id": "v",
+     "label": "1,500 objects",
+     "note": "visible",
+     "style": "normal"
+    },
+    {
+     "id": "l",
+     "label": "LOD 40%",
+     "note": "400 tris each after LOD (1,000 before)",
+     "style": "normal"
+    },
+    {
+     "id": "t",
+     "label": "600,000 tris",
+     "note": "render",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "o",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "v",
+     "style": "solid"
+    },
+    {
+     "from": "v",
+     "to": "l",
+     "style": "solid"
+    },
+    {
+     "from": "l",
+     "to": "t",
+     "style": "solid"
+    }
+   ],
+   "aria": "Flow from 10,000 objects through frustum culling to 30 percent, occlusion culling to 50 percent, 1,500 visible objects, LOD to 40 percent, and 600,000 triangles."
+  }
+ },
+ "examples": [
+  {
+   "question": "A VR scene contains 10,000 objects, each with 1,000 triangles. Frustum culling keeps 30% of the objects, occlusion culling keeps 50% of those, and the chosen LOD levels keep 40% of the triangles of each surviving object. Find the number of objects drawn, the triangles rendered per eye per frame, and the triangle rate needed at 90 frames per second.",
+   "steps": [
+    "Frustum culling: 10,000 × 0.30 = 3,000 objects survive.",
+    "Occlusion culling: 3,000 × 0.50 = 1,500 objects are actually drawn.",
+    "Triangles before LOD: 1,500 objects × 1,000 triangles = 1,500,000 triangles.",
+    "After LOD: 1,500,000 × 0.40 = 600,000 triangles per eye per frame.",
+    "Rate needed: 600,000 triangles × 90 frames per second = 54,000,000 triangles per second."
+   ],
+   "answer": "1,500 objects are drawn and 600,000 triangles are rendered per eye per frame, so the GPU must sustain 54 million triangles per second.",
+   "check": "objects = 10000\ntris_each = 1000\nafter_frustum = objects * 0.30\nvisible = after_frustum * 0.50\ntris_before_lod = visible * tris_each\nrendered = tris_before_lod * 0.40\nfps = 90\nrate = rendered * fps\nprint(int(round(visible)))\nprint(int(round(rendered)))\nprint(int(round(rate)))\n",
+   "values": [
+    1500,
+    600000,
+    54000000
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Culling fractions multiply, they do not add: keeping 30% then 50% leaves 15% of the objects, not 20%.",
+  "LOD reduces triangles per object; it does not remove objects. Report object counts and triangle counts separately.",
+  "Occlusion culling needs an occluder that is solid and large enough to hide whole objects. Open sky hides nothing and a wire fence hides almost nothing, so flat desert ground gains little. Hills, buildings and walls are real occluders, so outdoor scenes do gain from it.",
+  "Screen size uses the distance to the bounding-sphere centre, not the nearest vertex. Measuring to the nearest vertex over-estimates the projected size, so a long object stays at high detail far too long. The centre rule errs the other way: a long object may drop to a coarse level slightly early, which shows as a pop, so pad the radius.",
+  "Test cheap first. An occlusion query on every object before frustum culling costs more than it saves."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define level of detail and state what LOD0 means.",
+   "marks": 2,
+   "a": "Storing one object at several triangle counts and choosing one at draw time. LOD0 is the full-detail model; higher numbers are coarser."
+  },
+  {
+   "level": "remember",
+   "q": "Name three kinds of culling used in a VR renderer.",
+   "marks": 2,
+   "a": "Backface culling, view-frustum culling and occlusion culling. Cells and portals are a precomputed form of occlusion culling."
+  },
+  {
+   "level": "understand",
+   "q": "Why does occlusion culling find nothing to remove in an open desert scene?",
+   "marks": 3,
+   "a": "It needs an occluder, a surface nearer the camera that hides something behind it. Flat open ground has none, so every object inside the frustum must still be drawn."
+  },
+  {
+   "level": "understand",
+   "q": "Why select LOD by screen size instead of a fixed distance?",
+   "marks": 3,
+   "a": "The same object at the same distance covers more pixels on a higher-resolution display or with a narrower field of view. Screen size measures what the eye actually receives."
+  },
+  {
+   "level": "apply",
+   "q": "A scene has 8,000 objects of 500 triangles each. Frustum culling keeps 25%, occlusion culling keeps 60% of those, and LOD keeps 50% of the triangles. Find the objects drawn and the triangles per frame.",
+   "marks": 4,
+   "a": "8,000 × 0.25 = 2,000 objects; 2,000 × 0.60 = 1,200 objects drawn. 1,200 × 500 = 600,000 triangles before LOD; 600,000 × 0.50 = 300,000 triangles per frame."
+  },
+  {
+   "level": "apply",
+   "q": "A 2 m tall object stands 50 m away. The viewport is 1,200 px high and the vertical field of view is 90°. Find its height on screen.",
+   "marks": 4,
+   "a": "s = (2 × 1200) ÷ (2 × 50 × tan 45°) = 2400 ÷ 100 = 24 px."
+  },
+  {
+   "level": "analyze",
+   "q": "A user turning the head sees frame time suddenly double. Give the cause and two fixes.",
+   "marks": 5,
+   "a": "Turning sweeps many objects into the frustum at once, so the visible object and triangle counts jump. Fixes: coarser LOD thresholds for distant objects, occlusion culling, and splitting large objects into cells so only a small part enters the frustum."
+  },
+  {
+   "level": "analyze",
+   "q": "The camera stands in a room with one door; behind the door a corridor has three more doors. Describe how a portal renderer decides what to draw.",
+   "marks": 6,
+   "a": "Start from the camera's cell. Clip the first portal's screen rectangle; it is non-empty, so draw the corridor cell and clip each of the three next portals against that rectangle. Recurse until a rectangle is empty or a depth limit is reached. Cells never reached are not drawn."
+  }
+ ],
+ "beyond": "Not for the exam. Modern engines push these decisions onto the GPU: mesh shaders and GPU-driven culling keep the object list in a buffer and let the card reject invisible pieces, so the CPU never visits ten thousand nodes. Virtualised geometry streams clusters of triangles and picks detail per cluster instead of per object, and virtual texturing does the same for textures. In headsets, foveated rendering drops detail in the peripheral field, where the eye cannot resolve it anyway. Search next for GPU-driven rendering, meshlets, potentially visible sets and foveated rendering."
+}

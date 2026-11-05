@@ -1,0 +1,273 @@
+{
+ "lead": "A VR headset must draw two slightly different images, many times a second, from a scene of millions of triangles. The graphics pipeline is the fixed order of steps that does it: every vertex passes through model, world and view transforms, projection, clipping and a viewport map, then rasterisation and fragment shading give the pixels their colour. The order matters because a mistake at one stage cannot be repaired later — a missing perspective divide cannot be undone during shading. Every GPU driver implements this chain, and every VR toolkit assumes you know it.",
+ "prereq": "You need: <a href=\"#kinematics-modeling-transformation-matrices-and-object-hierarchi\">chapter 4.2</a> for matrix multiplication and <a href=\"#geometric-modeling-object-shape-and-visual-appearance\">chapter 4.1</a> for what a mesh stores.",
+ "sections": [
+  {
+   "h3": "The pipeline as an ordered chain",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A mesh is stored in local coordinates (chapter 4.1). The pipeline turns those coordinates into pixel colours in a fixed order."
+    },
+    {
+     "type": "p",
+     "text": "<b>Model</b> transform places the object inside its parent's frame. <b>World</b> transform gives world coordinates by multiplying up the hierarchy (chapter 4.2). <b>View</b> transform moves everything so the camera sits at the origin looking along one axis. <b>Projection</b> turns the visible pyramid into a cube. <b>Clipping</b> cuts away geometry outside that cube. The <b>perspective divide</b> gives normalised device coordinates (NDC), where every surviving point has x, y and z between −1 and 1. <b>Viewport</b> maps x and y to pixel columns and rows. <b>Rasterisation</b> lists the pixels each triangle covers, and <b>fragment shading</b> gives each covered pixel its colour."
+    },
+    {
+     "type": "p",
+     "text": "The order is forced. Shading needs a pixel, so shading is last. Clipping needs depth in front of the camera, so it comes before the divide. For stereo, the late stages run twice with two view matrices whose camera centres sit about 63 mm apart — the interpupillary distance."
+    },
+    {
+     "type": "p",
+     "text": "A VR frame at 90 Hz must finish in 11 ms, for both eyes."
+    }
+   ]
+  },
+  {
+   "h3": "Model, world and view matrices",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each object in the scene database carries a local transform M. Multiplying up the parent chain gives the parent's accumulated matrix W, so a local vertex p becomes p_world = W · M · p. The object's own world matrix is the product W · M."
+    },
+    {
+     "type": "p",
+     "text": "The camera is an object too. Its world matrix C says where the headset is, so the view matrix is its inverse: V = C⁻¹. Built directly from an eye position e and a target t with up hint u, the camera axes are:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "forward f = normalize(t − e)",
+      "right r = normalize(f × u)",
+      "true up u′ = r × f"
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The look-at matrix rotates r, u′ and −f onto the x, y and z axes, then translates e to the origin. A point straight ahead of the camera now has x = y = 0 and negative z."
+    },
+    {
+     "type": "formula",
+     "text": "p_clip = P · V · W · M · p",
+     "where": "P is the projection matrix, V the view, W the world transform, M the model transform, and p = (x, y, z, 1) is the local vertex. Matrices act right to left: M first, P last."
+    },
+    {
+     "type": "p",
+     "text": "Both eyes share the product W · M. Only V and P differ between them."
+    }
+   ]
+  },
+  {
+   "h3": "Projection and the perspective divide",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Put the camera at the origin looking along +z, with an image plane at distance f in front. This section uses a +z-forward camera, so points in front of the eye have positive z; the image-plane formulas below use that convention. f is the focal length, in scene units, not pixels. A camera-space point (x, y, z) casts a ray from the eye, and similar triangles give where it crosses the plane:"
+    },
+    {
+     "type": "formula",
+     "text": "x′ = f · x / z        y′ = f · y / z",
+     "where": "x′, y′ are image-plane coordinates in scene units; x, y, z are camera-space coordinates; f is focal length. Doubling z halves the image size, which is why distant objects look small."
+    },
+    {
+     "type": "p",
+     "text": "A GPU does the same job with one 4×4 matrix. The projection matrix P copies z into the fourth clip coordinate w_c, scales y by 1/tan(θ/2) and x by 1/(a · tan(θ/2)), where θ is the vertical field of view and a = width/height is the aspect ratio. After P the vertex is in clip space, (x_c, y_c, z_c, w_c), and hardware divides:"
+    },
+    {
+     "type": "formula",
+     "text": "x_ndc = x_c / w_c    y_ndc = y_c / w_c    z_ndc = z_c / w_c",
+     "where": "the subscript c means clip space, ndc means normalised device coordinates. This is the perspective divide; w_c is zero at the eye and negative behind the camera."
+    },
+    {
+     "type": "p",
+     "text": "The divide is why clipping comes first. Dropping it leaves points in clip space: nothing shrinks with distance, and the image collapses."
+    }
+   ]
+  },
+  {
+   "h3": "Clipping, NDC, viewport and fragments",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Hardware clips against the near plane in clip space, before the divide, testing w > 0. After the divide, every surviving point lies in NDC: −1 ≤ x ≤ 1, −1 ≤ y ≤ 1, −1 ≤ z ≤ 1 (some APIs use 0 ≤ z ≤ 1). Clipping creates new edges at the boundary. Clip in clip space or NDC, never after the viewport map."
+    },
+    {
+     "type": "formula",
+     "text": "x_px = X + (x_ndc + 1) · W / 2        y_px = Y + (1 − y_ndc) · H / 2",
+     "where": "W and H are viewport width and height in pixels, (X, Y) is the top-left corner of the viewport in pixels, rows count downward, and x_px, y_px are pixel indices. The y term is flipped for that reason; a bottom-left origin would need y_px = Y + (y_ndc + 1) · H / 2. z_ndc goes to the depth buffer."
+    },
+    {
+     "type": "p",
+     "text": "Rasterisation visits the pixels inside each triangle and emits fragments. Each fragment carries interpolated depth, normal and texture coordinates. Texture coordinates are interpolated with a division by w; without it a textured floor in perspective looks stretched."
+    },
+    {
+     "type": "p",
+     "text": "Fragment shading runs a program per fragment: sample the texture, apply lighting, blend if transparent. The depth test then discards fragments lying behind ones already drawn. In VR this tail runs twice per frame, once per eye, and the two images must reach the displays close together (chapter 4.7). Culling work is cut earlier, as <a href=\"#level-of-detail-culling-and-large-environments\">chapter 4.6</a> describes."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Each box is one stage, applied in this fixed order. The two boxes picked out mark projection and raster/shading, where the perspective divide and the per-fragment program sit.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Rendering pipeline",
+   "nodes": [
+    {
+     "id": "m",
+     "label": "Model",
+     "note": "local coords",
+     "style": "normal"
+    },
+    {
+     "id": "w",
+     "label": "World",
+     "note": "world matrix",
+     "style": "normal"
+    },
+    {
+     "id": "v",
+     "label": "View",
+     "note": "camera matrix",
+     "style": "normal"
+    },
+    {
+     "id": "p",
+     "label": "Projection",
+     "note": "perspective",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Clip/NDC",
+     "note": "−1 to 1",
+     "style": "normal"
+    },
+    {
+     "id": "vp",
+     "label": "Viewport",
+     "note": "pixel area",
+     "style": "normal"
+    },
+    {
+     "id": "r",
+     "label": "Raster/shade",
+     "note": "fragments",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "m",
+     "to": "w",
+     "style": "solid"
+    },
+    {
+     "from": "w",
+     "to": "v",
+     "style": "solid"
+    },
+    {
+     "from": "v",
+     "to": "p",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "vp",
+     "style": "solid"
+    },
+    {
+     "from": "vp",
+     "to": "r",
+     "style": "solid"
+    }
+   ],
+   "aria": "Pipeline from model and world transforms through camera view, perspective projection, clipping and viewport mapping to raster and shading."
+  }
+ },
+ "examples": [
+  {
+   "question": "A point in camera space is (2, 1, 4). The camera is at the origin looking along +z and its image plane is at focal length f = 2. Find the point's image-plane coordinates before any viewport mapping, and state whether it needs clipping at the near plane z = 0.1.",
+   "steps": [
+    "Camera-space point: x = 2, y = 1, z = 4, all in scene units.",
+    "Focal length f = 2 scene units; image plane at z = 2.",
+    "x′ = f · x / z = 2 × 2 / 4 = 1.0 scene units.",
+    "y′ = f · y / z = 2 × 1 / 4 = 0.5 scene units.",
+    "z = 4 is greater than the near plane 0.1, so the point is in front and survives near clipping.",
+    "Image-plane point = (1.0, 0.5)."
+   ],
+   "answer": "The image-plane coordinates are (1.0, 0.5), in scene units, and the point is not clipped.",
+   "check": "f = 2.0\nx, y, z = 2.0, 1.0, 4.0\nxp = f * x / z\nyp = f * y / z\nprint(xp)\nprint(yp)\n",
+   "values": [
+    1.0,
+    0.5
+   ],
+   "code": {
+    "lang": "python",
+    "code": "f = 2.0\nx, y, z = 2.0, 1.0, 4.0\nprint(f * x / z)\nprint(f * y / z)\n",
+    "stdin": ""
+   },
+   "output": "1.0\n0.5"
+  }
+ ],
+ "traps": [
+  "Dropping the perspective divide by w or z: points stay in clip space, and the scene neither shrinks with distance nor lines up with the camera.",
+  "Mixing conventions: a camera looking down −z instead of +z flips the sign of z and of the projection's w row. Pick one convention and keep it.",
+  "Clipping after the viewport transform: pixel coordinates cannot be mapped back to 3D cleanly. Clip in clip space or NDC.",
+  "Confusing the view matrix with the projection matrix: view rotates and translates the world, projection scales x and y and writes w, with no translation.",
+  "Thinking the viewport map moves the object in 3D. It only turns NDC into pixel indices; depth is unchanged."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the pipeline stages from local coordinates to pixel colour, in order.",
+   "marks": 2,
+   "a": "Model, world, view, projection, clipping/perspective divide to NDC, viewport, rasterisation, fragment shading (then depth test and blending)."
+  },
+  {
+   "level": "understand",
+   "q": "Why must clipping happen before the perspective divide rather than after the viewport transform?",
+   "marks": 3,
+   "a": "The divide needs w ≠ 0, and points at or behind the eye give w ≤ 0. Clipping in clip space or NDC removes them before any projection to pixels; after the viewport transform the 3D position is lost, so a boundary cannot be computed correctly."
+  },
+  {
+   "level": "apply",
+   "q": "A camera-space point is (3, −2, 6), f = 3. Find its image-plane coordinates.",
+   "marks": 4,
+   "a": "x′ = f x / z = 3 × 3 / 6 = 1.5. y′ = f y / z = 3 × (−2) / 6 = −1.0. Image point (1.5, −1.0)."
+  },
+  {
+   "level": "apply",
+   "q": "A viewport is 1920 × 1080 pixels with origin at the top-left. Map NDC point (−1, 1) to pixel coordinates, using the y-flip formula.",
+   "marks": 4,
+   "a": "x_px = (x_ndc + 1) × 1920 / 2 = 0. y_px = (1 − y_ndc) × 1080 / 2 = 0. Pixel (0, 0), the top-left corner."
+  },
+  {
+   "level": "understand",
+   "q": "Why are texture coordinates interpolated with a division by w across a triangle?",
+   "marks": 3,
+   "a": "Screen-space interpolation is linear in NDC, not in 3D. Interpolating 1/w and the attribute/w, then dividing, recovers the perspective-correct value. Plain linear interpolation makes a receding floor texture look bent."
+  },
+  {
+   "level": "analyze",
+   "q": "A scene renders with triangles stretching into long spikes toward the screen edge. Which stage is most likely wrong, and what evidence supports it?",
+   "marks": 5,
+   "a": "The near-plane clip against w > 0 is missing. A vertex behind the eye survives, gets a small or sign-flipped divided position, and drags its triangle into a spike across the screen."
+  },
+  {
+   "level": "analyze",
+   "q": "For stereo VR, state exactly what differs and what is shared between the two eye renders of the same frame.",
+   "marks": 6,
+   "a": "Shared: the model and world matrices, geometry, textures and shading code. Different: each eye's view matrix, since its camera centre is shifted by roughly half the interpupillary distance, and the projection may differ slightly with eye orientation. The raster and fragment stages run twice."
+  }
+ ],
+ "beyond": "Not for the exam. Production engines no longer issue draw calls one by one: they use Vulkan, Metal or WebGPU command buffers and tile-based mobile GPUs, where shading happens per tile so colour can stay in fast memory. VR-specific work goes further: single-pass stereo renders both eyes in one pass using multiview extensions; foveated rendering shades the centre of gaze fully and the periphery cheaply; late reprojection warps an already-rendered frame to the newest head pose. Search for multiview rendering, foveated rendering, and tile-based deferred shading to go deeper."
+}
