@@ -36,8 +36,10 @@ Each task names **one unit**, for example `c-oop-u3`. Write that one book and no
 
 ## Environment setup (for the maintainer)
 
-Codex environment setup script, so the render check works:
+Codex environment setup script, so the render check works (no admin rights in Codex, so no `--with-deps`):
 
 ```
-pip install playwright && python -m playwright install --with-deps chromium
+pip install playwright && python -m playwright install chromium
 ```
+
+Internet access for the environment: package managers plus the Playwright browser download domains (`cdn.playwright.dev` and the ones Codex proposes).
