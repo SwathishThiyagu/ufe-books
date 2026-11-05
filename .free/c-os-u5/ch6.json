@@ -1,0 +1,198 @@
+{
+ "lead": "Free‑space management tells the operating system which disk blocks are unused so that new files can be stored. It is needed because a disk does not self‑organise; the OS must keep a map that can be updated quickly when blocks are allocated or released. The map is used by file allocation methods, by the allocator in the kernel, and by utilities such as fsck.",
+ "prereq": "You need: allocation methods <a href=\"#allocation-methods-contiguous-linked-indexed\">.",
+ "sections": [
+  {
+   "h3": "Bit‑vector free map",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A bit‑vector is an array of one‑bit entries. Entry i is 1 if block i is occupied and 0 if it is free. The vector lives in memory and is written back to a fixed location on the disk during a checkpoint."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Start at index 0.",
+      "Read the bit.",
+      "If the bit is 0, the block is free – stop.",
+      "Otherwise continue with the next index."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Allocation: set the found 0 to 1.",
+      "Deallocation: set the bit of the released block back to 0."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "FreeMap[i] = 0  ⇔  block i is free",
+     "where": "FreeMap[i] is the i‑th bit of the vector; i is the block number starting from 0."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\nint main(){\n    int freeMap[16] = {1,1,0,0,0,1,1,1,1,1,1,1,0,0,0,0};\n    int firstFree = -1;\n    for(int i=0;i<16;i++) if(freeMap[i]==0){ firstFree=i; break; }\n    printf(\"First free block = %d\\n\", firstFree);\n    // allocate the block\n    if(firstFree!=-1) freeMap[firstFree]=1;\n    // free block 5 (index 5)\n    freeMap[5]=0;\n    printf(\"Vector after operations: [\");\n    for(int i=0;i<16;i++){\n        printf(\"%d\", freeMap[i]);\n        if(i<15) printf(\", \");\n    }\n    printf(\"]\\n\");\n    return 0;\n}",
+     "stdin": "",
+     "output": "First free block = 2\nVector after operations: [1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]"
+    }
+   ]
+  },
+  {
+   "h3": "Free‑block linked list and grouping",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When the number of blocks is large, scanning a bit‑vector can be slow. A free‑block linked list stores the address of the next free block inside each free block itself. The head of the list is kept in a small table entry."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "To allocate, read the head pointer H.",
+      "Return block H to the caller.",
+      "Set H to the value stored inside block H (the next free block)."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "To free block X, store the current head pointer inside block X.",
+      "Set the head pointer to X."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Grouping: keep several free blocks together in a small array; the array entry points to the first block of the group.",
+      "Both structures reduce the number of disk reads for allocation and deallocation."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 0,
+  "caption": "Bit‑vector map for a 16‑block disk; 1 = occupied, 0 = free.",
+  "spec": {
+   "type": "array",
+   "title": "Bit‑vector map",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Free map",
+     "cells": [
+      "1",
+      "1",
+      "0",
+      "0",
+      "0",
+      "1",
+      "1",
+      "1",
+      "1",
+      "1",
+      "1",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0"
+     ],
+     "marks": {
+      "2": "accent"
+     }
+    }
+   ],
+   "pointers": [],
+   "aria": "A single row showing the bits of the free‑space map from block 0 to block 15."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 16‑block disk uses the bit vector 1100 0111 1111 0000. (a) Find the first free block. (b) Allocate that block. (c) Then free block 5. Show the final bit vector.",
+   "steps": [
+    "Start scanning at index 0: bits 0 and 1 are 1 (occupied).",
+    "Bit 2 is 0, so the first free block is 2.",
+    "Set bit 2 to 1 to allocate it: vector becomes 1110 0111 1111 0000.",
+    "Free block 5 (index 5) by setting bit 5 to 0: final vector 1110 0011 1111 0000."
+   ],
+   "answer": "First free block = 2; final vector = 1110 0011 1111 0000.",
+   "check": "bits = [1,1,0,0,0,1,1,1,1,1,1,1,0,0,0,0]\nfirst = next(i for i,b in enumerate(bits) if b==0)\nbits[first]=1\nbits[5]=0\nprint(first)\nprint(bits)\n",
+   "values": [
+    2
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    int bits[16] = {1,1,0,0,0,1,1,1,1,1,1,1,0,0,0,0};\n    int first=-1;\n    for(int i=0;i<16;i++) if(bits[i]==0){ first=i; break; }\n    printf(\"First free block = %d\\n\", first);\n    bits[first]=1; // allocate\n    bits[5]=0;    // free block 5\n    printf(\"Final vector: \");\n    for(int i=0;i<16;i++) printf(\"%d\", bits[i]);\n    printf(\"\\n\");\n    return 0;\n}",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "i",
+     "bits[i]"
+    ],
+    "rows": [
+     [
+      "0",
+      "1"
+     ],
+     [
+      "1",
+      "1"
+     ],
+     [
+      "2",
+      "0"
+     ]
+    ]
+   },
+   "output": "First free block = 2\nFinal vector: 1110001111110000"
+  }
+ ],
+ "traps": [
+  "Confusing 0‑based block numbers with 1‑based numbering; the first free block is block 2, not block 1.",
+  "Forgetting to clear the bit after freeing a block, leaving the block marked as occupied.",
+  "Assuming the head pointer of a free‑block list is always stored in memory; it must be persisted on disk to survive a crash."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a bit value of 0 represent in a free‑space bit‑vector?",
+   "marks": 2,
+   "a": "The corresponding disk block is free."
+  },
+  {
+   "level": "understand",
+   "q": "Why might an OS prefer a free‑block linked list over a bit‑vector for very large disks?",
+   "marks": 3,
+   "a": "Scanning a bit‑vector can be O(N) time; a linked list gives O(1) allocation by reading the head pointer."
+  },
+  {
+   "level": "apply",
+   "q": "Given the vector 1 0 1 0 0 1, locate the first free block and show the vector after allocating it.",
+   "marks": 4,
+   "a": "First free block is index 1; after allocation vector becomes 1 1 1 0 0 1."
+  },
+  {
+   "level": "analyze",
+   "q": "A free‑block list head points to block 7, whose stored next pointer is 3. After freeing block 5, what is the new head and what does block 5 contain?",
+   "marks": 5,
+   "a": "New head = 5; block 5 stores the previous head value 7."
+  },
+  {
+   "level": "remember",
+   "q": "What extra information does a grouping scheme add to a free‑block list?",
+   "marks": 2,
+   "a": "It stores a small array of free block numbers, reducing the number of list traversals."
+  },
+  {
+   "level": "apply",
+   "q": "If a disk uses a 32‑bit integer to store the free‑space map, what is the maximum number of blocks it can address?",
+   "marks": 3,
+   "a": "maximum number of blocks = 32."
+  }
+ ],
+ "beyond": "If a disk uses a 32‑bit bitmap (32 bits) to store the free‑space map, it can address up to 32 blocks. To address more blocks, multiple words or a larger bitmap is needed. Not for the exam. Modern SSDs expose wear‑leveling tables that replace simple free‑space maps, but the OS still needs a logical free‑block allocator. Research explores bitmap compression (e.g., run‑length encoding) to fit large maps in RAM. Cloud storage stacks often combine bitmap allocation with distributed consensus to keep the map consistent across nodes. Look for papers on \"bitmap allocation for flash storage\" and on \"distributed free‑space management\" for the next step."
+}

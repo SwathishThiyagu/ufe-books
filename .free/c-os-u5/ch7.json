@@ -1,0 +1,243 @@
+{
+ "lead": "I/O hardware uses three mechanisms to handle data transfer between a device and memory: polling and interrupts to detect when data is ready, and DMA to move blocks of data without CPU involvement. Polling lets the CPU repeatedly ask the device if data is ready. Interrupts let the device signal the CPU only when needed. DMA lets a dedicated controller move blocks of data without CPU involvement. The three methods trade off response time, CPU utilisation and hardware complexity, and all appear in everyday devices such as keyboards, network cards and storage controllers.",
+ "prereq": "You need: basic I/O concepts from <a href=\"#file-concept-attributes-and-access-methods\">5.1</a> and the idea of a CPU‑device bus from Unit 4.",
+ "sections": [
+  {
+   "h3": "Polling I/O",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In polling the CPU executes a loop that reads a status register of the device. The loop continues until the register shows that data is ready. Each iteration consumes CPU cycles, so the processor is busy even when no data arrives. Polling is simple to implement in hardware and software, but it gives high CPU utilisation and poor response when the device is idle."
+    },
+    {
+     "type": "formula",
+     "text": "U_poll = t_busy ÷ (t_busy + t_idle)",
+     "where": "U_poll is CPU utilisation for polling; t_busy is the total time the CPU spends in the polling loop (reading the register, evaluating the condition, and looping); t_idle is the time the CPU could have done other work."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Easy to design: only a status register is needed.",
+      "CPU waste: the loop executes as fast as the CPU clock, consuming cycles even when no data is ready.",
+      "Latency = time between data becoming ready and the next poll."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <stdbool.h>\nint main() {\n    bool data_ready = false;\n    int polls = 0;\n    while (!data_ready) {\n        // simulate reading a status register\n        polls++;\n        if (polls == 5) data_ready = true; // data arrives after 5 polls\n    }\n    printf(\"Polling finished after %d polls\\n\", polls);\n    return 0;\n}",
+     "stdin": "",
+     "output": "Polling finished after 5 polls"
+    }
+   ]
+  },
+  {
+   "h3": "Interrupt‑driven I/O",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An interrupt request (IRQ) is a signal sent by the device to the CPU. When the CPU receives the IRQ it suspends the current task, saves its context and jumps to an interrupt service routine (ISR). The ISR reads the device, clears the interrupt line and returns control. Because the CPU runs only when needed, utilisation is low and response latency is the time taken to recognise the IRQ and start the ISR."
+    },
+    {
+     "type": "formula",
+     "text": "L_int = t_detect + t_isr",
+     "where": "L_int is interrupt latency; t_detect is the time for the CPU to detect the IRQ; t_isr is the time to execute the ISR."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Hardware support: interrupt controller and vector table.",
+      "CPU can perform other work while waiting.",
+      "Latency is typically on the order of a few to a few tens of microseconds on modern systems."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Direct Memory Access (DMA)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A DMA controller is a specialised hardware block that can read from or write to memory without CPU intervention. The CPU programs the DMA engine with source address, destination address, transfer size and a command to start. The DMA controller then takes control of the bus, moves the data, and finally raises an interrupt to inform the CPU that the transfer is complete."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "CPU writes source address, destination address and byte count to DMA registers.",
+      "CPU issues a start command to the DMA controller.",
+      "DMA controller takes the bus, reads from the device and writes to memory.",
+      "When the count reaches zero the DMA controller asserts an IRQ.",
+      "CPU runs the ISR, clears the DMA status and resumes normal work."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "CPU utilisation during transfer ≈ 0 % (only start and finish overhead).",
+      "Latency = time to start DMA + time for transfer; often dominated by transfer time.",
+      "Used for large block transfers such as disk I/O, network packets and audio streams."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "T_DMA = (N ÷ B) + t_start",
+     "where": "T_DMA is total DMA time; N is number of bytes; B is bus bandwidth (bytes/ms); t_start is the controller start overhead."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Sequence of messages for polling, interrupt and DMA transfer of a block of data.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "CPU",
+    "Device",
+    "InterruptController",
+    "DMA"
+   ],
+   "messages": [
+    {
+     "from": "CPU",
+     "to": "Device",
+     "label": "poll status",
+     "dashed": false
+    },
+    {
+     "from": "Device",
+     "to": "CPU",
+     "label": "data ready",
+     "dashed": false
+    },
+    {
+     "from": "Device",
+     "to": "CPU",
+     "label": "IRQ",
+     "dashed": false
+    },
+    {
+     "from": "CPU",
+     "to": "Device",
+     "label": "ISR complete",
+     "dashed": false
+    },
+    {
+     "from": "CPU",
+     "to": "DMA",
+     "label": "start transfer",
+     "dashed": false
+    },
+    {
+     "from": "DMA",
+     "to": "Device",
+     "label": "move data",
+     "dashed": false
+    },
+    {
+     "from": "DMA",
+     "to": "CPU",
+     "label": "transfer complete",
+     "dashed": false
+    }
+   ]
+  },
+  "aria": "The diagram shows the CPU polling the device, the device signalling data ready, the device sending an IRQ, the CPU completing the ISR, the CPU commanding the DMA controller, the DMA moving data, and finally the DMA notifying the CPU that the transfer is done."
+ },
+ "examples": [
+  {
+   "question": "A 4 KB block is transferred from a network card to main memory. Using DMA the transfer takes 2 ms. The same block transferred by pure polling takes 8 ms. Compute the speed‑up factor of DMA over polling and state which method uses less CPU time.",
+   "steps": [
+    "Convert 4 KB to bytes: 4 KB = 4 × 1024 B = 4096 B.",
+    "DMA time = 2 ms, polling time = 8 ms.",
+    "Speed‑up factor = polling time ÷ DMA time = 8 ms ÷ 2 ms = 4.",
+    "CPU time during DMA ≈ start overhead only (assume 0.1 ms).",
+    "CPU time during polling = 8 ms (CPU busy whole transfer)."
+   ],
+   "answer": "DMA is 4× faster than polling and consumes far less CPU time.",
+   "check": "size = 4*1024\nT_dma = 2.0\nT_poll = 8.0\nspeedup = T_poll / T_dma\nprint(speedup)\n",
+   "values": [
+    4
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main() {\n    double T_dma = 2.0; // ms\n    double T_poll = 8.0; // ms\n    double speedup = T_poll / T_dma;\n    printf(\"Speed‑up = %.1fx\\n\", speedup);\n    return 0;\n}"
+   },
+   "stdin": "",
+   "output": "Speed‑up = 4.0x",
+   "dry_run": {
+    "head": [
+     "Method",
+     "Time (ms)"
+    ],
+    "rows": [
+     [
+      "Polling",
+      "8"
+     ],
+     [
+      "DMA",
+      "2"
+     ]
+    ]
+   }
+  }
+ ],
+ "traps": [
+  "Confusing interrupt latency (time to start ISR) with the total time DMA needs to move the data.",
+  "Adding the CPU start‑up time twice when computing DMA total time.",
+  "Using the word “polling” to mean “checking a flag in software” and forgetting that the CPU still executes the loop.",
+  "Assuming the DMA controller eliminates all CPU work; it still needs start and completion handling."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the name of the hardware signal a device sends to the CPU to indicate that it needs service?",
+   "marks": 2,
+   "a": "Interrupt request (IRQ)."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why CPU utilisation is high during a polling‑based I/O operation.",
+   "marks": 3,
+   "a": "The CPU repeatedly reads the device status register in a tight loop, consuming cycles even when no data is ready, so most of the CPU time is spent on the poll."
+  },
+  {
+   "level": "apply",
+   "q": "Given a device that generates an interrupt every 5 ms and an ISR that takes 0.2 ms, calculate the CPU utilisation due to this interrupt source.",
+   "marks": 4,
+   "a": "Utilisation = ISR time ÷ (interrupt period) = 0.2 ms ÷ 5 ms = 0.04 = 4 %."
+  },
+  {
+   "level": "apply",
+   "q": "A DMA controller can move data at 2 MB/s. How long does it take to transfer 1 MB?",
+   "marks": 3,
+   "a": "Time = size ÷ bandwidth = 1 MB ÷ 2 MB/s = 0.5 s = 500 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the pros and cons of using DMA versus interrupt‑driven I/O for a high‑frequency sensor that produces 256 B every 1 ms.",
+   "marks": 6,
+   "a": "Interrupt‑driven I/O: low hardware cost, but ISR must run every 1 ms, consuming CPU time (256 B ÷ bus speed). DMA: higher hardware cost, but can transfer the 256 B with a single start command and minimal CPU involvement, reducing jitter. However, DMA setup latency may be comparable to the 1 ms interval, so careful timing is needed."
+  },
+  {
+   "level": "remember",
+   "q": "What register does the CPU typically write to in order to start a DMA transfer?",
+   "marks": 2,
+   "a": "The DMA control register (or command register)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does polling give the worst response time when the device is idle for a long period?",
+   "marks": 3,
+   "a": "Because the CPU must keep checking the status register at regular intervals; if the interval is short the CPU wastes cycles, if it is long the device may wait longer before being noticed."
+  },
+  {
+   "level": "analyze",
+   "q": "A system uses both polling and interrupts for the same device. Under what condition would the poll be disabled?",
+   "marks": 4,
+   "a": "When the interrupt mechanism is confirmed to work reliably, the poll can be disabled to avoid redundant CPU usage; typically after device initialization and successful IRQ handling."
+  }
+ ],
+ "beyond": "Not for the exam. Modern systems combine these mechanisms. High‑speed NICs use DMA with multiple queues, while low‑power microcontrollers rely on interrupts to stay in sleep mode. Research explores zero‑copy DMA that bypasses kernel buffers, reducing latency for data‑center workloads. To learn more, search for \"I/O virtualization\", \"SR‑IOV\" and \"kernel bypass networking\"."
+}

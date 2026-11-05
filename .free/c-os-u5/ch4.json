@@ -1,0 +1,239 @@
+{
+ "lead": "File systems store persistent data on disks. They need a fixed layout so the OS can find files quickly. The layout consists of a superblock, an inode table, data blocks and a free‑block bitmap. The Virtual File System (VFS) sits above concrete file‑system code and presents a uniform API to applications. This chapter explains the internal structures and how VFS translates generic calls to specific file‑system operations.",
+ "prereq": "You need: basic file concepts from <a href=\"#file-concept-attributes-and-access-methods\">5.1</a> and directory ideas from <a href=\"#directory-structure-and-implementation\">5.2</a>.",
+ "sections": [
+  {
+   "h3": "Internal layout of a UNIX‑like file system",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The first disk block (block 0) holds the superblock. The superblock contains fixed metadata such as block size, total blocks, and the location of the inode table."
+    },
+    {
+     "type": "p",
+     "text": "The inode table occupies a contiguous range of blocks after the superblock. Each inode is a fixed‑size record that stores file attributes and pointers to data blocks."
+    },
+    {
+     "type": "p",
+     "text": "Data blocks store the actual file bytes. An inode may contain direct pointers, a single indirect block, a double indirect block, etc."
+    },
+    {
+     "type": "p",
+     "text": "The free‑block bitmap marks each block as free (0) or used (1). It is usually placed in a dedicated block for fast allocation."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Read the superblock to obtain the start of the inode table.",
+      "Locate the inode number of the target file.",
+      "Read the inode to get the list of data‑block numbers.",
+      "Use the bitmap to find free blocks for new allocations."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "FreeBlocks = TotalBlocks – UsedBlocks",
+     "where": "TotalBlocks is the number of blocks on the disk; UsedBlocks is the count of bits set to 1 in the bitmap."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Superblock: most fields are set at creation, but some fields (e.g., free block count, timestamps) are updated by the file system as needed.",
+      "Inode table: grows only when the file system is created.",
+      "Data blocks: can be fragmented.",
+      "Bitmap: simple and fast for allocation."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "From file name to data blocks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A directory is a special file that maps file names to inode numbers. When an application opens a file, the OS walks the directory hierarchy to obtain the inode."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Start at the root directory (inode 2).",
+      "Read each directory entry until the target name matches.",
+      "Extract the inode number from the matching entry.",
+      "Read the inode to get data‑block pointers."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "If the file is larger than the direct pointers can hold, the inode points to an indirect block that contains additional data‑block numbers."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\nint main(void) {\n    int blocks[] = {20, 21, 22};\n    printf(\"%d %d %d\\n\", blocks[0], blocks[1], blocks[2]);\n    return 0;\n}",
+     "stdin": "",
+     "output": "20 21 22"
+    }
+   ]
+  },
+  {
+   "h3": "Virtual File System (VFS) abstraction",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "VFS defines a set of generic operations such as open, read, write and close. Each concrete file system implements these operations in a structure called a file‑system type."
+    },
+    {
+     "type": "p",
+     "text": "When an application calls open( ), VFS looks up the mount point, selects the appropriate file‑system type, and invokes its open method."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Parse the pathname and find the mount point.",
+      "Select the file‑system driver (e.g., ext4, FAT).",
+      "Call the driver’s open function with the inode number.",
+      "Return a file descriptor that points to a VFS file object."
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "VFS provides portability across different file‑system types (ext4, FAT, NFS, etc.).",
+      "Drivers can be added without changing user programs.",
+      "Caching and permission checks are performed in VFS."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The four core components of a typical UNIX‑like file system and their relationships.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "FS internal components",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Superblock",
+     "note": "",
+     "style": "accent"
+    },
+    {
+     "id": "b",
+     "label": "Inode table",
+     "note": "",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Data blocks",
+     "note": "",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Free bitmap",
+     "note": "",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "a",
+     "to": "d",
+     "label": "",
+     "style": "solid"
+    }
+   ],
+   "aria": "Internal components of a typical UNIX‑like file system."
+  }
+ },
+ "examples": [
+  {
+   "question": "A disk has 1024 blocks. Block 0 holds the superblock, blocks 1‑4 hold the inode table, and block 5 holds the free bitmap. Inode 7 contains three direct pointers to blocks 20, 21 and 22. List the physical block numbers that store the file data.",
+   "steps": [
+    "Identify the inode number: 7.",
+    "Read inode 7 from the inode table (blocks 1‑4).",
+    "Extract the three direct pointers: 20, 21, 22.",
+    "These pointers are the physical block numbers of the file."
+   ],
+   "answer": "The file occupies blocks 20, 21 and 22.",
+   "check": "data = [20, 21, 22]\nfor b in data:\n    print(b)",
+   "values": [
+    20,
+    21,
+    22
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(void) {\n    int blocks[] = {20, 21, 22};\n    for (int i = 0; i < 3; ++i) {\n        printf(\"%d \", blocks[i]);\n    }\n    printf(\"\\n\");\n    return 0;\n}"
+   },
+   "stdin": "",
+   "output": "20 21 22"
+  }
+ ],
+ "traps": [
+  "Confusing inode numbers with data‑block numbers; the inode is a metadata record, not storage for file bytes.",
+  "Assuming the free bitmap is always in block 5; its location is stored in the superblock and can vary.",
+  "Forgetting that directory entries map names to inode numbers, not directly to data blocks."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What fixed‑size structure holds the overall file‑system parameters such as block size?",
+   "marks": 2,
+   "a": "The superblock."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a bitmap is used for free‑block management instead of a linked list of free blocks.",
+   "marks": 3,
+   "a": "A bitmap enables fast allocation and deallocation. It often gives O(1) time on average using word‑level operations, but worst‑case scanning may be O(n). It uses constant space proportional to the number of blocks and avoids the pointer overhead of a linked list."
+  },
+  {
+   "level": "apply",
+   "q": "Given a file system with 4096‑byte blocks and a bitmap of 512 bytes, how many blocks can the file system manage?",
+   "marks": 4,
+   "a": "Each bitmap byte tracks 8 blocks. 512 bytes × 8 = 4096 blocks."
+  },
+  {
+   "level": "apply",
+   "q": "A directory entry contains the name \"report.pdf\" and inode number 15. If inode 15 points to data blocks 300‑302, what are the physical blocks of the file?",
+   "marks": 4,
+   "a": "Blocks 300, 301 and 302."
+  },
+  {
+   "level": "analyze",
+   "q": "A VFS call open( ) receives pathname \"/mnt/usb/docs/readme.txt\". List the steps VFS performs to locate the file, assuming \"/mnt/usb\" is a mount point for a FAT file system.",
+   "marks": 6,
+   "a": "1. Parse the pathname and locate the mount point \"/mnt/usb\".\n2. Select the FAT driver.\n3. Starting from the FAT root directory, traverse \"docs\" to find the directory entry for the subdirectory.\n4. In the \"docs\" directory, locate the entry for \"readme.txt\" and obtain its starting cluster number.\n5. Call the FAT driver’s open method with that cluster number (or with the directory entry information).\n6. Return a file descriptor linked to a VFS file object."
+  },
+  {
+   "level": "remember",
+   "q": "Name the VFS operation that translates a generic read request into a file‑system‑specific read.",
+   "marks": 2,
+   "a": "The VFS read method (often called vfs_read)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does VFS improve portability of user programs across different storage media?",
+   "marks": 3,
+   "a": "Because user programs call only VFS APIs, which hide the details of the underlying file‑system implementation. The same program works on ext4, FAT, or network file systems without changes."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, VFS concepts are extended to distributed file systems such as Ceph and GlusterFS. Research explores log‑structured file systems that replace the bitmap with append‑only logs for higher write throughput. Cloud platforms expose object storage APIs that map to VFS layers internally. Next, study how modern Linux kernels implement VFS hooks for container isolation and overlay file systems."
+}

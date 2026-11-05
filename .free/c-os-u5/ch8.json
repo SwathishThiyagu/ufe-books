@@ -1,0 +1,230 @@
+{
+ "lead": "The I/O software stack connects an application’s request to the physical device. It exists to hide hardware details, to share devices safely, and to improve performance through buffering and caching. The stack is used every time a program reads a file, writes to a disk, or sends data over a network, and it is the foundation for reliable and fast I/O in Linux, Windows and mobile OSes.",
+ "prereq": "You need: basic I/O concepts from <a href=\"#i-o-hardware-polling-interrupts-and-dma\">I/O hardware</a> and file‑system basics from <a href=\"#file-concept-attributes-and-access-methods\">File concept</a>.",
+ "sections": [
+  {
+   "h3": "The I/O software stack",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An application calls an OS API such as read() or write(). The API checks parameters, updates file descriptors and forwards the request to the buffer cache. The cache holds recently used blocks in RAM and can satisfy the request without touching the device. If the needed block is not cached, the request then passes to the appropriate device driver. The driver translates the logical request into block numbers or command codes that the hardware understands and initiates the device operation. The stack therefore looks like: Application → OS API → Buffer Cache → Driver → Device."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Application: code written in C, Java, Python, etc.",
+      "OS API: system calls like read(), write(), ioctl().",
+      "Buffer cache: RAM area managed by the kernel.",
+      "Driver: kernel module that knows the device protocol.",
+      "Device: magnetic disk, SSD, network card, etc."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Application issues read(fd, buf, n).",
+      "Kernel validates fd and checks the buffer cache.",
+      "If the needed block is cached, copy it to buf.",
+      "If not cached, driver issues a device read.",
+      "Device returns data; driver stores it in the cache and copies to buf."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Device drivers and buffering",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A driver is a kernel program that knows how to start, stop and communicate with a specific device. It abstracts the device registers, command sequences and interrupt handling into a uniform interface. The kernel uses the page cache, a global RAM area, to buffer data read from or written to the device before it reaches the user buffer."
+    },
+    {
+     "type": "formula",
+     "text": "B = Bsize × Nreads",
+     "where": "B is total bytes transferred from device, Bsize is the buffer size in bytes, Nreads is the number of device read operations."
+    },
+    {
+     "type": "p",
+     "text": "If a file of 8 KB is read with a driver buffer of 4 KB, the formula gives Nreads = 8 KB ÷ 4 KB = 2 reads. Each read moves one buffer’s worth of data from the device to RAM."
+    },
+    {
+     "type": "p",
+     "text": "If the file size is not a multiple of Bsize, the last read may transfer fewer bytes, so B ≤ Bsize × Nreads."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\nint main(){\n    const int fileSize = 8192; // bytes\n    const int bufSize = 4096;  // bytes\n    int reads = fileSize / bufSize;\n    printf(\"Device reads required: %d\\n\", reads);\n    return 0;\n}",
+     "stdin": "",
+     "output": "Device reads required: 2"
+    }
+   ]
+  },
+  {
+   "h3": "Caching policies: write‑through, write‑back, read‑ahead and page cache",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Caching improves performance by keeping frequently accessed blocks in RAM. Two main write policies exist. Write‑through copies data to the device immediately; it guarantees that the disk always has the latest data but incurs a write latency for every call. Write‑back postpones the actual device write until the block is evicted or a sync request arrives; it is faster but risks data loss on power failure."
+    },
+    {
+     "type": "p",
+     "text": "Read‑ahead (or prefetch) is used when sequential access is detected. The kernel reads the next block(s) into the cache before the application asks for them, reducing the number of wait cycles. The page cache is the unified cache for file data and metadata; it is shared by all processes, so a block read by one program is instantly available to another."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Write‑through: every write → cache + device.",
+      "Write‑back: write → cache; device write delayed.",
+      "Read‑ahead: anticipate next block(s) and fetch early.",
+      "Page cache: global RAM pool for file pages."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Application calls write(fd, data, n).",
+      "Kernel stores data in the page cache.",
+      "If policy is write‑through, driver issues device write now.",
+      "If policy is write‑back, driver marks page dirty and defers write.",
+      "Background flush thread eventually writes dirty pages."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The five software layers from an application down to the physical device, showing the flow of an I/O request.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "I/O software layers",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Application",
+     "note": "",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "OS API",
+     "note": "",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Buffer Cache",
+     "note": "",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Driver",
+     "note": "",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "Device",
+     "note": "",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "d",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "c",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "e",
+     "label": "",
+     "style": "solid"
+    }
+   ],
+   "aria": "Software layers from application to hardware with buffering."
+  }
+ },
+ "examples": [
+  {
+   "question": "A program reads a 12 KB file using a driver buffer of 4 KB. How many device read operations are required? Show the calculation.",
+   "steps": [
+    "File size = 12 KB = 12 × 1024 = 12288 bytes.",
+    "Buffer size = 4 KB = 4 × 1024 = 4096 bytes.",
+    "Number of reads = ceil(12288 ÷ 4096) = ceil(3) = 3 reads."
+   ],
+   "answer": "Three device reads are needed.",
+   "check": "file_size = 12 * 1024\nbuf_size = 4 * 1024\nreads = -(-file_size // buf_size)  # ceiling division\nprint(reads)",
+   "values": [
+    3
+   ],
+   "code": {
+    "lang": "c",
+    "code": "#include <stdio.h>\nint main(){\n    const int fileSize = 12 * 1024; // bytes\n    const int bufSize = 4 * 1024;   // bytes\n    int reads = (fileSize + bufSize - 1) / bufSize; // ceiling division\n    printf(\"Device reads required: %d\\n\", reads);\n    return 0;\n}"
+   },
+   "stdin": "",
+   "output": "Device reads required: 3"
+  }
+ ],
+ "traps": [
+  "Assuming that a newly opened file will always be served from the cache, ignoring the first‑time miss.",
+  "Confusing write‑through with write‑back and swapping the meaning of ‘dirty’ pages.",
+  "Using the buffer size as the total cache size; they are different concepts.",
+  "Counting only the number of reads and forgetting that writes may also cause cache evictions."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the five layers of the I/O software stack in order from the application down to the hardware.",
+   "marks": 2,
+   "a": "Application → OS API → Buffer Cache → Driver → Device."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a write‑back cache can be faster than a write‑through cache.",
+   "marks": 3,
+   "a": "Write‑back stores data in RAM and delays the actual device write until the block is evicted or a sync occurs, reducing the number of immediate slow disk writes."
+  },
+  {
+   "level": "apply",
+   "q": "A 20 KB file is read with a driver buffer of 6 KB. Compute the number of device reads required.",
+   "marks": 4,
+   "a": "File size = 20 KB = 20480 bytes; buffer = 6 KB = 6144 bytes; reads = ceil(20480 ÷ 6144) = 4 reads."
+  },
+  {
+   "level": "apply",
+   "q": "If the system uses write‑through, how many disk writes occur when a program writes 8 KB of data in one call?",
+   "marks": 4,
+   "a": "Assuming a device block size of 4 KB, the data is split into two 4 KB blocks. Each block triggers an immediate device write, so 2 disk writes."
+  },
+  {
+   "level": "analyze",
+   "q": "A program repeatedly reads the same 2 KB record from a large file. Discuss how the buffer cache and read‑ahead affect performance.",
+   "marks": 5,
+   "a": "The first read causes a device access and stores the 4 KB block containing the record in the cache. Subsequent reads hit the cache, eliminating device latency. Read‑ahead may fetch the next block, which is unnecessary for this pattern but does not hurt much."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the impact on data integrity of write‑through versus write‑back when a sudden power loss occurs after a write call.",
+   "marks": 5,
+   "a": "With write‑through, the data has already been written to the device, so it is safe. With write‑back, the data may still reside only in RAM; a power loss can cause loss of the unwritten (dirty) data."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, modern SSDs expose internal caches that interact with the OS page cache, creating multi‑level caching hierarchies. Research explores persistent memory (e.g., Intel Optane) where the line between cache and storage blurs, requiring new driver models. Cloud providers implement distributed caching layers (e.g., Amazon EFS cache) to reduce network I/O. For further study, look up \"NVMe driver architecture\" and \"cache coherence in multi‑core systems\"."
+}
