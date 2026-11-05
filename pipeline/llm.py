@@ -23,7 +23,7 @@ class ModelError(RuntimeError):
     pass
 
 
-def _http(method, url, key, body=None, timeout=300):
+def _http(method, url, key, body=None, timeout=240):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method,
                                  headers={'Content-Type': 'application/json', 'x-goog-api-key': key})
@@ -80,7 +80,7 @@ class Gemini:
                 n = m.get('name', '').replace('models/', '')
                 if 'generateContent' not in m.get('supportedGenerationMethods', []): continue
                 if not re.match(r'gemini-\d', n) or version_key(n) < (2, 5): continue
-                if re.search(r'lite|image|tts|audio|live|embedding|vision|thinking-exp|robotics|computer-use|learnlm|-8b|nano|veo|omni', n): continue
+                if re.search(r'lite|image|tts|audio|live|embedding|vision|thinking-exp|robotics|computer-use|customtools|learnlm|-8b|nano|veo|omni', n): continue
                 names.append(n)
         else:
             log(f'could not list models (HTTP {st}): {js.get("error", {}).get("message", "")[:200]}')
@@ -98,16 +98,23 @@ class Gemini:
         log(f'models: writer {writer[:4]}, reviewer {reviewer[:4]}')
         return cls(key, log, writer, reviewer, float(os.environ.get('GEMINI_MIN_GAP', '6.5')))
 
-    def _pick(self, role):
-        for m in (self.reviewer if role == 'review' else self.writer):
-            if m not in self.dead:
+    def _pick(self, role, busy=()):
+        alive = [m for m in (self.reviewer if role == 'review' else self.writer) if m not in self.dead]
+        if not alive:
+            raise QuotaExhausted('every free model has used its quota for today')
+        for m in alive:
+            if m not in busy:
                 return m
-        raise QuotaExhausted('every free model has used its quota for today')
+        return None          # every live model is overloaded right now
 
     def text(self, task, system, prompt, role='write', temperature=0.6, json_mode=True, max_tokens=32768):
         attempt = 0
+        busy, fails, waited = set(), {}, 0.0
         while True:
-            model = self._pick(role)
+            model = self._pick(role, busy)
+            if model is None:            # all overloaded: wait, then try them all again
+                if waited > 2400: raise ModelError(f'{task}: every model stayed overloaded for 40 minutes')
+                self.log(f'  all models busy; waiting 90s'); time.sleep(90); waited += 90; busy.clear(); continue
             gap = time.time() - self.last.get(model, 0)
             if gap < self.min_gap:
                 time.sleep(self.min_gap - gap)
@@ -154,10 +161,12 @@ class Gemini:
                 raise SystemExit('The Gemini API key was refused. Check the GEMINI_API_KEY secret.')
             if st in (400, 404):
                 self.log(f'  {model}: HTTP {st} {msg[:160]}; dropping this model'); self.dead.add(model); continue
-            attempt += 1
-            if attempt > 6: raise ModelError(f'{task}: HTTP {st} {msg}')
-            wait = min(120, 8 * 2 ** attempt) + random.random() * 3
-            self.log(f'  {model}: HTTP {st} {msg[:120]}; retry in {wait:.0f}s'); time.sleep(wait)
+            # 5xx, overload or network trouble: one quick retry, then move on to the next model
+            fails[model] = fails.get(model, 0) + 1
+            if fails[model] >= 2:
+                self.log(f'  {model}: HTTP {st} {msg[:100]}; trying another model'); busy.add(model); continue
+            wait = 10 + random.random() * 5
+            self.log(f'  {model}: HTTP {st} {msg[:100]}; retry in {wait:.0f}s'); time.sleep(wait)
 
     def json(self, task, system, prompt, role='write', temperature=0.6, check=None):
         """Ask for JSON. `check(data)` may return a list of problems; they are sent back once or twice."""
