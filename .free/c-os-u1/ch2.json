@@ -1,0 +1,208 @@
+{
+ "lead": "A computer is not only a CPU. It is a CPU, memory and device controllers joined by buses, and the operating system must make them cooperate. Devices are much slower than the CPU, so the CPU cannot sit and wait for each one. Interrupts let a device signal the CPU, and DMA lets a device move data without the CPU copying each byte. This chapter shows the hardware path from a key press or disk read to the kernel's interrupt handler. The same mechanism drives network cards, timers, keyboards and system calls on phones and servers.",
+ "prereq": "You need: <a href=\"#role-of-an-os-and-computer-system-organization\">Chapter 1.1</a> for the OS as resource manager and abstraction layer.",
+ "sections": [
+  {
+   "h3": "CPU, memory, buses and controllers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A von Neumann computer keeps instructions and data in the same memory. The CPU fetches an instruction, decodes it, executes it, and writes a result back. This is the stored-program idea. Phones, laptops and servers all follow it."
+    },
+    {
+     "type": "p",
+     "text": "Inside the CPU, registers hold the few values needed right now. The program counter (PC) holds the address of the next instruction. The instruction register (IR) holds the instruction being decoded. The memory address register (MAR) holds an address, and the memory data register (MDR) holds the value moving to or from memory. General registers hold operands, and the flags register holds condition bits such as zero and carry. The OS saves and restores these registers when it switches activities."
+    },
+    {
+     "type": "p",
+     "text": "The CPU, memory and device controllers share buses. The address bus carries the address of a memory cell or device register. The data bus carries the value. The control bus carries read, write, interrupt and clock signals. A device controller is the hardware between a device and the bus. A disk controller, keyboard controller and network interface controller each have registers. The CPU writes a command to a control register, reads a status register, and moves data through a data register. On many systems these registers are memory-mapped: they appear at ordinary addresses, so the CPU uses normal load and store instructions."
+    },
+    {
+     "type": "p",
+     "text": "The OS needs this picture because a driver is a small program that talks to controller registers. Driver layers are in Unit 5."
+    }
+   ]
+  },
+  {
+   "h3": "Polling, interrupt-driven I/O and DMA",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Polling is the simplest way to wait for a device. The CPU reads a status bit in a loop. If the bit is 0, the device is not ready; if it is 1, the CPU reads the data. Polling needs no special hardware and is predictable, but the CPU burns cycles while it waits. A fast CPU polling a slow keyboard wastes almost all its time."
+    },
+    {
+     "type": "p",
+     "text": "Interrupt-driven I/O reverses the control. The CPU starts the device and continues useful work. When the device is ready, the controller asserts an interrupt request line (IRQ). The CPU finishes the current instruction, saves enough state to return later, and jumps to kernel code. That code runs the interrupt service routine (ISR) for the device. The CPU does not spin, but every event costs an interrupt entry and exit. A device that moves one byte per interrupt can still overload the CPU."
+    },
+    {
+     "type": "p",
+     "text": "Direct memory access (DMA) removes the CPU from the copying loop. The CPU programs a DMA controller with the source address, destination address and byte count. The DMA controller moves the block between the device and memory while the CPU runs other code. When the block is complete, the DMA controller raises one interrupt. For a 4 KiB disk block, interrupt-driven byte-by-byte I/O may cause 4096 interrupts; DMA causes one. The cost is a small setup time and one interrupt at the end."
+    },
+    {
+     "type": "p",
+     "text": "Use polling when the wait is very short or the device is checked often. Use interrupts when events are rare and unpredictable. Use DMA for block devices: disks, network cards and graphics engines. In the figure, a 40 ms DMA transfer runs in parallel with 40 ms of application work."
+    }
+   ]
+  },
+  {
+   "h3": "Interrupts, traps and the vector table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An interrupt source is any hardware unit that can raise an interrupt: a keyboard, disk controller, network card, timer or power-failure circuit. A timer interrupt is how the OS takes back the CPU from a runaway program; dual mode and timers are covered in <a href=\"#os-operations-dual-mode-and-timers\">Chapter 1.4</a>."
+    },
+    {
+     "type": "p",
+     "text": "Several devices can ask at once, so an interrupt controller ranks them by priority. A power-failure interrupt can interrupt a low-priority ISR; a low-priority request waits. Each line has a mask bit; a masked line is ignored until the OS unmasks it. Intel uses an advanced programmable interrupt controller (APIC); ARM uses a generic interrupt controller (GIC) in many systems. The controller collects requests, picks the highest priority, and tells the CPU which number to service."
+    },
+    {
+     "type": "p",
+     "text": "The CPU needs an address for each interrupt number. A vector table is an array of entry points indexed by interrupt number. Intel x86 uses an interrupt descriptor table (IDT), usually with 256 entries. Each entry gives the code address, privilege level and gate type. ARM uses an exception vector table at a fixed low address, with entries for reset, undefined instruction, supervisor call, prefetch abort, data abort, IRQ and FIQ. Some syllabi call this the interrupt descriptor table; the general name is interrupt vector table."
+    },
+    {
+     "type": "p",
+     "text": "The interrupt sequence is short and fixed."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Device asserts IRQ.",
+      "CPU completes the current instruction; the controller supplies a vector number.",
+      "CPU saves PC and flags, switches to kernel mode, and loads the handler address from the vector table.",
+      "ISR saves other registers it will use, services the device, and acknowledges it. ISRs should be short so other interrupts are not delayed.",
+      "Return-from-interrupt restores PC and flags; the interrupted code continues."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A trap is a software-generated interrupt caused by an instruction. A system call uses a trap instruction to enter the kernel; a divide by zero or a page fault also traps. Traps are synchronous: they happen at a known instruction. Hardware interrupts are asynchronous: they arrive between instructions. A trap is not a process; it is a control transfer. System calls are covered in <a href=\"#system-calls-and-their-types\">Chapter 1.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The disk moves data by DMA for 40 ms while the CPU runs the application. At 40 ms the disk interrupts; the CPU spends 5 ms taking the interrupt and 10 ms in the ISR, then the application resumes at 55 ms and runs to 100 ms.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "CPU",
+     "bars": [
+      {
+       "label": "app",
+       "start": 0,
+       "end": 40,
+       "style": "normal"
+      },
+      {
+       "label": "IRQ",
+       "start": 40,
+       "end": 45,
+       "style": "live"
+      },
+      {
+       "label": "ISR",
+       "start": 45,
+       "end": 55,
+       "style": "accent"
+      },
+      {
+       "label": "app",
+       "start": 55,
+       "end": 100,
+       "style": "normal"
+      }
+     ]
+    },
+    {
+     "label": "Disk",
+     "bars": [
+      {
+       "label": "DMA",
+       "start": 0,
+       "end": 40,
+       "style": "muted"
+      }
+     ]
+    }
+   ],
+   "aria": "The CPU runs an application until a disk interrupt at 40 ms, handles the interrupt for 15 ms, then resumes the application at 55 ms."
+  }
+ },
+ "examples": [
+  {
+   "question": "A disk controller uses DMA to read a block into memory in 40 ms while the CPU runs an application. At t = 0 ms the CPU starts the application and the disk starts DMA. DMA ends and the disk raises one interrupt at t = 40 ms. The CPU spends 5 ms taking the interrupt and 10 ms running the disk ISR. Draw the CPU and disk timeline from 0 to 100 ms. Find total CPU time in the application, total interrupt-handling time, disk DMA time, and the time the application resumes.",
+   "steps": [
+    "Disk DMA runs from 0 ms to 40 ms. It raises one interrupt at 40 ms. Disk DMA time = 40 ms.",
+    "CPU runs the application from 0 ms to 40 ms. First application stretch = 40 ms.",
+    "CPU takes the interrupt from 40 ms to 45 ms. Interrupt entry time = 5 ms.",
+    "CPU runs the disk ISR from 45 ms to 55 ms. ISR time = 10 ms. Interrupt handling total = 5 + 10 = 15 ms.",
+    "The application resumes at 40 + 5 + 10 = 55 ms. It runs from 55 ms to 100 ms. Second application stretch = 100 − 55 = 45 ms.",
+    "Total application time = 40 + 45 = 85 ms. Check: 85 ms application + 15 ms handling = 100 ms."
+   ],
+   "answer": "The application runs for 85 ms in total, interrupt handling takes 15 ms, disk DMA lasts 40 ms, and the application resumes at 55 ms.",
+   "check": "dma_end = 40\nirq_entry = 5\nisr = 10\nend = 100\napp_first = dma_end\nresume = dma_end + irq_entry + isr\napp_second = end - resume\napp_total = app_first + app_second\nhandling = irq_entry + isr\nprint(app_total)\nprint(handling)\nprint(dma_end)\nprint(resume)",
+   "values": [
+    85,
+    15,
+    40,
+    55
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "An interrupt is not a process. It has no process control block; the ISR runs in the context of whatever it interrupted.",
+  "A trap is not the same as a hardware interrupt. A trap is synchronous and caused by an instruction; an interrupt is asynchronous.",
+  "The IRQ number is not the ISR address. The vector table maps the number to an address.",
+  "DMA does not remove all CPU work. The CPU still sets up the transfer and handles the final interrupt.",
+  "Do not say the hardware saves every register. The CPU saves at least PC and flags; the ISR saves the rest it uses."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define interrupt and name one source.",
+   "marks": 2,
+   "a": "An interrupt is a signal that makes the CPU stop its current instruction stream and enter kernel code. A keyboard, disk controller, network card or timer can be a source."
+  },
+  {
+   "level": "remember",
+   "q": "What is a vector table? Give the Intel name.",
+   "marks": 2,
+   "a": "A vector table is an array of entry points indexed by interrupt number. Intel x86 calls it the interrupt descriptor table (IDT)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does DMA need fewer interrupts than interrupt-driven I/O for a block transfer?",
+   "marks": 3,
+   "a": "Interrupt-driven I/O may interrupt once per byte or word. DMA moves the whole block and raises one interrupt at the end, so the CPU handles one event instead of thousands."
+  },
+  {
+   "level": "apply",
+   "q": "A network card raises 500 interrupts per second. Each costs 6 µs to take and 14 µs in the ISR. What percentage of one CPU is spent on interrupts?",
+   "marks": 4,
+   "a": "Time per interrupt = 6 + 14 = 20 µs. Total per second = 500 × 20 µs = 10,000 µs = 10 ms. Fraction = 10 ms / 1000 ms = 0.01 = 1%."
+  },
+  {
+   "level": "analyze",
+   "q": "An ISR runs with interrupts masked for 2 ms while another device needs service every 1 ms. What can go wrong? Give one fix.",
+   "marks": 4,
+   "a": "The second device's request is delayed or lost, so its data may overrun and timing jitter grows. Keep the masked section short, allow priority-based nesting, or defer work out of the ISR."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between a trap and a hardware interrupt.",
+   "marks": 3,
+   "a": "A trap is synchronous and comes from an instruction, such as a system call or divide by zero. A hardware interrupt is asynchronous and comes from a device."
+  },
+  {
+   "level": "analyze",
+   "q": "Why should an ISR not call a blocking system call?",
+   "marks": 4,
+   "a": "The ISR runs in interrupt context and may have interrupts masked or partly disabled. Blocking would stop the CPU from servicing other devices and can deadlock the system. Defer long work to a kernel thread or bottom half."
+  }
+ ],
+ "beyond": "Not for the exam. In real systems, interrupt latency and jitter decide whether a robot arm or a car brake controller meets its deadline. Modern kernels split ISRs into a short top half and a deferred bottom half, and use message-signalled interrupts instead of shared lines. Search for interrupt latency, top half and bottom half, message-signalled interrupts, and generic interrupt controller."
+}

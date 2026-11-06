@@ -1,0 +1,213 @@
+{
+ "lead": "A running program must not be able to stop interrupts, write page tables, or halt the CPU. The OS uses two hardware features to stop it. A mode bit splits execution into user mode and kernel mode, and a timer interrupt returns control to the kernel after a fixed interval. Together they let an OS share one CPU safely among many programs, on a phone, a laptop or a bank server.",
+ "prereq": "You need: <a href=\"#role-of-an-os-and-computer-system-organization\">Chapter 1.1</a> for the OS as resource manager, and <a href=\"#computer-system-architecture-and-interrupts\">Chapter 1.2</a> for how interrupts enter OS code.",
+ "sections": [
+  {
+   "h3": "User mode, kernel mode and the mode bit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The CPU has a status bit called the mode bit. It is a hardware bit, not a normal variable that a program can load or store. When the mode bit is 1, the CPU runs in user mode. When it is 0, the CPU runs in kernel mode, also called supervisor mode or privileged mode."
+    },
+    {
+     "type": "p",
+     "text": "Kernel mode can execute every machine instruction and touch every memory address. User mode is restricted. Instructions that change the machine's protected state are privileged instructions. Examples: disable interrupts, set the timer, change the page-table base register, change the mode bit by a direct write, halt the CPU. In user mode the CPU refuses to execute them and raises an exception. This is not politeness; the hardware enforces it."
+    },
+    {
+     "type": "p",
+     "text": "The hardware itself sets the mode bit to 0 when it takes a trap; the program cannot do it by writing the bit."
+    },
+    {
+     "type": "p",
+     "text": "Memory protection works beside the mode bit. The kernel's code and data are marked kernel-only. A user-mode load or store to those addresses faults, even if the instruction is ordinary. So the mode bit and memory-protection bits together keep a buggy or hostile program out of the kernel."
+    }
+   ]
+  },
+  {
+   "h3": "Trap: the controlled door into kernel mode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A user program cannot set the mode bit to 0 by writing it. It must ask the hardware to trap. The usual instruction is a system call instruction; for example, <code>read()</code> in C becomes a trap instruction with a call number and arguments."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "User program places the system call number and arguments in registers.",
+      "The program executes the trap instruction.",
+      "Hardware saves the return address and switches to kernel mode: mode bit 0.",
+      "Kernel checks the call number, runs the service, and prepares to return.",
+      "Hardware restores the saved state and sets the mode bit back to 1."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A system call is not a separate mode and not a software function call. It is one instruction that enters the kernel through a fixed, hardware-checked entry point. <a href=\"#system-calls-and-their-types\">Chapter 1.6</a> covers the types of calls."
+    }
+   ]
+  },
+  {
+   "h3": "The timer: forcing the CPU back",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Mode protects the kernel from user instructions. It does not take the CPU away from a user program that is in an infinite loop. A user-mode loop executes only non-privileged instructions, so it is legal. The timer solves this."
+    },
+    {
+     "type": "p",
+     "text": "The timer is a hardware counter. The OS sets it before it gives the CPU to a user program; this is a privileged operation. The counter decrements at a fixed clock rate. When it reaches zero, it raises a timer interrupt. An interrupt switches the CPU to kernel mode and jumps to the OS's timer handler, regardless of what user code is running."
+    },
+    {
+     "type": "p",
+     "text": "The OS uses the timer interrupt to charge CPU time, update clocks and decide whether to reschedule. If it decides to switch, it saves the current process and runs another. See Unit 2 for context switching. The timer interval is a policy choice: too long and a hog keeps the CPU; too short and the OS spends its time handling interrupts."
+    },
+    {
+     "type": "p",
+     "text": "Neither feature is enough alone. Mode alone cannot preempt a legal user loop. A timer alone cannot stop a user program from disabling the timer or changing the interrupt vector table."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The cycle moves from user mode to a trap, then kernel mode, then back to user mode. Notice the mode bit values: 1 in user mode, 0 in kernel mode.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Mode switch cycle",
+   "nodes": [
+    {
+     "id": "user",
+     "label": "User mode",
+     "note": "mode bit 1",
+     "style": "accent"
+    },
+    {
+     "id": "trap",
+     "label": "System call or interrupt",
+     "note": "trap or IRQ",
+     "style": "live"
+    },
+    {
+     "id": "kernel",
+     "label": "Kernel mode",
+     "note": "mode bit 0",
+     "style": "accent"
+    },
+    {
+     "id": "ret",
+     "label": "Return",
+     "note": "restore state",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "user",
+     "to": "trap",
+     "label": "call",
+     "style": "solid"
+    },
+    {
+     "from": "trap",
+     "to": "kernel",
+     "label": "switch",
+     "style": "solid"
+    },
+    {
+     "from": "kernel",
+     "to": "ret",
+     "label": "return",
+     "style": "solid"
+    },
+    {
+     "from": "ret",
+     "to": "user",
+     "label": "resume",
+     "style": "solid"
+    }
+   ],
+   "aria": "A cycle that moves from user mode to a trap, then to kernel mode, and back to user mode after return."
+  }
+ },
+ "examples": [
+  {
+   "question": "A process starts at t = 0 ms in user mode on a single CPU. At t = 5 ms it calls read(); the kernel handles the call for 2 ms. At t = 10 ms a timer interrupt fires. Give the mode bit at t = 0, 5, 7 and 10 ms. State any assumption.",
+   "steps": [
+    "At t = 0 ms the process has just started. No kernel service is active, so it is in user mode with mode bit = 1.",
+    "At t = 5 ms the read() call executes its trap instruction. Hardware switches to kernel mode at once, so mode bit = 0.",
+    "The kernel service takes 2 ms. It ends at 5 + 2 = 7 ms. The kernel returns to the user program, so mode bit = 1.",
+    "From t = 7 ms to t = 10 ms the process runs in user mode, so the bit stays 1 in that interval.",
+    "At t = 10 ms the timer interrupt fires. Hardware switches to kernel mode to run the timer handler, so mode bit = 0.",
+    "Assumption: the trap is taken at exactly t = 5 ms, the return completes at exactly t = 7 ms, and the timer event is taken at exactly t = 10 ms. Real hardware adds small overheads at each boundary."
+   ],
+   "answer": "Mode bit: 1 at t = 0 ms, 0 at t = 5 ms, 1 at t = 7 ms, 0 at t = 10 ms.",
+   "check": "mode_at_0 = 1\nmode_at_5 = 0\nkernel_end = 5 + 2\nmode_at_7 = 1\nmode_at_10 = 0\nprint(mode_at_0)\nprint(mode_at_5)\nprint(mode_at_7)\nprint(mode_at_10)\n",
+   "values": [
+    1,
+    0,
+    1,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A system call is an instruction that traps; it is not a separate 'system mode' and not just a normal function call.",
+  "Mode bit 1 means user, 0 means kernel. Writing '1 = kernel' reverses the standard convention.",
+  "The timer interrupt is asynchronous and can arrive in the middle of a user instruction sequence; it does not need the program's permission.",
+  "A privileged instruction is not 'any important instruction'. It is one the hardware blocks in user mode. read() is a library routine that puts a call number in registers and executes a trap instruction; the trap instruction itself is not privileged — it is the legal user-mode door into the kernel. What is privileged is everything the kernel does after the trap, such as setting the timer or masking interrupts.",
+  "If a user program could set the timer or mask interrupts, protection would fail; these are privileged operations."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does mode bit 0 mean?",
+   "marks": 2,
+   "a": "The CPU is in kernel mode, also called supervisor or privileged mode. It can execute privileged instructions."
+  },
+  {
+   "level": "understand",
+   "q": "Why can't a user program set the mode bit to 0 directly?",
+   "marks": 3,
+   "a": "The mode bit is a hardware status bit. Writing it is a privileged operation. A user-mode store to it faults, so the program must enter the kernel through a trap."
+  },
+  {
+   "level": "apply",
+   "q": "A process runs in user mode. At t = 0 ms the OS sets a timer for 4 ms. The process enters the kernel at t = 2 ms for 1 ms. Give the mode bit at t = 0, 2, 3 and 4 ms.",
+   "marks": 4,
+   "a": "At 0 ms user mode: 1. At 2 ms trap to kernel: 0. Kernel returns at 2 + 1 = 3 ms: 1. Timer fires at 4 ms: 0. Sequence: 1, 0, 1, 0."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is a timer needed if dual mode already protects the kernel?",
+   "marks": 4,
+   "a": "Dual mode stops privileged instructions but allows a user-mode infinite loop. The timer interrupts that loop and forces a switch to kernel mode, where the OS can reschedule."
+  },
+  {
+   "level": "remember",
+   "q": "Name two privileged instructions.",
+   "marks": 2,
+   "a": "Any two of: disable interrupts, set the timer, change the page-table base register, halt the CPU, do direct I/O."
+  },
+  {
+   "level": "understand",
+   "q": "What is a trap?",
+   "marks": 3,
+   "a": "A trap is a hardware event caused by an instruction, such as a system call, that switches the CPU to kernel mode at a fixed entry point."
+  },
+  {
+   "level": "apply",
+   "q": "A system call takes 2 ms and the kernel returns at t = 7 ms. When did the call start?",
+   "marks": 2,
+   "a": "Start = 7 - 2 = 5 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "What happens if the timer fires while the CPU is already in kernel mode?",
+   "marks": 5,
+   "a": "No user-to-kernel switch is needed because the mode bit is already 0. The kernel may mask the interrupt during critical work or handle it after saving state. The handler still runs in kernel mode."
+  }
+ ],
+ "beyond": "Not for the exam. Real CPUs have more than two privilege levels: x86 has rings 0 to 3, and ARM has exception levels EL0 to EL3. Hypervisors use a new privilege level so a guest kernel runs below the host. Newer CPUs add memory tagging and control-flow integrity to limit what a compromised user process can do. Search for 'x86 protection rings', 'ARM exception levels' and 'tickless kernel'."
+}

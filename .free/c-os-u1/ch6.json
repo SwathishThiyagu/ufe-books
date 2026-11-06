@@ -1,0 +1,169 @@
+{
+ "lead": "A system call is the legal doorway from a user program into the kernel. The program needs a file, a new process, or the time, but those operations touch shared hardware and protected data. Dual mode stops user code from doing them directly. The system call makes the CPU switch to kernel mode at one controlled point, performs the service, and returns. Every program that reads a file, sends a packet, or starts a process uses this path. The C library usually hides the details, but the kernel entry is the real service request.",
+ "prereq": "You need: dual mode and traps from <a href=\"#os-operations-dual-mode-and-timers\">Chapter 1.4</a>, and the service list from <a href=\"#operating-system-services\">Chapter 1.5</a>.",
+ "sections": [
+  {
+   "h3": "The trap path",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A system call is a request to the kernel for a service that user mode cannot perform. The kernel runs it in kernel mode, after a controlled switch. The CPU instruction that causes the switch is a trap or a special syscall instruction. A trap is a synchronous interrupt: it happens because of the current instruction, not because a device raised a line. See <a href=\"#computer-system-architecture-and-interrupts\">Chapter 1.2</a> for interrupts."
+    },
+    {
+     "type": "p",
+     "text": "Most programs call a C library wrapper, not the trap directly. For <code>read(fd, buf, 10)</code>, the wrapper puts the system call number and the three arguments where the kernel expects them. It executes the trap. The CPU saves the return point, switches to kernel mode, and jumps to the kernel's system call handler. The handler reads the number, finds the table entry, checks the file descriptor and buffer, copies data, and puts a result in a register. It then returns to user mode and to the wrapper. The wrapper returns the result to the program."
+    }
+   ]
+  },
+  {
+   "h3": "Number, arguments and return value",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The system call number is a small integer that selects the kernel routine. The kernel indexes a system call table with it. Numbers are specific to the OS and CPU architecture. In the Linux x86-64 convention used in this chapter, <code>read</code> is 0; on another architecture it can differ. A program should call the library, not hard-code a number."
+    },
+    {
+     "type": "p",
+     "text": "Arguments travel in CPU registers when they fit. In x86-64 Linux, the first three arguments for <code>read</code> go in registers <code>rdi</code>, <code>rsi</code>, and <code>rdx</code>; the number goes in <code>rax</code>. If there are more arguments than registers, the library places them in a block in memory and passes the block's address in a register, or pushes them on the stack. The exact convention is part of the ABI. The kernel copies arguments it needs into kernel space; it does not trust user pointers."
+    },
+    {
+     "type": "p",
+     "text": "The return value also comes back in a register. For <code>read</code>, a positive value is the number of bytes copied, 0 means end of file, and -1 means an error; the library then sets <code>errno</code> to a code that explains the error. A library function is not always a system call. <code>strlen</code> runs only in user space. <code>printf</code> may buffer and call <code>write</code> later. The API is what you call; the system call is the kernel entry."
+    }
+   ]
+  },
+  {
+   "h3": "The standard types",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Calls are grouped by the service they request. The groups overlap, but exam answers use these names. Some syllabi call this group of calls the 'system call interface'."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Process control: create, end, wait for, load, and allocate memory to a process. Examples are <code>fork</code>, <code>exec</code>, <code>wait</code>, <code>exit</code>, and <code>kill</code>. See Unit 2 for process creation.",
+      "File management: create, open, read, write, close, delete, seek, and get or set file attributes. Examples are <code>open</code>, <code>read</code>, <code>write</code>, <code>close</code>, and <code>lseek</code>.",
+      "Device management: request and release a device, read or write a device, and get or set device attributes. Examples are <code>ioctl</code> and <code>read</code> or <code>write</code> on a device file.",
+      "Information maintenance: get or set time, date, system data, and process attributes. Examples are <code>getpid</code>, <code>time</code>, <code>uname</code>, and <code>sysinfo</code>.",
+      "Communication: create and delete a connection, send and receive messages, and share memory. Examples are <code>pipe</code>, <code>shmget</code>, <code>mmap</code>, <code>socket</code>, <code>send</code>, and <code>recv</code>. See Unit 2 for pipes.",
+      "Protection: get or set permissions and control access. Examples are <code>chmod</code>, <code>chown</code>, <code>umask</code>, and <code>setuid</code>. See Unit 6 for access control."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The program asks for up to 10 bytes, the kernel copies the 6 bytes left in the file, and the wrapper returns 6.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "User app",
+    "C library",
+    "Kernel"
+   ],
+   "messages": [
+    {
+     "from": "User app",
+     "to": "C library",
+     "label": "read(fd, buf, 10)",
+     "dashed": false
+    },
+    {
+     "from": "C library",
+     "to": "Kernel",
+     "label": "trap: syscall 0",
+     "dashed": false
+    },
+    {
+     "from": "Kernel",
+     "to": "C library",
+     "label": "return 6",
+     "dashed": true
+    },
+    {
+     "from": "C library",
+     "to": "User app",
+     "label": "return 6",
+     "dashed": true
+    }
+   ],
+   "aria": "A user program calls read in the C library; the library traps into the kernel with system call number 0; the kernel returns 6 bytes, and the library passes 6 back."
+  }
+ },
+ "examples": [
+  {
+   "question": "A program calls <code>read(fd, buf, 10)</code>. The file has 6 bytes left before end of file. Trace the system call path and give the call's type. State the return value and what the next read returns.",
+   "steps": [
+    "The user program calls the C library <code>read</code> with three arguments: <code>fd</code> is an open file descriptor, <code>buf</code> is the destination address, and 10 is the maximum number of bytes wanted.",
+    "The library sets the system call number to 0 for Linux x86-64 <code>read</code> and places the arguments in the expected registers: fd in <code>rdi</code>, buf in <code>rsi</code>, and 10 in <code>rdx</code>.",
+    "The library executes the trap. The CPU switches to kernel mode and enters the system call handler.",
+    "The kernel uses number 0 to select the read routine, checks the descriptor, and copies bytes from the file to <code>buf</code>. Only 6 bytes are available, so it copies 6, not 10.",
+    "The kernel puts 6 in the return register and returns to user mode. The library returns 6 to the program. The file offset has moved 6 bytes, so 4 of the requested 10 bytes were not read.",
+    "A later read at the same position finds end of file and returns 0."
+   ],
+   "answer": "The call returns 6 bytes, leaving 4 of the requested 10 bytes unread, and the next read returns 0; it is a file-management system call.",
+   "check": "requested = 10\navailable = 6\nreturned = min(requested, available)\nunread = requested - returned\nnext_read = 0\nprint(returned)\nprint(unread)\nprint(requested)\nprint(next_read)",
+   "values": [
+    6,
+    4,
+    10,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A library function is not automatically a system call. <code>strlen</code> is pure user code; <code>printf</code> may call <code>write</code> once, many times, or not yet because of buffering.",
+  "<code>read</code> returns the count of bytes copied. 0 means end of file, not 'zero bytes read because the buffer is empty'.",
+  "Do not treat one system call number as universal. The number for <code>read</code> varies with architecture and OS.",
+  "A return of -1 is an error, and the real cause is in <code>errno</code>. A positive return is a count, not the data itself.",
+  "API and system call are different layers. An API can be implemented with no trap, one trap, or several traps."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a system call?",
+   "marks": 2,
+   "a": "A controlled request from a user program to the kernel for a service that needs kernel mode."
+  },
+  {
+   "level": "remember",
+   "q": "Name the six standard types of system calls.",
+   "marks": 2,
+   "a": "Process control, file management, device management, information maintenance, communication, and protection."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a user program need a trap to enter the kernel?",
+   "marks": 3,
+   "a": "Dual mode keeps user code from running privileged instructions. The trap is the single controlled entry point that switches the CPU to kernel mode and to the kernel's handler."
+  },
+  {
+   "level": "apply",
+   "q": "A program calls <code>read(fd, buf, 8)</code> and 3 bytes remain in the file. What does this read return, and what does the next read return?",
+   "marks": 4,
+   "a": "It returns 3 bytes, because only 3 are available. The next read finds end of file and returns 0."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a C library function be cheaper than a system call even when both do similar work?",
+   "marks": 4,
+   "a": "A library function can run completely in user mode, with no mode switch and no kernel table lookup. It may also buffer work and avoid many small kernel entries."
+  },
+  {
+   "level": "understand",
+   "q": "What does a <code>read</code> return value of 0 mean?",
+   "marks": 3,
+   "a": "It means end of file: no bytes were copied because the file offset is at the end."
+  },
+  {
+   "level": "apply",
+   "q": "In Linux x86-64, <code>read</code> is system call 0 and its arguments are fd, buf, and count. Which register holds count?",
+   "marks": 5,
+   "a": "<code>rdx</code> holds count; <code>rdi</code> holds fd, <code>rsi</code> holds buf, and <code>rax</code> holds the system call number 0."
+  }
+ ],
+ "beyond": "Not for the exam. Real kernels reduce system call cost with vDSO, which runs some clock reads in user space, and with io_uring, which batches I/O requests through shared rings. Security tools use seccomp to filter system call numbers and eBPF to observe them. Search for seccomp, io_uring, and vDSO next."
+}
