@@ -1,0 +1,251 @@
+{
+ "lead": "Ether is the money Ethereum runs on. Fees and value transfers are counted in wei, an integer. A transaction is a signed instruction from an account that owns a private key: it moves value, pays gas and changes shared state. A message is an internal call made by code during execution, with no signature and no pool entry. Tokens are contract records, not coins. This chapter keeps ether, transactions and messages apart, because examiners test that confusion and every wallet depends on it.",
+ "prereq": "You need: <a href=\"#ethereum-network-and-ecosystem-components\">5.1</a> for accounts and nodes, the transaction life cycle from Unit 3, and digital signatures from Unit 4.",
+ "sections": [
+  {
+   "h3": "Ether, units and two account types",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Ether (ETH) is Ethereum's native currency. It pays for computation and moves between accounts. The network stores no decimals; it stores whole numbers of wei. 1 ETH = 10¹⁸ wei. Gas prices are quoted in gwei: 1 gwei = 10⁹ wei, so 1 ETH = 10⁹ gwei. Contract code holds wei as an integer, never as a floating-point number."
+    },
+    {
+     "type": "p",
+     "text": "Ethereum has two account types. Both have a 20-byte address and both can hold ether."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Externally owned account (EOA): derived from a public key and controlled by the matching private key. It has a balance and a nonce, and no code. Only an EOA can start a transaction.",
+      "Contract account: created by a transaction or by another contract. It has code and storage. It cannot act on its own; it runs only when a transaction or a message calls it."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The nonce is a counter kept per account. For an EOA it is the number of transactions that account has sent: a transaction with nonce 7 is rejected until nonce 6 is on chain, which fixes ordering and stops anyone re-broadcasting a signed transaction to move the same funds twice. For a contract account it counts the contracts created."
+    }
+   ]
+  },
+  {
+   "h3": "A transaction: fields and life cycle",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A transaction is a signed instruction from an EOA. Its fields are:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "nonce — the sender's next count",
+      "to — recipient address; empty when the transaction creates a contract",
+      "value — ether sent, in wei",
+      "data — input bytes for a contract call, or the bytecode when creating one",
+      "gasLimit — the maximum gas the sender allows this transaction to burn",
+      "gas price — legacy transactions give one gasPrice in wei per gas; newer type-2 transactions give maxFeePerGas and maxPriorityFeePerGas instead",
+      "v, r, s — the ECDSA signature over all the above fields and the chain id"
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A plain transfer to an EOA consumes exactly 21,000 gas and runs no code. Intrinsic gas for any transaction is 21,000 for the base, plus 32,000 more when creating a contract, plus 16 gas per non-zero calldata byte and 4 gas per zero byte. On top of that come the opcodes actually executed (<a href=\"#ethereum-virtual-machine-evm\">5.3</a>). The fee is not the same thing as the value."
+    },
+    {
+     "type": "formula",
+     "text": "fee = gasUsed × gasPrice",
+     "where": "gasUsed is the gas actually consumed (in gas); gasPrice is the price of one gas in wei per gas; fee is in wei. gasLimit is a cap, not a charge."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The wallet fills the fields, hashes them, signs the hash with the sender's private key and produces a raw transaction.",
+      "It broadcasts the raw bytes to a node.",
+      "The node checks the signature, the chain id, that the nonce is the next one, that the balance covers value + gasLimit × gasPrice, and that gasLimit is at least 21,000.",
+      "The transaction waits in the pool; a block producer orders candidates by fee per gas.",
+      "The EVM executes it, charging gas per opcode. Unused gas returns to the sender.",
+      "The node returns a receipt; the wallet reports confirmation as later blocks pile on top."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Messages, receipts and logs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A message is a call made by code while the EVM is already executing. CALL, STATICCALL and DELEGATECALL each send a message to another address, but the callee sees different things:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "CALL: the sender is the calling contract's address and the value is whatever is passed, which may be zero. The callee uses its own storage.",
+      "STATICCALL: the value is always zero and state writes are forbidden.",
+      "DELEGATECALL: the target's code runs in the caller's storage, and the callee sees the original msg.sender and msg.value of the parent frame — not the calling contract's own address or its own value."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The message also carries a data payload and a gas allowance. It is not a transaction: it has no signature and no nonce of its own, it never enters the pool, and it cannot exist without the transaction that started it. If a message reverts or runs out of gas, that frame's state changes and its ether transfer are undone; the caller receives a success flag and decides whether to continue or revert as well."
+    },
+    {
+     "type": "p",
+     "text": "After execution the node stores a receipt: status 1 for success or 0 for reverted, the gas used, the cumulative gas in the block, a bloom filter for quick log search, and the logs."
+    },
+    {
+     "type": "p",
+     "text": "Logs, also called events, are the cheap output channel. Each log has the emitting contract's address, up to four topics — topic 0 is usually the hash of the event signature — and a data blob. Contracts cannot read logs; logs exist for wallets, indexers and block explorers. Emitting a log costs far less gas than writing the same data to storage."
+    }
+   ]
+  },
+  {
+   "h3": "Tokens, and the two chains ETH and ETC",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A token is not a currency on its own chain; it is a number inside one contract's storage. ERC-20 defines a mapping from address to balance, a totalSupply, a decimals field, the functions transfer, approve and transferFrom, the view function balanceOf(address), a nested allowance mapping (owner to spender to amount), and the events Transfer and Approval. Wallets call balanceOf to display a balance. approve sets one entry in the allowance mapping; transferFrom spends from it."
+    },
+    {
+     "type": "p",
+     "text": "Token amounts are integers in the token's smallest unit. With decimals = 6, a stored balance of 2,500,000 means 2.5 tokens. Sending tokens is a transaction to the token contract whose data names transfer and the recipient, and its gas is paid in ether — so an account holding tokens but no ether cannot move them."
+    },
+    {
+     "type": "p",
+     "text": "Non-fungible tokens follow ERC-721: each tokenId has exactly one owner, so every unit is distinct rather than a line in a shared balance."
+    },
+    {
+     "type": "p",
+     "text": "In 2016 the DAO contract (<a href=\"#dao-ghost-protocol-and-side-chains\">5.8</a>) was drained. Most participants accepted a hard fork that rewrote the affected state, and that chain is ETH. Nodes that rejected the fork kept the original history and became ETC. Blocks before the fork are shared, and the same private key controls the same address on both chains, so replay is prevented only by putting the chain id in the signature."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "A signed transaction travels from user to wallet to node; the EVM executes it and a message call reaches the contract; a receipt travels back. The message lives inside execution and the receipt is the only proof the user gets.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A signed transaction moves from user to wallet to node, the EVM executes it, a contract receives an internal message, and a receipt returns to the user.",
+   "actors": [
+    "User",
+    "Wallet",
+    "Node",
+    "EVM",
+    "Contract"
+   ],
+   "messages": [
+    {
+     "from": "User",
+     "to": "Wallet",
+     "label": "sign tx",
+     "dashed": false
+    },
+    {
+     "from": "Wallet",
+     "to": "Node",
+     "label": "raw tx",
+     "dashed": false
+    },
+    {
+     "from": "Node",
+     "to": "EVM",
+     "label": "execute",
+     "dashed": false
+    },
+    {
+     "from": "EVM",
+     "to": "Contract",
+     "label": "message call",
+     "dashed": false
+    },
+    {
+     "from": "Contract",
+     "to": "EVM",
+     "label": "return data",
+     "dashed": true
+    },
+    {
+     "from": "EVM",
+     "to": "Node",
+     "label": "state change",
+     "dashed": true
+    },
+    {
+     "from": "Node",
+     "to": "Wallet",
+     "label": "receipt",
+     "dashed": true
+    },
+    {
+     "from": "Wallet",
+     "to": "User",
+     "label": "confirmed",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A sender transfers 0.1 ETH to a friend. The transaction consumes 21,000 gas and the gas price is 20 gwei. Find the fee in wei and in ETH, and the total ether debited from the sender.",
+   "steps": [
+    "gasUsed = 21,000 gas. gasPrice = 20 gwei = 20 × 10⁹ wei = 2 × 10¹⁰ wei per gas.",
+    "fee = gasUsed × gasPrice = 21,000 × 2 × 10¹⁰ wei = 4.2 × 10¹⁴ wei.",
+    "Convert to ETH: 4.2 × 10¹⁴ ÷ 10¹⁸ = 0.00042 ETH. Check in gwei: 21,000 × 20 gwei = 420,000 gwei, and 420,000 ÷ 10⁹ = 0.00042 ETH.",
+    "value = 0.1 ETH is separate from the fee.",
+    "Total debit = value + fee = 0.1 + 0.00042 = 0.10042 ETH."
+   ],
+   "answer": "The fee is 4.2 × 10¹⁴ wei = 0.00042 ETH, and the sender is debited 0.10042 ETH in total.",
+   "check": "gas_used = 21000\nprice_gwei = 20\nvalue_eth = 0.1\nprice_wei = price_gwei * 10**9\nfee_wei = gas_used * price_wei\nfee_eth = fee_wei / 10**18\ntotal_eth = value_eth + fee_eth\nprint(round(fee_eth, 5))\nprint(round(total_eth, 5))",
+   "values": [
+    0.00042,
+    0.10042
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The fee is gasUsed × gasPrice, never the value sent. They are added, not confused.",
+  "Unit slip: 20 gwei is 20 × 10⁹ wei. Multiply by 10⁹ before multiplying by gas, or the answer is off by a billion.",
+  "gasLimit is a cap: ether reserved is gasLimit × gasPrice, ether spent is gasUsed × gasPrice, and the difference is refunded.",
+  "A message is not a transaction: no signature, no nonce, no pool entry. Only an EOA starts a transaction.",
+  "Token balances carry their own decimals: a stored 2,500,000 with decimals = 6 is 2.5 tokens."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many wei are in 1 gwei, and how many gwei in 1 ETH?",
+   "marks": 2,
+   "a": "1 gwei = 10⁹ wei. 1 ETH = 10¹⁸ wei = 10⁹ gwei."
+  },
+  {
+   "level": "understand",
+   "q": "Why does every EOA transaction carry a nonce?",
+   "marks": 3,
+   "a": "The nonce is the count of transactions the account has sent. Nodes accept only the next expected nonce, so ordering is fixed and a re-broadcast signed transaction cannot execute twice. A gap blocks later transactions from that account."
+  },
+  {
+   "level": "apply",
+   "q": "A contract call uses 50,000 gas at a gas price of 30 gwei and sends 0.25 ETH. Find the fee and the total ether debited.",
+   "marks": 4,
+   "a": "gasPrice = 30 × 10⁹ = 3 × 10¹⁰ wei per gas. fee = 50,000 × 3 × 10¹⁰ = 1.5 × 10¹⁵ wei = 0.0015 ETH. Total debit = 0.25 + 0.0015 = 0.2515 ETH."
+  },
+  {
+   "level": "analyze",
+   "q": "A contract calls another contract, the inner call reverts, and the outer call catches the failure and continues. The transaction ends with receipt status 1. What was recorded about the failed inner message?",
+   "marks": 4,
+   "a": "Nothing separate. A message is not a transaction, so it has no own receipt and never enters the pool. The inner frame's state changes and ether transfer were rolled back; the only record is the outer receipt, its gas used and its logs, some of which may report the failure."
+  },
+  {
+   "level": "apply",
+   "q": "An ERC-20 token has decimals = 8 and a holder's stored integer balance is 123,400,000. What balance does a wallet display?",
+   "marks": 3,
+   "a": "Divide by 10⁸: 123,400,000 ÷ 100,000,000 = 1.234 tokens."
+  },
+  {
+   "level": "analyze",
+   "q": "An account holds a large token balance and 0 ETH. Explain why its token transfer fails before any code runs.",
+   "marks": 5,
+   "a": "A token transfer is a transaction sent to the token contract, and the sender pays gas in ether. At validation the node checks balance ≥ value + gasLimit × gasPrice. With 0 ETH the check fails, so the transaction is rejected and never reaches the EVM; the token balance cannot be spent without ether for gas."
+  }
+ ],
+ "beyond": "Not for the exam. Most networks now use EIP-1559 pricing: each block has a base fee that is burned and a priority tip for the block producer, so estimation uses maxFeePerGas and maxPriorityFeePerGas instead of one gasPrice. Blob-carrying transactions, priced separately, carry rollup data. Account abstraction (ERC-4337) lets a contract wallet pay fees or batch signatures, blurring the EOA-only rule for starting transactions. ERC-1155 puts many token types in one contract; ERC-4626 wraps yield-bearing vault shares as tokens."
+}

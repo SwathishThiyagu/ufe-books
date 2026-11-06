@@ -1,0 +1,168 @@
+{
+ "lead": "The Ethereum Virtual Machine (EVM) is the part of every Ethereum node that runs contract bytecode. It is a stack machine with 256-bit words, so the same bytecode gives the same result on every node. It is gas-metered: each opcode has a price, and execution stops when gas runs out. The EVM changes account state only through state changes that a block finally commits. Wallets, tokens, DeFi and NFTs all run on it.",
+ "prereq": "You need: transaction execution in <a href=\"#ether-tokens-transactions-and-messages\">5.2</a> and block structure from Unit 1.",
+ "sections": [
+  {
+   "h3": "A deterministic stack machine",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The EVM is a virtual machine: software inside each Ethereum node that executes bytecode. Bytecode is a sequence of bytes; each opcode is one byte, sometimes followed by immediate data. A contract account stores code. A transaction or message calls that code. Every full node runs the same bytecode with the same input and gets the same result. This determinism lets nodes agree on state without trusting one executor. Some syllabi call this the EVM execution model."
+    },
+    {
+     "type": "p",
+     "text": "The EVM is a stack machine, not a register machine. It has one last-in-first-out stack of 256-bit words. A 256-bit word is 32 bytes. Arithmetic is modulo 2²⁵⁶: values wrap on overflow. The stack holds at most 1024 items. Opcodes push, pop or combine stack items. For example PUSH1 0x02 pushes the one-byte value 2; ADD pops two items, adds them, and pushes the sum. High-level code from <a href=\"#solidity-programming-language\">5.5</a> compiles to this. Deployment and ABI are covered in <a href=\"#web3-contract-deployment-and-development-frameworks\">5.7</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Memory, storage and calldata",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The EVM has three data areas beyond the stack. Memory is a flat byte array, created fresh for each call frame. It is volatile: it disappears when the frame ends. Reading or writing memory costs gas, and memory expands in 32-byte words when touched, so large arrays cost more. Calldata is the read-only input bytes attached to a call. It is cheap to read and cannot be changed by the running code."
+    },
+    {
+     "type": "p",
+     "text": "Storage is persistent contract state: a key-value map from 256-bit keys to 256-bit values. SSTORE writes storage; SLOAD reads it. Storage survives between transactions and is part of account state committed in a block. Storage writes are far more expensive than memory writes because every node must keep the data. MSTORE writes a 256-bit word to memory. A common mistake is to treat memory as permanent; it is not. State that must survive must go to storage or be emitted in logs and stored off-chain."
+    }
+   ]
+  },
+  {
+   "h3": "Gas and call frames",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Gas is the unit of execution work. Every opcode has a gas cost. A transaction sets a gas limit; if execution uses all gas, it stops with out-of-gas and its state changes are rolled back. Unused gas is returned to the sender, subject to the fee rules. Gas accounting makes infinite loops impossible: a loop must pay each iteration. Gas costs can change between protocol upgrades, so bytecode that assumes a fixed total may fail after an upgrade."
+    },
+    {
+     "type": "p",
+     "text": "A CALL creates a new call frame with its own stack, memory and calldata. The caller can pass value in wei (see <a href=\"#ether-tokens-transactions-and-messages\">5.2</a>) and a gas limit. If the callee reverts, the CALL returns 0 and the callee's state changes are undone, but the caller can continue. REVERT stops execution, undoes the frame's state changes, returns remaining gas and can return error data. An invalid opcode consumes all gas in the frame. Logs are written by LOG opcodes; they appear in transaction receipts and are not readable by contracts during execution."
+    }
+   ]
+  },
+  {
+   "h3": "What a block commits",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The EVM itself does not decide consensus. It executes during block processing. After execution, the node has a new state root: a cryptographic commitment to all account balances, nonces, code and storage. The block header carries that root. If two nodes execute the same transactions on the same parent state, they must reach the same root. A revert leaves the state as if the failing internal call had not happened, apart from gas paid to the miner or validator. This is why contract code must check inputs and use REVERT deliberately."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The top of the stack is on the left in each row. PUSH1 adds one value; ADD replaces the top two values with their sum.",
+  "spec": {
+   "type": "array",
+   "title": "EVM stack for 60 02 60 03 01",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "After PUSH1 2",
+     "cells": [
+      "2"
+     ]
+    },
+    {
+     "label": "After PUSH1 3",
+     "cells": [
+      "3",
+      "2"
+     ]
+    },
+    {
+     "label": "After ADD",
+     "cells": [
+      "5"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 2,
+     "cell": 0,
+     "label": "top"
+    }
+   ],
+   "aria": "Three stack snapshots: 2, then 3 above 2, then the single result 5 after ADD."
+  }
+ },
+ "examples": [
+  {
+   "question": "A contract's bytecode begins 60 02 60 03 01. Opcode 60 is PUSH1: read the next byte and push it. Opcode 01 is ADD: pop two values, add them, and push the sum. PUSH1 costs 3 gas and ADD costs 3 gas. Give the stack after each instruction, top first, and the total gas used.",
+   "steps": [
+    "Start: stack is empty and gas used is 0.",
+    "Execute 60 02: PUSH1 0x02 pushes 2. Stack top first is [2]. Gas used = 3.",
+    "Execute 60 03: PUSH1 0x03 pushes 3. Stack top first is [3, 2]. Gas used = 3 + 3 = 6.",
+    "Execute 01: ADD pops 3 and 2, pushes 3 + 2 = 5. Stack top first is [5]. Gas used = 6 + 3 = 9."
+   ],
+   "answer": "After ADD the stack is [5] top first, and the total gas used is 9 gas.",
+   "check": "push_gas = 3\nadd_gas = 3\nstack = []\nstack.append(2)\nprint(stack[-1])\nstack.append(3)\nprint(stack[-1])\na = stack.pop()\nb = stack.pop()\nstack.append(a + b)\nprint(stack[-1])\nprint(2 * push_gas + add_gas)\n",
+   "values": [
+    2,
+    3,
+    5,
+    9
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The EVM is a stack machine, not a register machine. ADD pops two values and pushes one result; it does not leave the operands in place.",
+  "EVM words are 256-bit, and arithmetic wraps modulo 2²⁵⁶. Do not treat values as ordinary Python integers in overflow questions.",
+  "Memory is temporary and expands during a call, so memory gas grows. Storage is persistent account state and costs much more to write.",
+  "REVERT undoes the frame's state changes and returns unused gas; an invalid opcode consumes all gas in that frame. Out-of-gas also fails and rolls back.",
+  "Logs go to receipts, not to contract storage. A contract cannot read a log from an earlier transaction as if it were state."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the word size of the EVM stack?",
+   "marks": 2,
+   "a": "256 bits, which is 32 bytes."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a storage write cost more gas than a memory write?",
+   "marks": 3,
+   "a": "Storage is persistent account state kept by every node across blocks. Memory exists only inside one call frame and disappears when the frame ends."
+  },
+  {
+   "level": "apply",
+   "q": "The stack is [4, 9] with top first. Execute PUSH1 7, then ADD. Give the stack top first.",
+   "marks": 3,
+   "a": "After PUSH1 7 the stack is [7, 4, 9]. ADD pops 7 and 4 and pushes 11, so the stack is [11, 9]."
+  },
+  {
+   "level": "apply",
+   "q": "Opcode PUSH1 costs 3 gas, ADD costs 3 gas and MUL costs 5 gas. Bytecode runs PUSH1 2, PUSH1 3, ADD, PUSH1 4, MUL. What is the total gas used?",
+   "marks": 3,
+   "a": "There are three PUSH1 operations: 3 + 3 + 3 = 9 gas. ADD adds 3 gas, MUL adds 5 gas. Total = 9 + 3 + 5 = 17 gas. The stack ends with (2 + 3) × 4 = 20."
+  },
+  {
+   "level": "analyze",
+   "q": "A CALL to contract B reverts. What happens to B's storage changes and to the value returned to the caller?",
+   "marks": 4,
+   "a": "B's state changes inside that call frame are undone. CALL returns 0 to the caller. The caller can continue if it checks the return value; gas already used is not fully returned."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a contract not read a log emitted by an earlier transaction?",
+   "marks": 4,
+   "a": "Logs are stored in transaction receipts, not in account storage. EVM code can read its own storage, memory, calldata, code and environment, but not past receipts."
+  },
+  {
+   "level": "understand",
+   "q": "What does a transaction's gas limit protect against?",
+   "marks": 2,
+   "a": "It caps the work done. If gas runs out, execution stops and state changes revert, so an infinite loop cannot run forever."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems optimise EVM gas because small opcode changes multiply across many users. Zero-knowledge EVMs prove that off-chain execution matches EVM rules, and EVM equivalence is a research goal. Account abstraction changes how calls and gas are paid. Formal verification tools prove contract properties over all inputs. Search next for EVM opcodes, the Ethereum Yellow Paper, EVM equivalence and zkEVM."
+}

@@ -1,0 +1,256 @@
+{
+ "lead": "A DApp is a web page or mobile app that talks to a contract on Ethereum. The page cannot reach the chain by itself: a Web3 library turns a JavaScript function call into a JSON-RPC request, a wallet adds the signature, and a node runs the result on the EVM. Deployment follows the same path with one extra step — a transaction whose data is the contract's bytecode, which the network stores at a fresh address. Teams therefore use a development framework to compile, test and deploy the contract, and then to wire its address and ABI into the front end.",
+ "prereq": "You need: <a href=\"#ether-tokens-transactions-and-messages\">5.2</a> for transactions and gas, <a href=\"#solidity-programming-language\">5.5</a> for Solidity functions, and <a href=\"#ethereum-development-environment-and-test-networks\">5.6</a> for local chains and testnets.",
+ "sections": [
+  {
+   "h3": "JSON-RPC, providers and signers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An Ethereum node exposes its functions over JSON-RPC. Every request is a small JSON object with four fields: <code>jsonrpc</code> (the protocol version, normally \"2.0\"), <code>method</code> (the function to run), <code>params</code> (an array of arguments) and <code>id</code> (a tag echoed back in the reply). To read a balance the client sends method <code>eth_getBalance</code> with the address and the block tag \"latest\". Plain HTTP suits one-off requests. WebSocket suits subscriptions, where the node pushes new blocks and event logs to the client as they appear."
+    },
+    {
+     "type": "p",
+     "text": "A Web3 library writes and parses these messages so the programmer never handles raw JSON. Web3.js and ethers.js are the two JavaScript libraries in wide use. Both take a contract object, encode the call, send it to the node and decode the reply into ordinary JavaScript values. Python and Java have similar libraries."
+    },
+    {
+     "type": "p",
+     "text": "Two objects do the work. A <b>provider</b> knows a node's URL and transports requests; it is read-only. A <b>signer</b> holds a private key and can produce a signed transaction. ethers.js keeps them separate on purpose, so that code which only reads state can run with no key at all."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Object",
+      "Holds",
+      "Can do",
+      "Needs a key"
+     ],
+     "rows": [
+      [
+       "Provider",
+       "node URL",
+       "read state, run eth_call",
+       "no"
+      ],
+      [
+       "Signer",
+       "private key",
+       "sign and send transactions",
+       "yes"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "In a browser the signer is usually a wallet extension such as MetaMask, which injects a provider object at <code>window.ethereum</code>. The page asks the wallet to sign; the key never leaves the wallet. This is why a private key pasted into front-end JavaScript is a serious bug — anyone who opens the page can read it."
+    }
+   ]
+  },
+  {
+   "h3": "ABI, bytecode and the deployment transaction",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Solidity compiler emits two things a DApp needs. <b>Bytecode</b> is the hexadecimal EVM code that lives on chain. The <b>ABI</b> (Application Binary Interface) is a JSON list describing each public function: its name, argument types, return types, and whether it is view, pure or payable. The ABI is a calling convention, not code. It plays the role a function prototype plays in C — it tells the caller how to pack arguments and unpack results."
+    },
+    {
+     "type": "p",
+     "text": "To call a function, the library hashes the signature text, for example <code>transfer(address,uint256)</code>, with keccak-256 and keeps the first four bytes. That is the <b>selector</b>. Calldata is the selector, then each argument padded to a 32-byte word. Without the right ABI the library cannot build this calldata, so an address alone is not enough to use a contract."
+    },
+    {
+     "type": "p",
+     "text": "Deployment is a transaction with an empty <code>to</code> field. The <code>data</code> field holds the bytecode, with any constructor arguments appended. The EVM runs that init code, which returns the runtime code, and the node stores the runtime code at a new address. The address is the last 20 bytes of the keccak-256 hash of the RLP encoding of the deployer's address and its nonce, so each deployment from the same account lands at a different address."
+    },
+    {
+     "type": "p",
+     "text": "A read uses <code>eth_call</code>: one node runs the function against current state, returns the value at once, needs no signature, and spends no gas. A write is a full <a href=\"#ether-tokens-transactions-and-messages\">transaction</a>: signed, gossiped, mined, and paid for in gas. It returns only a transaction hash, not a value. You read the outcome later from the receipt and its event logs."
+    }
+   ]
+  },
+  {
+   "h3": "Frameworks and DApp front-end architecture",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A development framework automates the loop of compile, test, deploy. <b>Hardhat</b> is JavaScript and TypeScript based; it starts a local chain inside the same process, gives Solidity a <code>console.log</code>, and loads plugins for testing and verification. <b>Truffle</b> is the older tool: it uses numbered migration scripts and usually pairs with the Ganache local chain. Foundry, written in Rust, is a newer option. All three produce a build artifact per contract that bundles the ABI and bytecode, plus the address after deployment."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write the contract in a .sol file and compile it; the artifact holds ABI and bytecode.",
+      "Write tests that deploy to a local chain and assert on return values and events.",
+      "Write a deploy script that sends the deployment transaction and records the new address.",
+      "Point the front end at the node URL and load the artifact with address and ABI.",
+      "The user connects a wallet; reads go through the provider, writes through the wallet's signer."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The front end has three jobs. It shows contract state by calling view functions through a provider. It sends changes by asking the wallet to sign a transaction, then waits for the receipt and updates the screen from pending to confirmed. It listens for contract events so the display stays current without a manual refresh. The figure traces one click through these layers."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One click travels down the stack: the UI builds the request, the wallet signs it, the node receives it over JSON-RPC, and the contract at its address runs the bytecode. Notice that the wallet, not the page, holds the key.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "DApp call path",
+   "nodes": [
+    {
+     "id": "u",
+     "label": "User",
+     "note": "browser or app",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "DApp UI",
+     "note": "HTML and JS",
+     "style": "normal"
+    },
+    {
+     "id": "w",
+     "label": "Wallet",
+     "note": "signs request",
+     "style": "accent"
+    },
+    {
+     "id": "n",
+     "label": "RPC node",
+     "note": "JSON-RPC",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Contract",
+     "note": "bytecode at address",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "u",
+     "to": "f",
+     "label": "click",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "w",
+     "label": "sign",
+     "style": "solid"
+    },
+    {
+     "from": "w",
+     "to": "n",
+     "label": "send",
+     "style": "solid"
+    },
+    {
+     "from": "n",
+     "to": "c",
+     "label": "call",
+     "style": "solid"
+    }
+   ],
+   "aria": "A user clicks a DApp UI, the wallet signs the request, an RPC node receives it over JSON-RPC, and the call reaches the contract stored at its address."
+  }
+ },
+ "examples": [
+  {
+   "question": "A team deploys a contract with a deployment transaction that uses 1,500,000 gas at a gas price of 20 gwei. The deployer account starts with 5 ETH and the transaction sends 0 ETH of value. Find the deployment fee in ETH and the balance left in the account.",
+   "steps": [
+    "Gas used = 1,500,000 gas. Gas price = 20 gwei.",
+    "Convert the price: 1 gwei = 10⁹ wei, so 20 gwei = 20 × 10⁹ = 2 × 10¹⁰ wei per gas.",
+    "Fee in wei = gas used × gas price = 1,500,000 × 2 × 10¹⁰ = 3 × 10¹⁶ wei.",
+    "Convert to ether: 1 ETH = 10¹⁸ wei, so fee = 3 × 10¹⁶ ÷ 10¹⁸ = 0.03 ETH.",
+    "The transaction sends 0 ETH of value, so only the fee leaves the account: balance = 5 − 0.03 = 4.97 ETH."
+   ],
+   "answer": "The deployment fee is 0.03 ETH, and the deployer is left with 4.97 ETH.",
+   "check": "gas = 1500000\nprice_gwei = 20\nfee_gwei = gas * price_gwei\nfee_eth = fee_gwei / 1e9\nprint(fee_gwei)\nprint(fee_eth)\nprint(5 - fee_eth)",
+   "values": [
+    30000000,
+    0.03,
+    4.97
+   ],
+   "output": ""
+  },
+  {
+   "question": "A read call to a view function is made with eth_call and costs nothing. A second operation writes to storage using 45,000 gas at 40 gwei. What does the write cost in ETH, and what does the caller receive back from the node immediately?",
+   "steps": [
+    "Fee in gwei = 45,000 × 40 = 1,800,000 gwei.",
+    "Convert: 1,800,000 gwei ÷ 10⁹ gwei per ETH = 0.0018 ETH.",
+    "A write is a transaction, so the node returns a transaction hash at once, not the function's return value.",
+    "The return value and events appear only in the receipt after the transaction is mined."
+   ],
+   "answer": "The write costs 0.0018 ETH, and the caller immediately receives only a transaction hash.",
+   "check": "gas = 45000\nprice_gwei = 40\nfee_gwei = gas * price_gwei\nprint(fee_gwei)\nprint(fee_gwei / 1e9)",
+   "values": [
+    1800000,
+    0.0018
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "An address alone cannot be called. You need the address and the matching ABI; the wrong ABI builds wrong calldata and the call fails or returns garbage.",
+  "eth_call is not a transaction. It changes nothing, spends no gas, needs no signature, and returns the value directly. A state-changing send returns a hash and must be waited on.",
+  "The ABI is not the bytecode and gives no security. It is only a description of the interface; anyone can write an ABI for any address.",
+  "The deployment address depends on the deployer address and its nonce, not on the bytecode alone, so the same bytecode deployed twice gives two different addresses.",
+  "Unit slip: gas price is quoted in gwei (10⁹ wei) but balances are in ether (10¹⁸ wei). Multiply gas by the price in wei first, then divide by 10¹⁸."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is JSON-RPC and which four fields does a request carry?",
+   "marks": 2,
+   "a": "It is the text protocol a node uses to expose its functions. A request carries jsonrpc (version), method (function name), params (argument array) and id (reply tag)."
+  },
+  {
+   "level": "remember",
+   "q": "Name the two compiler outputs a DApp needs from a contract.",
+   "marks": 2,
+   "a": "The bytecode that is deployed on chain, and the ABI that describes each public function so the library can encode calls and decode results."
+  },
+  {
+   "level": "understand",
+   "q": "Why do modern libraries separate the provider from the signer?",
+   "marks": 3,
+   "a": "Reading state needs only a node URL and no key. Keeping signing in a separate object lets read-only code run without any private key, and lets a browser hand signing to a wallet so the key never enters the page."
+  },
+  {
+   "level": "understand",
+   "q": "Explain the difference between eth_call and sending a transaction.",
+   "marks": 3,
+   "a": "eth_call runs one node against current state, needs no signature, spends no gas, and returns the function's value at once. A transaction is signed, propagated, mined, costs gas, changes state, and returns only a hash; the result is read from the receipt and logs."
+  },
+  {
+   "level": "apply",
+   "q": "A contract call uses 900,000 gas at 30 gwei. Find the fee in ETH.",
+   "marks": 4,
+   "a": "Fee = 900,000 × 30 = 27,000,000 gwei. Divide by 10⁹: 27,000,000 ÷ 10⁹ = 0.027 ETH."
+  },
+  {
+   "level": "apply",
+   "q": "A deployment uses 2,200,000 gas at 25 gwei from an account holding 3 ETH, sending 0 value. Find the fee and the remaining balance.",
+   "marks": 4,
+   "a": "Fee = 2,200,000 × 25 = 55,000,000 gwei = 0.055 ETH. Balance = 3 − 0.055 = 2.945 ETH."
+  },
+  {
+   "level": "analyze",
+   "q": "A front end has the correct contract address but every call reverts or returns empty data. Give two likely causes and one check for each.",
+   "marks": 5,
+   "a": "First, the ABI may be stale or from another contract, so the selector and argument encoding are wrong; compare the selector with the one computed from the source. Second, the front end may be pointed at a different network than the one holding the contract; compare the chain id reported by the wallet with the deploy network."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is a private key written into front-end JavaScript unrecoverable as a security failure, and what should replace it?",
+   "marks": 5,
+   "a": "All browser JavaScript is delivered to the user, so the key is public the moment the page loads and anyone can drain the account. The fix is a wallet-held signer, where the page requests a signature and the key stays inside the wallet."
+  }
+ ],
+ "beyond": "Not for the exam. In industry the wallet-plus-provider pattern now has a formal name, account abstraction, where a contract account validates its own transactions and can pay gas through a sponsor. Libraries have moved on too: viem and wagmi wrap ethers-style calls for React front ends, and Foundry has become common for Solidity testing in Rust-style tooling. Indexing layers such as The Graph store event logs so a DApp can query history without scanning every block. Search terms to follow: ERC-4337, account abstraction, viem, wagmi, Foundry, contract verification on block explorers, and JSON-RPC method reference."
+}
