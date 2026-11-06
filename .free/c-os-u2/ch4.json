@@ -1,0 +1,192 @@
+{
+ "lead": "Cooperating processes must exchange data, and the operating system offers three common ways: shared memory, message passing and pipes. Shared memory is fast but leaves safety to the processes. Message passing is slower but the kernel controls every copy. Pipes are byte streams with a kernel buffer that blocks a full writer or an empty reader. You meet these ideas in a shell pipeline, a database page cache, and a phone app talking to a service.",
+ "prereq": "You need: <a href=\"#process-concept-states-and-process-control-block\">2.1</a> for what a process is, and <a href=\"#operations-on-processes-creation-and-termination\">2.3</a> for fork, exec and wait.",
+ "sections": [
+  {
+   "h3": "Why processes cooperate, and shared memory",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An independent process cannot affect another. A cooperating process shares data or work with another, so it needs a channel. Three common channels are shared memory, message passing and pipes."
+    },
+    {
+     "type": "p",
+     "text": "Shared memory is the fastest. The OS takes one physical region of memory and maps it into the address space of both processes. Each process calls a system call to attach the region; in POSIX this is <code>shmat</code>. After that, a write by one process is visible to the other without any kernel copy. The catch: the kernel sets up the mapping and then steps away. Nothing stops both processes writing the same byte at the same time. The processes must guard the region with their own locks, semaphores or monitors. See <a href=\"#critical-section-problem-and-race-conditions\">Unit 3</a> for those tools."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "One process creates the region and gives it a name or key.",
+      "Both processes attach the region to their address space.",
+      "Both read and write it like ordinary memory.",
+      "They detach when done; the creator removes the region."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Use it for large data: a video frame, a database page cache, or a game world shared by two processes."
+    }
+   ]
+  },
+  {
+   "h3": "Message passing: names, blocking and buffers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Message passing avoids shared bytes. Processes call <code>send(destination, message)</code> and <code>receive(source, message)</code>. The kernel copies the message between address spaces. This is slower than shared memory but safer: no process can touch another's memory."
+    },
+    {
+     "type": "p",
+     "text": "Naming. In direct communication the sender names the receiver process, for example <code>send(P2, msg)</code>. In indirect communication the sender names a mailbox or port, for example <code>send(mailbox_A, msg)</code>; any process that owns or shares the mailbox can receive. Direct links pair exactly two processes; indirect links let many senders and receivers meet at one mailbox."
+    },
+    {
+     "type": "p",
+     "text": "Timing. A blocking send waits until the message is copied or received. A blocking receive waits until a message arrives. A non-blocking send returns at once, and a non-blocking receive returns either a message or nothing yet. Blocking is also called synchronous; non-blocking is asynchronous."
+    },
+    {
+     "type": "p",
+     "text": "Buffering. The queue between sender and receiver can hold messages. Zero capacity means no queue: the sender must wait for the receiver, a rendezvous. Bounded capacity means a fixed number n of messages; the sender waits only when the queue is full. Unbounded capacity means the sender never waits for space. Message passing suits small control messages and machines that do not share memory."
+    }
+   ]
+  },
+  {
+   "h3": "Pipes: unnamed and named",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A pipe is a one-way byte stream held in a kernel buffer. The classic unnamed pipe is made by <code>pipe(fd)</code>; <code>fd[0]</code> is the read end and <code>fd[1]</code> the write end. It is half-duplex: bytes flow one way in one pipe. For two-way talk, make two pipes."
+    },
+    {
+     "type": "p",
+     "text": "An unnamed pipe exists only between related processes, usually a parent and a child made by <code>fork</code>. The child inherits the file descriptors. It has no name in the file system, so an unrelated process cannot open it. A fixed kernel buffer sits between writer and reader. When the buffer is full the writer blocks; when it is empty the reader blocks. That blocking is what makes a pipe a synchronising channel."
+    },
+    {
+     "type": "p",
+     "text": "A named pipe, or FIFO, has a path name in the file system. Unrelated processes open that name and exchange bytes. It is still a byte stream, not a message queue: the reader must parse boundaries itself."
+    },
+    {
+     "type": "p",
+     "text": "Sockets generalise pipes across machines; client-server systems use them. See Unit 6 for sockets, remote procedure calls and distributed IPC."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The writer fills the pipe with 65 writes of 1,000 bytes, then blocks on write 66; a 4,000-byte read frees 4,536 bytes and the kernel wakes the writer.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Writer",
+    "Kernel buffer",
+    "Reader"
+   ],
+   "messages": [
+    {
+     "from": "Writer",
+     "to": "Kernel buffer",
+     "label": "write 1000 B"
+    },
+    {
+     "from": "Kernel buffer",
+     "to": "Writer",
+     "label": "return 1000"
+    },
+    {
+     "from": "Writer",
+     "to": "Kernel buffer",
+     "label": "65 more writes"
+    },
+    {
+     "from": "Kernel buffer",
+     "to": "Reader",
+     "label": "data ready"
+    },
+    {
+     "from": "Reader",
+     "to": "Kernel buffer",
+     "label": "read 4000 B"
+    },
+    {
+     "from": "Kernel buffer",
+     "to": "Writer",
+     "label": "space free, wake up"
+    }
+   ],
+   "aria": "A time-ordered message exchange in which the writer fills a kernel pipe buffer, the reader drains 4000 bytes, and the kernel wakes the writer when space appears."
+  }
+ },
+ "examples": [
+  {
+   "question": "An unnamed pipe has a 65,536-byte kernel buffer and the reader is sleeping. The writer sends 1,000-byte writes. After how many writes does the writer block? What happens on write number 66? After the reader reads 4,000 bytes, how many bytes are free?",
+   "steps": [
+    "Buffer capacity = 65,536 B; each write = 1,000 B.",
+    "Writes that fit = floor(65,536 ÷ 1,000) = 65. Bytes used = 65 × 1,000 = 65,000 B.",
+    "Free space before write 66 = 65,536 − 65,000 = 536 B.",
+    "Write 66 needs 1,000 B. 1,000 > 536, so it does not fit. The writer blocks and is queued on the pipe.",
+    "The reader reads 4,000 B. Free space = 536 + 4,000 = 4,536 B.",
+    "4,536 ≥ 1,000, so the blocked writer is woken and its 1,000 bytes can be copied."
+   ],
+   "answer": "The writer completes 65 writes, blocks on write 66, and after a 4,000-byte read 4,536 bytes are free.",
+   "check": "buffer = 65536\nchunk = 1000\nwrites = buffer // chunk\nfree = buffer - writes * chunk\nafter = free + 4000\nprint(writes)\nprint(free)\nprint(after)",
+   "values": [
+    65,
+    536,
+    4536
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Saying shared memory needs no synchronisation because the kernel set it up. The kernel maps the region and steps away; the processes must guard it.",
+  "Forgetting that an unnamed pipe cannot connect two unrelated processes. A named pipe can.",
+  "Treating a non-blocking send as a lost message. It returns at once, but the message may still be queued.",
+  "Thinking one unnamed pipe gives two-way talk. It is half-duplex; use two pipes.",
+  "Confusing zero capacity buffering with unbounded capacity. Zero capacity forces a rendezvous; the sender waits for the receiver."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three IPC mechanisms covered in this chapter.",
+   "marks": 2,
+   "a": "Shared memory, message passing and pipes."
+  },
+  {
+   "level": "understand",
+   "q": "Why is shared memory faster than message passing, and why is it more dangerous?",
+   "marks": 3,
+   "a": "Shared memory needs no kernel copy after setup, so it is faster. The kernel does not police reads and writes, so the processes must synchronise themselves or get race conditions."
+  },
+  {
+   "level": "apply",
+   "q": "A pipe buffer holds 8,192 bytes. The writer sends 512-byte writes and the reader is sleeping. After how many writes does the writer block?",
+   "marks": 4,
+   "a": "8,192 ÷ 512 = 16 writes fit exactly and leave 0 bytes free. Write 17 needs 512 bytes and blocks."
+  },
+  {
+   "level": "analyze",
+   "q": "A system uses indirect message passing with one mailbox shared by five producers and one consumer. What naming problem does this solve, and what new problem does it create?",
+   "marks": 4,
+   "a": "Producers do not need to know the consumer's identity; they name the mailbox. The new problem is that messages from different producers mix in one queue, so the consumer may need message types or separate mailboxes."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between a blocking send and a non-blocking send?",
+   "marks": 3,
+   "a": "A blocking send waits until the message is copied or received. A non-blocking send returns immediately, whether or not the message has been delivered."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can an unrelated process use a named pipe but not an unnamed pipe?",
+   "marks": 3,
+   "a": "A named pipe has a path name in the file system, so any process that can open that name can use it. An unnamed pipe exists only as inherited file descriptors between related processes."
+  },
+  {
+   "level": "apply",
+   "q": "A message system has zero capacity. The sender calls a blocking send. What happens next?",
+   "marks": 2,
+   "a": "The sender waits until the receiver calls receive. This is a rendezvous; no message is stored in a queue."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems mix these tools: Android's Binder is a message-passing kernel driver, while databases use shared memory for page caches. Modern Linux adds io_uring for batched asynchronous I/O, and gRPC carries messages over sockets. Search for POSIX shared memory, pipe buffer size and Binder IPC to see the same ideas in production code."
+}

@@ -1,0 +1,207 @@
+{
+ "lead": "Every running process in an operating system comes from another process. A parent asks the kernel to make a copy with <code>fork()</code>, the child may load a new program with <code>exec</code>, and the parent later collects the child's result with <code>wait()</code>. The child ends with <code>exit()</code>. This chain is how a shell starts <code>ls</code>, how a web server starts a worker, and how your phone starts an app. This chapter shows each call, the process tree it builds, and the two leftovers: zombies and orphans.",
+ "prereq": "You need <a href=\"#process-concept-states-and-process-control-block\">2.1</a> on process states and the PCB, and Unit 1 on system calls.",
+ "sections": [
+  {
+   "h3": "Creation: fork() makes a copy",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>fork()</code> is a system call that creates a new process. The caller is the parent and the new process is the child. The child gets a new process identifier, or pid. A pid is a positive integer. The child is a copy of the parent: same code, same data values, same open files, and the same program counter at the instruction just after <code>fork()</code>. The kernel also makes a new process control block for the child (see <a href=\"#process-concept-states-and-process-control-block\">2.1</a>)."
+    },
+    {
+     "type": "p",
+     "text": "<code>fork()</code> returns twice: once in the parent and once in the child. In the child the return value is 0. In the parent the return value is the child's pid. If the kernel cannot create the child, <code>fork()</code> returns −1 in the parent and no child exists. Programs branch on this value to give the parent and child different work."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Parent calls <code>fork()</code>.",
+      "Kernel allocates a PCB and a copy of the address space for the child.",
+      "Both processes continue after the same <code>fork()</code> call.",
+      "The child sees return value 0; the parent sees the child's pid."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The child does not start again from <code>main()</code>. It continues after the call. The address spaces are separate, so a variable changed in the child is not changed in the parent. Modern systems copy pages only when one side writes to them; this is copy-on-write (see Unit 4, copy-on-write)."
+    },
+    {
+     "type": "p",
+     "text": "A chain of forks builds a process tree. The figure shows a shell at pid 100, two children at pid 101 and 102, and a grandchild at pid 103 made by the first child."
+    }
+   ]
+  },
+  {
+   "h3": "exec: replace the program, keep the pid",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "After a fork, the child often needs to run a different program. The <code>exec</code> family of calls replaces the process image: code, data, heap and stack. The pid does not change. The PCB stays the same. Open files usually stay open unless they were marked close-on-exec. If <code>exec</code> succeeds, it does not return. It starts the new program at its entry point. If it fails, it returns −1 and the old program continues."
+    },
+    {
+     "type": "p",
+     "text": "Common forms are <code>execl</code>, <code>execv</code>, <code>execve</code>, <code>execlp</code> and <code>execvp</code>. They differ in how the argument list and environment are passed, and whether the shell path is searched. <code>execve</code> is the real system call; the others are library wrappers. A shell child might call <code>execlp(\"ls\", \"ls\", NULL)</code>. If that fails, the child calls <code>_exit(1)</code>."
+    },
+    {
+     "type": "p",
+     "text": "<code>exit()</code> is the reverse of creation. A process calls <code>exit(status)</code> to end. The status is an integer that the parent can read. The OS closes the process's files and frees its memory, but it keeps the PCB and the exit status until the parent collects them. <code>exit()</code> does not return. A process can also be ended by a signal from the kernel or another process."
+    }
+   ]
+  },
+  {
+   "h3": "wait, the process tree, zombies and orphans",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A parent collects a child's end with <code>wait()</code> or <code>waitpid()</code>. <code>wait(&status)</code> blocks until any one child ends. <code>waitpid(pid, &status, options)</code> waits for a chosen child. Both return the pid of the child that ended and store its status. Macros such as <code>WIFEXITED</code> and <code>WEXITSTATUS</code> read that status."
+    },
+    {
+     "type": "p",
+     "text": "When a child ends before its parent waits, it becomes a zombie. A zombie has finished running. Its memory and files are gone. Its PCB, pid and exit status remain so the parent can collect them. The parent's <code>wait()</code> removes the zombie. If the parent never waits, zombies can fill the pid table."
+    },
+    {
+     "type": "p",
+     "text": "An orphan is different. An orphan is a running child whose parent has died. On Linux, init or systemd, usually pid 1, adopts the orphan and later reaps it. Init or systemd is at the root of the user process tree. A login shell, a service and a desktop app all descend from it."
+    },
+    {
+     "type": "p",
+     "text": "Cascading termination is a policy in which the OS ends all descendants when a parent ends. Some systems use it for a job or a session. Linux does not kill a child just because its parent exits; the child becomes an orphan. A shell can still ask for a signal when its parent dies, but that is an extra feature."
+    },
+    {
+     "type": "p",
+     "text": "The standard shell example ties the calls together. To run <code>ls</code>, the shell calls <code>fork()</code>. The child calls <code>exec</code> to load <code>ls</code>. The parent calls <code>wait()</code> and blocks. <code>ls</code> runs, calls <code>exit(0)</code>, and the shell reaps it, then prints the next prompt."
+    },
+    {
+     "type": "p",
+     "text": "Thread creation is a different operation: it makes a thread inside the same process, not a new process (see <a href=\"#threads-multicore-programming-and-multithreading-models\">2.5</a>)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The shell at pid 100 forks two children, and the first child forks one grandchild. Every edge is a fork; the parent gets the child's pid while the child gets 0.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "shell pid 100",
+    "style": "accent",
+    "children": [
+     {
+      "label": "child pid 101",
+      "edge": "fork",
+      "style": "normal",
+      "children": [
+       {
+        "label": "grandchild pid 103",
+        "edge": "fork",
+        "style": "normal",
+        "_d": 2,
+        "children": [],
+        "_x": 270.0,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 270.0,
+      "_y": 116
+     },
+     {
+      "label": "child pid 102",
+      "edge": "fork",
+      "style": "normal",
+      "_d": 1,
+      "children": [],
+      "_x": 450.0,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "A tree with the shell at the root, two children made by fork, and one grandchild made by a second fork from the first child."
+  }
+ },
+ "examples": [
+  {
+   "question": "A program starts as one process and runs: <code>fork(); fork(); fork();</code>. How many processes exist in total, and how many are new children? Then the program is changed to: <code>pid = fork(); if (pid == 0) fork();</code>. How many processes exist now? Assume every fork succeeds.",
+   "steps": [
+    "Each unconditional <code>fork()</code> doubles the number of processes. Start with 1 process.",
+    "After the first fork: 2 processes in total, which is 1 new child.",
+    "After the second fork: 2 × 2 = 4 processes in total, which is 3 new children.",
+    "After the third fork: 4 × 2 = 8 processes in total, which is 7 new children.",
+    "In the second program, the first fork makes parent P and child C1. P gets a positive pid and skips the if. C1 gets 0 and calls the second fork, making C2. P does not call the second fork.",
+    "Total for the second program: P, C1 and C2 = 3 processes."
+   ],
+   "answer": "The first code creates 8 processes in total, 7 of them new children. The second code creates 3 processes in total.",
+   "check": "n_forks = 3\nfirst_total = 2 ** n_forks\nfirst_new = first_total - 1\nsecond_total = 3\nprint(first_total)\nprint(first_new)\nprint(second_total)",
+   "values": [
+    8,
+    7,
+    3
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not assume the parent or the child runs first after <code>fork()</code>. Both are ready, and the scheduler chooses.",
+  "In the child, <code>fork()</code> returns 0; in the parent, it returns the child's pid. Reversing these is the most common fork mistake.",
+  "A zombie has exited and is waiting to be reaped. An orphan is still running after its parent died. They are not the same.",
+  "<code>exec</code> does not create a new process and does not change the pid. It only replaces the program inside the existing process.",
+  "<code>exit()</code> frees memory and files but not the PCB and exit status. <code>wait()</code> removes those. If the parent never waits, the zombie remains."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In a successful <code>fork()</code>, what value does the child receive and what value does the parent receive?",
+   "marks": 2,
+   "a": "Child: 0. Parent: the child's pid, a positive integer."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a shell call <code>fork()</code> before <code>exec()</code> to run a command?",
+   "marks": 3,
+   "a": "fork makes a separate child. The child can call exec and be replaced by the command. The shell stays alive and waits. If the shell called exec directly, the shell itself would be replaced."
+  },
+  {
+   "level": "apply",
+   "q": "A program calls <code>fork(); fork();</code> and all forks succeed. How many processes exist in total, and how many are new children?",
+   "marks": 3,
+   "a": "First fork: 2 total, 1 new. Second fork runs in both processes, so 4 total and 3 new children."
+  },
+  {
+   "level": "apply",
+   "q": "Code: <code>pid = fork(); if (pid == 0) fork();</code>. How many processes exist after it, assuming success?",
+   "marks": 4,
+   "a": "First fork gives parent P and child C1. P gets a positive pid and skips the if. C1 gets 0 and forks C2. Total 3: P, C1 and C2."
+  },
+  {
+   "level": "analyze",
+   "q": "A child exits, but its parent keeps running and never calls <code>wait()</code>. What is the child called, what remains, and how is it removed?",
+   "marks": 4,
+   "a": "It is a zombie. Its memory and files are gone, but its PCB, pid and exit status remain. It is removed when the parent calls wait, or when the parent exits and init/systemd reaps it."
+  },
+  {
+   "level": "analyze",
+   "q": "A parent exits while its child is still running on Linux. What happens to the child?",
+   "marks": 3,
+   "a": "The child becomes an orphan. init or systemd, usually pid 1, adopts it. The child continues running unless something kills it."
+  },
+  {
+   "level": "understand",
+   "q": "For the shell command <code>ls</code>, state which process calls <code>fork</code>, which calls <code>exec</code>, and which calls <code>wait</code>.",
+   "marks": 4,
+   "a": "The shell calls fork. The child calls exec to become ls. The parent shell calls wait and blocks until ls exits."
+  },
+  {
+   "level": "remember",
+   "q": "Which process is at the root of the normal Linux user process tree?",
+   "marks": 2,
+   "a": "init or systemd, usually with pid 1."
+  }
+ ],
+ "beyond": "Not for the exam. Linux creates processes with <code>clone()</code>, which can share parts of the address space; the same call with flags creates threads. Containers use namespaces and cgroups to make one process tree look isolated. Service managers such as systemd supervise children and reap them. Search terms: posix_spawn, clone3, pidfd, PR_SET_PDEATHSIG."
+}

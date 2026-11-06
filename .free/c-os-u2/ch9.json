@@ -1,0 +1,215 @@
+{
+ "lead": "Linux must choose the next task to run thousands of times a second, so it cannot scan a long list each time. The O(1) scheduler answered with 140 priority queues and a bitmap, finding the top task in constant time. The Completely Fair Scheduler (CFS) replaced it with a red-black tree ordered by virtual runtime, so CPU time is shared in proportion to task weights. Both live in the Linux kernel, which means the same ideas run on Android phones and on most internet servers. Only a few universities teach this in detail.",
+ "prereq": "You need: <a href=\"#scheduling-algorithms-fcfs-sjf-priority-round-robin\">Chapter 2.7</a> for timeslices and priority, and <a href=\"#threads-multicore-programming-and-multithreading-models\">Chapter 2.5</a> for what a thread is.",
+ "sections": [
+  {
+   "h3": "The O(1) scheduler: queues and a bitmap",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every priority is a number from 0 to 139. Priorities 0–99 are reserved for real-time tasks. Priorities 100–139 serve ordinary tasks, one level per nice value: nice −20 maps to 100 and nice 19 maps to 139, so a smaller nice number means more CPU."
+    },
+    {
+     "type": "p",
+     "text": "The runqueue holds two arrays of 140 lists: the <b>active array</b> and the <b>expired array</b>. Each list queues the tasks at one priority. A 140-bit bitmap beside the active array has bit i set whenever list i is non-empty."
+    },
+    {
+     "type": "p",
+     "text": "Picking the next task takes three steps:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "A waking task is inserted at slot = its priority in the active array.",
+      "A find-first-set instruction reads the bitmap and returns the highest non-empty list.",
+      "The first task of that list is removed and runs for its timeslice."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "After the timeslice the task drops into the expired array with a fresh slice. When the active array empties, the kernel swaps the two pointers. The pick costs the same with 10 tasks or 10,000, and that is what the name O(1) claims."
+    }
+   ]
+  },
+  {
+   "h3": "Why O(1) was replaced, and the CFS idea",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "O(1) guessed which tasks were interactive by watching how long they slept, and paid a bonus to the ones it judged interactive. The guesses needed hand-tuned constants. A workload that did not fit the guess, such as a long compile or a database, was treated unfairly, and fixed timeslices forced a compromise between latency and throughput."
+    },
+    {
+     "type": "p",
+     "text": "CFS drops the guess. It records how much CPU each task has received and always runs the task with the least."
+    },
+    {
+     "type": "p",
+     "text": "That record is the <b>virtual runtime</b>, vruntime: CPU time used, scaled by the task's weight, in nanoseconds. A heavy task (nice −20) has a large weight, so its vruntime grows slowly; a light task's vruntime grows fast. Always running the smallest vruntime hands more real CPU to the heavy task, with no extra rule."
+    }
+   ]
+  },
+  {
+   "h3": "CFS in practice: tree, weight and latency",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Runnable tasks sit in a <b>red-black tree</b> keyed by vruntime. The leftmost node holds the smallest vruntime, and that task runs next. The tree stays balanced, so insert, delete and find-leftmost each cost O(log n)."
+    },
+    {
+     "type": "p",
+     "text": "A task waking from sleep is placed at the tree's current minimum vruntime, not at the value it had before sleeping. That charge stops a task from hoarding credit while asleep and then running a long burst."
+    },
+    {
+     "type": "p",
+     "text": "CFS has no fixed timeslice. A target latency, sched_latency, is the window in which every runnable task should run once. Each task takes a share of it in proportion to weight:"
+    },
+    {
+     "type": "formula",
+     "text": "slice_i = sched_latency × w_i ÷ Σ w_j",
+     "where": "slice_i is the slice of task i in ms; w_i is its weight, a number fixed by its nice value (nice 0 → 1024, nice 1 → 820); Σ w_j is the sum of weights of all runnable tasks. If too many tasks are runnable, the window is stretched so no slice falls below sched_min_granularity."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The O(1) loop: a waking task joins the active array, the bitmap finds the highest-priority non-empty queue in one instruction, the task runs its timeslice and drops to the expired array, and the arrays swap when the active one empties.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Linux O(1) runqueue",
+   "nodes": [
+    {
+     "id": "wake",
+     "label": "Task wakes",
+     "style": "normal"
+    },
+    {
+     "id": "ins",
+     "label": "Insert in active array",
+     "note": "slot = priority",
+     "style": "normal"
+    },
+    {
+     "id": "pick",
+     "label": "Find first set bit",
+     "note": "bitmap, constant time",
+     "style": "accent"
+    },
+    {
+     "id": "run",
+     "label": "Run for timeslice",
+     "style": "live"
+    },
+    {
+     "id": "exp",
+     "label": "Move to expired array",
+     "style": "normal"
+    },
+    {
+     "id": "swap",
+     "label": "Active empty?",
+     "note": "swap the two arrays",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "wake",
+     "to": "ins"
+    },
+    {
+     "from": "ins",
+     "to": "pick"
+    },
+    {
+     "from": "pick",
+     "to": "run"
+    },
+    {
+     "from": "run",
+     "to": "exp"
+    },
+    {
+     "from": "exp",
+     "to": "swap"
+    },
+    {
+     "from": "swap",
+     "to": "pick",
+     "label": "next task"
+    }
+   ],
+   "aria": "A loop in which a waking task joins the active array, the bitmap picks the highest-priority queue, the task runs for its timeslice, drops into the expired array, and the arrays are swapped when the active one empties."
+  }
+ },
+ "examples": [
+  {
+   "question": "Two CPU-bound tasks run on one core under CFS. Task A has nice 0 (weight 1024) and task B has nice 1 (weight 820). sched_latency is 24 ms. (a) Find each task's slice. (b) Find each task's vruntime growth in one window, using growth = slice × 1024 ÷ weight. (c) Comment on the result.",
+   "steps": [
+    "Total weight = 1024 + 820 = 1844.",
+    "A's slice = 24 ms × 1024 ÷ 1844 = 24576 ÷ 1844 = 13.33 ms.",
+    "B's slice = 24 ms × 820 ÷ 1844 = 19680 ÷ 1844 = 10.67 ms. Check: 13.33 + 10.67 = 24 ms.",
+    "A's vruntime growth = 13.33 × 1024 ÷ 1024 = 13.33 ms of virtual time.",
+    "B's vruntime growth = 10.67 × 1024 ÷ 820 = 13.33 ms of virtual time.",
+    "Both grow equally, so the two tasks stay level in the tree. The nicer task gets fewer real milliseconds for the same virtual progress, and neither starves."
+   ],
+   "answer": "A gets 13.33 ms and B gets 10.67 ms of every 24 ms window, and both virtual runtimes grow by about 13.33 ms, so the CPU is split fairly by weight.",
+   "check": "wA = 1024\nwB = 820\nlat = 24\ntotal = wA + wB\nsA = lat * wA / total\nsB = lat * wB / total\nvA = sA * 1024 / wA\nvB = sB * 1024 / wB\nprint(total)\nprint(round(sA, 2))\nprint(round(sB, 2))\nprint(round(vA, 2))\nprint(round(vB, 2))",
+   "values": [
+    1844,
+    13.33,
+    10.67,
+    13.33,
+    13.33
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "CFS does not assign a fixed timeslice; slices are shares of sched_latency and change as runnable tasks come and go.",
+  "O(1) means the pick of the next task is constant time, not that the whole schedule is; inserting and expiring tasks still cost work.",
+  "In both schedulers a lower nice value (−20) means higher priority and more CPU; nice 19 is the least favoured. Do not reverse the scale.",
+  "In CFS a waking task is not credited for time slept; it starts at the tree minimum, so sleeping earns no extra CPU.",
+  "Priorities 0–99 belong to real-time tasks and 100–139 to normal tasks; a normal task placed in the first band outranks everything."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many priority levels does the O(1) scheduler have, and how are they divided?",
+   "marks": 2,
+   "a": "140: levels 0–99 for real-time tasks and 100–139 for normal tasks, one level per nice value."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the bitmap make choosing the next task constant time?",
+   "marks": 3,
+   "a": "A find-first-set instruction reads the 140-bit bitmap and returns the highest non-empty queue directly; no list of tasks is scanned."
+  },
+  {
+   "level": "apply",
+   "q": "Two runnable tasks have nice 0 (weight 1024) and nice 5 (weight 335). sched_latency is 20 ms. Find each slice.",
+   "marks": 4,
+   "a": "Total weight = 1359. Nice 0: 20 × 1024 ÷ 1359 = 15.07 ms. Nice 5: 20 × 335 ÷ 1359 = 4.93 ms. Sum 20 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A task sleeps a long time and then wakes. What does CFS do to its vruntime, and why?",
+   "marks": 5,
+   "a": "It sets vruntime to the tree's minimum, so the sleep earns no credit; otherwise a sleeper could wake and monopolise the CPU for a long burst."
+  },
+  {
+   "level": "understand",
+   "q": "What is the expired array for, and when are the two arrays swapped?",
+   "marks": 3,
+   "a": "It holds tasks that used their slice, each with a fresh slice. The kernel swaps the active and expired pointers when the active array becomes empty."
+  },
+  {
+   "level": "analyze",
+   "q": "Why did the O(1) interactivity bonus cause unfairness?",
+   "marks": 5,
+   "a": "It inferred interactivity from sleep time using tuned constants; tasks whose sleep pattern did not match the constants received a smaller share than their work deserved."
+  }
+ ],
+ "beyond": "Not for the exam. The CFS weight table is a geometric series: each nice step multiplies weight by about 1.25, so one step gives roughly 25% more CPU. Linux 6.6 replaced CFS with EEVDF (Earliest Eligible Virtual Deadline First), which keeps the red-black tree but adds a virtual deadline per task so short-running tasks are picked sooner. Search 'sched_prio_to_weight' and 'EEVDF scheduler' to read the kernel source and the design notes."
+}

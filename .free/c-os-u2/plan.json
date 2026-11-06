@@ -1,0 +1,667 @@
+{
+ "lead": "This unit follows one program from the moment it becomes a process to the moment the CPU is handed to the next one. You will learn what the OS records about a process, how processes are created and how they talk, how threads split a process, and how scheduling algorithms share the CPU. After it you can draw a process state diagram, explain a context switch, compute waiting and turnaround times for FCFS, SJF, priority and round robin, and describe how Linux's CFS picks the next task.",
+ "about": "The unit follows one process from birth to scheduling. Chapter 2.1 defines the process and the PCB that records it. Chapter 2.2 shows the queues those PCBs sit in and what a context switch costs. Chapter 2.3 covers fork, exec, exit and wait; chapter 2.4 covers the ways processes then talk — shared memory, messages and pipes. Chapter 2.5 splits the process into threads and looks at multicore speedup. Chapter 2.6 sets the criteria for judging a schedule and the preemptive/non-preemptive split. Chapter 2.7 computes FCFS, SJF, priority and round-robin schedules by hand. Chapter 2.8 extends scheduling to threads, several CPUs and real-time deadlines. Chapter 2.9 reads the Linux O(1) and CFS schedulers as real implementations of these ideas.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A process is a program in execution, and the OS tracks each one with a small record called the process control block whose state field moves through five states.",
+   "depth": "Process vs program (code is passive, process is active). What a process holds in memory: text, data, heap, stack, plus the program counter and register values. The five states — new, ready, running, waiting, terminated — and every legal transition, including running to ready on a timer interrupt. Some syllabi write 'blocked' for waiting and 'exit' for terminated; the words mean the same. PCB fields: process id, state, program counter, saved registers, scheduling priority, memory base and limit, open file list, accounting, parent pointer. Keep the PCB as a table of fields, not a diagram of memory. Mention a thread as the flow of control inside the process and stop there.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Process state transitions",
+    "nodes": [
+     {
+      "id": "new",
+      "label": "New",
+      "style": "normal"
+     },
+     {
+      "id": "ready",
+      "label": "Ready",
+      "style": "normal"
+     },
+     {
+      "id": "run",
+      "label": "Running",
+      "note": "one per core",
+      "style": "accent"
+     },
+     {
+      "id": "wait",
+      "label": "Waiting",
+      "note": "blocked on I/O",
+      "style": "normal"
+     },
+     {
+      "id": "term",
+      "label": "Terminated",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "new",
+      "to": "ready",
+      "label": "admitted"
+     },
+     {
+      "from": "ready",
+      "to": "run",
+      "label": "dispatch"
+     },
+     {
+      "from": "run",
+      "to": "ready",
+      "label": "time slice over"
+     },
+     {
+      "from": "run",
+      "to": "wait",
+      "label": "I/O request"
+     },
+     {
+      "from": "wait",
+      "to": "ready",
+      "label": "I/O done"
+     },
+     {
+      "from": "run",
+      "to": "term",
+      "label": "exit"
+     }
+    ],
+    "aria": "Five boxes for the process states with arrows for admitted, dispatch, timer preemption, I/O request, I/O completion and exit; the Running box is highlighted."
+   },
+   "example": "Process pid 1042 is playing a video. Its PCB shows state = Running, PC = 0x2A40, SP = 0x7FF0, and three open files. It calls read() on a slow SD card. Which state does it enter, which PCB fields change, and which queue does it wait in? Answer: it enters Waiting; the PC is saved as the address after the read call and the register set is saved into the PCB; the PCB is moved to the device queue of that SD card, and it returns to Ready (not Running) when the driver signals completion.",
+   "trap": "Sending a process from Waiting straight to Running when its I/O finishes. It always goes to Ready, because the CPU may now be busy. The second trap is calling a program a process: the program is a file on disk, the process is that file plus memory, registers and a PCB.",
+   "prereq": "Unit 1: system calls and dual-mode operation.",
+   "leave": "The mechanics and cost of switching between processes go to chapter 2.2; how processes are created goes to 2.3."
+  },
+  {
+   "k": 2,
+   "idea": "The OS keeps the PCBs of all processes in queues by state, and a context switch saves one process's state and restores another's so the CPU can change owner.",
+   "depth": "Job queue, ready queue and device queues, described as linked lists of PCBs. The queueing diagram: a process migrates ready → running → waiting → ready. Long-term (job), medium-term (swap) and short-term (CPU) schedulers and why the short-term one must be fast. Dispatcher as the code that does the switch; dispatch latency. The steps of a context switch: save registers and PC into the old PCB, update its state, choose the next PCB with the scheduler, update memory-management data, restore the new PCB's registers. State clearly that switching is pure overhead: no user work is done. One line on swapping to disk, pointing to Unit 4.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Queueing diagram",
+    "nodes": [
+     {
+      "id": "ready",
+      "label": "Ready queue",
+      "note": "PCBs waiting for CPU",
+      "style": "accent"
+     },
+     {
+      "id": "cpu",
+      "label": "CPU",
+      "note": "one process at a time",
+      "style": "live"
+     },
+     {
+      "id": "io",
+      "label": "Device queue",
+      "note": "waiting for I/O",
+      "style": "normal"
+     },
+     {
+      "id": "term",
+      "label": "Terminated",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ready",
+      "to": "cpu",
+      "label": "dispatch"
+     },
+     {
+      "from": "cpu",
+      "to": "ready",
+      "label": "preempted"
+     },
+     {
+      "from": "cpu",
+      "to": "io",
+      "label": "I/O request"
+     },
+     {
+      "from": "io",
+      "to": "ready",
+      "label": "I/O done"
+     },
+     {
+      "from": "cpu",
+      "to": "term",
+      "label": "exit"
+     }
+    ],
+    "aria": "A flowchart where a PCB moves from the ready queue to the CPU, back to ready when preempted, to a device queue on an I/O request, back to ready when the I/O completes, and to the terminated state on exit."
+   },
+   "example": "A switch saves 8 registers and restores 8 registers, each register transfer costs 5 ns, and the scheduler itself takes 200 ns. The time slice is 5 ms. Find the overhead of one switch and its share of the slice. Answer: save 8 × 5 = 40 ns, restore 8 × 5 = 40 ns, plus 200 ns = 280 ns per switch. Slice = 5 ms = 5,000,000 ns, so overhead = 280 ÷ 5,000,000 = 0.000056 = 0.0056% of the slice.",
+   "trap": "Adding the context-switch time to the burst time of the process being scheduled, or assuming the switch is instant. Also do not say the dispatcher chooses the next process — the scheduler chooses, the dispatcher performs the switch.",
+   "prereq": "Chapter 2.1 for the PCB and the states.",
+   "leave": "Swapping processes out to disk is Unit 4; the policy that decides who runs next is chapter 2.6 and 2.7."
+  },
+  {
+   "k": 3,
+   "idea": "Processes are created by other processes through fork, given a new program by exec, and removed by exit, with the parent collecting the result through wait.",
+   "depth": "fork(): the child is a copy of the parent's address space, fork returns 0 in the child and the child's pid in the parent, and −1 on failure. exec family: replaces the process image, keeps the pid. wait()/waitpid(): parent blocks until a child ends and collects its exit status. exit(): frees resources and returns a status. The process tree, with the first user process (init or systemd on Linux) at the root, and process hierarchy. Zombies (finished, not yet reaped) and orphans (parent died, adopted by init). Cascading termination. Tie the whole thing to a shell running ls: fork, exec ls in the child, wait in the parent. Thread creation is one sentence pointing to 2.5.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "shell  pid 100",
+     "style": "accent",
+     "children": [
+      {
+       "label": "child  pid 101",
+       "edge": "fork",
+       "children": [
+        {
+         "label": "grandchild  pid 103",
+         "edge": "fork"
+        }
+       ]
+      },
+      {
+       "label": "child  pid 102",
+       "edge": "fork"
+      }
+     ]
+    },
+    "aria": "A tree with the shell at the root, two children made by fork, and one grandchild made by a second fork from the first child."
+   },
+   "example": "How many processes exist after this code runs: fork(); fork(); fork(); ? Answer: each fork doubles the number, so 2³ = 8 processes in total, 7 of them new children. In the parent of each fork the return value is the child's pid (a positive number), in each child it is 0. Now change it to fork(); if (pid == 0) fork(); — the second fork is executed only by the first child, so only 3 processes exist.",
+   "trap": "Guessing which of parent and child runs first — the order is decided by the scheduler, not by the code. The second trap is mixing zombies and orphans: a zombie has finished but has not been waited for; an orphan is still running after its parent died.",
+   "prereq": "Chapter 2.1 and Unit 1 on system calls.",
+   "leave": "Thread creation goes to chapter 2.5; passing data between the parent and the child goes to 2.4."
+  },
+  {
+   "k": 4,
+   "idea": "Cooperating processes need to exchange data, and the OS offers three ways: shared memory, message passing and pipes, trading speed against control and safety.",
+   "depth": "Independent vs cooperating processes and why cooperation is needed. Shared memory: the OS maps one region into both address spaces, both attach it, and the processes must synchronise themselves — point to Unit 3 for the synchronization. Message passing: send and receive, direct (name the process) vs indirect (name a mailbox), blocking (synchronous) vs non-blocking (asynchronous), and buffering — zero capacity, bounded capacity, unbounded capacity. Pipes: unnamed pipe is half-duplex, exists only between related processes, has a fixed kernel buffer, and blocks the writer when full and the reader when empty; named pipe (FIFO) works between unrelated processes and lives as a name in the file system. One line each on sockets and client-server systems, which Unit 6 extends.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Writer",
+     "Kernel buffer",
+     "Reader"
+    ],
+    "messages": [
+     {
+      "from": "Writer",
+      "to": "Kernel buffer",
+      "label": "write 1000 B"
+     },
+     {
+      "from": "Kernel buffer",
+      "to": "Writer",
+      "label": "return 1000"
+     },
+     {
+      "from": "Writer",
+      "to": "Kernel buffer",
+      "label": "65 more writes"
+     },
+     {
+      "from": "Kernel buffer",
+      "to": "Reader",
+      "label": "data ready"
+     },
+     {
+      "from": "Reader",
+      "to": "Kernel buffer",
+      "label": "read 4000 B"
+     },
+     {
+      "from": "Kernel buffer",
+      "to": "Writer",
+      "label": "space free, wake up"
+     }
+    ],
+    "aria": "A time-ordered message exchange in which the writer fills a kernel pipe buffer, the reader drains 4000 bytes, and the kernel wakes the writer when space appears."
+   },
+   "example": "An unnamed pipe has a 65,536-byte kernel buffer and the reader is sleeping. The writer sends 1,000-byte writes. After how many writes does the writer block, and what happens on write number 66? Answer: 65 writes put 65,000 bytes in the buffer, leaving 536 bytes. Write 66 needs 1,000 bytes and does not fit, so the writer blocks and is queued on the pipe. When the reader reads 4,000 bytes, 4,536 bytes are free and the blocked writer is woken.",
+   "trap": "Saying shared memory needs no synchronization because the kernel set it up — that is exactly backwards: the kernel does the mapping and then steps away, so the processes must guard the region themselves. Also, an unnamed pipe cannot connect two unrelated processes; a named pipe can.",
+   "prereq": "Chapters 2.1 and 2.3.",
+   "leave": "Semaphores, monitors and race conditions are Unit 3; sockets, remote procedure calls and distributed IPC are Unit 6."
+  },
+  {
+   "k": 5,
+   "idea": "A thread is the unit of CPU use inside a process: threads share code and data but each keeps its own registers, program counter and stack.",
+   "depth": "What is shared (code, data, heap, open files, signals) and what is private (registers, program counter, stack, thread id). The four benefits: responsiveness, resource sharing, economy of creation and switching, scalability on multicore. A short process vs thread comparison — address space, creation cost, communication, crash effect. User-level threads vs kernel-level threads, and the three models: many-to-one (fast, but one blocking call stalls all and no true parallelism), one-to-one (Linux and Windows), many-to-many (and the two-level variant). Multicore programming: concurrency vs parallelism, data parallelism vs task parallelism, and Amdahl's law. Thread libraries named only (pthreads, Windows threads, Java threads).",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Threads inside one process",
+    "nodes": [
+     {
+      "id": "p",
+      "label": "Process",
+      "note": "code, data, open files",
+      "style": "accent"
+     },
+     {
+      "id": "t1",
+      "label": "Thread 1",
+      "note": "own stack and registers",
+      "style": "normal"
+     },
+     {
+      "id": "t2",
+      "label": "Thread 2",
+      "note": "own stack and registers",
+      "style": "normal"
+     },
+     {
+      "id": "t3",
+      "label": "Thread 3",
+      "note": "own stack and registers",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p",
+      "to": "t1",
+      "label": "shares"
+     },
+     {
+      "from": "p",
+      "to": "t2",
+      "label": "shares"
+     },
+     {
+      "from": "p",
+      "to": "t3",
+      "label": "shares"
+     }
+    ],
+    "aria": "One process box with three thread boxes below it, each thread holding only its own stack and registers while sharing the process's code and data."
+   },
+   "example": "An image-filter app spends 20% of its single-core run time in code that cannot be parallelised. Find the speedup with 4 cores, and the best possible speedup with any number of cores. Answer: Amdahl's law gives 1 ÷ (0.20 + 0.80/4) = 1 ÷ 0.40 = 2.5. With unlimited cores, 1 ÷ (0.20 + 0) = 5. Four threads on a 4-core phone therefore cannot beat 2.5× for this app.",
+   "trap": "Saying threads have their own address space, or that two threads on one core run in parallel. Threads on one core run concurrently by time slicing; only on separate cores do they run in parallel.",
+   "prereq": "Chapter 2.1 for the process and its PCB.",
+   "leave": "Race conditions and locking between threads are Unit 3; how threads are scheduled is chapter 2.8."
+  },
+  {
+   "k": 6,
+   "idea": "Scheduling is choosing which ready process gets the CPU, scheduling criteria score that choice, and preemption decides whether a running process can be taken off the CPU.",
+   "depth": "The CPU–I/O burst cycle and the histogram of bursts. The four decision points: running to waiting, running to ready, waiting to ready, and termination — the first and fourth cannot be avoided, so a scheme is preemptive if it also switches at the second and third. Preemptive vs non-preemptive, and why preemption creates races over kernel data (Unit 1 dual mode, Unit 3). The criteria with their formulas: CPU utilization (percent busy), throughput (processes finished per unit time), turnaround = completion time − arrival time, waiting = turnaround − burst, response = first time on CPU − arrival. Optimisation goals: maximise CPU utilization and throughput, minimise turnaround, waiting and response. Dispatcher latency as part of the cost.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "Non-preemptive",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 8,
+        "style": "accent"
+       },
+       {
+        "label": "P2",
+        "start": 8,
+        "end": 12,
+        "style": "live"
+       }
+      ]
+     },
+     {
+      "label": "Preemptive",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 1,
+        "style": "accent"
+       },
+       {
+        "label": "P2",
+        "start": 1,
+        "end": 5,
+        "style": "live"
+       },
+       {
+        "label": "P1",
+        "start": 5,
+        "end": 12,
+        "style": "accent"
+       }
+      ]
+     }
+    ],
+    "aria": "Two timelines for the same two processes: without preemption P1 runs to 8 ms before P2 starts, with preemption P2 cuts in at 1 ms and P1 resumes at 5 ms."
+   },
+   "example": "P1 arrives at 0 ms with burst 8 ms; P2 arrives at 1 ms with burst 4 ms; switching takes zero time. Schedule under (a) non-preemptive FCFS and (b) preemptive shortest-remaining-time-first, and find average waiting and average response time. Answer: (a) P1 runs 0–8, P2 runs 8–12. Waiting: P1 = 0, P2 = 8 − 1 = 7, average 3.5 ms; response 0 and 7, average 3.5 ms; turnaround 8 and 11, average 9.5 ms. (b) P1 runs 0–1, P2 runs 1–5, P1 runs 5–12. Waiting: P2 = 0, P1 = 12 − 8 = 4, average 2 ms; response 0 and 0, average 0 ms; turnaround 12 and 4, average 8 ms.",
+   "trap": "Using turnaround = completion − arrival as the waiting time, or forgetting to subtract the arrival time at all. Also remember response time is the first time on the CPU, so a long job that runs first has response 0 and a short job behind it does not.",
+   "prereq": "Chapter 2.2 for the dispatcher and Unit 1 for timer interrupts.",
+   "leave": "The step-by-step working of each algorithm is chapter 2.7; several CPUs and deadlines are 2.8."
+  },
+  {
+   "k": 7,
+   "idea": "Each scheduling algorithm is a rule for picking the next process, and they differ in average waiting time, starvation and how much they must know in advance.",
+   "depth": "FCFS: simple, non-preemptive, convoy effect where one long job delays everyone; average waiting computed from the Gantt chart. SJF: provably minimum average waiting time when all arrive together; needs the next burst, predicted by exponential averaging τₙ₊₁ = α tₙ + (1 − α) τₙ where tₙ is the last actual burst, τₙ the last prediction and α a weight between 0 and 1; preemptive version is shortest-remaining-time-first. Priority: a number is attached to each PCB, low number usually means high priority, internal vs external priorities, starvation and aging. Round robin: quantum q, preemptive by timer, q large becomes FCFS, q small makes switching overhead dominant; typical q 10–100 ms. Mention multilevel queue and multilevel feedback queue as combinations, and priority inversion in one line. Every algorithm must be worked on a Gantt chart with waiting and turnaround times.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "FCFS",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 24,
+        "style": "accent"
+       },
+       {
+        "label": "P2",
+        "start": 24,
+        "end": 27,
+        "style": "live"
+       },
+       {
+        "label": "P3",
+        "start": 27,
+        "end": 30,
+        "style": "next"
+       }
+      ]
+     },
+     {
+      "label": "SJF",
+      "bars": [
+       {
+        "label": "P2",
+        "start": 0,
+        "end": 3,
+        "style": "live"
+       },
+       {
+        "label": "P3",
+        "start": 3,
+        "end": 6,
+        "style": "next"
+       },
+       {
+        "label": "P1",
+        "start": 6,
+        "end": 30,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "RR q = 4",
+      "bars": [
+       {
+        "label": "P1",
+        "start": 0,
+        "end": 4,
+        "style": "accent"
+       },
+       {
+        "label": "P2",
+        "start": 4,
+        "end": 7,
+        "style": "live"
+       },
+       {
+        "label": "P3",
+        "start": 7,
+        "end": 10,
+        "style": "next"
+       },
+       {
+        "label": "P1",
+        "start": 10,
+        "end": 14,
+        "style": "accent"
+       },
+       {
+        "label": "P1",
+        "start": 14,
+        "end": 18,
+        "style": "accent"
+       },
+       {
+        "label": "P1",
+        "start": 18,
+        "end": 22,
+        "style": "accent"
+       },
+       {
+        "label": "P1",
+        "start": 22,
+        "end": 26,
+        "style": "accent"
+       },
+       {
+        "label": "P1",
+        "start": 26,
+        "end": 30,
+        "style": "accent"
+       }
+      ]
+     }
+    ],
+    "aria": "Three timelines for the same three processes: FCFS runs the 24 ms job first, SJF runs the two 3 ms jobs first, and round robin breaks the long job into 4 ms slices."
+   },
+   "example": "Three processes arrive at time 0 in the order P1, P2, P3 with bursts 24 ms, 3 ms, 3 ms. Draw the Gantt chart and find the average waiting time for FCFS, SJF and round robin with q = 4 ms. Answer: FCFS order P1, P2, P3 gives waits 0, 24, 27, average 17 ms. SJF order P2, P3, P1 gives waits 0, 3, 6, average 3 ms. Round robin runs P1 0–4, P2 4–7, P3 7–10, then P1 in five more slices to 30; completions are P1 = 30, P2 = 7, P3 = 10, so waits are 6, 4, 7 and the average is 17/3 ≈ 5.67 ms.",
+   "trap": "Using SJF on processes that arrive at different times without tracking when the CPU goes idle — check the Gantt chart, not just the sorted burst list. Also state the priority convention before using it: in most textbooks a smaller number means higher priority.",
+   "prereq": "Chapter 2.6 for the criteria and the preemptive/non-preemptive split.",
+   "leave": "Multiple CPUs, thread scheduling and real-time algorithms are chapter 2.8; deadlock and priority inversion are Unit 3."
+  },
+  {
+   "k": 8,
+   "idea": "With threads, several CPUs and deadlines, the scheduler works at three levels: which thread of a process, which processor, and which deadline is nearest.",
+   "depth": "Thread scheduling: contention scope — process-contention scope (user threads compete inside their process) and system-contention scope (kernel threads compete for CPUs) — and how the light-weight process maps user threads to kernel threads. Multiprocessor scheduling: asymmetric vs symmetric multiprocessing, load balancing by push and pull migration, processor affinity (soft and hard) and why it protects caches. Real-time CPU scheduling: deadline, periodic task with execution time t and period p, admission control, rate-monotonic scheduling (shorter period gets higher priority, static priority) and earliest-deadline-first (dynamic priority), utilization U = Σ tᵢ/pᵢ, and the rate-monotonic bound U ≤ n(2^(1/n) − 1) which is 0.828 for 2 tasks and tends to 0.693 as n grows.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "Rate monotonic",
+      "bars": [
+       {
+        "label": "T1",
+        "start": 0,
+        "end": 1,
+        "style": "accent"
+       },
+       {
+        "label": "T2",
+        "start": 1,
+        "end": 3,
+        "style": "live"
+       },
+       {
+        "label": "T1",
+        "start": 4,
+        "end": 5,
+        "style": "accent"
+       },
+       {
+        "label": "T2",
+        "start": 5,
+        "end": 7,
+        "style": "live"
+       },
+       {
+        "label": "T1",
+        "start": 8,
+        "end": 9,
+        "style": "accent"
+       },
+       {
+        "label": "T2",
+        "start": 10,
+        "end": 12,
+        "style": "live"
+       },
+       {
+        "label": "T1",
+        "start": 12,
+        "end": 13,
+        "style": "accent"
+       },
+       {
+        "label": "T2",
+        "start": 15,
+        "end": 16,
+        "style": "live"
+       },
+       {
+        "label": "T1",
+        "start": 16,
+        "end": 17,
+        "style": "accent"
+       },
+       {
+        "label": "T2",
+        "start": 17,
+        "end": 18,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "A 20 ms real-time timeline where the 4 ms task always preempts the 5 ms task, and every job finishes before its deadline."
+   },
+   "example": "Task T1 has period 4 ms and execution time 1 ms; task T2 has period 5 ms and execution time 2 ms; both are released at time 0. Test rate-monotonic schedulability and draw the schedule up to 20 ms. Answer: U = 1/4 + 2/5 = 0.25 + 0.40 = 0.65. The rate-monotonic bound for n = 2 is 2(√2 − 1) = 0.828, and 0.65 ≤ 0.828, so it is schedulable. T1 has the shorter period, so it has higher priority. The schedule is T1 0–1, T2 1–3, T1 4–5, T2 5–7, T1 8–9, T2 10–12, T1 12–13, then idle, T2 15–16, T1 16–17, T2 17–18. T1 finishes at 1, 5, 9, 13, 17 against deadlines 4, 8, 12, 16, 20 and T2 finishes at 3, 7, 12, 18 against deadlines 5, 10, 15, 20, so no deadline is missed.",
+   "trap": "Giving the higher rate-monotonic priority to the task with the longer period. Priority goes to the shorter period, because it must be served more often. The second trap is treating the utilization bound as exact: it is sufficient, not necessary, so a task set above the bound may still pass a full schedule check.",
+   "prereq": "Chapters 2.5, 2.6 and 2.7.",
+   "leave": "Priority inversion and its remedies are Unit 3 with deadlocks."
+  },
+  {
+   "k": 9,
+   "idea": "Linux first chose the next task in constant time with the O(1) scheduler's two priority arrays, then replaced it with CFS, which keeps a red-black tree ordered by virtual runtime so tasks get CPU in proportion to their weights.",
+   "depth": "Only a few universities teach this; keep it short. O(1) scheduler: 140 priority levels (0–99 for real-time, 100–139 for normal tasks mapped from nice values −20 to 19), an active array and an expired array of queues, a bitmap that finds the highest-priority non-empty queue with one instruction, timeslice derived from priority, and the two arrays swapped when the active one empties — hence constant time per pick regardless of the number of tasks. Problems: the interactivity heuristics were hard to tune and unfair to some workloads. CFS: no fixed timeslice; each task has a virtual runtime, kept in a red-black tree, and the leftmost task runs next; on wake-up a task is charged the tree's minimum virtual runtime so it cannot sleep and hoard credit. Nice value maps to a weight, and the target latency is shared in proportion to weight. Name sched_latency and sched_min_granularity without detail.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Linux O(1) runqueue",
+    "nodes": [
+     {
+      "id": "wake",
+      "label": "Task wakes",
+      "style": "normal"
+     },
+     {
+      "id": "ins",
+      "label": "Insert in active array",
+      "note": "slot = priority",
+      "style": "normal"
+     },
+     {
+      "id": "pick",
+      "label": "Find first set bit",
+      "note": "bitmap, constant time",
+      "style": "accent"
+     },
+     {
+      "id": "run",
+      "label": "Run for timeslice",
+      "style": "live"
+     },
+     {
+      "id": "exp",
+      "label": "Move to expired array",
+      "style": "normal"
+     },
+     {
+      "id": "swap",
+      "label": "Active empty?",
+      "note": "swap the two arrays",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "wake",
+      "to": "ins"
+     },
+     {
+      "from": "ins",
+      "to": "pick"
+     },
+     {
+      "from": "pick",
+      "to": "run"
+     },
+     {
+      "from": "run",
+      "to": "exp"
+     },
+     {
+      "from": "exp",
+      "to": "swap"
+     },
+     {
+      "from": "swap",
+      "to": "pick",
+      "label": "next task"
+     }
+    ],
+    "aria": "A loop in which a waking task joins the active array, the bitmap picks the highest-priority queue, the task runs for its timeslice, drops into the expired array, and the arrays are swapped when the active one empties."
+   },
+   "example": "Two tasks share a CPU under CFS. Task A has nice 0, weight 1024; task B has nice 1, weight 820. The target latency is 24 ms and both are runnable. Find each task's share and each one's virtual-runtime increase. Answer: total weight 1024 + 820 = 1844. A gets 24 × 1024/1844 = 13.3 ms, B gets 24 × 820/1844 = 10.7 ms. A's virtual runtime grows by 13.3 × 1024/1024 = 13.3; B's grows by 10.7 × 1024/820 ≈ 13.4. The two virtual runtimes stay almost equal, so neither starves, and the nicer task simply receives less real time for the same virtual time.",
+   "trap": "Saying CFS assigns fixed time slices — it assigns shares of a target latency through weights, and a task's slice changes with the number of runnable tasks. Also do not read O(1) as 'the whole schedule takes constant time': it is the choice of the next task that is constant time.",
+   "prereq": "Chapters 2.5, 2.6 and 2.7.",
+   "leave": "Kernel structure, system calls and the Linux case study are Unit 1 and Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the PCB state field is what the queues are built from"
+  ],
+  [
+   2,
+   3,
+   "a fork adds a new PCB to the ready queue"
+  ],
+  [
+   3,
+   4,
+   "parent and child usually need to exchange data"
+  ],
+  [
+   1,
+   5,
+   "a process is the container that threads live in"
+  ],
+  [
+   4,
+   5,
+   "threads share memory, so IPC gets cheaper"
+  ],
+  [
+   5,
+   6,
+   "more threads means more scheduling decisions"
+  ],
+  [
+   6,
+   7,
+   "the criteria are the score each algorithm is judged by"
+  ],
+  [
+   7,
+   8,
+   "one-CPU rules generalise to many CPUs and deadlines"
+  ],
+  [
+   8,
+   9,
+   "CFS and O(1) are Linux's answer to these scheduling problems"
+  ]
+ ]
+}

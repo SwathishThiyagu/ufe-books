@@ -1,0 +1,206 @@
+{
+ "lead": "A CPU runs one process at a time, but a system holds many. So the OS must park the processes that are not running and remember exactly where each one stopped. It does this by putting their process control blocks into queues — one queue for processes waiting for the CPU, one for each device — and by switching the CPU from one PCB to another. That switch is the context switch. It is what makes a single core look like it is doing many things at once, and it is pure overhead: no user work happens during it.",
+ "prereq": "You need <a href=\"#process-concept-states-and-process-control-block\">chapter 2.1</a>: the PCB and the five process states.",
+ "sections": [
+  {
+   "h3": "Queues hold PCBs, not processes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The OS does not queue whole processes; it queues their PCBs. A PCB is the small record that holds the process state, the program counter, the register values and the memory limits. Each PCB has a next pointer, so a queue is a linked list of PCBs with a header that points to the front and the rear. Adding a process to a queue or removing it changes only a few pointers."
+    },
+    {
+     "type": "p",
+     "text": "There are three kinds of queue, each named by the reason the process is waiting there."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Job queue: every process in the system, including those still on disk waiting to be allowed into memory.",
+      "Ready queue: PCBs of processes that are in memory and ready to run, lacking only the CPU. The CPU scheduler reads this queue.",
+      "Device queue: processes waiting for one particular device. Each device has its own queue, so a process blocked on a disk read sits in the disk queue, not in the ready queue."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A process migrates between these queues all its life. It is admitted from the job queue into the ready queue, dispatched to the CPU, preempted back to ready, sent to a device queue when it asks for I/O, brought back to ready when the I/O finishes, and removed when it exits. The figure traces these paths."
+    }
+   ]
+  },
+  {
+   "h3": "Three schedulers and one dispatcher",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The <b>long-term scheduler</b>, or job scheduler, picks a process from the job queue and admits it into memory. It therefore sets the degree of multiprogramming — how many processes are in memory at once. It should admit a mix of I/O-bound and CPU-bound processes so the CPU and the devices stay busy together. It runs only when a process is admitted, perhaps once every few seconds, so it can afford to be slow and clever."
+    },
+    {
+     "type": "p",
+     "text": "The <b>short-term scheduler</b>, or CPU scheduler, picks the next PCB from the ready queue. It runs at every switch, perhaps every few milliseconds, so it must be fast. If it took 10 ms to choose a process for a 10 ms time slice, half the CPU would vanish into choosing. A good implementation decides in tens of nanoseconds."
+    },
+    {
+     "type": "p",
+     "text": "The <b>medium-term scheduler</b> removes a process from memory and puts it on disk to reduce load, bringing it back later. That is swapping, covered in Unit 4."
+    },
+    {
+     "type": "p",
+     "text": "The <b>dispatcher</b> is the code that actually performs the switch: it loads the chosen PCB's registers, returns to user mode and jumps to the saved program counter. The time taken to stop one process and start another is the <b>dispatch latency</b>. Keep the roles apart: the scheduler chooses, the dispatcher performs."
+    }
+   ]
+  },
+  {
+   "h3": "What a context switch saves and restores",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "An interrupt or trap hands control to the kernel, and the running process's registers and program counter are saved into its PCB.",
+      "Its state field is changed, for example running to ready, or running to waiting.",
+      "The scheduler picks the next PCB from the ready queue.",
+      "Memory-management data is updated: the page-table base register, the memory limits, and cached address translations. If the address space changes, old translations must be flushed, a hidden extra cost.",
+      "The chosen PCB's registers and program counter are restored, its state becomes running, and the CPU returns to user mode at that program counter."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The switched-out process later resumes at the exact instruction where it stopped, with the same register values. That is the whole purpose. But not one user instruction runs during the switch, so the time is pure overhead — cost with no output. On a general-purpose CPU a switch costs a few microseconds. The cost depends on the hardware: how many registers exist, how fast memory is, and whether the CPU has several register banks, in which case a switch is little more than changing a pointer."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A process moves from the ready queue to the CPU, back to ready when preempted, to a device queue on an I/O request, back to ready when the I/O finishes, and to terminated on exit.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Queueing diagram",
+   "nodes": [
+    {
+     "id": "ready",
+     "label": "Ready queue",
+     "note": "PCBs waiting for CPU",
+     "style": "accent"
+    },
+    {
+     "id": "cpu",
+     "label": "CPU",
+     "note": "one process at a time",
+     "style": "live"
+    },
+    {
+     "id": "io",
+     "label": "Device queue",
+     "note": "waiting for I/O",
+     "style": "normal"
+    },
+    {
+     "id": "term",
+     "label": "Terminated",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ready",
+     "to": "cpu",
+     "label": "dispatch"
+    },
+    {
+     "from": "cpu",
+     "to": "ready",
+     "label": "preempted"
+    },
+    {
+     "from": "cpu",
+     "to": "io",
+     "label": "I/O request"
+    },
+    {
+     "from": "io",
+     "to": "ready",
+     "label": "I/O done"
+    },
+    {
+     "from": "cpu",
+     "to": "term",
+     "label": "exit"
+    }
+   ],
+   "aria": "A flowchart where a PCB moves from the ready queue to the CPU, back to ready when preempted, to a device queue on an I/O request, back to ready when the I/O completes, and to the terminated state on exit."
+  }
+ },
+ "examples": [
+  {
+   "question": "A context switch saves 8 registers and restores 8 registers. Each register transfer takes 5 ns. The scheduler itself needs 200 ns to choose the next process. The time slice is 5 ms. Find the time spent on one context switch and its share of the time slice, as a percentage.",
+   "steps": [
+    "Saving the old process: 8 registers × 5 ns = 40 ns.",
+    "Restoring the new process: 8 registers × 5 ns = 40 ns.",
+    "Scheduler cost: 200 ns — this is part of dispatch latency, so it is counted.",
+    "Total cost of one switch = 40 ns + 40 ns + 200 ns = 280 ns.",
+    "Convert the slice to the same unit: 5 ms = 5 × 10⁻³ s = 5,000,000 ns.",
+    "Share of the slice = 280 ns ÷ 5,000,000 ns = 0.000056.",
+    "As a percentage: 0.000056 × 100 = 0.0056%."
+   ],
+   "answer": "One context switch costs 280 ns, which is 0.0056% of a 5 ms time slice.",
+   "check": "save = 8 * 5\nrestore = 8 * 5\nsched = 200\nswitch = save + restore + sched\nslice_ns = 5 * 1_000_000\nshare = switch / slice_ns * 100\nprint(switch)\nprint(round(share, 6))",
+   "values": [
+    280,
+    0.0056
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Adding the context-switch time to the burst time of the process. The burst is user work; the switch is overhead, measured separately.",
+  "Assuming the switch is instant. Every switch costs register saves, restores and scheduler time, and the cost is real CPU time taken from user processes.",
+  "Saying the dispatcher chooses the next process. The scheduler chooses; the dispatcher only performs the switch.",
+  "Mixing up the schedulers: the long-term scheduler picks from the job queue and admits processes into memory; the short-term scheduler picks from the ready queue.",
+  "Forgetting unit conversion — mixing nanoseconds and milliseconds gives an answer that is wrong by a factor of a million."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is held in the ready queue?",
+   "marks": 2,
+   "a": "The PCBs of processes that are in memory, ready to run, and waiting only for the CPU. The queue is a linked list of these PCBs."
+  },
+  {
+   "level": "remember",
+   "q": "State the difference in job between the scheduler and the dispatcher.",
+   "marks": 2,
+   "a": "The scheduler chooses which process runs next. The dispatcher performs the switch: it loads the chosen PCB's registers, switches to user mode and jumps to its program counter."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the short-term scheduler be fast while the long-term scheduler may be slow?",
+   "marks": 3,
+   "a": "The short-term scheduler runs at every context switch, which can happen every few milliseconds, so its own time is overhead taken from useful work. The long-term scheduler runs only when a process is admitted into memory, perhaps once in seconds, so its cost is negligible and it can spend time choosing a good I/O-bound and CPU-bound mix."
+  },
+  {
+   "level": "understand",
+   "q": "What does the medium-term scheduler do and why does the OS need it?",
+   "marks": 3,
+   "a": "It removes processes from memory and places them on disk, then brings them back later. This reduces the number of processes competing for memory, lowering load and helping when memory is short. The mechanism is swapping, detailed in Unit 4."
+  },
+  {
+   "level": "apply",
+   "q": "A system switches context once per time slice. The slice is 4 ms and one switch costs 300 ns. What percentage of CPU time is lost to switching?",
+   "marks": 4,
+   "a": "Slice in ns = 4 × 1,000,000 = 4,000,000 ns. Share = 300 ÷ 4,000,000 = 0.000075. As a percentage = 0.0075%. So one switch per slice wastes 0.0075% of the CPU."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a context switch cost more than the register saves and restores alone?",
+   "marks": 4,
+   "a": "Because the memory-management data must also change. A new address space means a new page-table base register, and cached address translations in the TLB may have to be flushed or tagged. Those operations touch memory and can dominate the switch cost, especially when the two processes do not share an address space."
+  },
+  {
+   "level": "analyze",
+   "q": "Two machines switch between the same two processes. Machine A has 8 registers and no cache of translations; machine B has 64 registers and a large TLB. Which loses more time per switch, and what does this tell you about dispatch latency?",
+   "marks": 5,
+   "a": "Machine B saves and restores 64 registers instead of 8, so its save and restore time is eight times larger, and a large TLB may need more flushing. Unless B's hardware gives extra register banks or tagged TLB entries, B's switch is more expensive. Dispatch latency is therefore a property of the hardware and the memory system, not a fixed constant of the OS."
+  }
+ ],
+ "beyond": "Not for the exam. Hardware has been fighting switch cost for decades. Some CPUs provide several register banks so that a switch changes a pointer instead of copying registers. After the Meltdown disclosure in 2018, many kernels separated kernel and user page tables, which made each entry to and exit from the kernel more expensive — a security feature paid for in dispatch latency. In user space, coroutines and green threads avoid the kernel switch entirely by switching stacks inside one process. Search for tagged TLBs, kernel page-table isolation, and the switch_to routine in the Linux kernel to go further."
+}

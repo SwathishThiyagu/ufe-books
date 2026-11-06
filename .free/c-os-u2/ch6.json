@@ -1,0 +1,253 @@
+{
+ "lead": "Scheduling is the choice of which ready process gets the CPU next. One CPU, many candidates, so the OS must pick, and pick again within milliseconds. Criteria are the numbers that score a choice: how busy the CPU stays, how many jobs finish per second, and how long each process waits before it starts and before it ends. Preemption decides whether a running process can be pushed off the CPU before it finishes.",
+ "prereq": "You need: <a href=\"#process-scheduling-queues-and-context-switching\">Chapter 2.2</a> for the dispatcher, ready queue and context switch, and Unit 1, OS operations: dual mode and timers, for the timer interrupt that makes preemption possible.",
+ "sections": [
+  {
+   "h3": "CPU bursts and the four decision points",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process alternates between a CPU burst, where it computes, and an I/O burst, where it waits for a disk read, a keystroke or a network reply. A program that reads a file and prints it makes several short CPU bursts with I/O waits in between."
+    },
+    {
+     "type": "p",
+     "text": "Draw a histogram of burst lengths: burst length in milliseconds on the x-axis, number of bursts of that length on the y-axis. Most real systems give a curve tall at the left with a long tail to the right — many very short bursts, a few very long ones. That shape is why order matters: letting a short burst through early clears a whole process out of the system."
+    },
+    {
+     "type": "p",
+     "text": "The scheduler can act only at four moments, called decision points."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Running → waiting: the process asks for I/O or waits for another process.",
+      "Running → ready: the process is interrupted, usually by the timer, and returns to the ready queue.",
+      "Waiting → ready: an I/O operation completes and the process can run again.",
+      "Running → terminated: the process finishes."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Points 1 and 4 are forced, because the process caused them itself. Points 2 and 3 are choices. A scheme is preemptive if it also switches at points 2 and 3, that is, if the OS can take the CPU from a process that could still run. It is non-preemptive if it switches only at points 1 and 4: once on the CPU, a process keeps it until it blocks or ends. Non-preemptive scheduling is also called cooperative."
+    }
+   ]
+  },
+  {
+   "h3": "Preemptive and non-preemptive scheduling",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Preemption costs something. Every switch is a context switch: the kernel saves the registers and state of the old process and restores the new one. Nothing useful runs meanwhile, so dispatch latency — the delay between stopping one process and starting the next — is a real loss. That is why most kernels allow preemption in user mode but restrict it inside kernel code."
+    },
+    {
+     "type": "p",
+     "text": "The larger cost is correctness. Suppose the kernel is halfway through updating the ready queue and a timer interrupt preempts it. The next process can find the list half-changed. In a non-preemptive kernel this cannot happen, because kernel code runs to completion. A preemptive kernel must protect every shared kernel structure with locks or by disabling interrupts around short critical sections; see Unit 3, Process Synchronization and Deadlocks."
+    },
+    {
+     "type": "p",
+     "text": "So why preempt at all? Response. Without preemption a long compute job can hold the CPU for seconds while a user types into an editor waiting to echo the keystroke. With preemption the timer interrupt arrives after a fixed quantum, say 10 ms, and the editor gets its turn. Preemption also lets an urgent new job cut in at once, which interactive and real-time systems need."
+    },
+    {
+     "type": "p",
+     "text": "Some systems preempt only at point 2, not point 3, so a job waking from I/O waits for the next tick. Any switching beyond points 1 and 4 is still preemption."
+    }
+   ]
+  },
+  {
+   "h3": "The scheduling criteria and their formulas",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Criteria compare two schedules for the same set of processes. Measure all times from the same clock, in milliseconds."
+    },
+    {
+     "type": "formula",
+     "text": "CPU utilization = (busy time ÷ total time) × 100",
+     "where": "busy time is the time the CPU spent running processes, total time is the length of the interval observed, and the answer is a percentage. Idle time lowers it."
+    },
+    {
+     "type": "formula",
+     "text": "Throughput = number of processes completed ÷ length of the interval",
+     "where": "the answer is in processes per second (or per millisecond). It counts finished processes, not started ones."
+    },
+    {
+     "type": "formula",
+     "text": "Turnaround time = completion time − arrival time",
+     "where": "for one process: from the moment it enters the system to the moment it finishes. It includes waiting, CPU time and all I/O."
+    },
+    {
+     "type": "formula",
+     "text": "Waiting time = turnaround time − burst time − I/O time",
+     "where": "the time spent in the ready queue. With no I/O in the process, I/O time = 0, so waiting = turnaround − burst. With I/O, subtract it too, or simply add up the intervals the process actually spent in the ready queue. A process preempted twice adds both waits."
+    },
+    {
+     "type": "formula",
+     "text": "Response time = time of first run on the CPU − arrival time",
+     "where": "how long the process waited before it started at all. Later runs do not count."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Criterion",
+      "Formula",
+      "Goal"
+     ],
+     "rows": [
+      [
+       "CPU utilization",
+       "busy ÷ total × 100",
+       "maximise"
+      ],
+      [
+       "Throughput",
+       "completed ÷ time",
+       "maximise"
+      ],
+      [
+       "Turnaround",
+       "completion − arrival",
+       "minimise"
+      ],
+      [
+       "Waiting",
+       "turnaround − burst − I/O",
+       "minimise"
+      ],
+      [
+       "Response",
+       "first run − arrival",
+       "minimise"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "These goals fight each other. Keeping the CPU busy with long jobs raises utilisation but ruins response. A good average can hide starvation: a schedule can minimise average waiting while one long job never runs. Compare schedules with context-switch time included, because assuming zero switch time makes preemption look better than it is. The rules that pick processes are in <a href=\"#scheduling-algorithms-fcfs-sjf-priority-round-robin\">Chapter 2.7</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The same two processes both ways: without preemption P1 runs 0–8 ms and P2 follows; with preemption P2 cuts in at 1 ms and P1 resumes at 5 ms. P2's wait falls from 7 ms to 0.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "Non-preemptive",
+     "bars": [
+      {
+       "label": "P1",
+       "start": 0,
+       "end": 8,
+       "style": "accent"
+      },
+      {
+       "label": "P2",
+       "start": 8,
+       "end": 12,
+       "style": "live"
+      }
+     ]
+    },
+    {
+     "label": "Preemptive",
+     "bars": [
+      {
+       "label": "P1",
+       "start": 0,
+       "end": 1,
+       "style": "accent"
+      },
+      {
+       "label": "P2",
+       "start": 1,
+       "end": 5,
+       "style": "live"
+      },
+      {
+       "label": "P1",
+       "start": 5,
+       "end": 12,
+       "style": "accent"
+      }
+     ]
+    }
+   ],
+   "aria": "Two timelines for the same two processes: without preemption P1 runs to 8 ms before P2 starts, with preemption P2 cuts in at 1 ms and P1 resumes at 5 ms."
+  }
+ },
+ "examples": [
+  {
+   "question": "P1 arrives at 0 ms with a CPU burst of 8 ms. P2 arrives at 1 ms with a CPU burst of 4 ms. Switch time is zero. Schedule them under (a) non-preemptive FCFS and (b) preemptive shortest-remaining-time-first. Find average waiting, response and turnaround for each.",
+   "steps": [
+    "(a) At time 0 only P1 is present, and the scheme is non-preemptive, so P1 runs 0–8 ms. P2 waits and runs 8–12 ms. Completion: P1 = 8 ms, P2 = 12 ms.",
+    "(a) Turnaround: P1 = 8 − 0 = 8 ms; P2 = 12 − 1 = 11 ms. Average = (8 + 11) ÷ 2 = 9.5 ms.",
+    "(a) Waiting = turnaround − burst: P1 = 8 − 8 = 0 ms; P2 = 11 − 4 = 7 ms. Average = 3.5 ms.",
+    "(a) Response: P1 first ran at 0 ms → 0 ms; P2 first ran at 8 ms → 8 − 1 = 7 ms. Average = 3.5 ms.",
+    "(b) At 1 ms P2 arrives with 4 ms of burst left while P1 has 7 ms left. P2 is shorter, so it preempts P1 and runs 1–5 ms. P1 resumes at 5 ms and runs to 12 ms.",
+    "(b) Turnaround: P1 = 12 − 0 = 12 ms; P2 = 5 − 1 = 4 ms. Average = 8 ms.",
+    "(b) Waiting: P1 = 12 − 8 = 4 ms; P2 = 4 − 4 = 0 ms. Average = 2 ms.",
+    "(b) Response: P1 = 0 ms; P2 = 1 − 1 = 0 ms. Average = 0 ms."
+   ],
+   "answer": "Non-preemptive: average waiting 3.5 ms, response 3.5 ms, turnaround 9.5 ms. Preemptive SRTF: average waiting 2 ms, response 0 ms, turnaround 8 ms.",
+   "check": "procs = {\"P1\": (0, 8), \"P2\": (1, 4)}  # arrival ms, burst ms\n\ndef report(runs):\n    first, comp = {}, {}\n    for pid, s, e in runs:\n        if pid not in first:\n            first[pid] = s\n        comp[pid] = e\n    n = len(procs)\n    wait = [comp[p] - procs[p][0] - procs[p][1] for p in procs]\n    resp = [first[p] - procs[p][0] for p in procs]\n    turn = [comp[p] - procs[p][0] for p in procs]\n    print(sum(wait) / n, sum(resp) / n, sum(turn) / n)\n\nreport([(\"P1\", 0, 8), (\"P2\", 8, 12)])          # non-preemptive\nreport([(\"P1\", 0, 1), (\"P2\", 1, 5), (\"P1\", 5, 12)])  # preemptive",
+   "values": [
+    3.5,
+    3.5,
+    9.5,
+    2.0,
+    0.0,
+    8.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Writing waiting time as completion − arrival. That is turnaround; waiting = turnaround − burst (− I/O if any).",
+  "Ignoring arrival time and assuming every process starts at 0 ms.",
+  "Treating response time as the last run on the CPU. It is the first run only.",
+  "Calling a scheme preemptive because it has priorities. If it never takes the CPU from a running process, it is non-preemptive.",
+  "Leaving out dispatch latency. With zero switch time preemption looks free; each real switch adds to waiting and turnaround."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the four decision points at which the CPU scheduler may act, and say which two make a scheme preemptive.",
+   "marks": 2,
+   "a": "Running → waiting, running → ready, waiting → ready, running → terminated. A scheme is preemptive if it also switches at running → ready (point 2) and waiting → ready (point 3)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a switch at running → waiting not counted as preemption?",
+   "marks": 3,
+   "a": "The running process caused it itself by asking for I/O or waiting for another process, so it cannot continue anyway. Preemption means the OS removes the CPU from a process that is still able to run."
+  },
+  {
+   "level": "apply",
+   "q": "P1 arrives at 0 ms with burst 6 ms. P2 arrives at 2 ms with burst 2 ms. Use non-preemptive FCFS with zero switch time. Find the waiting time and turnaround time of each process.",
+   "marks": 4,
+   "a": "P1 runs 0–6 ms, P2 runs 6–8 ms. Waiting: P1 = (6 − 0) − 6 = 0 ms; P2 = (8 − 2) − 2 = 4 ms. Turnaround: P1 = 6 − 0 = 6 ms; P2 = 8 − 2 = 6 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A scheduler assigns priorities but never takes the CPU away from a running process. Is it preemptive? What happens when a high-priority process arrives while a low-priority one is running?",
+   "marks": 5,
+   "a": "It is non-preemptive. The high-priority process waits in the ready queue until the running process blocks or terminates; priority only affects the choice at the next decision point. The wait can be long, so response time suffers for exactly the process that needed it most."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must a preemptive kernel protect its own data structures, and what does a non-preemptive kernel gain by avoiding this?",
+   "marks": 4,
+   "a": "A timer interrupt can arrive while the kernel is halfway through updating the ready queue, and the next process may read it half-changed — a race condition. A non-preemptive kernel finishes each kernel operation before any switch, so it needs no locks there, at the cost of longer response times."
+  },
+  {
+   "level": "understand",
+   "q": "A system shows high CPU utilization but low throughput. How is that possible?",
+   "marks": 3,
+   "a": "It runs a few very long jobs. The CPU is busy almost all the time, so utilization is high, but only a small number of processes complete per second, so throughput is low."
+  }
+ ],
+ "beyond": "Not for the exam. Linux's Completely Fair Scheduler has been replaced by EEVDF, earliest eligible virtual deadline first, which adds a deadline to the fairness rule so latency-sensitive tasks get the CPU sooner. The same kernel lets you write schedulers as BPF programs through sched_ext. Real-time systems treat the deadline as the first criterion. Search for \"EEVDF scheduler\", \"sched_ext\" and \"cyclictest\"."
+}

@@ -1,0 +1,279 @@
+{
+ "lead": "A program sitting on disk does nothing. A process is that program in execution: its code and data are in memory, its values are in the CPU registers, and a small kernel record called the process control block (PCB) keeps its identity and its state. One CPU is shared by many processes, so the OS must know at every instant what each one is doing — running, ready, waiting for a disk read, or finished. The PCB's state field answers that question, and it drives every scheduling decision in this unit.",
+ "prereq": "You need: system calls and dual-mode operation from Unit 1, because a process changes state only by making a system call or by being interrupted.",
+ "sections": [
+  {
+   "h3": "Program is a file, process is a running thing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <b>program</b> is a file of machine instructions on disk, such as an .exe on Windows or an ELF binary on Linux. It is passive. Nobody executes a file; the OS first copies parts of it into memory."
+    },
+    {
+     "type": "p",
+     "text": "A <b>process</b> is a program in execution, plus everything the CPU needs at that moment. Open the same UPI app twice and you get two processes from one program file, each with its own memory and its own PCB."
+    },
+    {
+     "type": "p",
+     "text": "One process's memory has four regions:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>text</b>: the instructions, usually read-only and shared by copies of the same program.",
+      "<b>data</b>: global and static variables.",
+      "<b>heap</b>: memory asked for at run time by malloc() or new, growing upward.",
+      "<b>stack</b>: one frame per active function call, holding parameters, the return address and locals; it grows downward."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Add the <b>CPU context</b>: the <b>program counter</b> (PC), the address of the next instruction; the <b>stack pointer</b> (SP), the top of the current stack; and the general-purpose registers. To stop a process and later continue it exactly where it stopped, the kernel must save all of this — into the PCB."
+    }
+   ]
+  },
+  {
+   "h3": "The five states and every legal move",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process lives through five states. Some syllabi write <i>blocked</i> for waiting and <i>exit</i> for terminated; the words mean the same."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>New</b>: the PCB has been created but the process is not yet ready to run.",
+      "<b>Ready</b>: able to run, waiting only for a CPU.",
+      "<b>Running</b>: its instructions are executing on a core. On a machine with n cores, at most n processes are running at once.",
+      "<b>Waiting</b> (<i>blocked</i>): cannot continue until an event happens — a disk read finishes, a key is pressed, a lock is freed.",
+      "<b>Terminated</b> (<i>exit</i>): execution is over; the PCB stays until the parent collects the exit status."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "new → ready (<b>admitted</b>): address space and other resources are allocated and the process is placed in the ready queue.",
+      "ready → running (<b>dispatch</b>): the scheduler picks this process and restores its saved registers.",
+      "running → ready (<b>time slice over</b>): a timer interrupt fires, or a higher-priority process arrives. The process did no wrong; it is simply preempted (chapter 2.6).",
+      "running → waiting (<b>I/O request</b>): a system call such as read() cannot finish at once.",
+      "waiting → ready (<b>I/O done</b>): the event happened; the process is eligible again but must still compete for a CPU.",
+      "running → terminated (<b>exit</b>): the process calls exit()."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two rules hold: waiting never goes straight to running, and nothing returns to new. The state field, not the program, decides which queue the PCB sits in."
+    }
+   ]
+  },
+  {
+   "h3": "What the PCB holds",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every process has exactly one PCB: a fixed-layout struct in kernel memory (Linux calls it <code>task_struct</code>). Its fields are the answer to the question \"what does the kernel need to know about this process?\""
+    },
+    {
+     "type": "table",
+     "head": [
+      "Field",
+      "Holds",
+      "Why the kernel needs it"
+     ],
+     "rows": [
+      [
+       "Process id (PID)",
+       "a unique number, e.g. 1042",
+       "names the process in system calls and signals"
+      ],
+      [
+       "State",
+       "one of the five states",
+       "decides which queue the PCB sits in"
+      ],
+      [
+       "Program counter",
+       "address of the next instruction",
+       "resumes at the right place"
+      ],
+      [
+       "Saved registers",
+       "register values at the last switch",
+       "restores the CPU exactly"
+      ],
+      [
+       "Scheduling info",
+       "priority, time left, queue pointers",
+       "picks who runs next"
+      ],
+      [
+       "Memory info",
+       "base and limit registers, or a page-table pointer",
+       "translates addresses (Unit 4)"
+      ],
+      [
+       "Open file list",
+       "table of open file descriptors",
+       "continues reading and writing (Unit 5)"
+      ],
+      [
+       "Accounting",
+       "CPU time used, start time, owner",
+       "limits, statistics, billing"
+      ],
+      [
+       "Parent pointer",
+       "PID of the parent",
+       "wait() and process trees (chapter 2.3)"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A <b>thread</b> is a flow of control inside the process. Threads share text and data but each keeps its own PC, registers and stack, so a multithreaded process keeps one PCB plus a small record per thread (chapter 2.5)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The five states and every legal move between them. Running has an arrow back to Ready for the timer interrupt, and Waiting returns only to Ready, never straight to Running.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Process state transitions",
+   "nodes": [
+    {
+     "id": "new",
+     "label": "New",
+     "style": "normal"
+    },
+    {
+     "id": "ready",
+     "label": "Ready",
+     "style": "normal"
+    },
+    {
+     "id": "run",
+     "label": "Running",
+     "note": "one per core",
+     "style": "accent"
+    },
+    {
+     "id": "wait",
+     "label": "Waiting",
+     "note": "blocked on I/O",
+     "style": "normal"
+    },
+    {
+     "id": "term",
+     "label": "Terminated",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "new",
+     "to": "ready",
+     "label": "admitted"
+    },
+    {
+     "from": "ready",
+     "to": "run",
+     "label": "dispatch"
+    },
+    {
+     "from": "run",
+     "to": "ready",
+     "label": "time slice over"
+    },
+    {
+     "from": "run",
+     "to": "wait",
+     "label": "I/O request"
+    },
+    {
+     "from": "wait",
+     "to": "ready",
+     "label": "I/O done"
+    },
+    {
+     "from": "run",
+     "to": "term",
+     "label": "exit"
+    }
+   ],
+   "aria": "Five boxes for New, Ready, Running, Waiting and Terminated joined by arrows for admitted, dispatch, time slice over, I/O request, I/O done and exit; the Running box is highlighted."
+  }
+ },
+ "examples": [
+  {
+   "question": "Process pid 1042 is playing a video. Its PCB holds state = Running, PC = 0x2A40, SP = 0x7FF0 and three open files. The program calls read() on a slow SD card. (a) Which state does it enter? (b) Which PCB fields change? (c) Where does it wait, and which state follows when the driver signals completion?",
+   "steps": [
+    "Before the call: the state field reads Running and the process is on a CPU core.",
+    "read() is a system call, so the CPU switches to kernel mode (Unit 1) and the kernel starts the SD card transfer.",
+    "A card transfer is slow compared with CPU speed, so the process cannot continue. The state field moves Running → Waiting.",
+    "The PC is saved as the address of the instruction after the call, not 0x2A40, which points at the call itself. The register set and SP = 0x7FF0 are copied into the PCB.",
+    "The PCB leaves the running set and joins the device queue of that SD card (chapter 2.2).",
+    "The driver's interrupt handler marks the transfer complete: state goes Waiting → Ready and the PCB moves to the ready queue. It does not go to Running, because a CPU may not be free.",
+    "On a later dispatch the saved PC and registers are restored, and read() returns the byte count to the program."
+   ],
+   "answer": "The process moves Running → Waiting → Ready; the changed fields are the state plus the saved context (PC, registers, SP); it waits on the SD card's device queue.",
+   "check": "",
+   "values": [],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Sending a process from Waiting straight to Running when its I/O finishes. It always goes to Ready, because the CPU may now be busy.",
+  "Calling a program a process. The program is a file on disk; the process is that file plus memory, registers and a PCB.",
+  "Thinking only one process in the whole system can be Running. On a multicore machine, one per core may run.",
+  "Believing a terminated process has lost its PCB. The record survives until the parent calls wait() (chapter 2.3).",
+  "Saving the PC as the address of the system call instruction instead of the instruction after it, which would repeat the call forever."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a process and a PCB in one line each.",
+   "marks": 2,
+   "a": "A process is a program in execution together with its memory, registers and kernel record. The PCB is that kernel record, holding the PID, state, saved PC and registers, scheduling and memory info, open files and accounting data."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a running process go to Ready on a timer interrupt, and not to Waiting?",
+   "marks": 3,
+   "a": "Waiting means the process itself cannot proceed until an event such as I/O completes. A preempted process can proceed at once; it has only lost the CPU, so it is Ready and competes again for dispatch."
+  },
+  {
+   "level": "apply",
+   "q": "A system has 4 cores. Of 10 processes, 6 are Waiting, 3 are Ready and 1 is Terminated. How many can be Running at this instant, and why?",
+   "marks": 4,
+   "a": "The terminated process is out and the 6 waiting ones cannot run. Only the 3 Ready processes can be dispatched, so at most 3 are Running — fewer than the 4 cores, so one core stays idle."
+  },
+  {
+   "level": "apply",
+   "q": "A process sits at PC = 0x2A40, and the read() call instruction occupies bytes 0x2A40 to 0x2A43. It blocks. What value is saved as the PC in the PCB?",
+   "marks": 3,
+   "a": "0x2A44, the address of the next instruction. On return the process continues after the call and receives the result."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must Waiting → Ready be enforced instead of allowing Waiting → Running?",
+   "marks": 5,
+   "a": "I/O completion says nothing about CPU availability. Jumping to Running would bypass the scheduler's choice of which ready process fits the available core, and 'Running' would stop meaning 'currently executing on a core'. Ready lets the scheduler compare the woken process fairly with others already queued."
+  },
+  {
+   "level": "understand",
+   "q": "Which PCB fields change at a dispatch of a ready process?",
+   "marks": 3,
+   "a": "The state field goes Ready → Running, and the saved PC, SP and register values are loaded into the CPU. Accounting fields such as start time or CPU time may also be updated, and the PCB leaves the ready queue."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is the list of open files kept in the PCB rather than inside the process's own heap?",
+   "marks": 6,
+   "a": "The open-file table is kernel data: the kernel must read it on every read() and write(), even while the process is not running and has no valid address space loaded. Keeping it in the PCB, which lives in kernel memory, protects it from a buggy or malicious process and lets the kernel reclaim the files at exit."
+  }
+ ],
+ "beyond": "Not for the exam. On a real Linux machine you can read a live PCB through the /proc file system: /proc/1042/status shows the state letter (R, S, D, Z), and ps or top are formatted views of /proc/<pid> files. /proc/1042/stat has, among its fields, slots for the saved kernel stack pointer and instruction pointer (historically kstkesp and kstkeip), which most current kernels report as 0. The kernel struct is task_struct. Debuggers and tracers such as strace attach to a process through kernel interfaces like ptrace, whose bookkeeping also lives in task_struct. Containers and cgroups are built on the same record: they tag a group of task_structs with shared limits. Search for task_struct, the proc file system and zombie process to go further."
+}
