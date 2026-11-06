@@ -1,0 +1,321 @@
+{
+ "lead": "A hard disk keeps data on spinning platters, in concentric rings called tracks. The OS must move a mechanical arm to the right ring and wait for the platter to turn before any byte is read. That movement costs milliseconds, far more than memory access. Disk scheduling orders the waiting requests so the arm travels less and average waiting time drops. Every database, file server and phone relies on it: the log a UPI payment writes and the table an IRCTC booking updates both sit on disks whose access time decides how fast the reply comes back.",
+ "prereq": "You need: <a href=\"#allocation-methods-contiguous-linked-indexed\">5.5 allocation methods</a> for how blocks hold a file, <a href=\"#i-o-software-layers-device-drivers-buffering-and-caching\">5.8 I/O software</a> for how a request reaches a driver, and Unit 4, Memory Management for swapping.",
+ "sections": [
+  {
+   "h3": "Disk geometry and access time",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A magnetic disk holds one or more round platters on a single spindle. Each flat surface has a read/write head on an arm. The arm moves in and out along the radius; the platters spin at a fixed speed. Data sits in concentric rings called tracks. Each track is divided into sectors, usually 512 bytes or 4096 bytes. The set of tracks at one arm position, one per surface, is a cylinder. A physical address is (cylinder, surface, sector). Modern disks instead expose a flat logical block address and translate it inside the drive."
+    },
+    {
+     "type": "p",
+     "text": "The cost of one request is the sum of three times."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Seek time: moving the arm to the target cylinder. This is the largest part, roughly proportional to the distance travelled.",
+      "Rotational latency: waiting for the target sector to spin under the head. It ranges from 0 to one full rotation, so 0.5 rotation on average.",
+      "Transfer time: reading or writing the bytes once the head is in place."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "T_access = T_seek + 30 ÷ r + (b ÷ B_track) × (60 ÷ r)",
+     "where": "T_access is the time for one request in seconds; T_seek is the seek time in seconds; r is the rotation speed in revolutions per minute, so 60 ÷ r is one full rotation in seconds and 30 ÷ r is the average rotational latency; b is the number of bytes transferred and B_track is the bytes on one track."
+    },
+    {
+     "type": "p",
+     "text": "A large transfer is cheap per byte, because the seek and the latency are paid once and the rest of the track is read in order. That is why the OS reads ahead in large chunks."
+    }
+   ]
+  },
+  {
+   "h3": "Attachment, disk management and RAID",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Disks attach in four common ways. SATA connects one disk to one host port. SCSI and SAS put many disks on one bus and are common in servers. USB carries removable disks. A network disk appears either as NAS, which shares files over NFS or SMB, or as SAN, which shares raw blocks over Fibre Channel or iSCSI. The first three look like block devices behind a device driver."
+    },
+    {
+     "type": "p",
+     "text": "Disk management has four jobs."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Low-level formatting writes the sector headers and gaps on a raw disk.",
+      "Partitioning splits the disk into independent regions, and the boot block in the first region holds the code that loads the kernel.",
+      "Logical formatting writes the file-system structures described in <a href=\"#file-system-structure-implementation-and-virtual-file-systems\">5.4</a>.",
+      "Bad blocks are hidden by sector sparing, where a spare pool remaps the sector, or by the file system marking the cluster unusable."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Swap space is best placed on its own raw partition, so no file system sits between the page fault and the disk. A swap file also works and is easier to resize."
+    },
+    {
+     "type": "table",
+     "head": [
+      "RAID level",
+      "Minimum disks",
+      "Survives failure of",
+      "Usable space"
+     ],
+     "rows": [
+      [
+       "0",
+       "2",
+       "nothing",
+       "all disks"
+      ],
+      [
+       "1",
+       "2",
+       "one disk",
+       "half"
+      ],
+      [
+       "5",
+       "3",
+       "one disk",
+       "n − 1 of n"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Disk scheduling algorithms",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The driver keeps pending requests in a table, each naming a cylinder. It picks the next request to serve. Seek dominates the cost, so a good order cuts total head movement."
+    },
+    {
+     "type": "formula",
+     "text": "Total head movement = Σ |cᵢ − cᵢ₋₁|",
+     "where": "c₀ is the starting cylinder, c₁ to cₙ are the cylinders served in the chosen order, and |cᵢ − cᵢ₋₁| is the distance moved between two consecutive requests, counted in cylinders."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "FCFS serves requests in arrival order. It is fair and starvation-free, but the arm swings across the disk repeatedly.",
+      "SSTF serves the request nearest the current head position. Movement is small, but far requests can starve while near ones keep arriving.",
+      "SCAN moves in one direction to the last cylinder, serving everything on the way, then reverses. It behaves like a lift, so it is also called the elevator algorithm.",
+      "C-SCAN sweeps in one direction only. On reaching the end it returns to the other end without serving anyone, then sweeps again. Wait time becomes uniform; some syllabi call C-SCAN circular SCAN.",
+      "LOOK and C-LOOK are the same as SCAN and C-SCAN but reverse at the last pending request instead of at the physical disk end, saving that extra travel."
+     ]
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write the service order for the chosen algorithm.",
+      "Subtract each consecutive pair of cylinders, including the start position.",
+      "Add the absolute differences. The total is in cylinders, not in milliseconds.",
+      "Divide by the number of requests for the average movement per request."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "Three queues with head at cylinder 50. FCFS keeps arrival order and swings widely; SSTF always takes the nearest cylinder; SCAN sweeps down to 0 and then up, passing through 55, 90 and 120.",
+  "spec": {
+   "type": "gantt",
+   "unit": "step",
+   "aria": "Three timelines show the request order for FCFS, SSTF and SCAN with head at 50 and requests 55, 90, 30, 120, 10.",
+   "lanes": [
+    {
+     "label": "FCFS",
+     "bars": [
+      {
+       "label": "55",
+       "start": 0,
+       "end": 10,
+       "style": "normal"
+      },
+      {
+       "label": "90",
+       "start": 10,
+       "end": 20,
+       "style": "normal"
+      },
+      {
+       "label": "30",
+       "start": 20,
+       "end": 30,
+       "style": "normal"
+      },
+      {
+       "label": "120",
+       "start": 30,
+       "end": 40,
+       "style": "normal"
+      },
+      {
+       "label": "10",
+       "start": 40,
+       "end": 50,
+       "style": "normal"
+      }
+     ]
+    },
+    {
+     "label": "SSTF",
+     "bars": [
+      {
+       "label": "55",
+       "start": 0,
+       "end": 10,
+       "style": "accent"
+      },
+      {
+       "label": "30",
+       "start": 10,
+       "end": 20,
+       "style": "accent"
+      },
+      {
+       "label": "10",
+       "start": 20,
+       "end": 30,
+       "style": "accent"
+      },
+      {
+       "label": "90",
+       "start": 30,
+       "end": 40,
+       "style": "accent"
+      },
+      {
+       "label": "120",
+       "start": 40,
+       "end": 50,
+       "style": "accent"
+      }
+     ]
+    },
+    {
+     "label": "SCAN",
+     "bars": [
+      {
+       "label": "30",
+       "start": 0,
+       "end": 10,
+       "style": "live"
+      },
+      {
+       "label": "10",
+       "start": 10,
+       "end": 20,
+       "style": "live"
+      },
+      {
+       "label": "0",
+       "start": 20,
+       "end": 30,
+       "style": "live"
+      },
+      {
+       "label": "55",
+       "start": 30,
+       "end": 40,
+       "style": "live"
+      },
+      {
+       "label": "90",
+       "start": 40,
+       "end": 50,
+       "style": "live"
+      },
+      {
+       "label": "120",
+       "start": 50,
+       "end": 60,
+       "style": "live"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A disk has cylinders 0 to 199. The head is at cylinder 50. The pending requests, in arrival order, are 55, 90, 30, 120, 10. Compute the total head movement for FCFS, for SSTF, and for SCAN moving toward cylinder 0. State which is shortest and which is fairest.",
+   "steps": [
+    "FCFS keeps the arrival order 55, 90, 30, 120, 10.",
+    "FCFS distances: |50−55| = 5, |55−90| = 35, |90−30| = 60, |30−120| = 90, |120−10| = 110 cylinders.",
+    "FCFS total = 5 + 35 + 60 + 90 + 110 = 300 cylinders.",
+    "SSTF from 50: nearest is 55, distance 5. From 55 nearest is 30, distance 25. From 30 nearest is 10, distance 20. From 10 nearest is 90, distance 80. Then 120, distance 30.",
+    "SSTF order 55, 30, 10, 90, 120 gives 5 + 25 + 20 + 80 + 30 = 160 cylinders.",
+    "SCAN toward 0 serves 30 (distance 20), 10 (20), then 0 (10), then reverses and serves 55 (55), 90 (35), 120 (30).",
+    "SCAN order 30, 10, 0, 55, 90, 120 gives 20 + 20 + 10 + 55 + 35 + 30 = 170 cylinders.",
+    "SSTF has the least movement at 160 cylinders. SCAN moves 170 cylinders but no request waits longer than one sweep, so it is fairer."
+   ],
+   "answer": "FCFS moves 300 cylinders, SSTF moves 160 cylinders and SCAN moves 170 cylinders; SSTF is shortest but SCAN gives the bounded wait.",
+   "check": "def movement(order, start=50):\n    total = 0\n    cur = start\n    for c in order:\n        total += abs(c - cur)\n        cur = c\n    return total\n\nfcfs = movement([55, 90, 30, 120, 10])\nsstf = movement([55, 30, 10, 90, 120])\nscan = movement([30, 10, 0, 55, 90, 120])\nprint(fcfs)\nprint(sstf)\nprint(scan)\n",
+   "values": [
+    300,
+    160,
+    170
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Forgetting the trip to cylinder 0 in SCAN. Count every movement, including travel past the last request to the disk end.",
+  "Reporting head movement in milliseconds when the data gives only cylinders. Movement is measured in cylinders; time needs seek time per cylinder.",
+  "Calling SSTF optimal. It minimises the next seek, not the total, and it can starve a far request indefinitely.",
+  "Forgetting that average rotational latency is half a rotation, not zero and not a full rotation.",
+  "Sorting the queue and calling it FCFS. FCFS keeps arrival order; only SSTF and SCAN reorder by distance."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a cylinder on a magnetic disk.",
+   "marks": 2,
+   "a": "The set of tracks at the same arm position, one on each platter surface. Naming a cylinder names all those tracks together."
+  },
+  {
+   "level": "understand",
+   "q": "Why can SSTF starve a request?",
+   "marks": 3,
+   "a": "It always picks the nearest cylinder. A far request keeps losing to newly arriving near requests, so it may wait forever."
+  },
+  {
+   "level": "apply",
+   "q": "Head at cylinder 30, queue 10, 60, 20. Give the total head movement for FCFS and for SSTF.",
+   "marks": 4,
+   "a": "FCFS order 10, 60, 20: 20 + 50 + 40 = 110 cylinders. SSTF order 20, 10, 60: 10 + 10 + 50 = 70 cylinders."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does C-SCAN give a more uniform wait than SCAN?",
+   "marks": 4,
+   "a": "C-SCAN always sweeps in one direction, so a request is served within one sweep plus the return. SCAN serves the middle cylinders twice per cycle and the edge cylinders once, so edge requests wait longer."
+  },
+  {
+   "level": "apply",
+   "q": "A disk spins at 7200 rpm. Find one full rotation and the average rotational latency.",
+   "marks": 3,
+   "a": "One rotation = 60 ÷ 7200 s = 8.33 ms. Average latency = half of that = 4.17 ms."
+  },
+  {
+   "level": "understand",
+   "q": "What does sector sparing do with a bad block?",
+   "marks": 2,
+   "a": "The disk keeps a pool of spare sectors and remaps the bad sector to a spare, so the file system never sees the fault."
+  },
+  {
+   "level": "analyze",
+   "q": "RAID 5 needs at least three disks. Why can it survive one disk failure and how much space is usable?",
+   "marks": 3,
+   "a": "Parity for each stripe is spread across all disks, so the data on a failed disk can be rebuilt from the surviving data plus parity. Usable space is n − 1 disks out of n."
+  }
+ ],
+ "beyond": "Not for the exam. Real drives hide geometry behind a flash translation layer or a host-managed zoned interface, and SSDs remove seek time while adding erase-block garbage collection. Linux still offers pluggable elevators such as mq-deadline, kyber and none, and cloud block stores schedule at the virtual-disk layer. Search for zoned block devices, NVMe queues and the mq-deadline scheduler to go further."
+}

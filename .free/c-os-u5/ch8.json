@@ -1,0 +1,150 @@
+{
+ "lead": "A read call looks simple to a program. Under it, the operating system turns one request into a chain of layers that talk to a controller. Each layer hides the layer below: the file system hides blocks, the driver hides device commands, the interrupt handler hides completion timing. The chain matters because it decides speed, safety and portability. Three tools make I/O faster and safer: blocking modes, buffers and caches. You meet them in every phone: a photo gallery reads thumbnails from cache, a printer queues jobs through spooling, and a music app keeps streaming while the screen stays responsive.",
+ "prereq": "You need: <a href=\"#i-o-hardware-polling-interrupts-and-dma\">I/O hardware: polling, interrupts and DMA</a> and the system-call idea from Unit 1.",
+ "sections": [
+  {
+   "h3": "The four layers below the call",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Read a file on a phone. The app calls <code>read()</code> through a user-space I/O library such as C stdio. That call crosses into the kernel through a system call, so the CPU switches to kernel mode. The kernel does not ask the disk controller directly. It passes the request down a stack of software layers. The top layer is the user process. The next is the system-call interface. Below it sits the I/O subsystem, also called the device-independent I/O software. It knows file names, permissions, buffers and caches, but not disk registers. The device driver knows one device family: it writes the controller registers. The interrupt handler runs when the device signals completion. Hardware is the controller and the device itself. On the way back, data and status climb the same stack. The driver reports success or an error. The subsystem copies data into the user buffer. The system call returns the byte count. The layering exists so a new disk needs a new driver, not a new file system. Link: <a href=\"#file-system-structure-implementation-and-virtual-file-systems\">virtual file systems</a> use the same idea for file systems."
+    }
+   ]
+  },
+  {
+   "h3": "Drivers and how a process waits",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A device driver is the kernel code that owns one device or one family. It hides registers, command codes and timing. A common interface has <code>open</code>, <code>read</code>, <code>write</code>, <code>ioctl</code> and <code>close</code>. The I/O subsystem calls these functions through a function table, so it never needs the device details. The driver's <code>read</code> may start DMA, then sleep. The interrupt handler wakes the driver. The driver checks status, clears the interrupt and returns. A process can wait in three ways. Blocking I/O puts the process to sleep until the data is ready; this is the usual <code>read()</code>. Nonblocking I/O returns at once with whatever is ready, or an error such as 'try again'; a game loop can poll a keyboard this way. Asynchronous I/O starts the transfer and returns; the process continues and later gets a signal, callback or completion queue entry. Blocking is easy to program. Nonblocking returns at once, so a process that polls in a loop keeps the CPU busy; used without polling, it lets the program do other work. Asynchronous gives overlap without busy waiting, but it is harder to code. On a phone, a blocking read of a photo file is fine in a background thread; a nonblocking read keeps the UI thread alive."
+    }
+   ]
+  },
+  {
+   "h3": "Buffers, caches and spooling",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A buffer is memory that holds data while it moves. Single buffering uses one buffer: the device fills it, then the CPU empties it. Double buffering uses two: while the CPU works on buffer A, the device fills buffer B. Circular buffering uses a ring of buffers with a read pointer and a write pointer; it suits streams such as audio. Buffering absorbs speed differences and lets a slow device and a fast CPU work in steps. A cache is different. It keeps a copy of data that may be used again. A cache hit is served fast; a miss goes to the slower device. If the hit ratio is h, the average access time is T = h × T_cache + (1 − h) × T_device. Here h is the fraction of requests found in cache, T_cache is cache time and T_device is the slower device time. This assumes the miss costs only the device access; if the cache probe is also paid on a miss, the miss term becomes (1 − h) × (T_cache + T_device). Spooling is another tool. It puts jobs in a queue on disk for a device that cannot interleave, such as a printer. One job prints at a time, and users can submit more. A buffer is not a cache: a buffer holds data in transit, a cache keeps a copy for reuse. A cache may also be a buffer, but the purpose differs."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A read call passes down the stack; the I/O subsystem adds buffers and caches before the driver sends device commands.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "User process",
+     "note": "read()",
+     "style": "normal"
+    },
+    {
+     "label": "System call",
+     "note": "kernel mode",
+     "style": "normal"
+    },
+    {
+     "label": "I/O subsystem",
+     "note": "buffer, cache",
+     "style": "accent"
+    },
+    {
+     "label": "Device driver",
+     "note": "device commands",
+     "style": "live"
+    },
+    {
+     "label": "Interrupt handler",
+     "note": "completion",
+     "style": "normal"
+    },
+    {
+     "label": "Hardware",
+     "note": "controller",
+     "style": "muted"
+    }
+   ],
+   "side": {
+    "top": "user",
+    "bottom": "device"
+   },
+   "aria": "A read call passes from the user process through the system call and I/O subsystem to the device driver, interrupt handler and hardware."
+  }
+ },
+ "examples": [
+  {
+   "question": "A cache has hit ratio 0.8. A cache access takes 0.1 ms; a disk access takes 10 ms. Find the average read time and the total time for 1000 reads.",
+   "steps": [
+    "Given: hit ratio h = 0.8, cache time T_cache = 0.1 ms, disk time T_device = 10 ms, reads = 1000.",
+    "Miss ratio = 1 − h = 1 − 0.8 = 0.2.",
+    "Hit contribution = h × T_cache = 0.8 × 0.1 = 0.08 ms.",
+    "Miss contribution = (1 − h) × T_device = 0.2 × 10 = 2.0 ms.",
+    "Average read time = 0.08 + 2.0 = 2.08 ms.",
+    "Total time for 1000 reads = 1000 × 2.08 = 2080 ms."
+   ],
+   "answer": "Average read time is 2.08 ms, and 1000 reads take 2080 ms.",
+   "check": "hit = 0.8\ncache = 0.1\ndisk = 10.0\nn = 1000\navg = hit*cache + (1-hit)*disk\ntotal = n*avg\nprint(avg)\nprint(total)",
+   "values": [
+    2.08,
+    2080.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A buffer is not a cache: a buffer holds data in transit, a cache keeps a copy for reuse.",
+  "In the hit-ratio formula, use the miss ratio 1 − h for the slow device. A common slip is to multiply the slow-device time by h.",
+  "The interrupt handler is not the driver. The handler is short and runs on completion; the driver contains the device logic.",
+  "Nonblocking is not asynchronous: nonblocking returns immediately with partial data or an error; asynchronous returns and reports completion later.",
+  "Spooling is not double buffering: spooling queues whole jobs on disk for a device such as a printer that cannot interleave jobs."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four software layers between a user process and device hardware.",
+   "marks": 2,
+   "a": "The four software layers between the user process and the hardware are the system-call interface, the device-independent I/O subsystem, the device drivers and the interrupt handlers; hardware (controller plus device) is below these. The user-space library such as stdio is part of the user process, above the layers."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the I/O subsystem stay device-independent?",
+   "marks": 3,
+   "a": "It handles files, permissions, buffers and caches using a standard driver interface. Device details stay inside each driver, so one subsystem can serve many devices."
+  },
+  {
+   "level": "apply",
+   "q": "A cache has hit ratio 0.9, cache time 0.2 ms and disk time 12 ms. Find the average access time. Show the steps.",
+   "marks": 4,
+   "a": "Miss ratio = 0.1. Hit contribution = 0.9 × 0.2 = 0.18 ms. Miss contribution = 0.1 × 12 = 1.2 ms. Average = 0.18 + 1.2 = 1.38 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A process busy-waits on a nonblocking read in a loop. What CPU cost appears, and which mode would you choose for a background file read?",
+   "marks": 4,
+   "a": "The loop burns CPU cycles checking the device and may starve other work. A blocking read in a background thread is better: it sleeps until data is ready and leaves the CPU free."
+  },
+  {
+   "level": "remember",
+   "q": "Define spooling.",
+   "marks": 2,
+   "a": "Spooling queues complete jobs on disk for a device that cannot interleave, such as a printer, and runs them one at a time."
+  },
+  {
+   "level": "understand",
+   "q": "Why does double buffering help when device and CPU speeds differ?",
+   "marks": 3,
+   "a": "While the CPU empties one buffer, the device fills the other. Both work in parallel on different buffers, so the slower side does not sit idle."
+  },
+  {
+   "level": "apply",
+   "q": "For 1000 reads, hit ratio 0.5, cache time 1 ms and disk time 9 ms, find the average time and the total time.",
+   "marks": 4,
+   "a": "Hit contribution = 0.5 × 1 = 0.5 ms. Miss contribution = 0.5 × 9 = 4.5 ms. Average = 5 ms. Total = 1000 × 5 = 5000 ms."
+  }
+ ],
+ "beyond": "Not for the exam. Real kernels expose asynchronous interfaces such as Linux io_uring and Windows overlapped I/O, which batch many requests and cut system-call overhead. Zero-copy paths use DMA and page remapping so data is not copied between kernel and user buffers. Storage caches now sit in the device, the host and the network, so hit ratios are measured at several levels. Search terms: io_uring, zero-copy I/O, page cache, spooler."
+}

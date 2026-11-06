@@ -1,0 +1,250 @@
+{
+ "lead": "A directory is a table inside a file system that maps a name to a file entry. Without it, users would remember inode numbers or disk addresses. The directory structure decides how the OS searches a path such as /home/ravi/notes.txt: it reads one directory entry at a time from the root or from the current directory. This chapter covers single-level, two-level, tree and graph directories, absolute and relative paths, path resolution, and two common directory implementations: a linear list and a hash table. The same ideas appear in Linux, Windows and phone file managers.",
+ "prereq": "You need: <a href=\"#file-concept-attributes-and-access-methods\">5.1 File concept, attributes and access methods</a> for file attributes and the open-file table.",
+ "sections": [
+  {
+   "h3": "From a path to a directory entry",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A directory is a file containing directory entries. A directory entry stores at least a name and a reference to the file's metadata. On many systems that reference is an inode number; an inode number identifies a metadata record inside one file system. The name is for people; the inode number is for the file system. In the figure, the entry notes.txt points to inode 2048. A directory block is a disk block that holds directory entries."
+    },
+    {
+     "type": "p",
+     "text": "A path is a sequence of names separated by /. An absolute path starts at the root directory, written /. A relative path starts at the current directory, the directory a process is working in. The entry . names the current directory; .. names its parent. If the current directory is /home/ravi, then notes.txt and ./notes.txt are relative paths to the same file, while /home/ravi/notes.txt is absolute."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Start at the root for an absolute path, or at the current directory for a relative path.",
+      "Split the path on /.",
+      "For each component except the last, search the current directory, then read the child directory.",
+      "For the last component, search and return its directory entry.",
+      "Treat . as the current directory and .. as its parent."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "To resolve /home/ravi/notes.txt, the OS starts at the root. It searches the root's entries for home, reads that directory, searches for ravi, reads that directory, searches for notes.txt, and returns the inode. The final component names the file or directory the path identifies; earlier components must name directories. A cache of recent path lookups, often called a directory entry cache or dentry cache, can skip disk reads."
+    },
+    {
+     "type": "formula",
+     "text": "T_resolve = T_start + Σ T_read(component_i)",
+     "where": "T_resolve is total path lookup time; T_start is the cost of reading the root or current directory before the search (0 if cached); T_read(component_i) is the cost of reading the directory block that holds component_i. Count each directory block read once: if T_start is the root/current read, start the sum at the second component; if T_start is 0, the first term is the root/current read."
+    }
+   ]
+  },
+  {
+   "h3": "Directory structures: from one list to a graph",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In a single-level directory, all files sit in one directory. Names must be unique, so two users cannot both have notes.txt without renaming. It is simple and fast for a few files, but naming and grouping break down at scale."
+    },
+    {
+     "type": "p",
+     "text": "A two-level directory gives each user one directory. The path starts with the user name, as in /ravi/notes.txt. Names now need to be unique only inside a user's directory. Sharing is awkward: one user's file is outside another user's directory, so the OS needs a search path or an explicit link. A link is another name for an existing file."
+    },
+    {
+     "type": "p",
+     "text": "A tree directory allows directories inside directories, to any depth. Each file and directory has one parent, except the root. Some syllabi call this a hierarchical directory. Paths are unique from the root. Grouping by project, user and type becomes natural. Deletion of a directory is simple because one parent owns it."
+    },
+    {
+     "type": "p",
+     "text": "An acyclic-graph directory allows a file or directory to appear under more than one parent, but no cycle. It supports sharing: one copy of a file can be reached by two paths. The OS must track links; deleting one name must not delete the file while another name still points to it. A reference count, a counter of how many names point to a file, does this job."
+    },
+    {
+     "type": "p",
+     "text": "A general-graph directory allows cycles. Symbolic links can point to a parent, so a path search can loop. The OS needs a hop limit, a visited set or cycle detection during traversal, and garbage collection or cycle-aware deletion to reclaim unreachable files. General graphs are flexible but cost more bookkeeping."
+    }
+   ]
+  },
+  {
+   "h3": "Directory implementation: linear list and hash table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A directory is stored in directory blocks on disk. Implementation chooses how entries inside those blocks are found. The two classic methods are the linear list and the hash table."
+    },
+    {
+     "type": "p",
+     "text": "A linear list stores entries one after another. To find a name, the OS scans entries and compares names. Lookup costs O(n) for n entries in the directory; O(n) means the time grows in proportion to n. Creating a file appends an entry; deleting marks a slot free or compacts. It is simple and works for small directories. A large directory can need many block reads."
+    },
+    {
+     "type": "p",
+     "text": "A hash table stores a hash of the name and uses it to choose a bucket. Lookup computes hash(name), goes to the bucket, and compares names in that bucket. Average lookup is O(1) if hashing is good; worst case is O(n) when all names collide. Collisions are normal: two names can hash to the same bucket, so the OS must compare the full name. The table may be in memory, on disk or both; a fixed table can fill up, while a dynamic table can grow."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Method",
+      "Lookup",
+      "Strength",
+      "Weakness"
+     ],
+     "rows": [
+      [
+       "Linear list",
+       "O(n) scan",
+       "Simple, compact",
+       "Slow for many names"
+      ],
+      [
+       "Hash table",
+       "Average O(1)",
+       "Fast name lookup",
+       "Collisions, table size"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Both methods map a name to a directory entry. The entry's inode number then leads to file metadata. Neither method stores file data in the directory. A directory is itself a file, and its data blocks contain directory entries."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A path walks directory entries from the root: home, ravi, then notes.txt; the final entry names inode 2048. The root is cached in the worked example, so the root lookup costs 0 ms and only reading home and ravi cost time.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "/",
+    "style": "normal",
+    "children": [
+     {
+      "label": "home",
+      "style": "normal",
+      "children": [
+       {
+        "label": "ravi",
+        "style": "normal",
+        "children": [
+         {
+          "label": "notes.txt",
+          "note": "inode 2048",
+          "style": "accent",
+          "_d": 3,
+          "children": [],
+          "_x": 298.384,
+          "_y": 234
+         }
+        ],
+        "_d": 2,
+        "_x": 298.384,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 298.384,
+      "_y": 106
+     },
+     {
+      "label": "bin",
+      "style": "muted",
+      "_d": 1,
+      "children": [],
+      "_x": 421.616,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "The root directory contains home and bin; home contains ravi, and ravi contains notes.txt with inode 2048."
+  }
+ },
+ "examples": [
+  {
+   "question": "A file is /home/ravi/notes.txt. The root directory is cached. Reading one directory block costs 1 ms. Resolution reads the directory containing each path component: home, ravi, and notes.txt. (a) Find the resolution time with the root cached. (b) Find it if the root is not cached and must be read first.",
+   "steps": [
+    "The path names three components below root: home, ravi and notes.txt. The entry for home is held in the root; the entry for ravi is held in home; the entry for notes.txt is held in ravi.",
+    "With the root cached, reading the root to find home costs 0 ms. Cumulative time: 0 ms.",
+    "Read home to find ravi: 1 ms. Cumulative time: 0 + 1 = 1 ms.",
+    "Read ravi to find notes.txt entry: 1 ms. Cumulative time: 1 + 1 = 2 ms.",
+    "With the root cached, total resolution time is 2 ms.",
+    "Without the root cache, add one root read: 2 + 1 = 3 ms."
+   ],
+   "answer": "With the root cached, resolution takes 2 ms; without the root cache it takes 3 ms.",
+   "check": "read_ms = 1\nlower_reads = 2\ncached = lower_reads * read_ms\nno_cache = cached + read_ms\nprint(cached)\nprint(no_cache)",
+   "values": [
+    2,
+    3
+   ],
+   "dry_run": {
+    "head": [
+     "component",
+     "directory read cost (ms)",
+     "cumulative (ms)"
+    ],
+    "rows": [
+     [
+      "home (search root)",
+      "0",
+      "0"
+     ],
+     [
+      "ravi (read home)",
+      "1",
+      "1"
+     ],
+     [
+      "notes.txt (read ravi)",
+      "1",
+      "2"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A path component is a directory entry, not a disk block. You search entries; a directory block is only the storage that holds them. The final entry names the file.",
+  "An absolute path begins at /; a relative path begins at the current directory. Do not add / to a relative path and call it absolute.",
+  "A tree gives every file and directory one parent. An acyclic graph allows shared files or directories with no cycle. A general graph allows cycles and needs loop control.",
+  "A hash collision does not mean a duplicate name. The OS must compare the full name in the bucket before declaring a match.",
+  "An inode number is unique inside one file system, not across all disks or all computers. A directory entry points to it; the inode is not the file's data."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a directory entry store?",
+   "marks": 2,
+   "a": "At least a name and a reference to the file's metadata, such as an inode number."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a two-level directory reduce name clashes compared with a single-level directory?",
+   "marks": 3,
+   "a": "Each user has a separate directory, so two users can both use notes.txt; names must be unique only inside one user's directory."
+  },
+  {
+   "level": "apply",
+   "q": "A path /a/b/c.txt has three components below root. The root is cached. Each directory block read costs 2 ms. Find the resolution time; then find it if the root is not cached.",
+   "marks": 4,
+   "a": "Cached: 2 × 2 = 4 ms. Not cached: 3 × 2 = 6 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A directory has 10,000 entries. Compare a linear list and a hash table for one name lookup, including the worst case.",
+   "marks": 5,
+   "a": "A linear list scans up to 10,000 entries. A hash table averages O(1): one bucket, but the worst case is all names in one bucket, so it scans up to 10,000. The hash table is faster on average; the linear list is simpler."
+  },
+  {
+   "level": "understand",
+   "q": "What is the current directory, and how is it used in a relative path?",
+   "marks": 2,
+   "a": "The current directory is the directory a process is working in. A relative path starts there instead of at the root."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a general-graph directory loop during path search, and what must the OS do?",
+   "marks": 4,
+   "a": "A link can point back to an ancestor or to itself, so following entries can repeat forever. The OS must use a hop limit, a visited set or cycle detection during traversal."
+  }
+ ],
+ "beyond": "Not for the exam. Production file systems use balanced trees or hashed trees for large directories, such as B-trees in NTFS and htree in ext4, because linear lists do not scale to millions of names. Operating systems cache recent path lookups in a dentry cache, so repeated opens avoid disk reads. Distributed file systems add name lookup across hosts, and symbolic-link cycles are a real security and correctness issue. Search next for directory entry, dentry cache, B-tree directory, path resolution and symbolic link cycle."
+}

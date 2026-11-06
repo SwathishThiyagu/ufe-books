@@ -1,0 +1,184 @@
+{
+ "lead": "A CPU cannot read a file directly from a disk or a network card. It talks to a device controller: a small chip with registers for command, status and data. Three mechanisms move data between controller and memory: polling, interrupts and direct memory access (DMA). Polling asks status again and again. Interrupts let the device signal the CPU. DMA lets the device write memory without per-byte CPU copying. Every read() or write() in a program ends here, in register writes, interrupt lines and DMA descriptors.",
+ "prereq": "You need: interrupts and computer-system organization from Unit 1, and the layered file-system view of <a href=\"#file-system-structure-implementation-and-virtual-file-systems\">5.4</a>.",
+ "sections": [
+  {
+   "h3": "Device registers, port I/O and memory-mapped I/O",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A device controller has registers. The command register receives operations such as READ or WRITE. The status register reports busy, ready and error. The data register carries bytes or a pointer to a buffer. The CPU sets these registers over the bus."
+    },
+    {
+     "type": "p",
+     "text": "Two address styles exist. Port-mapped I/O gives registers a separate I/O address space. The CPU uses special instructions such as in and out; ordinary memory loads cannot touch them. Memory-mapped I/O maps the same registers into physical memory addresses. The CPU uses normal load and store instructions. The OS maps those physical pages into kernel virtual address space, so a driver reads a status register like a variable. Memory-mapped I/O is common on ARM and PCI devices; x86 supports both."
+    },
+    {
+     "type": "p",
+     "text": "Polling is the simplest completion test. The driver writes a command, then loops: read status, test the busy bit, branch back if busy. This is busy-waiting: the CPU spins and does no other useful work. Polling is fine for a fast device or a short wait, because the loop has no interrupt overhead. It is poor for a slow device such as a disk or a human typing, because the CPU can spin for milliseconds. A real driver may poll briefly, then sleep and wait for an interrupt."
+    }
+   ]
+  },
+  {
+   "h3": "Interrupt request lines, vectors and ISRs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An interrupt request (IRQ) line is a hardware signal from a controller to the CPU, usually through an interrupt controller. The device raises the line when it needs service: a packet arrived, a disk sector is ready, or a DMA transfer finished. Unit 1 covers the CPU side: the CPU finishes the current instruction, saves the program counter and status, switches to kernel mode, and jumps to a handler."
+    },
+    {
+     "type": "p",
+     "text": "The handler address comes from two tables. The interrupt vector is a small integer supplied by the interrupt controller; it identifies the source or the priority slot. The interrupt descriptor table (IDT) maps each vector to the address of its interrupt service routine (ISR). An ISR is the kernel code for that device. A correct ISR reads the device status, clears the cause so the line drops, and does urgent work. It may copy a few bytes, then mark a waiting process runnable. Long work is deferred because interrupts are disabled or nested handling is limited."
+    },
+    {
+     "type": "p",
+     "text": "Interrupts cost more than a single poll. Entry saves registers, changes mode, and may flush pipeline state; exit restores all of it. The gain is that the CPU runs other work while the device is slow. A high interrupt rate can overwhelm the CPU, so systems coalesce interrupts or switch to polling under load."
+    }
+   ]
+  },
+  {
+   "h3": "DMA setup, completion and CPU cost",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Direct memory access (DMA) moves a block without the CPU copying each byte. A DMA engine or bus-mastering device has a descriptor: memory address, byte count, direction, and control bits. The CPU checks that the device is free, writes the command and descriptor, and sets a start bit. The device then reads or writes memory directly. The CPU runs other work. When the block ends, the device raises an interrupt; the ISR checks status, updates the count, and wakes the waiting process. Some systems use a separate DMA controller; modern PCIe devices are bus masters. DMA still competes for memory bus cycles, so heavy DMA can slow CPU memory access. It also does not remove the completion interrupt; it removes per-byte CPU copying."
+    },
+    {
+     "type": "formula",
+     "text": "T = B / R",
+     "where": "T is transfer time in seconds; B is bytes moved; R is transfer rate in bytes per second."
+    },
+    {
+     "type": "formula",
+     "text": "Npoll ≤ ⌊T / tpoll⌋ + 1",
+     "where": "Npoll is the maximum number of polls; tpoll is the polling interval in seconds; ⌊ ⌋ rounds down."
+    },
+    {
+     "type": "p",
+     "text": "CPU cost decides the choice. Polling pays Cpoll per poll. Interrupt pays Cint per event: entry, mode switch, ISR, exit. DMA pays Csetup plus Cint per block. For a slow device with a long wait, polling burns CPU; interrupts are better. For a very fast device with a short wait, interrupt overhead can exceed polling. For large blocks, DMA wins because per-byte copying disappears. For tiny, frequent transfers, setup overhead can dominate."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The CPU polls a busy device, programs DMA for 4 KB, the device writes memory, then an interrupt tells the CPU the transfer is complete.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "CPU",
+    "Device",
+    "Memory"
+   ],
+   "messages": [
+    {
+     "from": "CPU",
+     "to": "Device",
+     "label": "poll status",
+     "dashed": true
+    },
+    {
+     "from": "Device",
+     "to": "CPU",
+     "label": "busy",
+     "dashed": true
+    },
+    {
+     "from": "CPU",
+     "to": "Device",
+     "label": "DMA setup",
+     "dashed": false
+    },
+    {
+     "from": "Device",
+     "to": "Memory",
+     "label": "4 KB transfer",
+     "dashed": false
+    },
+    {
+     "from": "Device",
+     "to": "CPU",
+     "label": "interrupt",
+     "dashed": true
+    },
+    {
+     "from": "CPU",
+     "to": "Memory",
+     "label": "read data",
+     "dashed": false
+    }
+   ],
+   "aria": "The CPU polls a busy device, sets up DMA, the device writes 4 KB to memory, then the device interrupts the CPU to signal completion."
+  }
+ },
+ "examples": [
+  {
+   "question": "A device transfers 4 KB at 100 MB/s. Find the transfer time. If the CPU polls once per µs, find the maximum number of polls during the transfer.",
+   "steps": [
+    "B = 4 KB = 4 × 1024 = 4096 bytes.",
+    "R = 100 MB/s = 100 × 10⁶ bytes/s.",
+    "T = B / R = 4096 / (100 × 10⁶) s = 4.096 × 10⁻⁵ s = 40.96 µs.",
+    "tpoll = 1 µs. Poll instants inside 40.96 µs can be at 0, 1, 2, ..., 40 µs. Count = ⌊40.96 / 1⌋ + 1 = 40 + 1 = 41 polls."
+   ],
+   "answer": "The transfer takes 40.96 µs, and at most 41 polls fit in that time.",
+   "check": "B = 4 * 1024\nR = 100 * 10**6\nT = B / R\nT_us = T * 1e6\nt_poll = 1e-6\npolls = int(T / t_poll) + 1\nprint(T_us)\nprint(polls)",
+   "values": [
+    40.96,
+    41
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "DMA removes per-byte CPU copying, not the completion interrupt or the setup work; a DMA block still ends with an interrupt or a poll.",
+  "Memory-mapped I/O is not ordinary RAM. The addresses decode to device registers, and caching those locations is wrong.",
+  "The interrupt vector is not the IRQ line number. The line is a hardware signal; the vector indexes the IDT to find the ISR.",
+  "Polling is not always bad. For a fast device with a short expected wait, it avoids interrupt entry and exit cost.",
+  "Unit slip: 4 KB is 4096 bytes, and 100 MB/s in I/O rates is 100 × 10⁶ B/s here. That gives 40.96 µs, not 40.96 ms."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three controller registers and one job of each.",
+   "marks": 2,
+   "a": "Command register: receives operations such as READ or WRITE. Status register: reports busy, ready or error. Data register: carries bytes or a buffer pointer."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a driver use a normal load instruction for a memory-mapped status register, but not for a port-mapped register?",
+   "marks": 3,
+   "a": "Memory-mapped registers are placed in physical memory addresses, so normal load and store instructions reach them through the bus. Port-mapped registers sit in a separate I/O address space and need special in and out instructions."
+  },
+  {
+   "level": "remember",
+   "q": "Define interrupt vector and IDT.",
+   "marks": 3,
+   "a": "The interrupt vector is a small integer that identifies the interrupt source or slot. The interrupt descriptor table (IDT) maps each vector to the address of its interrupt service routine."
+  },
+  {
+   "level": "apply",
+   "q": "A device transfers 8 KB at 200 MB/s. The CPU polls every 2 µs. Find the maximum number of polls during the transfer.",
+   "marks": 4,
+   "a": "8 KB = 8192 bytes. T = 8192 / (200 × 10⁶) s = 40.96 µs. Polls = ⌊40.96 / 2⌋ + 1 = 20 + 1 = 21 polls."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a DMA transfer still need a completion interrupt?",
+   "marks": 4,
+   "a": "The CPU must learn when the block is finished, check for errors, update byte counts, and wake the waiting process. DMA removes per-byte copying, not the need for a completion signal."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare polling and interrupts for a slow device and for a very fast device.",
+   "marks": 5,
+   "a": "For a slow device, polling wastes CPU cycles during a long wait; interrupts let the CPU run another process. For a very fast device with a short wait, interrupt entry and exit overhead can exceed a few polls, so polling may be cheaper."
+  },
+  {
+   "level": "analyze",
+   "q": "A driver polls 1000 times before the device is ready. Each poll costs 20 ns. An interrupt would cost 1 µs. Which is cheaper here?",
+   "marks": 4,
+   "a": "Polling cost = 1000 × 20 ns = 20,000 ns = 20 µs. The interrupt cost is 1 µs. The interrupt is cheaper for this wait."
+  }
+ ],
+ "beyond": "Not for the exam. Modern servers use message-signalled interrupts (MSI-X), an I/O memory management unit (IOMMU) for DMA address translation and safety, and NVMe queues that batch many commands. High-performance networking sometimes polls deliberately in user space (DPDK) to avoid interrupt cost. Linux io_uring reduces system-call overhead for many I/O operations. Search next for MSI-X, IOMMU, NVMe, and interrupt coalescing."
+}

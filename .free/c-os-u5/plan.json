@@ -1,0 +1,596 @@
+{
+ "lead": "This unit explains how an operating system turns disks into files: naming, directories, mounting, allocation, free space, I/O, and disk scheduling. After it, you can trace a pathname to disk blocks, choose an allocation or scheduling method, and compute costs such as head movement or bitmap scans.",
+ "about": "5.1 defines a file and its access methods. 5.2 turns names into paths with directory structures. 5.3 adds mounting and sharing, which only a few universities teach. 5.4 connects the path to a file-system implementation through the virtual file system. 5.5 places file blocks on disk by contiguous, linked or indexed allocation. 5.6 manages the free blocks; only a few universities teach its grouping and counting variants. 5.7 moves data with polling, interrupts and DMA. 5.8 layers device drivers, buffering and caching above that hardware. 5.9 covers disk structure and scheduling, then ties the cost of seeking to file layout.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A file is a named, persistent unit of bytes with attributes, and its access method decides how the OS finds a byte.",
+   "depth": "Cover file attributes (name, identifier, type, location, size, protection, timestamps), common operations (create, open, read, write, seek, delete, truncate), and the open-file table. Compare sequential, direct, index and hash access. Some syllabi call direct access random access. Mention memory-mapped files as a mapping, with detail in Unit 4.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "File access path",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Process",
+      "note": "pathname",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "open()",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "File table",
+      "note": "offset = 0",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "read/write",
+      "note": "sequential or direct",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "close()",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "label": "call"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "label": "descriptor"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "I/O"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "label": "done"
+     }
+    ],
+    "aria": "A process opens a pathname, gets a file-table entry with an offset, performs reads or writes, and closes the file."
+   },
+   "example": "A file has 1000 fixed records of 200 bytes each. Records are numbered from 1. Find the byte offset of record 250 for direct access. Find how many record reads sequential access needs to reach record 250 from the start. Answer: offset = (250 − 1) × 200 = 49,800 bytes; sequential access reads 250 records; direct access reads one record.",
+   "trap": "Do not treat an access method as a disk allocation method; direct access still needs block addresses.",
+   "prereq": "Unit 1 system calls; Unit 4 memory mapping if mentioned.",
+   "leave": "Physical block placement to 5.5; access control to Unit 6."
+  },
+  {
+   "k": 2,
+   "idea": "Directories map names to file entries, and their structure decides how paths are searched.",
+   "depth": "Cover single-level, two-level, tree, acyclic-graph and general-graph directories. Explain absolute and relative paths, current directory, path resolution, and directory implementation by linear list or hash table. Some syllabi call the tree a hierarchical directory. Do not teach access-matrix protection here.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "/",
+     "style": "normal",
+     "children": [
+      {
+       "label": "home",
+       "style": "normal",
+       "children": [
+        {
+         "label": "ravi",
+         "style": "normal",
+         "children": [
+          {
+           "label": "notes.txt",
+           "note": "inode 2048",
+           "style": "accent"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "label": "bin",
+       "style": "muted"
+      }
+     ]
+    },
+    "aria": "The root directory contains home and bin; home contains ravi, and ravi contains notes.txt with inode 2048."
+   },
+   "example": "A path /home/ravi/notes.txt has components home, ravi and notes.txt below root. Each directory block read costs 1 ms. Root is cached. Find the resolution time. Answer: read home (1 ms), read ravi (1 ms), read notes.txt entry (1 ms) = 3 ms. Without the root cache, add 1 ms = 4 ms.",
+   "trap": "A path component is a directory entry, not a disk block; the final entry names the file.",
+   "prereq": "5.1 file attributes and open-file table.",
+   "leave": "Mounting to 5.3; access control to Unit 6."
+  },
+  {
+   "k": 3,
+   "idea": "Mounting attaches one file system at a directory, and sharing lets processes or hosts open the same file.",
+   "depth": "Cover mount point, mount table, mount order, unmount, and the hiding of the old directory at the mount point. Explain shared open-file entries, file descriptors after fork, file locking, and sharing semantics (Unix, session, immutable-share). Name NFS and SMB as remote examples. Only a few universities teach this chapter; keep it short.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Mount lookup",
+    "nodes": [
+     {
+      "id": "p",
+      "label": "/mnt/usb/note.txt",
+      "style": "normal"
+     },
+     {
+      "id": "m",
+      "label": "Mount table",
+      "note": "/mnt/usb → sdb1",
+      "style": "accent"
+     },
+     {
+      "id": "u",
+      "label": "USB file system",
+      "note": "inode 77",
+      "style": "live"
+     },
+     {
+      "id": "l",
+      "label": "Local root",
+      "note": "inode 101 hidden",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p",
+      "to": "m",
+      "label": "lookup"
+     },
+     {
+      "from": "m",
+      "to": "u",
+      "label": "after mount"
+     },
+     {
+      "from": "m",
+      "to": "l",
+      "label": "before mount",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A path under /mnt/usb is looked up in the mount table; after mounting it reaches USB inode 77, while before mounting it reached hidden local inode 101."
+   },
+   "example": "Before mounting, /mnt/usb/note.txt reads local inode 101. After mount /dev/sdb1 on /mnt/usb, the same path reads USB inode 77. The old local directory is hidden until unmount. State what a read of the same path returns before and after the mount. Answer: inode 101 before, inode 77 after.",
+   "trap": "The mount point is not merged with the old directory; it hides it until unmount.",
+   "prereq": "5.2 directory tree and path resolution.",
+   "leave": "Distributed file systems and network security to Unit 6."
+  },
+  {
+   "k": 4,
+   "idea": "A file system is layered: the VFS gives one interface, while each concrete file system maps files to its own on-disk structures.",
+   "depth": "Cover file-system structure (boot block, superblock, inode or FAT, data blocks), operations, and implementation. Explain VFS objects (superblock, inode, dentry, file) and how a pathname reaches an inode. Compare inode-based Linux ext4 and FAT as examples without details of journaling. Some syllabi call this file-system implementation; others put VFS under the file-system interface.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "Application",
+      "note": "open, read",
+      "style": "normal"
+     },
+     {
+      "label": "VFS",
+      "note": "common calls",
+      "style": "accent"
+     },
+     {
+      "label": "ext4 driver",
+      "note": "inode 2048",
+      "style": "live"
+     },
+     {
+      "label": "Buffer cache",
+      "note": "disk blocks",
+      "style": "normal"
+     },
+     {
+      "label": "Disk driver",
+      "note": "I/O queue",
+      "style": "normal"
+     }
+    ],
+    "side": {
+     "top": "user",
+     "bottom": "disk"
+    },
+    "aria": "An application calls the VFS, which reaches the ext4 driver for inode 2048, then the buffer cache and disk driver."
+   },
+   "example": "A process opens /home/ravi/notes.txt, which VFS maps to inode 2048 on ext4. It reads 100 bytes at offset 0, then 50 bytes. The file size is 4000 bytes. Find the offset after each read and the bytes left. Answer: first read starts at 0, next offset is 100; second read starts at 100, next offset is 150; bytes left = 4000 − 150 = 3850 bytes.",
+   "trap": "VFS is not a disk file system; it is the kernel's common interface and object layer.",
+   "prereq": "5.2 paths; 5.3 mounts.",
+   "leave": "Allocation to 5.5; caching to 5.8; Linux security to Unit 6."
+  },
+  {
+   "k": 5,
+   "idea": "Allocation methods decide which disk blocks hold a file and how the OS finds them.",
+   "depth": "Cover contiguous, linked and indexed allocation; file allocation table as a linked variant; multilevel index and combined schemes. Compare external and internal fragmentation, direct access, pointer overhead and index-block reads. Some syllabi call linked allocation a chain. Use block numbers, not bytes.",
+   "figure": {
+    "type": "array",
+    "title": "File F: four blocks",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Contig",
+      "cells": [
+       "12",
+       "13",
+       "14",
+       "15"
+      ],
+      "marks": {
+       "2": "accent"
+      }
+     },
+     {
+      "label": "Linked",
+      "cells": [
+       "12",
+       "7",
+       "20",
+       "5"
+      ],
+      "marks": {
+       "2": "accent"
+      }
+     },
+     {
+      "label": "Index",
+      "cells": [
+       "30",
+       "12",
+       "7",
+       "20",
+       "5"
+      ],
+      "marks": {
+       "3": "accent"
+      }
+     }
+    ],
+    "aria": "Three rows show the same four-block file as contiguous blocks 12 to 15, as linked blocks 12, 7, 20, 5, and as an index block 30 pointing to those blocks."
+   },
+   "example": "File F has four blocks, numbered 0 to 3. Contiguous allocation uses disk blocks 12,13,14,15. Linked allocation uses 12→7→20→5. Indexed allocation uses index block 30 pointing to 12,7,20,5. Find the number of disk reads to fetch block 2 of F under each method, with the directory entry cached. Answer: contiguous 1 read (block 14); linked 3 reads (12, 7, 20); indexed 2 reads (30, then 20).",
+   "trap": "Linked allocation cannot compute block 2 directly; you follow pointers. Indexed pays one index-block read.",
+   "prereq": "5.4 file-system structures; 5.2 directory entry.",
+   "leave": "Free-space maps to 5.6; disk seek time to 5.9."
+  },
+  {
+   "k": 6,
+   "idea": "Free-space management tracks unused disk blocks so allocation can find space quickly.",
+   "depth": "Cover bitmap, linked list, grouping and counting. Explain bit meaning, scan cost, and first-fit or next-fit choice. Only a few universities teach grouping and counting; keep them brief. Compare bitmap memory cost with linked-list traversal.",
+   "figure": {
+    "type": "array",
+    "title": "Bitmap: 1 = free",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Blocks",
+      "cells": [
+       "0",
+       "0",
+       "0",
+       "1",
+       "1",
+       "0",
+       "1",
+       "1",
+       "1",
+       "0",
+       "0",
+       "1",
+       "1",
+       "1",
+       "1",
+       "0"
+      ],
+      "marks": {
+       "3": "accent"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 0,
+      "cell": 3,
+      "label": "first free"
+     }
+    ],
+    "aria": "A 16-bit bitmap for blocks 0 to 15 marks used blocks with 0 and free blocks with 1; the first free block is block 3."
+   },
+   "example": "A 16-block disk (0–15) has used blocks 0,1,2,5,9,10,15. Draw a bitmap with 1 = free. Find the free count and the first free block. Answer: bitmap = 0001101110011110; free count = 9; first free block = 3.",
+   "trap": "Fix the bit meaning before scanning: 1 may mean free or used. The first free block is not always block 0.",
+   "prereq": "5.5 allocation methods; 5.9 disk blocks.",
+   "leave": "Block allocation policy to 5.5; disk layout details to 5.9."
+  },
+  {
+   "k": 7,
+   "idea": "The CPU talks to devices through registers, then uses polling, interrupts or DMA to move data.",
+   "depth": "Cover device controller registers, memory-mapped and port I/O, polling, interrupt request lines, interrupt vector and IDT, interrupt service routine, and DMA setup and completion. Cross-reference Unit 1 for interrupt basics. Compare CPU cost of polling with interrupt overhead.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "CPU",
+     "Device",
+     "Memory"
+    ],
+    "messages": [
+     {
+      "from": "CPU",
+      "to": "Device",
+      "label": "poll status",
+      "dashed": true
+     },
+     {
+      "from": "Device",
+      "to": "CPU",
+      "label": "busy",
+      "dashed": true
+     },
+     {
+      "from": "CPU",
+      "to": "Device",
+      "label": "DMA setup",
+      "dashed": false
+     },
+     {
+      "from": "Device",
+      "to": "Memory",
+      "label": "4 KB transfer",
+      "dashed": false
+     },
+     {
+      "from": "Device",
+      "to": "CPU",
+      "label": "interrupt",
+      "dashed": true
+     },
+     {
+      "from": "CPU",
+      "to": "Memory",
+      "label": "read data",
+      "dashed": false
+     }
+    ],
+    "aria": "The CPU polls a busy device, sets up DMA, the device writes 4 KB to memory, then the device interrupts the CPU to signal completion."
+   },
+   "example": "A device transfers 4 KB at 100 MB/s. Find the transfer time. If the CPU polls once per µs, find the maximum number of polls during the transfer. Answer: 4 KB = 4096 bytes; time = 4096 / (100 × 10⁶) s = 40.96 µs; polls ≤ 41.",
+   "trap": "DMA does not remove the completion interrupt; it removes per-byte CPU copying.",
+   "prereq": "Unit 1 interrupts and computer-system organization.",
+   "leave": "Driver layers to 5.8; disk mechanics to 5.9."
+  },
+  {
+   "k": 8,
+   "idea": "I/O software hides device details with layers, drivers, buffers and caches.",
+   "depth": "Cover the I/O software layers: interrupt handler, device driver, device-independent OS software, user-space I/O. Explain blocking, nonblocking and asynchronous I/O, single, double and circular buffering, caching, and spooling. Mention device-driver interfaces. Some syllabi call the device-independent layer the I/O subsystem.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "User process",
+      "note": "read()",
+      "style": "normal"
+     },
+     {
+      "label": "System call",
+      "note": "kernel mode",
+      "style": "normal"
+     },
+     {
+      "label": "I/O subsystem",
+      "note": "buffer, cache",
+      "style": "accent"
+     },
+     {
+      "label": "Device driver",
+      "note": "device commands",
+      "style": "live"
+     },
+     {
+      "label": "Interrupt handler",
+      "note": "completion",
+      "style": "normal"
+     },
+     {
+      "label": "Hardware",
+      "note": "controller",
+      "style": "muted"
+     }
+    ],
+    "side": {
+     "top": "user",
+     "bottom": "device"
+    },
+    "aria": "A read call passes from the user process through the system call and I/O subsystem to the device driver, interrupt handler and hardware."
+   },
+   "example": "A cache has hit ratio 0.8. A cache access takes 0.1 ms; a disk access takes 10 ms. Find the average read time and the total time for 1000 reads. Answer: average = 0.8 × 0.1 + 0.2 × 10 = 0.08 + 2 = 2.08 ms; total = 1000 × 2.08 = 2080 ms.",
+   "trap": "A buffer is not a cache: a buffer holds data in transit, a cache keeps a copy for reuse.",
+   "prereq": "5.7 I/O hardware; Unit 1 system calls.",
+   "leave": "Disk scheduling to 5.9; file-system layout to 5.4–5.5."
+  },
+  {
+   "k": 9,
+   "idea": "A disk is addressed by cylinder, track and sector, and scheduling orders requests to cut seek time.",
+   "depth": "Cover platters, tracks, sectors, cylinders, heads, seek time, rotational latency and transfer time. Cover disk attachment (SATA, SCSI, USB, network), disk management (formatting, partitions, boot block, bad blocks), swap-space placement and RAID levels 0,1,5. Teach FCFS, SSTF, SCAN, C-SCAN, LOOK and C-LOOK with total head movement. Some syllabi call C-SCAN circular SCAN.",
+   "figure": {
+    "type": "gantt",
+    "unit": "step",
+    "lanes": [
+     {
+      "label": "FCFS",
+      "bars": [
+       {
+        "label": "55",
+        "start": 0,
+        "end": 10,
+        "style": "normal"
+       },
+       {
+        "label": "90",
+        "start": 10,
+        "end": 20,
+        "style": "normal"
+       },
+       {
+        "label": "30",
+        "start": 20,
+        "end": 30,
+        "style": "normal"
+       },
+       {
+        "label": "120",
+        "start": 30,
+        "end": 40,
+        "style": "normal"
+       },
+       {
+        "label": "10",
+        "start": 40,
+        "end": 50,
+        "style": "normal"
+       }
+      ]
+     },
+     {
+      "label": "SSTF",
+      "bars": [
+       {
+        "label": "55",
+        "start": 0,
+        "end": 10,
+        "style": "accent"
+       },
+       {
+        "label": "30",
+        "start": 10,
+        "end": 20,
+        "style": "accent"
+       },
+       {
+        "label": "10",
+        "start": 20,
+        "end": 30,
+        "style": "accent"
+       },
+       {
+        "label": "90",
+        "start": 30,
+        "end": 40,
+        "style": "accent"
+       },
+       {
+        "label": "120",
+        "start": 40,
+        "end": 50,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "SCAN",
+      "bars": [
+       {
+        "label": "30",
+        "start": 0,
+        "end": 10,
+        "style": "live"
+       },
+       {
+        "label": "10",
+        "start": 10,
+        "end": 20,
+        "style": "live"
+       },
+       {
+        "label": "0",
+        "start": 20,
+        "end": 30,
+        "style": "live"
+       },
+       {
+        "label": "55",
+        "start": 30,
+        "end": 40,
+        "style": "live"
+       },
+       {
+        "label": "90",
+        "start": 40,
+        "end": 50,
+        "style": "live"
+       },
+       {
+        "label": "120",
+        "start": 50,
+        "end": 60,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "Three timelines show the request order for FCFS, SSTF and SCAN with head 50 and requests 55, 90, 30, 120, 10."
+   },
+   "example": "Disk cylinders are 0–199. The head is at 50. Requests are 55, 90, 30, 120, 10. Compute total head movement for FCFS, SSTF, and SCAN moving toward 0. Answer: FCFS order 55,90,30,120,10 gives 5 + 35 + 60 + 90 + 110 = 300 cylinders; SSTF order 55,30,10,90,120 gives 5 + 25 + 20 + 80 + 30 = 160; SCAN order 30,10,0,55,90,120 gives 20 + 20 + 10 + 55 + 35 + 30 = 170.",
+   "trap": "Count every movement, including travel to cylinder 0 for SCAN; SSTF can starve far requests.",
+   "prereq": "5.5 allocation; 5.8 I/O software; Unit 4 swapping.",
+   "leave": "File-system consistency to Unit 6; detailed RAID parity calculations to storage courses."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "a file name is resolved through directories"
+  ],
+  [
+   2,
+   3,
+   "a mount point swaps a directory subtree"
+  ],
+  [
+   3,
+   4,
+   "the mount table lives in the VFS"
+  ],
+  [
+   4,
+   5,
+   "VFS calls an allocation method"
+  ],
+  [
+   5,
+   6,
+   "allocation consumes free blocks"
+  ],
+  [
+   7,
+   8,
+   "interrupts and DMA feed the I/O layers"
+  ],
+  [
+   8,
+   9,
+   "buffered requests reach the disk scheduler"
+  ],
+  [
+   9,
+   4,
+   "disk layout sets file-system performance"
+  ]
+ ]
+}

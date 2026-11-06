@@ -1,0 +1,288 @@
+{
+ "lead": "A file is a named box of bytes that survives the process that wrote it. RAM forgets everything when power goes, so the operating system keeps data on secondary storage and gives you one simple handle for it: a name. That name maps to attributes (size, owner, times) and to bytes you can read or write. Without this abstraction every program would have to know disk geometry. With it, a photo, a database, a UPI log and a compiler's source file are all just files, opened and closed by the same calls.",
+ "prereq": "You need: system calls from <a href=\"#system-calls-and-their-types\">Unit 1, System calls and their types</a>, and paging from <a href=\"#virtual-memory-demand-paging-page-faults-copy-on-write\">Unit 4, Virtual memory, demand paging, page faults, copy-on-write</a> for the memory-mapped paragraph.",
+ "sections": [
+  {
+   "h3": "What a file is, and what it carries",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A file is a named sequence of bytes stored on secondary storage. Secondary storage means any device that keeps its contents without power: a hard disk, a solid-state drive, a USB stick. RAM does not keep contents without power; a power cut in Chennai wipes it. The file is the operating system's abstraction for data that must outlive the process. The process gives a pathname, and the OS finds the bytes."
+    },
+    {
+     "type": "p",
+     "text": "The name is what a user types. Many systems split it into a stem and an extension, as in notes.txt or report.pdf. The extension is a convention, not a guarantee. Windows picks the program from the extension; UNIX-like systems store a type with the file and check the bytes. A renamed file opens in the wrong program, but its data is intact."
+    },
+    {
+     "type": "p",
+     "text": "Attributes are the facts about a file, separate from its data."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Attribute",
+      "What it holds",
+      "Example"
+     ],
+     "rows": [
+      [
+       "Name",
+       "human-readable label",
+       "marks.txt"
+      ],
+      [
+       "Identifier",
+       "unique tag inside the file system",
+       "inode 481516"
+      ],
+      [
+       "Type",
+       "kind of file",
+       "regular, directory, executable"
+      ],
+      [
+       "Location",
+       "pointer to the blocks on the device",
+       "device 8, block 90210"
+      ],
+      [
+       "Size",
+       "current bytes, and sometimes a maximum",
+       "12,880 bytes"
+      ],
+      [
+       "Protection",
+       "who may read, write, execute",
+       "owner read-write, others read"
+      ],
+      [
+       "Timestamps",
+       "creation, last modification, last access",
+       "modified 14:05"
+      ],
+      [
+       "Owner",
+       "user and group that created it",
+       "user 1001, group 1001"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The name sits in the directory entry. The other attributes usually live in a separate structure, the inode (index node) on UNIX-like systems, or the file record in other file systems. <a href=\"#directory-structure-and-implementation\">5.2</a> shows how the directory maps names to those records."
+    }
+   ]
+  },
+  {
+   "h3": "Operations and the open-file table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "open() is a system call, and it does four jobs."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Search the directory for the pathname and fetch the file's attributes.",
+      "Check permission. If allowed, copy the attributes into a system-wide open-file table; if the file is already open, just raise its open count.",
+      "Add an entry to the process's own table that points at the system-wide entry and holds a current position, the offset, starting at 0.",
+      "Return a small integer, the file descriptor in UNIX or handle in Windows, which indexes the process table."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The other operations act through that descriptor."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "create: make an entry and reserve attributes.",
+      "read(fd, buf, n): copy n bytes from the offset into buf, then advance the offset by n.",
+      "write(fd, buf, n): copy n bytes from buf at the offset, advance, and extend the size if needed.",
+      "seek(fd, pos): set the offset without transferring data; this is what makes direct access possible.",
+      "truncate: keep the attributes but set size to 0 and free the blocks.",
+      "delete: remove the name and free the blocks.",
+      "close: drop the process entry and lower the open count; at zero the system-wide entry is removed."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two tables exist for a reason. The system-wide entry holds data every opener shares: location, size, open count. The per-process entry holds what is private: the offset and the access mode. Two processes that call open separately get separate offsets, so one reading does not disturb the other. After fork, the child shares the parent's offset because it shares the entry."
+    }
+   ]
+  },
+  {
+   "h3": "Access methods: how the OS finds a byte",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Sequential access reads bytes in order: read next, write next, rewind, skip n. The OS holds the offset and moves it by the number of bytes transferred. Copying a log file, or a compiler reading source, works this way. It matches a magnetic tape and costs one pass to touch every byte once."
+    },
+    {
+     "type": "p",
+     "text": "Direct access, called random access in some syllabi, treats the file as a numbered sequence of blocks and lets the program name any one of them: read(n), write(n). One record out of a thousand is found in one jump. With fixed-length records the offset follows from the record number."
+    },
+    {
+     "type": "formula",
+     "text": "offset = (n − 1) × L   for records numbered from 1\noffset = n × L   for records numbered from 0",
+     "where": "offset is the byte position from the start of the file, in bytes; n is the record number; L is the record length in bytes."
+    },
+    {
+     "type": "p",
+     "text": "Indexed access adds an index: a table of keys and pointers kept inside or beside the file. The OS reads the index, gets a block pointer, then reads that block. A database with a B-tree index works this way. Cost is two reads instead of one, but the index is small and often cached."
+    },
+    {
+     "type": "p",
+     "text": "Hashed access computes hash(key) and uses the result as the block number. An equality lookup takes one read on average. Order is destroyed, so printing records in date order becomes impossible, and collisions need a chain or an overflow block. A log keyed by UPI transaction id fits; a sorted ledger does not."
+    },
+    {
+     "type": "p",
+     "text": "Memory-mapped files are not a fourth access method. mmap maps the file's pages into the process address space, so reads and writes become ordinary memory accesses that fault pages in. That mechanism is taught in <a href=\"#virtual-memory-demand-paging-page-faults-copy-on-write\">Unit 4, Virtual memory, demand paging, page faults, copy-on-write</a>. The file still has blocks; the program just stops calling read()."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "A pathname becomes a descriptor pointing at a table entry whose offset read and write advance, and close releases. Notice that the offset lives in the table, not in the process code.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "File access path",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Process",
+     "note": "gives pathname",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "open()",
+     "note": "search, check, copy",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "File table",
+     "note": "offset = 0",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "read / write",
+     "note": "sequential or direct",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "close()",
+     "note": "open count drops",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "call"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "descriptor"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "I/O"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "label": "done"
+    }
+   ],
+   "aria": "A process opens a pathname, gets a file-table entry with offset 0, performs sequential or direct reads and writes, then closes the file."
+  }
+ },
+ "examples": [
+  {
+   "question": "A file holds 1000 fixed-length records of 200 bytes each, numbered from 1. (a) For direct access, find the byte offset of record 250. (b) How many record reads does sequential access need to reach record 250 starting from record 1? (c) If the disk block size is 4096 bytes and block numbers start at 0, which block holds that offset?",
+   "steps": [
+    "Record length L = 200 bytes, record number n = 250, numbering starts at 1.",
+    "offset = (n − 1) × L = (250 − 1) × 200.",
+    "250 − 1 = 249.",
+    "249 × 200 = 49,800 bytes.",
+    "Sequential access must pass records 1, 2, ..., 250 in order, which is 250 record reads.",
+    "Block number = floor(offset ÷ block size) = floor(49,800 ÷ 4096) = floor(12.158) = 12, so block 12 counted from 0."
+   ],
+   "answer": "The offset is 49,800 bytes; sequential access needs 250 record reads; the byte lies in disk block 12 counted from 0, and direct access reads only the one record.",
+   "check": "L = 200\nn = 250\nblock_size = 4096\noffset = (n - 1) * L\nprint(offset)\nprint(n)\nprint(offset // block_size)\n",
+   "values": [
+    49800,
+    250,
+    12
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not confuse an access method with an allocation method. Direct access names a block of the file; where that block sits on disk is decided by contiguous, linked or indexed allocation, covered in 5.5.",
+  "The byte offset is not the disk address. Divide the offset by the block size and let the file system's mapping turn that logical block into a physical one.",
+  "Sequential access does not mean tape only. Any direct-access device can be read sequentially; the difference is whether the program may also jump.",
+  "An open-file offset is per process, not per file. Two independent open() calls have two offsets; only fork shares one.",
+  "Indexed access and indexed allocation are different things. One is a search structure for finding a record, the other is a way of placing blocks on disk."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name any four file attributes and say where the name is stored.",
+   "marks": 2,
+   "a": "Any four of: name, identifier, type, location, size, protection, timestamps, owner. The name is stored in the directory entry; the rest usually in the inode or file record."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the OS keep a per-process open-file table entry in addition to the system-wide entry?",
+   "marks": 3,
+   "a": "The system-wide entry holds shared facts: location, size, open count. The per-process entry holds private facts: the current offset and access mode. Separate entries let two processes read the same file at their own positions."
+  },
+  {
+   "level": "apply",
+   "q": "A file has 500 fixed records of 512 bytes, numbered from 1. Find the byte offset of record 40 for direct access.",
+   "marks": 3,
+   "a": "offset = (40 − 1) × 512 = 39 × 512 = 19,968 bytes."
+  },
+  {
+   "level": "apply",
+   "q": "A file has 1000 records of 100 bytes numbered from 0. A program reads record 700 directly, then record 5. How many record reads does each need?",
+   "marks": 3,
+   "a": "One read each, because record 700 starts at offset 70,000 bytes and record 5 at 500 bytes. Direct access does not pass the records in between."
+  },
+  {
+   "level": "understand",
+   "q": "A log file must be printed in the exact order the lines were written. Which access method suits it, and why not a hash?",
+   "marks": 3,
+   "a": "Sequential access, because it preserves order and needs one pass. Hashed access gives fast equality lookup but scrambles order, so an ordered printout would need sorting."
+  },
+  {
+   "level": "analyze",
+   "q": "Two processes open the same file separately. Process A reads 500 bytes. Does process B's next read start at byte 500? Explain.",
+   "marks": 4,
+   "a": "No. Separate open() calls create separate per-process entries, each with its own offset starting at 0. B's offset stays 0 until B itself reads. Only after fork do parent and child share one offset."
+  },
+  {
+   "level": "analyze",
+   "q": "A file is read once from start to end every night. Compare sequential and direct access for this job.",
+   "marks": 4,
+   "a": "Both must transfer every byte, so total I/O is the same. Sequential access needs no seek calls and lets the OS read ahead, so it is simpler and usually faster. Direct access adds a seek per record and gains nothing when all records are read."
+  },
+  {
+   "level": "remember",
+   "q": "State the difference between delete and truncate.",
+   "marks": 2,
+   "a": "Truncate keeps the file and its attributes but sets size to 0 and frees the data blocks. Delete removes the directory entry and frees the blocks, so the name no longer exists."
+  }
+ ],
+ "beyond": "Not for the exam. Real file systems add copy-on-write snapshots, checksums per block and log-structured writes; ZFS and btrfs are the usual names to search. Object stores such as S3 drop the offset model and address whole objects with keys, which is hashed access taken to its limit. Databases rarely use the OS read path directly; they use direct I/O and their own buffer pool. Search terms: inode, file descriptor table, mmap, direct I/O, object storage key lookup."
+}

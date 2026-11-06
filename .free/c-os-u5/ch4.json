@@ -1,0 +1,174 @@
+{
+ "lead": "A file system must turn a name such as /home/ravi/notes.txt into disk blocks. It must also support several file systems on one machine: ext4 on the root disk, FAT32 on a pen drive, or a network file system. A virtual file system (VFS) gives one set of calls for all of them. The VFS holds common objects. Each concrete file system supplies methods for its own on-disk layout. The on-disk parts, the VFS objects, and pathname-to-inode lookup explain every open, read and write on Linux.",
+ "prereq": "You need: <a href=\"#file-concept-attributes-and-access-methods\">5.1</a> for file attributes and offsets, <a href=\"#directory-structure-and-implementation\">5.2</a> for name-to-entry lookup, and <a href=\"#file-system-mounting-and-file-sharing\">5.3</a> for mounts.",
+ "sections": [
+  {
+   "h3": "On-disk layout and operations",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A file system on disk has a few fixed regions. The boot block is the first area. The system may use it to load an operating system. The superblock stores the file system's own metadata: block size, total blocks, free-block count, root directory location, and a magic number that identifies the type. An inode table, or a file allocation table (FAT), stores per-file metadata. Data blocks hold file content and directory content."
+    },
+    {
+     "type": "p",
+     "text": "In an inode-based file system, each file has an inode. The inode stores file type, permission bits, owner, size in bytes, timestamps, link count, and pointers to data blocks. The inode number is a stable identifier inside that file system. A directory is a file whose data maps names to inode numbers. In a FAT file system, a directory entry stores the name, attributes, first cluster, and size. The FAT table then chains clusters: each entry gives the next cluster of the file or a mark for the last cluster."
+    },
+    {
+     "type": "p",
+     "text": "The main operations are create, open, read, write, close, and delete. open finds the file's metadata and returns a file descriptor. read and write use a byte offset stored in the open file description. For a read of n bytes at offset o, the next offset is o + n. The bytes returned are from o to o + n − 1."
+    }
+   ]
+  },
+  {
+   "h3": "VFS objects and path lookup",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The VFS is the kernel's common file-system interface. It defines four main objects. A superblock represents one mounted file system. An inode represents one file inside that file system. The VFS inode is a memory copy with operations, not the raw disk inode. A dentry represents one name-to-inode link, such as notes.txt in /home/ravi. A file represents one open file description: current offset, open flags, and a pointer to the dentry. The VFS also keeps a dentry cache so repeated lookups skip disk reads."
+    },
+    {
+     "type": "p",
+     "text": "Path lookup walks one component at a time. Start at the root of the current process or at the current directory. For each component, ask the dentry cache. On a miss, call the parent inode's lookup method. The concrete file system reads its directory data and returns the child inode. At the end, the VFS has the target inode. open then creates a file object for that inode and returns a file descriptor to the process."
+    },
+    {
+     "type": "p",
+     "text": "Calls such as open, read, stat and unlink enter the VFS. The VFS selects the right function through the inode's or file's operation table. The ext4 driver then reads or writes its own structures. Crossing a mount point changes the superblock and the root inode used for the next component. Some syllabi call this file-system implementation; others place the VFS under the file-system interface."
+    }
+   ]
+  },
+  {
+   "h3": "ext4 and FAT as examples",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Linux ext4 is inode-based. A file is named by a directory entry that holds an inode number. The inode holds metadata and block pointers. A path lookup returns an inode number, then the VFS loads that inode. A file descriptor is not an inode number. Many descriptors can point to the same inode, and each descriptor has its own offset."
+    },
+    {
+     "type": "p",
+     "text": "FAT is simpler. It has no inode table. A directory entry holds the file name, attributes, first cluster, and size. To read cluster k, the file system follows the FAT chain from the first cluster. The chain entry gives the next cluster number. An end-of-chain value marks the last cluster. Random access needs a walk from the start of the chain."
+    },
+    {
+     "type": "p",
+     "text": "The VFS hides this difference. An ext4 read calls ext4's inode operations. A FAT read calls FAT's operations. Both return bytes to the same read system call. A pen drive formatted FAT32 and a root disk formatted ext4 can appear under one directory tree. Do not confuse the VFS superblock with the disk superblock. The VFS object is the in-memory handle for the mounted file system."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "An application read enters the common VFS layer, reaches the ext4 driver for inode 2048, then passes through the buffer cache and disk driver.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "Application",
+     "note": "open, read",
+     "style": "normal"
+    },
+    {
+     "label": "VFS",
+     "note": "common calls",
+     "style": "accent"
+    },
+    {
+     "label": "ext4 driver",
+     "note": "inode 2048",
+     "style": "live"
+    },
+    {
+     "label": "Buffer cache",
+     "note": "disk blocks",
+     "style": "normal"
+    },
+    {
+     "label": "Disk driver",
+     "note": "I/O queue",
+     "style": "normal"
+    }
+   ],
+   "side": {
+    "top": "user",
+    "bottom": "disk"
+   },
+   "aria": "An application calls the VFS, which reaches the ext4 driver for inode 2048, then the buffer cache and disk driver."
+  }
+ },
+ "examples": [
+  {
+   "question": "A process opens /home/ravi/notes.txt. The VFS maps it to inode 2048 on ext4. The file size is 4000 bytes. The process reads 100 bytes at offset 0, then reads 50 bytes. Find the offset after each read and the number of bytes left in the file.",
+   "steps": [
+    "open resolves the path to inode 2048 and creates an open file description. Its offset starts at 0 bytes.",
+    "First read: start offset = 0 bytes. Length = 100 bytes. End position = 0 + 100 = 100 bytes. New offset = 100 bytes.",
+    "Second read: start offset = 100 bytes. Length = 50 bytes. End position = 100 + 50 = 150 bytes. New offset = 150 bytes.",
+    "File size = 4000 bytes. Bytes left = file size − current offset = 4000 − 150 = 3850 bytes."
+   ],
+   "answer": "After the first read the offset is 100 bytes; after the second read it is 150 bytes; 3850 bytes are left.",
+   "check": "size = 4000\nfirst_read = 100\nsecond_read = 50\noffset_after_first = 0 + first_read\noffset_after_second = offset_after_first + second_read\nbytes_left = size - offset_after_second\nprint(offset_after_first)\nprint(offset_after_second)\nprint(bytes_left)",
+   "values": [
+    100,
+    150,
+    3850
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The VFS is not a disk file system. It is the kernel's common interface and object layer; ext4 or FAT does the disk work.",
+  "An inode number is not a file descriptor. An inode names a file in one file system; a file descriptor names one open file description in one process.",
+  "The VFS superblock object is not the same as the on-disk superblock. One is an in-memory handle; the other is a disk region.",
+  "A read starts at the current offset, not at byte 0. Update the offset by the number of bytes read, not by the file size.",
+  "FAT has no inode table. A FAT directory entry holds the first cluster, and the FAT chain gives the later clusters."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four on-disk regions of a simple file system.",
+   "marks": 2,
+   "a": "Boot block, superblock, inode table or FAT, and data blocks."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the kernel need a VFS above ext4 and FAT?",
+   "marks": 3,
+   "a": "The VFS gives one set of calls and one object model for many file systems. Each concrete file system supplies methods for its own disk layout."
+  },
+  {
+   "level": "apply",
+   "q": "A file is 5000 bytes. A process reads 200 bytes at offset 0, then 300 bytes. Find the offset after the second read and the bytes left.",
+   "marks": 3,
+   "a": "First read ends at 0 + 200 = 200 bytes. Second read starts at 200 bytes and ends at 200 + 300 = 500 bytes. Bytes left = 5000 − 500 = 4500 bytes."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain how the path /home/ravi/notes.txt reaches an inode in the VFS.",
+   "marks": 5,
+   "a": "Path lookup starts at the root. It resolves home, then ravi, then notes.txt one component at a time. Each step checks the dentry cache, then calls the parent inode's lookup method on a miss. The final step returns the inode of notes.txt. open creates a file object for that inode."
+  },
+  {
+   "level": "understand",
+   "q": "What does a VFS dentry store, and how does it help path lookup?",
+   "marks": 4,
+   "a": "A dentry stores one name-to-inode link. The dentry cache keeps recent links in memory, so repeated lookup of the same path component skips a disk read."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare how ext4 and FAT find the data blocks of a file.",
+   "marks": 5,
+   "a": "ext4 uses an inode. The inode holds metadata and block pointers or an extent tree root. FAT has no inode table. A FAT directory entry gives the first cluster, and the FAT chain gives each next cluster. ext4 can reach a block from the inode; FAT may need a walk along the chain."
+  },
+  {
+   "level": "remember",
+   "q": "What is a superblock?",
+   "marks": 2,
+   "a": "A superblock stores file-system metadata: block size, total and free blocks, root directory location, and a type identifier."
+  },
+  {
+   "level": "apply",
+   "q": "A process has file descriptor 3 open on a 2000-byte file at offset 0. It reads 120 bytes. What is the new offset and the bytes left? Does the answer depend on the inode number?",
+   "marks": 4,
+   "a": "New offset = 0 + 120 = 120 bytes. Bytes left = 2000 − 120 = 1880 bytes. The inode number does not change these values; the open file description holds the offset."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems stack file systems: overlayfs for containers, FUSE for user-space file systems, and network file systems under the same VFS. The dentry cache and inode cache are central to performance, so search for dcache and icache behaviour in Linux. Modern ext4 uses an extent tree instead of simple block pointers; FAT remains common on removable media. Search terms: VFS objects, dentry cache, overlayfs, FUSE, ext4 extent tree."
+}

@@ -1,0 +1,178 @@
+{
+ "lead": "Mounting makes one file system appear inside another at a directory called the mount point. Sharing lets processes, or hosts, open the same file with defined visibility of changes. The kernel uses a mount table for the first job and open-file entries plus locks for the second. A USB disk, second partition, or network share joins the directory tree this way. Only a few universities teach this chapter.",
+ "prereq": "You need: path resolution from <a href=\"#directory-structure-and-implementation\">5.2</a>; the VFS idea appears in <a href=\"#file-system-structure-implementation-and-virtual-file-systems\">5.4</a>.",
+ "sections": [
+  {
+   "h3": "Mount point, table and unmount",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A file system is a set of files and metadata on a device. Mounting attaches it at an existing directory, the mount point, such as /mnt/usb. The kernel records the pair in the mount table. Path resolution (<a href=\"#directory-structure-and-implementation\">5.2</a>) walks names. At a mount point it consults the mount table and continues at the mounted root. Device /dev/sdb1 may hold a USB file system; /mnt/usb is its visible door. Mount order matters: mount the parent before a child beneath it. At boot the root is first, then /home or a USB disk."
+    },
+    {
+     "type": "p",
+     "text": "Mounting does not merge directories. The old directory at /mnt/usb is hidden until unmount. After the mount, /mnt/usb/note.txt reaches USB inode 77, not local inode 101."
+    },
+    {
+     "type": "p",
+     "text": "Unmount removes the mount-table entry and reveals the old directory. It fails if any process has an open file, current directory, or working directory inside; this is a busy mount. Close files and leave the directory first. For nested mounts, unmount the child before the parent. A lazy unmount detaches the name at once and frees the file system when the last user stops. Mounting is privileged because it changes the shared name space."
+    }
+   ]
+  },
+  {
+   "h3": "Open files, fork and locking",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each process has a file-descriptor table. A descriptor is a small integer index. It points to an open-file entry holding the current offset, flags, and a pointer to the inode. Two processes can share one open-file entry, or have separate entries for the same inode."
+    },
+    {
+     "type": "p",
+     "text": "After fork, the child copies descriptors. Parent and child point to the same open-file entry, so they share one offset. An independent open() makes a new entry with a new offset. That is why a read after fork can surprise you."
+    },
+    {
+     "type": "p",
+     "text": "File locks coordinate shared access. Advisory locks work only if programs check them; mandatory locks are enforced by the kernel. Sharing semantics differ: Unix shows writes immediately; session semantics shows changes after close; immutable-share forbids changes once shared. NFS is a remote Unix-style example; SMB is common on Windows. The VFS in <a href=\"#file-system-structure-implementation-and-virtual-file-systems\">5.4</a> gives one interface."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A lookup of /mnt/usb/note.txt goes through the mount table. After mounting, it reaches USB inode 77; before mounting it reached hidden local inode 101.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Mount lookup",
+   "nodes": [
+    {
+     "id": "p",
+     "label": "/mnt/usb/note.txt",
+     "style": "normal"
+    },
+    {
+     "id": "m",
+     "label": "Mount table",
+     "note": "/mnt/usb → sdb1",
+     "style": "accent"
+    },
+    {
+     "id": "u",
+     "label": "USB file system",
+     "note": "inode 77",
+     "style": "live"
+    },
+    {
+     "id": "l",
+     "label": "Local root",
+     "note": "inode 101 hidden",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "p",
+     "to": "m",
+     "label": "lookup"
+    },
+    {
+     "from": "m",
+     "to": "u",
+     "label": "after mount"
+    },
+    {
+     "from": "m",
+     "to": "l",
+     "label": "before mount",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A path under /mnt/usb is looked up in the mount table; after mounting it reaches USB inode 77, while before mounting it reached hidden local inode 101."
+  }
+ },
+ "examples": [
+  {
+   "question": "Before any mount, /mnt/usb/note.txt maps to local inode 101. Then /dev/sdb1 is mounted on /mnt/usb, where note.txt maps to USB inode 77. State the inode returned by a read of the same path before and after the mount. What does a process that already opened inode 101 before the mount still read?",
+   "steps": [
+    "Before the mount, path resolution at /mnt/usb uses the local file system, so note.txt gives local inode 101.",
+    "The mount table is then changed to map /mnt/usb to /dev/sdb1. The old local directory becomes hidden.",
+    "After the mount, the same path resolves inside the USB file system, so note.txt gives USB inode 77.",
+    "A process that opened inode 101 before the mount still holds that open-file entry; unmount does not change its inode, though it may see stale data."
+   ],
+   "answer": "A read returns inode 101 before mount and inode 77 after mount; an already-open old file still refers to inode 101.",
+   "check": "before = 101\nafter = 77\nprint(before)\nprint(after)",
+   "values": [
+    101,
+    77
+   ],
+   "code": {
+    "lang": "python",
+    "code": "print(101)\nprint(77)",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "state",
+     "inode"
+    ],
+    "rows": [
+     [
+      "before mount",
+      "101"
+     ],
+     [
+      "after mount",
+      "77"
+     ]
+    ]
+   },
+   "output": "101\n77"
+  }
+ ],
+ "traps": [
+  "A mount point hides the old directory; it never merges the two directories.",
+  "Unmount can fail with a busy mount; a lazy unmount only detaches the name.",
+  "fork shares the open-file offset; a separate open() gives a new offset.",
+  "Advisory locks do not stop programs that ignore them.",
+  "NFS or SMB caching can delay visibility; do not assume local Unix semantics."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define mount point and mount table.",
+   "marks": 2,
+   "a": "A mount point is the directory where a file system is attached. The mount table stores mount point to mounted file system mappings."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the old directory at a mount point vanish?",
+   "marks": 3,
+   "a": "The mount-table entry redirects lookup to the mounted root. The old directory is hidden, not merged, until unmount."
+  },
+  {
+   "level": "apply",
+   "q": "Using inodes 101 and 77, what does /mnt/usb/note.txt return before and after mounting /dev/sdb1?",
+   "marks": 3,
+   "a": "Inode 101 before; inode 77 after."
+  },
+  {
+   "level": "analyze",
+   "q": "Parent and child share a descriptor after fork; parent reads 10 bytes. Why does the child's next read start at offset 10?",
+   "marks": 4,
+   "a": "Fork copies descriptors to the same open-file entry. Both processes share one offset."
+  },
+  {
+   "level": "understand",
+   "q": "Advisory versus mandatory lock?",
+   "marks": 3,
+   "a": "Advisory locks work only if programs check them; mandatory locks are enforced by the kernel."
+  },
+  {
+   "level": "apply",
+   "q": "Can you unmount a file system while a shell's current directory is inside it?",
+   "marks": 2,
+   "a": "No; the mount is busy. Leave the directory first, or use a lazy unmount."
+  }
+ ],
+ "beyond": "Not for the exam. Linux containers use mount namespaces to give each container a private view of the same mount table. Overlay file systems stack a writable layer over read-only images. Search for mount namespaces, overlayfs, NFSv4 delegation, and SMB oplocks."
+}

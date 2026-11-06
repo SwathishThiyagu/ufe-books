@@ -1,0 +1,192 @@
+{
+ "lead": "Allocation methods answer one question: which disk blocks hold a file, and how does the OS find block i? A directory entry can store a start block, a chain pointer, or an index-block number. The choice decides speed of sequential and direct access, fragmentation, and pointer overhead. Every file system uses one method or a mix: contiguous runs for small files, linked chains in FAT pen drives, and indexed inodes on Linux. The unit is the disk block, not the byte; a byte offset splits into a block number plus an offset inside that block.",
+ "prereq": "You need: <a href=\"#file-system-structure-implementation-and-virtual-file-systems\">5.4 file-system structures</a> and <a href=\"#directory-structure-and-implementation\">5.2 directory entries</a>.",
+ "sections": [
+  {
+   "h3": "Contiguous allocation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A contiguous file occupies a run of consecutive disk blocks. The directory entry stores the first block number s and the length in blocks n. To find logical block i, where i counts from 0, the OS computes b = s + i. Here b is the physical disk block, s is the start block, and i is the block index inside the file. The mapping is arithmetic, so the block is known without reading any pointer. One seek reaches the file, and block i is a direct read: 1 disk read when the directory entry is cached."
+    },
+    {
+     "type": "formula",
+     "text": "b = s + i",
+     "where": "b is the physical block number; s is the file's first block; i is the logical block index, starting at 0."
+    },
+    {
+     "type": "p",
+     "text": "Contiguous allocation gives the fastest direct access and almost no per-block overhead. It suits read-only media and files that rarely grow. The cost is external fragmentation: free space breaks into gaps between files, and a new file needs one gap large enough. Compaction copies files to join free gaps and is expensive. A file that grows may have to move. The last block also has internal fragmentation: if the file is 4100 bytes and a block is 4096 bytes, the second block holds only 4 useful bytes."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Direct access: logical block i needs 1 disk read once the directory entry is cached.",
+      "Sequential access: blocks are adjacent, so few seeks.",
+      "Problems: external fragmentation, hard growth, internal waste in the last block."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Linked allocation and the FAT",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Linked allocation puts each file block anywhere on disk. Each block stores the data and a pointer to the next block. The directory entry stores the first and often the last block number. A file is a chain: 12 → 7 → 20 → 5. The pointer costs space in every block: with 4-byte pointers and 512-byte blocks, overhead is 4/512 = 0.78%, and usable data is 508 bytes."
+    },
+    {
+     "type": "p",
+     "text": "Sequential access is natural: read a block, follow its pointer. Direct access to logical block i needs i+1 block reads, because the OS must read block 0, then 1, and so on. The pointer is the only map. A single damaged pointer loses the rest of the file. Free space is managed as a list of free blocks, so a growing file just links a free block: no external fragmentation."
+    },
+    {
+     "type": "p",
+     "text": "The file allocation table (FAT) variant keeps the pointers in one table in memory. The FAT holds one entry per allocation unit, called a cluster; a cluster is one or more disk blocks. Each entry holds the next cluster number of the chain, and an end-of-file value marks the last cluster. Following a chain can then avoid disk reads if the FAT is cached; the FAT itself still must be read from disk. Some syllabi call linked allocation a chain."
+    }
+   ]
+  },
+  {
+   "h3": "Indexed allocation and multilevel index",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Indexed allocation collects a file's block pointers in one index block. The directory entry stores the index-block number, for example 30. Entry i of block 30 holds the data block for logical block i: entry 0 → 12, entry 1 → 7, entry 2 → 20, entry 3 → 5. Direct access reads the index block and then the data block: 2 disk reads when the index block is not cached, 1 when it is."
+    },
+    {
+     "type": "p",
+     "text": "There is no external fragmentation, and a file can grow by adding a pointer to any free data block. The overhead is one index block per file. A tiny file wastes most of its index block; that is internal fragmentation of the index block. A very large file needs more pointers than one block holds."
+    },
+    {
+     "type": "p",
+     "text": "Multilevel index solves that: a first-level index points to second-level index blocks, which point to data. A two-level index costs 3 reads for an uncached data block: first-level, second-level, data. The combined scheme used by UNIX-like inodes mixes direct pointers, one single indirect pointer, one double indirect pointer and one triple indirect pointer. Small files use direct pointers with no index block; large files add levels only when needed."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The same four-block file under three methods. Notice logical block 2: contiguous lands on block 14 in one read, linked reaches 20 after following pointers, and indexed reaches 20 through index block 30.",
+  "spec": {
+   "type": "array",
+   "title": "File F: four blocks",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Contig",
+     "cells": [
+      "12",
+      "13",
+      "14",
+      "15"
+     ],
+     "marks": {
+      "2": "accent"
+     }
+    },
+    {
+     "label": "Linked",
+     "cells": [
+      "12",
+      "7",
+      "20",
+      "5"
+     ],
+     "marks": {
+      "2": "accent"
+     }
+    },
+    {
+     "label": "Index (30)",
+     "cells": [
+      "12",
+      "7",
+      "20",
+      "5"
+     ],
+     "marks": {
+      "2": "accent"
+     }
+    }
+   ],
+   "aria": "Three rows show the same four-block file as contiguous blocks 12 to 15, as linked blocks 12, 7, 20, 5, and as data blocks 12, 7, 20, 5 reached through index block 30."
+  }
+ },
+ "examples": [
+  {
+   "question": "File F has four blocks, numbered 0 to 3. Contiguous allocation uses disk blocks 12, 13, 14, 15. Linked allocation uses 12 → 7 → 20 → 5. Indexed allocation uses index block 30 pointing to 12, 7, 20, 5. The directory entry is cached. Find the number of disk reads to fetch logical block 2 of F under each method.",
+   "steps": [
+    "Logical block 2 is the third block of the file. Start with the directory entry already in memory, so the directory read is not counted.",
+    "Contiguous: s = 12 and i = 2, so b = 12 + 2 = 14. Read data block 14. Disk reads = 1.",
+    "Linked: start block 12 is block 0. Read block 12; it points to 7. Read block 7 (block 1); it points to 20. Read block 20 (block 2). Disk reads = 3.",
+    "Indexed: directory gives index block 30. Read block 30; entry 2 points to 20. Read data block 20. Disk reads = 2."
+   ],
+   "answer": "Contiguous needs 1 disk read, linked needs 3 disk reads, and indexed needs 2 disk reads.",
+   "check": "s = 12\ni = 2\ncontig_reads = 1\nchain = [12, 7, 20, 5]\ntarget = 20\nlinked_reads = chain.index(target) + 1\nindexed_reads = 2\nprint(contig_reads)\nprint(linked_reads)\nprint(indexed_reads)",
+   "values": [
+    1,
+    3,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not count the directory read when the question says the directory entry is cached. Count only index-block and data-block reads.",
+  "Linked allocation cannot compute logical block 2 from a formula; it must follow block 0 and block 1 first. Saying 1 read is the common error.",
+  "FAT is not indexed allocation. It is linked allocation with the pointers moved into a table; the chain is still followed in order.",
+  "Internal fragmentation is waste inside an allocated block; external fragmentation is free gaps between allocated runs. Contiguous allocation suffers both: internal waste in the last block and external gaps between runs. Linked allocation suffers no external fragmentation, but its last block can still hold unused space (internal fragmentation), the same as any fixed-block scheme. Indexed allocation likewise has no external fragmentation, though its index block and its last data block can both be partly unused.",
+  "Index-block reads add up in a multilevel index: two-level uncached needs 3 reads (first-level, second-level, data), not 2."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three allocation methods and state one cost of each.",
+   "marks": 2,
+   "a": "Contiguous: external fragmentation and hard file growth. Linked: pointer overhead and slow direct access. Indexed: one index block per file, wasted for tiny files."
+  },
+  {
+   "level": "understand",
+   "q": "Why can contiguous allocation fetch logical block i in one read but linked allocation needs i+1 reads?",
+   "marks": 3,
+   "a": "Contiguous stores the start block, so the OS computes the physical block by addition. Linked stores only the first block, and each block's pointer gives the next block, so the OS must read blocks 0 through i."
+  },
+  {
+   "level": "apply",
+   "q": "A contiguous file starts at block 40 and has length 6 blocks. Which block holds logical block 4, and how many disk reads does that take when the directory entry is cached?",
+   "marks": 2,
+   "a": "b = 40 + 4 = 44. One disk read, because the address is computed directly."
+  },
+  {
+   "level": "apply",
+   "q": "A linked file has the chain 9 → 3 → 14 → 8 → 21. The directory entry is cached. How many disk reads fetch logical block 3?",
+   "marks": 3,
+   "a": "Read 9 (block 0), 3 (block 1), 14 (block 2), 8 (block 3). That is 4 disk reads."
+  },
+  {
+   "level": "analyze",
+   "q": "A file's index block is cached. Compare disk reads for logical block 2 with the uncached case. The directory entry is cached.",
+   "marks": 4,
+   "a": "Cached: read data block 20 only, so 1 read. Uncached: read index block 30, then data block 20, so 2 reads. The cache saves 1 read."
+  },
+  {
+   "level": "analyze",
+   "q": "A FAT-based file and a pure linked file both have chain 12 → 7 → 20 → 5. Where are the pointers, and why can FAT direct access avoid data-block reads between pointers?",
+   "marks": 4,
+   "a": "Pure linked keeps the next pointer inside each data block, so reaching block 2 reads data blocks 12, 7, 20. FAT keeps pointers in a table with one entry per cluster; if the FAT is cached, the OS follows 12 → 7 → 20 in memory and reads only data block 20. If the FAT is not cached, FAT entries themselves cost disk reads."
+  },
+  {
+   "level": "understand",
+   "q": "Under contiguous allocation, which waste is internal and which is external?",
+   "marks": 3,
+   "a": "Internal: the last block may be partly unused, for example 4 useful bytes in a 4096-byte block. External: free gaps between files are too small for a new file, even though total free space is enough."
+  },
+  {
+   "level": "apply",
+   "q": "A file uses a two-level index. No index or data block is cached, but the directory entry is cached. How many disk reads fetch one data block?",
+   "marks": 3,
+   "a": "Read the first-level index, then the second-level index, then the data block: 3 disk reads."
+  }
+ ],
+ "beyond": "Not for the exam. Modern file systems rarely use one pure method. Ext4 uses extents, which are contiguous runs with a tree index; XFS uses B-trees; ZFS and btrfs use copy-on-write trees. Flash storage adds wear levelling, so the flash translation layer remaps blocks and hides allocation from the OS. Search for extents, inode indirect blocks, FAT32 cluster chains, and log-structured file systems."
+}
