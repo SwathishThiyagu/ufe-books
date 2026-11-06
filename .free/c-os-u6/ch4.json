@@ -1,0 +1,185 @@
+{
+ "lead": "An access list is one column of the access matrix, kept on the object it protects, and it answers every access check cheaply. Taking a right back is the hard direction. Once a right has been handed to a process, copies of it spread to children and to other machines, and the object's list no longer knows where they are. Revocation means finding and killing those copies. This chapter shows how rights are stored, why copies make revocation costly, and what each revocation scheme charges.",
+ "prereq": "You need: <a href=\"#access-matrix-and-its-implementation\">6.3</a> for the access matrix and its two list forms.",
+ "sections": [
+  {
+   "h3": "One column of the matrix, kept on the object",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An access list is one column of the access matrix, stored with the object it protects. Each entry names one subject and the rights that subject holds: read r, write w, execute x. The matrix itself was set out in <a href=\"#access-matrix-and-its-implementation\">6.3</a>. The practical point here is that the list is a real data structure the kernel reads on every open."
+    },
+    {
+     "type": "p",
+     "text": "A subject in an entry need not be a single user. It can be a named user such as raj, a group such as hr, or a wildcard such as everyone. Group entries keep the list short: one line covers two hundred HR staff, and the check expands the caller's group membership at access time."
+    },
+    {
+     "type": "p",
+     "text": "Order matters. The kernel scans the list from top to bottom, and the first entry that names the caller decides the outcome. A wildcard entry therefore goes last, or it shadows everything below it. If no entry matches at all, the answer is default deny: the access is refused. Default deny is the safe choice, because a forgotten entry locks a user out rather than letting a stranger in."
+    },
+    {
+     "type": "p",
+     "text": "Linux exposes the same idea through two commands. <code>setfacl -m u:bob:r payroll</code> adds an entry giving bob read on the file payroll, and <code>getfacl payroll</code> prints the whole list so you can check the order."
+    }
+   ]
+  },
+  {
+   "h3": "Why a right is hard to take back",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Granting a right is a write to one place. Revoking it is a search. The moment a process is allowed to read the payroll file, the right leaves the object. The process may fork, and the child inherits it. The process may pass it over a socket. In a capability system the right is a ticket the holder can copy and carry; <a href=\"#capability-based-and-language-based-protection\">6.5</a> covers those tickets in full."
+    },
+    {
+     "type": "p",
+     "text": "So the object's access list stops being a complete record of who holds the right. It records what the object is willing to grant now, not what has already been granted."
+    },
+    {
+     "type": "p",
+     "text": "Two words separate the cases. Selective revocation takes the right from one user, or from one object, and leaves everyone else untouched. Global revocation removes the right for all users at once. A system that offers only global revocation answers a complaint about one employee by disturbing everybody."
+    },
+    {
+     "type": "p",
+     "text": "There is also a difference between deleting a right and merely denying it. Deleting removes the entry; the slot is free and the check costs less. Denying keeps the entry but marks it invalid, so the check fails while the record survives. Denial is cheaper to undo and leaves an audit trail."
+    }
+   ]
+  },
+  {
+   "h3": "Four revocation schemes and what each one costs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Four schemes appear in textbooks, and each trades a different cost."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Reacquisition: the process holds no permanent right. On each access it presents its claim and the system rechecks the list. Revocation is one deletion; the price is a check on every access.",
+      "Back-pointers: each object keeps a list of back-pointers, one pointer to every copy of a right held on it. To revoke, the system follows the pointers stored with the object and deletes each copy they name. The cost is one step per copy, and one missed pointer leaves a live right.",
+      "Indirection by handle: the copy holds a handle, an index into a system-wide table, and the table entry points at the file. Revocation deletes or invalidates the handle. If many copies share one handle the cost is one step; if each copy has its own handle the cost is one step each.",
+      "Keys and locks: each right carries a key, and the object holds a matching lock or a list of keys. Revocation changes the lock, and every old key stops matching at once. One write revokes everyone, so this scheme is global unless keys are per-user."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Back-pointers and keys are hard to keep correct across crashes and machines. The handle table is the usual compromise, because it is small and can be scanned from end to end."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The payroll file's access list names raj, bob, group hr and root in scan order, and bob's read right has since been copied into four processes. Every copy is a place that revocation must reach.",
+  "spec": {
+   "type": "array",
+   "title": "One access list and the copies of one right",
+   "show_index": false,
+   "rows": [
+    {
+     "label": "who",
+     "cells": [
+      "raj",
+      "bob",
+      "hr",
+      "root"
+     ],
+     "marks": {
+      "1": "live"
+     }
+    },
+    {
+     "label": "right",
+     "cells": [
+      "rw",
+      "r",
+      "r",
+      "rw"
+     ],
+     "marks": {
+      "1": "live"
+     }
+    },
+    {
+     "label": "bob copies",
+     "cells": [
+      "P1",
+      "P4",
+      "P9",
+      "P12"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    }
+   ],
+   "aria": "The payroll file access list gives raj read-write, bob read, group hr read and root read-write, and bob's read right has been copied into processes P1, P4, P9 and P12."
+  }
+ },
+ "examples": [
+  {
+   "question": "The payroll file has the access list raj read-write, bob read, group hr read, root read-write. Bob's read right has been copied into processes P1, P4, P9 and P12. The auditor orders bob's read right revoked. Count the steps needed under four schemes: (a) access list, (b) capability list with back-pointers, (c) indirection with one shared handle, (d) indirection with one handle per copy.",
+   "steps": [
+    "Access list: delete the bob entry, which is 1 step. Every later check by bob finds no entry and falls to default deny. The four copies already inside P1, P4, P9 and P12 are not reached: they stay live unless the system rechecks each access (reacquisition) or the copies are closed or invalidated separately.",
+    "Back-pointers: the bob entry carries four pointers, to the copies inside P1, P4, P9 and P12. Follow each pointer and delete the copy it names: 4 steps. If one pointer is stale, that copy stays live.",
+    "Indirection, shared handle: all four copies name the same handle h7. Delete h7 from the handle table: 1 step, and all four copies fail to resolve.",
+    "Indirection, private handles: the copies name four separate entries h7, h8, h9 and h10. Delete all four: 4 steps.",
+    "Compare the counts: 1 step by access list (future checks only; the four live copies remain), 4 by back-pointer, 1 by shared handle, 4 by private handles. The handle scheme is cheap only when the handle is shared."
+   ],
+   "answer": "Access list: 1 step to delete bob's entry, which blocks all later checks but does not reach the four live copies unless each access is rechecked or the copies are closed or invalidated separately. Back-pointers: 4 steps, one per copy. One shared handle: 1 step. One handle per copy: 4 steps.",
+   "check": "copies = ['P1', 'P4', 'P9', 'P12']\n\nacl_steps = 1                      # delete the bob entry; blocks future checks only\nprint(acl_steps)\n\nback_pointer_steps = len(copies)   # one pointer per copy\nprint(back_pointer_steps)\n\nshared_handle_steps = 1            # all copies name one handle\nprint(shared_handle_steps)\n\nprivate_handle_steps = len(copies) # one handle per copy\nprint(private_handle_steps)\n",
+   "values": [
+    1,
+    4,
+    1,
+    4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not mix up the two directions. Rights stored per object make it easy to revoke one user from one object and hard to revoke one user everywhere; rights stored per domain do the reverse.",
+  "Deleting an entry from an access list does not delete rights already handed out. In a capability system those copies keep working.",
+  "Indirection is not automatically cheap. It costs one step per handle, so four private handles cost four steps, exactly like back-pointers.",
+  "A changed key or an invalidated shared handle revokes every holder at once. That is global revocation, however narrowly the request was worded.",
+  "Denial is not deletion. A marked-invalid entry blocks access but keeps the slot and the record, and it can be revived by clearing the mark."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is an access control list?",
+   "marks": 2,
+   "a": "A list attached to an object, with one entry per subject, giving the rights that subject holds on that object."
+  },
+  {
+   "level": "remember",
+   "q": "What does default deny mean in an access list?",
+   "marks": 2,
+   "a": "If no entry names the caller, the access is refused."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the order of entries matter in an access list?",
+   "marks": 3,
+   "a": "The kernel takes the first entry that names the caller, so a wildcard placed early hides every entry below it."
+  },
+  {
+   "level": "apply",
+   "q": "An access list gives priya read on a file, and that right has been copied into 6 processes. Give the number of steps to revoke it under (a) access list, (b) back-pointers, (c) indirection with one shared handle, (d) one handle per copy.",
+   "marks": 5,
+   "a": "(a) 1 step to delete the priya entry; this blocks all later checks but the 6 live copies stay valid unless the system rechecks each access or closes or invalidates them separately. (b) 6 steps, one per copy. (c) 1 step, delete the shared handle. (d) 6 steps, one per handle."
+  },
+  {
+   "level": "analyze",
+   "q": "A system revokes by back-pointers. After a crash, one back-pointer from the file to a copy held by process P9 is lost, though the copy is still valid. State the security consequence and one design change that would prevent it.",
+   "marks": 6,
+   "a": "P9 keeps read access after the revocation, so the file's list no longer matches reality. Either recheck the copy against the object before honouring it (reacquisition), or move to handles so one deletion kills the right everywhere."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a keys-and-locks scheme not revoke one user's right while leaving other holders untouched?",
+   "marks": 3,
+   "a": "Changing the lock invalidates every key that matched it, so all holders lose the right together; the scheme is global unless each user has a separate key."
+  }
+ ],
+ "beyond": "Not for the exam. POSIX access lists are standard on Linux files, and network file systems carry richer list models of their own. Cloud services mostly avoid the revocation problem by issuing short-lived tokens, so a right dies when the token expires rather than being chased down. Large web companies build central authorisation services, such as Google's Zanzibar, that answer checks for millions of objects and keep the lists in one place. Search for POSIX ACL, capability revocation, and short-lived tokens to go further."
+}

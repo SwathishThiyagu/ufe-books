@@ -1,0 +1,215 @@
+{
+ "lead": "A distributed operating system runs on many machines but looks like one computer. There is no shared memory and no single clock, so processes send messages and must order events without wall-clock time. Logical clocks do that ordering; mutual exclusion and elections decide who enters a critical section and who leads.",
+ "prereq": "You need race conditions and mutual exclusion (see Unit 3, Process Synchronization and Deadlocks) and the process and message-passing model (see Unit 2, Processes, Threads and CPU Scheduling).",
+ "sections": [
+  {
+   "h3": "Many machines, one system",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two processors sharing memory are tightly coupled: each reads what the other writes, and a lock in that memory keeps them apart. Machines with their own memory and processor, talking only by messages over a network, are loosely coupled. Distributed systems are loosely coupled."
+    },
+    {
+     "type": "p",
+     "text": "A network operating system (NOS) keeps the machines visible. Each machine runs its own OS, users log in machine by machine, and moving a file needs an explicit remote copy. A college lab with a separate account on each desktop works this way."
+    },
+    {
+     "type": "p",
+     "text": "A distributed operating system (DOS) hides the machines: one login, one file tree, one process name space. The OS decides which machine runs a new process and where a file lives. This hiding is called transparency:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Location transparency: you do not know which machine holds a resource.",
+      "Migration transparency: a process moves without your code noticing.",
+      "Replication transparency: extra copies of data are invisible to you.",
+      "Failure transparency: a retry hides a machine that has died."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The price is coordination. Every agreement costs messages, a machine can fail, and the network can split into two halves that cannot hear each other."
+    }
+   ]
+  },
+  {
+   "h3": "No shared clock: happened-before and logical clocks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each machine has its own quartz clock and they drift apart, so two machines reading at the same instant get different numbers. A distributed system has no global clock. Order events by causality instead. Event e1 happened before e2 (written e1 → e2) when both are in one process and e1 came first; or e1 is the send of a message and e2 is the receive of that same message; or some event e3 exists with e1 → e3 and e3 → e2. Events with no such chain are concurrent."
+    },
+    {
+     "type": "formula",
+     "text": "local event or send:  C = C + 1",
+     "where": "C is the process's own counter, starting at 0; the new value is that event's timestamp, and a send attaches it to the message as ts."
+    },
+    {
+     "type": "formula",
+     "text": "receive of a message stamped ts:  C = max(C, ts) + 1",
+     "where": "C is the receiver's counter before the receive; ts is the timestamp carried by the message; max is the larger of the two; the +1 counts the receive itself as an event."
+    },
+    {
+     "type": "p",
+     "text": "The second rule is the merge rule: the receiver jumps ahead of both its own past and the sender. It guarantees that e1 → e2 implies C(e1) < C(e2). The converse fails, and that is the main trap in this chapter."
+    },
+    {
+     "type": "p",
+     "text": "A vector clock repairs the converse. Each process keeps a vector V of n counters, one per process. A local or send event adds 1 to its own entry. A receive takes the element-wise maximum with the message's vector, then adds 1 to its own entry. Then e1 → e2 exactly when V(e1) ≤ V(e2) entry by entry and the vectors differ. If neither vector is ≤ the other, the events are concurrent."
+    }
+   ]
+  },
+  {
+   "h3": "One at a time, and one leader",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The race conditions of Unit 3 return in a worse form. Two machines read a shared counter, both see 5, both write 6, and one increment is lost. No hardware instruction stops this, because there is no shared bus and no shared lock. Distributed mutual exclusion has three classic shapes."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Centralized: one coordinator grants permission, two messages per entry, but the coordinator is a single point of failure.",
+      "Distributed: a process asks every other process and enters when all have replied, which is 2(n − 1) messages; timestamps break ties between simultaneous requests.",
+      "Token ring: a token circulates around a logical ring and only its holder enters; cheap under load, but a lost token stops everyone."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Election chooses one process as coordinator after a failure. The bully algorithm uses process ids, and the highest live id wins."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "A process notices the coordinator has stopped answering and sends ELECTION to every process with a higher id.",
+      "If no higher process replies before the timeout, it declares itself coordinator and sends COORDINATOR to every lower id.",
+      "If a higher process does reply, the lower one waits and the higher one starts its own election.",
+      "The highest live process wins, and every process records its id as the new coordinator."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Each message carries the sender's counter. The last arrow into P1: the receive uses max(2, 6) + 1 and jumps to 7.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A sequence diagram with P1, P2 and P3 sending m1 with timestamp 2, m2 with timestamp 4, and m3 with timestamp 6.",
+   "actors": [
+    "P1",
+    "P2",
+    "P3"
+   ],
+   "messages": [
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "m1, ts 2",
+     "dashed": false
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "m2, ts 4",
+     "dashed": false
+    },
+    {
+     "from": "P3",
+     "to": "P1",
+     "label": "m3, ts 6",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "P1, P2 and P3 run on different machines, each counter starting at 0. Every event, including a send, adds 1 to the counter; a receive sets the counter to max(local, message timestamp) + 1. P1 runs local event a, then sends m1 to P2. P2 runs local event d, receives m1, then sends m2 to P3. P3 runs local event g, receives m2, then sends m3 to P1. P1 receives m3. Give the Lamport timestamp of every event and state which events are concurrent.",
+   "steps": [
+    "P1 starts at 0. Local a: C = 0 + 1 = 1, so a = 1.",
+    "P1 sends m1: C = 1 + 1 = 2. Message m1 carries ts = 2.",
+    "P2 starts at 0. Local d: C = 0 + 1 = 1, so d = 1.",
+    "P2 receives m1: C = max(1, 2) + 1 = 3.",
+    "P2 sends m2: C = 3 + 1 = 4. Message m2 carries ts = 4.",
+    "P3 starts at 0. Local g: C = 0 + 1 = 1, so g = 1.",
+    "P3 receives m2: C = max(1, 4) + 1 = 5.",
+    "P3 sends m3: C = 5 + 1 = 6. Message m3 carries ts = 6.",
+    "P1 receives m3; its counter is still 2 from sending m1: C = max(2, 6) + 1 = 7.",
+    "Concurrency: a, d and g have no message chain linking them, so they are pairwise concurrent. Equal timestamps are a hint; the causal argument is the proof."
+   ],
+   "answer": "Timestamps are a = 1, m1 sent with 2, d = 1, receive of m1 at P2 = 3, m2 sent with 4, g = 1, receive of m2 at P3 = 5, m3 sent with 6, receive of m3 at P1 = 7; events a, d and g are pairwise concurrent.",
+   "check": "def receive(c, ts):\n    return max(c, ts) + 1\n\np1 = 0\na = p1 = p1 + 1\nm1 = p1 = p1 + 1\n\np2 = 0\nd = p2 = p2 + 1\nr_m1 = p2 = receive(p2, m1)\nm2 = p2 = p2 + 1\n\np3 = 0\ng = p3 = p3 + 1\nr_m2 = p3 = receive(p3, m2)\nm3 = p3 = p3 + 1\n\nr_m3 = p1 = receive(p1, m3)\nprint(a, m1, d, r_m1, m2, g, r_m2, m3, r_m3)\n",
+   "values": [
+    1,
+    2,
+    1,
+    3,
+    4,
+    1,
+    5,
+    6,
+    7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using wall-clock time to order events on different machines. Clock skew makes that order wrong, which is why logical clocks exist.",
+  "Reading a smaller Lamport timestamp as proof of happened-before. Only happened-before implies a smaller timestamp, not the reverse.",
+  "Forgetting the +1 on a receive. The counter becomes max(local, ts) + 1, never just max(local, ts).",
+  "Confusing a NOS with a DOS. In a NOS the user sees many machines; in a DOS they are hidden.",
+  "Comparing vector clocks by one number. The comparison is element-wise, and neither being ≤ the other means concurrent."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a loosely coupled system and give one example.",
+   "marks": 2,
+   "a": "Each machine has its own memory and processor, and machines communicate only by messages over a network. A cluster of web servers behind a load balancer is one example."
+  },
+  {
+   "level": "remember",
+   "q": "State the three rules that define happened-before.",
+   "marks": 2,
+   "a": "Same process: the earlier event happened before the later one. Message: a send happened before the matching receive. Transitivity: if e1 → e3 and e3 → e2 then e1 → e2."
+  },
+  {
+   "level": "understand",
+   "q": "Why can two machines not use their wall clocks to decide which of two events happened first?",
+   "marks": 3,
+   "a": "Each clock drifts at its own rate and they are never perfectly synchronised, so readings at the same real instant differ. The clock order can contradict the causal order of the messages."
+  },
+  {
+   "level": "apply",
+   "q": "Process A has counter 4 and sends a message stamped 5. Process B has counter 2 and receives it. What is B's counter after the receive?",
+   "marks": 4,
+   "a": "C = max(2, 5) + 1 = 6. The receiver jumps ahead of its own past and the sender, then counts the receive."
+  },
+  {
+   "level": "analyze",
+   "q": "Two events have Lamport timestamps 3 and 7. Can you conclude the first happened before the second?",
+   "marks": 4,
+   "a": "No. A smaller timestamp is consistent with happened-before but does not prove it; the events could be in different processes with no message chain, that is, concurrent. Only a vector clock settles it."
+  },
+  {
+   "level": "analyze",
+   "q": "Vector clocks: V(x) = (1, 1, 0) and V(y) = (2, 1, 0). Are the events ordered or concurrent, and which way?",
+   "marks": 5,
+   "a": "Entry by entry: 1 ≤ 2, 1 ≤ 1, 0 ≤ 0, and the vectors differ, so V(x) ≤ V(y) and x happened before y. Had each vector had an entry larger than the other's, they would be concurrent."
+  },
+  {
+   "level": "understand",
+   "q": "In the bully algorithm, which process becomes coordinator, and what does a lower-id process that started the election do?",
+   "marks": 3,
+   "a": "The live process with the highest id becomes coordinator. A lower-id process that started the election and got a reply from a higher one just waits; the higher one continues and broadcasts COORDINATOR."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare the failure behaviour of centralized mutual exclusion with the token ring algorithm.",
+   "marks": 5,
+   "a": "A coordinator crash halts all entries until a new coordinator is elected, but only one machine is affected. In a token ring a lost token stalls the whole ring until it is regenerated, so the failure is spread and recovery needs ring-wide detection."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems replace the coordinator with consensus protocols such as Paxos and Raft, which survive a minority of crashed machines and agree on an ordered log of commands. Vector clocks appear in stores that must detect conflicting writes, and conflict-free replicated data types let concurrent updates merge with no clock at all. Some systems bound clock error with special hardware and wait it out before committing. Useful search terms: Lamport clocks, vector clock versioning, Raft consensus, eventually consistent replication."
+}

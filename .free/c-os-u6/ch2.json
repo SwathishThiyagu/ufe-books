@@ -1,0 +1,199 @@
+{
+ "lead": "A domain is the set of rights a process holds at one moment, written as pairs: each object and the rights on it. It stops a process carrying its user's full power all the time. UNIX-like systems switch domains daily: passwd, sudo, containers, phone app permissions.",
+ "prereq": "You need the meaning of a right from <a href=\"#goals-and-principles-of-protection\">6.1</a> and the process control block from Unit 2.",
+ "sections": [
+  {
+   "h3": "A domain is a set of pairs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A domain D is a set of pairs (o, r). o is an object: file, printer, memory segment, socket. r is a set of rights: read, write, execute, delete."
+    },
+    {
+     "type": "formula",
+     "text": "D = {(notes.txt, {read, write}), (printer, {print}), (/etc/shadow, {})}",
+     "where": "D is the domain; each pair names an object and its rights; {} means no access."
+    },
+    {
+     "type": "p",
+     "text": "Static domains are fixed at start; simple but coarse. Dynamic domains change as the process runs, each change by a rule. Rights belong to the domain, not the pid, so the kernel stores a pointer to it."
+    }
+   ]
+  },
+  {
+   "h3": "How a domain changes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A switch happens only through an entry point set up by someone with authority."
+    },
+    {
+     "type": "formula",
+     "text": "new domain = switch(old domain, object, right)",
+     "where": "object is the program or file called; right permits the call; the result is the domain afterwards."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>setuid exec.</b> The file means 'run as owner'; on exec the process enters the owner's domain.",
+      "<b>sudo.</b> Password check, then one command in the root domain.",
+      "<b>Guarded procedure.</b> A user process calls a fixed entry point; hardware switches to a privileged ring. MULTICS had 8 rings; x86 has 4, ring 0 kernel, ring 3 user."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The kernel saved old rights at the entry point and restores them on return from the trap; the user takes no action."
+    }
+   ]
+  },
+  {
+   "h3": "UNIX maps a domain to (uid, gid)",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In UNIX a domain is (uid, gid) plus supplementary groups. File mode bits give read, write and execute to owner, group, others. A uid 1000 process reads a 644 file owned by uid 1000, but gets only 'other' bits on a file owned by uid 0. exec of a setuid file replaces the effective uid for the life of the new image. The kernel records the old uid in the saved set-user-id, so the program can call setuid(1000) to drop back and setuid(0) to regain root while running."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The shell stays in D1 with uid 1000. A child execs a setuid root program, runs in D2 as uid 0, then ends; there is no restore on exit.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Domain switch on exec of a setuid program",
+   "nodes": [
+    {
+     "id": "start",
+     "label": "Shell",
+     "note": "uid 1000",
+     "style": "normal"
+    },
+    {
+     "id": "d1",
+     "label": "Domain D1",
+     "note": "uid 1000, gid 1000",
+     "style": "accent"
+    },
+    {
+     "id": "exec",
+     "label": "fork + exec passwd",
+     "note": "setuid root bit on",
+     "style": "normal"
+    },
+    {
+     "id": "d2",
+     "label": "Domain D2",
+     "note": "uid 0",
+     "style": "live"
+    },
+    {
+     "id": "end",
+     "label": "child exits",
+     "note": "shell waits in D1",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "start",
+     "to": "d1",
+     "label": "enters",
+     "style": "solid"
+    },
+    {
+     "from": "d1",
+     "to": "exec",
+     "label": "forks child",
+     "style": "solid"
+    },
+    {
+     "from": "exec",
+     "to": "d2",
+     "label": "rights grow",
+     "style": "solid"
+    },
+    {
+     "from": "d2",
+     "to": "end",
+     "label": "finishes",
+     "style": "solid"
+    },
+    {
+     "from": "end",
+     "to": "d1",
+     "label": "child ends",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A shell stays in domain D1 with uid 1000. Its child execs a setuid root program to run in D2 as uid 0. When the child ends, the shell is still in D1."
+  }
+ },
+ "examples": [
+  {
+   "question": "uid 1000, gid 1000 runs /usr/bin/passwd (setuid root). Before, the process may read/write notes.txt but not /etc/shadow. After, it can write /etc/shadow. Write both domains and say how it returns to the first.",
+   "steps": [
+    "Objects: notes.txt, /usr/bin/passwd, /etc/shadow.",
+    "D1: notes.txt {read, write}; /usr/bin/passwd {read, execute}; /etc/shadow {}; uid 1000, gid 1000.",
+    "exec sees the setuid bit on /usr/bin/passwd; effective uid becomes 0. That is the switch.",
+    "D2: notes.txt {read, write}; /etc/shadow {read, write}; all files get uid 0 rights.",
+    "At exec the kernel recorded 1000 in the saved set-user-id. exec replaces the image, and effective uid is 0 for its life. The program may call setuid(1000) to drop to D1, then setuid(0) to return. When it finishes, the process ends; the parent shell stayed in D1.",
+    "The shell forked a child before exec; no exit restore is involved."
+   ],
+   "answer": "D1 = {(notes.txt, {read, write}), (/usr/bin/passwd, {read, execute}), (/etc/shadow, {})}; D2 = {(notes.txt, {read, write}), (/etc/shadow, {read, write}), (any file, uid 0 rights)}. The program drops back with setuid(1000) using the saved set-user-id, or simply ends; the parent shell never left D1.",
+   "check": "uid_before = 1000\nsetuid_owner = 0\nprint(uid_before)          # shell\nprint(setuid_owner)        # child during exec\nprint(uid_before)          # shell unchanged\n",
+   "values": [
+    1000,
+    0,
+    1000
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A domain changes only by an explicit mechanism — setuid exec, sudo, ring switch. Reading a file changes nothing.",
+  "Rights belong to the domain, not the pid. Two processes in one domain hold identical rights.",
+  "setuid changes effective uid, not real uid. The saved set-user-id lets the program call setuid() to drop back or regain root; the kernel does not restore it on exit.",
+  "A system call trapping to a privileged ring is a domain switch; a library call in the same ring is not."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a domain and give its form.",
+   "marks": 2,
+   "a": "A domain is the set of rights a process holds at a moment, written as pairs (object, set of rights)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a static domain easier to check but less useful than a dynamic one?",
+   "marks": 3,
+   "a": "A static domain never changes, so rights are checked once at creation. It is coarse: the process must hold its largest future set all the time, which violates least privilege."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a process not simply set its own uid to 0?",
+   "marks": 3,
+   "a": "Changing uid is a domain switch, allowed only through an authorised entry point: a setuid file, or sudo after a password check. A plain assignment is refused unless the process already has privilege."
+  },
+  {
+   "level": "apply",
+   "q": "A uid 1000 process runs a setuid root program and opens /etc/shadow for writing. Which domain holds that right, and which uid is checked?",
+   "marks": 4,
+   "a": "The right sits in D2, entered at exec; the check uses effective uid 0. The program can drop to uid 1000 with setuid(1000) using the saved set-user-id, or the process simply ends; the parent shell remains in D1."
+  },
+  {
+   "level": "analyze",
+   "q": "Two processes share one domain object. Process A execs a setuid program. Does B gain the new rights?",
+   "marks": 5,
+   "a": "No. exec creates a new domain for A and attaches only A to it; B still points at the old domain object. Rights belong to the domain, so B is unchanged."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a guarded procedure need a hardware trap, while a normal function call does not?",
+   "marks": 6,
+   "a": "A normal call stays in ring 3 with the same rights, so nothing needs checking. Entering the kernel's domain changes rights; the caller must not choose its own entry point. The trap sends control to a fixed kernel address, which checks arguments, then returns to ring 3."
+  }
+ ],
+ "beyond": "Not for the exam. Linux splits the (uid, gid) domain into capabilities such as CAP_NET_ADMIN, so one power can be held without root. Containers add namespaces and seccomp filters that shrink the domain. Windows uses restricted tokens and AppContainer identifiers. Object-capability systems go further: a domain is exactly the set of tickets it holds. Search next: Linux capabilities, seccomp-bpf, principle of least authority."
+}

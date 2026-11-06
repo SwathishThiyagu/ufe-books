@@ -1,0 +1,153 @@
+{
+ "lead": "A capability is an unforgeable ticket for one object plus the rights to that object. A process holds capabilities in a list and presents one to open a file, print a page, or write memory. The kernel checks the ticket, not a global table. Language-based protection gives the same guarantee in software: a compiler or virtual machine checks types and permissions before code runs. Only a few universities teach this topic. Browsers, phone apps, and Java virtual machines use these ideas.",
+ "prereq": "You need: <a href=\"#access-matrix-and-its-implementation\">6.3</a> for the row form and <a href=\"#access-control-and-revocation-of-access-rights\">6.4</a> for revocation.",
+ "sections": [
+  {
+   "h3": "A ticket that carries its rights",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A capability is a pair (object, rights). The object is a file, printer, or memory segment. The rights are a bit vector, for example read, write, execute and copy. The process holds a capability list. Possession is proof: the kernel compares the object in the ticket with the requested object, then tests the rights bit. No separate access-list lookup. Tagged memory marks capability words so a program cannot forge one with arithmetic. A file name is not a capability: the kernel must still check the name against an access list. A capability is the row form of the access matrix, from <a href=\"#access-matrix-and-its-implementation\">6.3</a>. The copy right lets the holder give a copy to a child. Some systems add an amplify right: the holder may increase the rights when passing on a copy, which plain copy does not allow."
+    }
+   ]
+  },
+  {
+   "h3": "Copying and revocation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Copying spreads rights. If P passes C2 to a child without the copy right, the kernel must refuse. With the copy right, the child gets an independent capability for F2. Revocation is now hard: the kernel has no record of the child's copy anywhere, so searching P's own list finds nothing. A handle solves this. Each capability points to a shared entry. Revocation clears the entry or bumps a version number. Every holder fails the next check. Cost is one update plus later faults, not a scan of unknown copies. Without a handle, revocation may need a scan of all processes, or it may be impossible. This is the revocation problem from <a href=\"#access-control-and-revocation-of-access-rights\">6.4</a> in capability form."
+    }
+   ]
+  },
+  {
+   "h3": "Language-based protection",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Language-based protection moves the check into a compiler or virtual machine. Type safety stops a program from treating an integer as a pointer. A bytecode verifier checks stack types and branch targets before the JVM runs a class. Stack inspection checks every caller: a method gets a right only if all frames on the stack hold it. Java groups classes into a ProtectionDomain by code source and gives each domain a set of Permissions. AccessController walks the call stack and tests every ProtectionDomain on it. If any domain on the stack lacks the permission, the check fails. A doPrivileged block cuts the walk short at that frame. A class from an untrusted site can be given no file-write permission. When it calls file write, the check fails. This is capability-like: code holds a permission object, and possession is proof. The runtime enforces the rule without a kernel call per access."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Process P holds a capability list, selects C2 for file F2 with read-write rights, and opens F2 from the ticket alone; there is no access-list lookup.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Using a capability",
+   "nodes": [
+    {
+     "id": "p",
+     "label": "Process P",
+     "style": "normal"
+    },
+    {
+     "id": "cl",
+     "label": "Capability list",
+     "note": "held by P",
+     "style": "accent"
+    },
+    {
+     "id": "c2",
+     "label": "Capability C2",
+     "note": "F2, right read-write",
+     "style": "live"
+    },
+    {
+     "id": "f2",
+     "label": "File F2",
+     "note": "data on disk",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "p",
+     "to": "cl",
+     "label": "holds",
+     "style": "solid"
+    },
+    {
+     "from": "cl",
+     "to": "c2",
+     "label": "selects",
+     "style": "solid"
+    },
+    {
+     "from": "c2",
+     "to": "f2",
+     "label": "opens",
+     "style": "solid"
+    }
+   ],
+   "aria": "A process holds a capability list, selects capability C2 for file F2 with read-write rights, and opens the file without a separate global lookup."
+  }
+ },
+ "examples": [
+  {
+   "question": "Process P holds C1 = (F1, read), C2 = (F2, read-write), C3 = (printer, write). A call asks for write on F2. (a) Show the check and count the comparisons. (b) P passes C2 to a child process. What must P hold for that to be legal, and what does revocation now cost?",
+   "steps": [
+    "Request: object F2, right write.",
+    "Entry 1: C1 object F1. F1 ≠ F2, so no match. Comparisons = 1.",
+    "Entry 2: C2 object F2. Match. Comparisons = 2.",
+    "Test write bit in C2 rights. Read-write contains write, bit = 1. Access allowed.",
+    "(b) Copy is legal only if C2 carries the copy right. Child gets independent copy of (F2, read-write).",
+    "Revocation needs a handle or back-pointer to find that copy. Without it, the kernel cannot locate the child's copy, so revocation is impossible or costs a scan of all processes."
+   ],
+   "answer": "2 object comparisons and write bit 1; the copy needs the copy right, and revocation needs a shared handle or back-pointer.",
+   "check": "c1=('F1','read')\nc2=('F2','read-write')\nc3=('printer','write')\nreq_obj='F2'\nreq_right='write'\ncomparisons=0\nallowed=0\nfor cap in (c1,c2,c3):\n    comparisons += 1\n    if cap[0] == req_obj:\n        rights = cap[1].split('-')\n        if req_right in rights:\n            allowed = 1\n        break\nprint(comparisons)\nprint(allowed)",
+   "values": [
+    2,
+    1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A file name is not a capability. The kernel must still check the name against an access list, so a name is not unforgeable.",
+  "Possession is proof. A capability is not a user password or a login identity; holding the ticket grants the rights in it.",
+  "The copy right is separate from read and write. A process may read F2 but still be unable to pass C2 to a child.",
+  "Revocation by deleting one list entry misses copies. Use a handle or back-pointer, or the kernel cannot find every copy."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a capability in one sentence.",
+   "marks": 2,
+   "a": "A pair (object, rights) held by a process, where possession is proof of access."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a file name not a capability?",
+   "marks": 3,
+   "a": "A name needs an access-list check, so it is not unforgeable; a capability carries its rights with it."
+  },
+  {
+   "level": "apply",
+   "q": "P has C1=(F1,read), C2=(F2,read-write), C3=(printer,write). Request is read on F2. How many comparisons, and is access allowed?",
+   "marks": 3,
+   "a": "2 comparisons; read bit is set, so access is allowed."
+  },
+  {
+   "level": "analyze",
+   "q": "What happens if P passes C2 to a child and C2 lacks the copy right?",
+   "marks": 4,
+   "a": "The kernel refuses the copy; the child cannot get an independent capability for F2."
+  },
+  {
+   "level": "understand",
+   "q": "What does a bytecode verifier check?",
+   "marks": 3,
+   "a": "Stack types and branch targets before the JVM runs the class."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare a capability list with an access list.",
+   "marks": 5,
+   "a": "Capability list is the row form, held by the process, and needs no object lookup. Access list is the column form, checked per file name. Revocation differs: capabilities need handles for copies."
+  }
+ ],
+ "beyond": "Not for the exam. Capability ideas appear in seL4, CHERI hardware, WebAssembly sandboxes, and cloud permission tokens. Search for 'capability-based security', 'Java ProtectionDomain', and 'bytecode verification'. The theme is moving the check closer to the object or to the code."
+}

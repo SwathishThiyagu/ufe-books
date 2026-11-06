@@ -1,0 +1,179 @@
+{
+ "lead": "A distributed file system lets a program open, read and write files on many servers as if they were on one local disk. It lets users share data without copying it by hand. The cost is a network: every miss is a message, and every cache copy can become old. Caching hides delay but creates a staleness window, the time a client may read an old block. Some syllabi teach NFS-style remote access and AFS-style whole-file caching.",
+ "prereq": "You need: <a href=\"#distributed-operating-systems-and-distributed-synchronization\">6.7</a> for messages and no global clock, and Unit 5 for file blocks and caching.",
+ "sections": [
+  {
+   "h3": "Naming and two access models",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Naming transparency means a path such as /data/notes.txt names the same file wherever the client runs. Location transparency goes further: the path does not say which server holds the file. A name service maps the path or file identifier to a server and file handle. The client mounts the remote directory and uses ordinary open, read and write calls through the virtual file system (VFS)."
+    },
+    {
+     "type": "p",
+     "text": "Two access models decide how much crosses the network. In remote access, each operation is sent to the server: a read for block 7 travels, the server returns block 7, and the client keeps little state. In upload/download, the client copies the whole file locally, works on it, and writes it back. Remote access suits small random reads and shared files. Upload/download suits large sequential work, but write-back can overwrite another user's changes. Neither model removes the need to validate cached data."
+    }
+   ]
+  },
+  {
+   "h3": "Cache validation, write policy and consistency",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A client cache stores blocks from the server. A hit returns locally; a miss sends a remote procedure call (RPC) and fills the cache. An entry needs validation: the client asks or is told whether the server copy changed. With write-through, every write reaches the server before it is acknowledged, so the server copy is always current, but a reader's cached block stays old until it is validated. With delayed write, the client keeps dirty blocks and sends them later; writes are fast, but a crash or a second reader can see old data. The staleness window is the maximum time a client may return an unvalidated copy. Shorter windows cost more messages. Replication copies a file to several servers; consistency needs a rule for the current copy, often a version number or a lease."
+    },
+    {
+     "type": "p",
+     "text": "Stateless servers keep no per-client open-file table. Each request carries a file handle: a server-chosen identifier for the file plus a generation number. A stateless server can restart and still answer, because the handle is enough. NFS uses remote access with file handles and client caching. AFS uses whole-file upload/download with callbacks when a cached file changes."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A read checks the client cache; only a miss goes by RPC to a stateless server and its disk. The cache is the fast path; the network is the slow path.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One read through a network file system",
+   "nodes": [
+    {
+     "id": "app",
+     "label": "Application",
+     "note": "calls read()",
+     "style": "normal"
+    },
+    {
+     "id": "vfs",
+     "label": "Virtual file system",
+     "note": "same calls, any file system",
+     "style": "normal"
+    },
+    {
+     "id": "cl",
+     "label": "Client cache",
+     "note": "checked",
+     "style": "accent"
+    },
+    {
+     "id": "rpc",
+     "label": "RPC over TCP",
+     "note": "on a miss",
+     "style": "live"
+    },
+    {
+     "id": "srv",
+     "label": "File server",
+     "note": "stateless, handle",
+     "style": "normal"
+    },
+    {
+     "id": "disk",
+     "label": "Server disk",
+     "note": "real block",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "app",
+     "to": "vfs",
+     "label": "read",
+     "style": "solid"
+    },
+    {
+     "from": "vfs",
+     "to": "cl",
+     "label": "look up",
+     "style": "solid"
+    },
+    {
+     "from": "cl",
+     "to": "rpc",
+     "label": "miss",
+     "style": "dashed"
+    },
+    {
+     "from": "rpc",
+     "to": "srv",
+     "label": "request block",
+     "style": "solid"
+    },
+    {
+     "from": "srv",
+     "to": "disk",
+     "label": "reads",
+     "style": "solid"
+    }
+   ],
+   "aria": "An application reads through the virtual file system, the client cache is checked first, and only a miss goes by remote procedure call to the stateless file server and its disk."
+  }
+ },
+ "examples": [
+  {
+   "question": "A client reads 1000 blocks of 4 KB. A hit costs 0.1 ms; a network fetch costs 20 ms. (a) Find the total time with no cache. (b) Find average time per block and total time with hit ratio 0.9. (c) The server changes a block while the client copy is 30 s old. What goes wrong?",
+   "steps": [
+    "No cache: every block is a miss. 1000 × 20 ms = 20 000 ms = 20 s.",
+    "Miss probability = 1 − 0.9 = 0.1. Average = 0.9 × 0.1 ms + 0.1 × 20 ms = 2.09 ms per block.",
+    "Total = 1000 × 2.09 ms = 2090 ms = 2.09 s.",
+    "With no validation the client returns its 30 s old copy, so two readers see different data for up to 30 s; only validation (a callback, a lease, or a check on open) shrinks that window. Write-through keeps the server copy current but does not refresh other clients' caches."
+   ],
+   "answer": "No cache needs 20 s; with hit ratio 0.9, average is 2.09 ms per block and total is 2090 ms (2.09 s); staleness window is 30 s.",
+   "check": "blocks = 1000\nhit = 0.1\nmiss = 20.0\nh = 0.9\nno_cache = blocks * miss\navg = h * hit + (1 - h) * miss\ntotal = blocks * avg\nstaleness = 30.0\nprint(no_cache)\nprint(no_cache / 1000)\nprint(round(avg, 2))\nprint(round(total, 2))\nprint(staleness)",
+   "values": [
+    20000.0,
+    20.0,
+    2.09,
+    2090.0,
+    30.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A larger cache or a higher hit ratio means fewer server contacts, so without validation the staleness window grows; a faster hit path changes nothing.",
+  "Do not mix remote access (one request per operation) with upload/download (copy the whole file, then write back).",
+  "Write-through is slower but more consistent; delayed write is faster but can lose dirty blocks on a client crash.",
+  "A file handle identifies a file on a stateless server; it is not the client's open-file descriptor. It carries no explicit rights bits, but since the server needs nothing else, holding the handle is enough to reach the file, so it behaves much like a capability.",
+  "Replication is not backup: replicas can all be changed, and the system still needs a rule for the current version."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define location transparency in a distributed file system.",
+   "marks": 2,
+   "a": "A path names the file without revealing its server; a name service maps the name to a server and file handle."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a stateless file server restart and still answer requests?",
+   "marks": 3,
+   "a": "It keeps no per-client open-file table. Each request carries a file handle with file identity and generation number, so no earlier state is needed."
+  },
+  {
+   "level": "apply",
+   "q": "A client reads 500 blocks. Hit time is 0.2 ms, miss time 15 ms, hit ratio 0.95. Find average time per block and total time.",
+   "marks": 4,
+   "a": "Average = 0.95 × 0.2 + 0.05 × 15 = 0.19 + 0.75 = 0.94 ms per block. Total = 500 × 0.94 = 470 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A client uses delayed write and crashes before sending dirty blocks. Explain the consistency risk.",
+   "marks": 3,
+   "a": "The server has old data while the client had newer data. After restart the updates may be lost, so readers may see a version missing the acknowledged changes."
+  },
+  {
+   "level": "remember",
+   "q": "State one difference between NFS and AFS.",
+   "marks": 2,
+   "a": "NFS uses remote access with file handles and client caching; AFS uses whole-file upload/download with callbacks on change."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does replication make consistency harder?",
+   "marks": 3,
+   "a": "Several servers can hold copies, so the system must decide which is current. A version number or lease is needed, or readers may use different replicas."
+  }
+ ],
+ "beyond": "Not for the exam. Real systems add leases, callbacks, and distributed metadata services; cloud object stores expose weaker consistency. Search NFSv4 delegations, AFS callbacks, and CAP to see this trade-off as a design choice."
+}

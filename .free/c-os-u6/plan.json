@@ -1,0 +1,597 @@
+{
+ "lead": "This unit answers two questions the operating system must answer: who may use a resource, and how the system survives people who try to break that rule. By the end you can read an access matrix and say how a system stores it, name a threat and its defence, order events across machines with logical clocks, and explain Linux and Windows protection from their real permission bits and access lists.",
+ "about": "The unit starts with the mechanism side. Chapter 6.1 states the goals and principles of protection, 6.2 makes the domain of a process precise, and 6.3 writes the whole protection state as an access matrix. Chapter 6.4 turns the matrix columns into access control lists and asks how a right is taken back, while 6.5 takes the rows into capabilities and language-based checks. Chapter 6.6 moves from mechanism to attackers: program threats, network threats, cryptography, authentication and firewalls. Chapters 6.7 and 6.8 carry the same questions to many machines, where there is no shared memory and no global clock. Chapter 6.9 shows Linux and Windows doing all of this with mode bits, SIDs and access lists.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Protection is the mechanism that decides, for every access, whether a subject may use an object in the way it asked.",
+   "depth": "Goals: controlled access, detection of programming errors, prevention of misuse of rights. The difference between protection (internal mechanism, checked by the kernel) and security (trust against deliberate attack). Principles with one line and one example each: least privilege, need-to-know, fail-safe defaults, separation of privilege, economy of mechanism, least common mechanism, separation of policy from mechanism. Some syllabi call these the design principles of protection. Keep every principle to two lines; skip implementation detail.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One access, one decision",
+    "nodes": [
+     {
+      "id": "sub",
+      "label": "Process",
+      "note": "the subject",
+      "style": "normal"
+     },
+     {
+      "id": "req",
+      "label": "Request on file",
+      "note": "read, write or execute",
+      "style": "normal"
+     },
+     {
+      "id": "mon",
+      "label": "Reference monitor",
+      "note": "compares with domain",
+      "style": "accent"
+     },
+     {
+      "id": "allow",
+      "label": "Allow",
+      "note": "access proceeds",
+      "style": "next"
+     },
+     {
+      "id": "deny",
+      "label": "Deny",
+      "note": "error to process",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "sub",
+      "to": "req",
+      "label": "issues",
+      "style": "solid"
+     },
+     {
+      "from": "req",
+      "to": "mon",
+      "label": "checked",
+      "style": "solid"
+     },
+     {
+      "from": "mon",
+      "to": "allow",
+      "label": "right held",
+      "style": "solid"
+     },
+     {
+      "from": "mon",
+      "to": "deny",
+      "label": "no right",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A process issues a request on a file, the reference monitor compares it with the rights in the process domain, and the request is either allowed or denied."
+   },
+   "example": "An exam cell runs one program. It must read results.dat and append to audit.log, and it must do nothing else. (a) Write its rights under least privilege. (b) A programmer instead gives the program read-write on the whole exam directory. Name the two principles that are broken. Answer: (a) read on results.dat, append on audit.log, nothing on any other file. (b) Least privilege, because write on files it never writes is more than it needs; need-to-know, because it can now read other students' files. Append instead of write on audit.log is also least privilege, since write would allow overwriting past entries.",
+   "trap": "Writing that protection and security are the same thing. Protection is the internal mechanism; security is whether the mechanism plus the people and the network can be trusted. Second trap: assuming protection only covers files, when it also covers memory, CPU time and devices.",
+   "prereq": "Unit 1: dual mode operation and the role of the kernel. Unit 5: file attributes and access methods.",
+   "leave": "Cryptography and authentication to 6.6. How rights are stored to 6.2 to 6.5."
+  },
+  {
+   "k": 2,
+   "idea": "A domain is the set of rights a process holds at a given moment, and a process can change domain only through a controlled entry point.",
+   "depth": "Domain as a set of (object, rights) pairs. Static domains (rights fixed for the life of the process) versus dynamic domains (rights change). Switching rules: setuid exec, sudo, calling a guarded procedure. UNIX domain as the pair (uid, gid) plus the resulting rights; one line on protection rings and MULTICS. Only a few universities teach this topic, so keep it to the definition, the switch rule and the UNIX mapping.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Domain switch on exec of a setuid program",
+    "nodes": [
+     {
+      "id": "start",
+      "label": "Process starts",
+      "note": "from login shell",
+      "style": "normal"
+     },
+     {
+      "id": "d1",
+      "label": "Domain D1",
+      "note": "uid 1000, gid 1000",
+      "style": "accent"
+     },
+     {
+      "id": "exec",
+      "label": "exec passwd",
+      "note": "setuid root bit on",
+      "style": "normal"
+     },
+     {
+      "id": "d2",
+      "label": "Domain D2",
+      "note": "uid 0",
+      "style": "live"
+     },
+     {
+      "id": "end",
+      "label": "process exits",
+      "note": "kernel restores D1",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "start",
+      "to": "d1",
+      "label": "enters",
+      "style": "solid"
+     },
+     {
+      "from": "d1",
+      "to": "exec",
+      "label": "calls",
+      "style": "solid"
+     },
+     {
+      "from": "exec",
+      "to": "d2",
+      "label": "rights grow",
+      "style": "solid"
+     },
+     {
+      "from": "d2",
+      "to": "end",
+      "label": "finishes",
+      "style": "solid"
+     },
+     {
+      "from": "end",
+      "to": "d1",
+      "label": "old rights back",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A process starts in domain D1 with uid 1000, execs a setuid root program to enter domain D2 with uid 0, and returns to D1 when it exits."
+   },
+   "example": "A user with uid 1000 and gid 1000 runs /usr/bin/passwd, which has the setuid root bit set. Before the run the process may read and write its own file notes.txt but may not open /etc/shadow. After the run it can open /etc/shadow for writing. Write the two domains as sets of pairs and say how the process returns. Answer: D1 = {(notes.txt, read and write), (/usr/bin, read and execute), (/etc/shadow, no access)}. D2 = {(notes.txt, read and write), (/etc/shadow, read and write), (any file, rights of uid 0)}. The kernel notes the old uid 1000 at exec and restores it at exit, so the process returns to D1 on its own; no user action is needed.",
+   "trap": "Saying a domain changes when another user logs in, or when a process simply reads a file. A domain changes only by an explicit mechanism such as setuid exec, sudo or a ring switch. Also, two processes can share one domain, so rights belong to the domain, not to the process id.",
+   "prereq": "6.1 for the meaning of a right. Unit 2: process and process control block.",
+   "leave": "How the kernel stores the rights of a domain to 6.3 and 6.4."
+  },
+  {
+   "k": 3,
+   "idea": "The whole protection state can be written as a matrix of domains against objects, and real systems store it either by columns (access lists) or by rows (capabilities).",
+   "depth": "Matrix definition: row is a domain, column is an object, each cell holds a set of rights. Special rights: copy, owner, control. Implementations: global table, access list per object, capability list per domain, lock and key. Compare space and access time on a sparse matrix. Only a few universities teach this topic, so cover the matrix, the two list forms, and one short comparison.",
+   "figure": {
+    "type": "array",
+    "title": "Access matrix: rows are domains D1 to D3, columns are objects F1 to F4",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "D1",
+      "cells": [
+       "r",
+       "rw",
+       "-",
+       "x"
+      ],
+      "marks": {
+       "1": "accent"
+      }
+     },
+     {
+      "label": "D2",
+      "cells": [
+       "-",
+       "r",
+       "rw",
+       "-"
+      ]
+     },
+     {
+      "label": "D3",
+      "cells": [
+       "r",
+       "-",
+       "-",
+       "rw"
+      ],
+      "marks": {
+       "3": "live"
+      }
+     }
+    ],
+    "aria": "A three by four matrix where domain D1 has read on F1, read-write on F2 and execute on F4, D2 has read on F2 and read-write on F3, and D3 has read on F1 and read-write on F4."
+   },
+   "example": "The protection state is D1: F1 read, F2 read-write, F4 execute. D2: F2 read, F3 read-write. D3: F1 read, F4 read-write. (a) How many cells does the full matrix have and how many are non-empty? (b) How many entries does an access-list store hold? (c) How many entries does a capability store hold? Answer: (a) 3 domains times 4 objects is 12 cells, of which 7 are non-empty. (b) One access list per object, holding only the non-empty cells: 7 entries in total, for example F1 has 2 entries. (c) One capability list per domain holding only its non-empty cells: 3 plus 2 plus 2 equals 7 entries. Both list forms store 7 entries, so on this matrix neither is smaller; the access list wins when one object is shared by many domains, the capability list wins when one domain touches many objects.",
+   "trap": "Believing the matrix is small and dense enough to store whole. It is usually very sparse, so a global table wastes space and both real implementations keep only the non-empty cells.",
+   "prereq": "6.2 for the domain as a row. Unit 5 for what a file object is.",
+   "leave": "How access lists are written in practice and how rights are revoked to 6.4. The row form to 6.5."
+  },
+  {
+   "k": 4,
+   "idea": "Systems store rights as lists attached to objects, and taking a right back is hard because copies of that right spread to other processes.",
+   "depth": "Access control list as one column of the matrix, with named users, groups and a wildcard entry. Order of entries and default deny. Revocation schemes with the cost of each: reacquisition, back-pointers, indirection by handle, keys and locks. Selective versus global revocation, and deletion of a right versus merely denying it. One line on Linux getfacl and setfacl as a worked tool.",
+   "figure": {
+    "type": "array",
+    "title": "One access list and the copies of one right",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "payroll ACL",
+      "cells": [
+       "alice rw",
+       "bob r",
+       "hr r",
+       "root rw"
+      ],
+      "marks": {
+       "1": "live"
+      }
+     },
+     {
+      "label": "bob copies in",
+      "cells": [
+       "P1",
+       "P4",
+       "P9",
+       "P12"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     }
+    ],
+    "aria": "The payroll file access list has four entries, and bob read right has been copied into processes P1, P4, P9 and P12, which is what makes revocation expensive."
+   },
+   "example": "The payroll file has the access list alice read-write, bob read, group hr read, root read-write. Bob read right was copied into processes P1, P4, P9 and P12. Revoke bob read right under three schemes and count the steps. Answer: by access list, delete the bob entry from the file, 1 step, and every future check fails. By capability list with back-pointers, follow 4 back-pointers from the file to the copies and delete each, 4 steps, and a missed pointer leaves a live right. By indirection, each copy holds a handle; if the four copies share one handle, delete that one handle, 1 step; if each copy has its own handle, 4 steps. So indirection is cheap only when the handle is shared.",
+   "trap": "Mixing up which structure makes which revocation easy. Rights stored per object (access lists) make revoking one object from one user easy and revoking one user everywhere hard; rights stored per domain (capabilities) make the reverse true.",
+   "prereq": "6.3 for the matrix and its two list forms.",
+   "leave": "Capabilities in full to 6.5. Real syntax to 6.9."
+  },
+  {
+   "k": 5,
+   "idea": "A capability is an unforgeable ticket that carries both the object and the rights to it, and language-based protection gives the same guarantee through checks made by a compiler or a virtual machine.",
+   "depth": "Capability as a pair (object, rights) that the process holds and presents. Capability list, tagged memory, copy right and amplify right, revocation by handle. Language-based protection: type safety, bytecode verification, stack inspection, Java ProtectionDomain. Only a few universities teach this topic, so explain the capability idea with one check and give one language example.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Using a capability",
+    "nodes": [
+     {
+      "id": "p",
+      "label": "Process P",
+      "style": "normal"
+     },
+     {
+      "id": "cl",
+      "label": "Capability list",
+      "note": "held by P",
+      "style": "accent"
+     },
+     {
+      "id": "c2",
+      "label": "Capability C2",
+      "note": "F2, right read-write",
+      "style": "live"
+     },
+     {
+      "id": "f2",
+      "label": "File F2",
+      "note": "data on disk",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p",
+      "to": "cl",
+      "label": "holds",
+      "style": "solid"
+     },
+     {
+      "from": "cl",
+      "to": "c2",
+      "label": "selects",
+      "style": "solid"
+     },
+     {
+      "from": "c2",
+      "to": "f2",
+      "label": "opens",
+      "style": "solid"
+     }
+    ],
+    "aria": "A process holds a capability list, selects capability C2 for file F2 with read-write rights, and opens the file without any separate global lookup."
+   },
+   "example": "Process P holds three capabilities: C1 = (F1, read), C2 = (F2, read-write), C3 = (printer, write). A call asks for write on F2. (a) Show the check and count the comparisons. (b) P passes C2 to a child process. What must P hold for that to be legal, and what does revocation now cost? Answer: (a) P scans its list: entry 1 is F1, no match; entry 2 is F2, match, then test the write bit, which is set, so the access is allowed after 2 comparisons. (b) The copy is legal only if C2 carries the copy right; the child now has an independent capability, so revoking it needs a back-pointer or a shared handle, otherwise the kernel cannot find the copy.",
+   "trap": "Calling a plain file name a capability. A name must still be checked against an access list, so it is not unforgeable. A capability carries its rights with it, so possession is the proof.",
+   "prereq": "6.3 and 6.4 for the row form and revocation.",
+   "leave": "Hardware tagging details and real systems to 6.9."
+  },
+  {
+   "k": 6,
+   "idea": "Security protects the system from deliberate attack, and every defence is only as strong as the weakest of authentication, authorisation, isolation and audit.",
+   "depth": "Program threats: trojan horse, trap door, logic bomb, virus, worm, ransomware, buffer overflow. System and network threats: port scan, denial of service and distributed denial of service, spoofing, man-in-the-middle. Cryptography as a tool, one line each: symmetric key, public key, hash, digital signature, TLS. User authentication: password, one-time password, biometric, multi-factor. Defences: firewall, patching, sandbox, least privilege, audit logs. Computer-security classifications D, C1, C2, B1, B2, B3, A1 in one line. No algorithm internals.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "One attack path and where it is stopped",
+    "nodes": [
+     {
+      "id": "atk",
+      "label": "Attacker",
+      "note": "scans the network",
+      "style": "muted"
+     },
+     {
+      "id": "net",
+      "label": "Internet",
+      "style": "normal"
+     },
+     {
+      "id": "fw",
+      "label": "Firewall",
+      "note": "allows port 443 only",
+      "style": "accent"
+     },
+     {
+      "id": "svc",
+      "label": "Web service",
+      "note": "port 443 open",
+      "style": "normal"
+     },
+     {
+      "id": "data",
+      "label": "Account data",
+      "note": "on disk",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "atk",
+      "to": "net",
+      "label": "probes",
+      "style": "dashed"
+     },
+     {
+      "from": "net",
+      "to": "fw",
+      "label": "port 22 dropped",
+      "style": "solid"
+     },
+     {
+      "from": "fw",
+      "to": "svc",
+      "label": "port 443 passes",
+      "style": "solid"
+     },
+     {
+      "from": "svc",
+      "to": "data",
+      "label": "reads",
+      "style": "solid"
+     }
+    ],
+    "aria": "An attacker on the internet reaches a firewall that drops port 22 and passes only port 443 to the web service, which then reads account data on disk."
+   },
+   "example": "A password is 8 characters. Case 1 uses 26 lowercase letters; case 2 uses 62 characters (a-z, A-Z, 0-9). An attacker can test 10⁹ guesses per second. Find the average search time for each case. Answer: case 1 has 26⁸ = 2.09 × 10¹¹ passwords, so the average is half, 1.04 × 10¹¹ guesses, which takes 1.04 × 10¹¹ ÷ 10⁹ = 104 s, under 2 minutes. Case 2 has 62⁸ = 2.18 × 10¹⁴ passwords, average half is 1.09 × 10¹⁴, which takes 1.09 × 10¹⁴ ÷ 10⁹ = 1.09 × 10⁵ s, about 30 hours. Widening the alphabet gains a factor of about 1000 at the same length, which is why length and alphabet both matter.",
+   "trap": "Treating virus and worm as the same thing. A virus needs a host file and usually a user action; a worm spreads by itself over the network. Second trap: claiming cryptography alone gives security, when authentication and patching matter as much.",
+   "prereq": "6.1 for protection versus security. Unit 1 for dual mode and kernel services.",
+   "leave": "Protection mechanisms themselves to 6.1 to 6.5. Distributed attacks to 6.7."
+  },
+  {
+   "k": 7,
+   "idea": "A distributed system has no shared memory and no global clock, so processes cooperate by messages and order events with logical clocks.",
+   "depth": "Tightly coupled versus loosely coupled systems; network operating system versus distributed operating system; transparency. The happened-before relation, Lamport logical clocks with the merge rule, vector clocks in two lines. Mutual exclusion: centralized, distributed and token ring, one line each. Election: the bully algorithm at statement level. Mention that the same race conditions of Unit 3 now appear across machines.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "P1",
+     "P2",
+     "P3"
+    ],
+    "messages": [
+     {
+      "from": "P1",
+      "to": "P2",
+      "label": "m1, ts 2",
+      "dashed": false
+     },
+     {
+      "from": "P2",
+      "to": "P3",
+      "label": "m2, ts 4",
+      "dashed": false
+     },
+     {
+      "from": "P3",
+      "to": "P1",
+      "label": "m3, ts 6",
+      "dashed": false
+     }
+    ]
+   },
+   "example": "Three processes run on different machines and each counter starts at 0. Rule: every event, including a send, adds 1 to the counter, and a receive sets the counter to max(local, message) + 1. P1 runs local event a, then sends m1 to P2. P2 runs local event d, receives m1, then sends m2 to P3. P3 runs local event g, receives m2, then sends m3 to P1, which P1 receives. Give the timestamp of every event. Answer: a = 1, m1 stamped 2. P2: d = 1, receive of m1 gives max(1, 2) + 1 = 3, m2 stamped 4. P3: g = 1, receive of m2 gives max(1, 4) + 1 = 5, m3 stamped 6. P1: receive of m3 gives max(2, 6) + 1 = 7. a and d are both 1, so they are concurrent; g = 1 is also concurrent with them, because nothing links them.",
+   "trap": "Using wall-clock time to order events on different machines, or reading a smaller Lamport timestamp as proof of happened-before. A smaller timestamp does not imply causality; only the reverse holds, that happened-before implies a smaller timestamp.",
+   "prereq": "Unit 3: race conditions, mutual exclusion and deadlock. Unit 2: processes and messages.",
+   "leave": "File sharing across machines to 6.8. Real network stacks to a networks course."
+  },
+  {
+   "k": 8,
+   "idea": "A distributed file system gives one view of files stored on many servers, and caching is what makes it fast and what makes it inconsistent.",
+   "depth": "Naming and location transparency. Remote access model versus upload and download model. Client caching with validation, write-through versus delayed write, the staleness window, consistency and replication. Stateless servers and file handles. Name NFS and AFS in one line each as examples. Only a few universities teach this topic, so keep it to the two access models, the cache and the consistency trade-off.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "One read through a network file system",
+    "nodes": [
+     {
+      "id": "app",
+      "label": "Application",
+      "note": "calls read()",
+      "style": "normal"
+     },
+     {
+      "id": "vfs",
+      "label": "Virtual file system",
+      "note": "same calls, any file system",
+      "style": "normal"
+     },
+     {
+      "id": "cl",
+      "label": "Client cache",
+      "note": "checked for a copy",
+      "style": "accent"
+     },
+     {
+      "id": "rpc",
+      "label": "RPC over TCP",
+      "note": "sent only on a miss",
+      "style": "live"
+     },
+     {
+      "id": "srv",
+      "label": "File server",
+      "note": "stateless, file handle",
+      "style": "normal"
+     },
+     {
+      "id": "disk",
+      "label": "Server disk",
+      "note": "the real block",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "app",
+      "to": "vfs",
+      "label": "read",
+      "style": "solid"
+     },
+     {
+      "from": "vfs",
+      "to": "cl",
+      "label": "look up",
+      "style": "solid"
+     },
+     {
+      "from": "cl",
+      "to": "rpc",
+      "label": "miss",
+      "style": "dashed"
+     },
+     {
+      "from": "rpc",
+      "to": "srv",
+      "label": "request block",
+      "style": "solid"
+     },
+     {
+      "from": "srv",
+      "to": "disk",
+      "label": "reads",
+      "style": "solid"
+     }
+    ],
+    "aria": "An application reads through the virtual file system, the client cache is checked first, and only a miss goes by remote procedure call to the stateless file server and its disk."
+   },
+   "example": "A client reads 1000 blocks of 4 KB. A cache hit costs 0.1 ms; a network fetch costs 20 ms. (a) Find the total time with no cache. (b) Find the average time per block and the total time with a hit ratio of 0.9. (c) The server changes a block while the client copy is 30 s old. What goes wrong? Answer: (a) 1000 × 20 ms = 20 000 ms = 20 s. (b) average = 0.9 × 0.1 + 0.1 × 20 = 0.09 + 2 = 2.09 ms per block, total 2090 ms, about 2.1 s, roughly ten times faster. (c) The client keeps returning the old block until the entry is validated, so for up to 30 s two users read different data; the 30 s is the staleness window, and write-through or a callback on change shrinks it.",
+   "trap": "Treating caching as free. It trades network traffic for consistency: the faster the cache, the more stale data a reader can see. Also mixing the remote access model (send each operation to the server) with upload and download (copy the whole file, work locally).",
+   "prereq": "6.7 for the message-passing and no-global-clock setting. Unit 5 for file systems, blocks and caching.",
+   "leave": "Local file-system internals to Unit 5. Mutual exclusion algorithms to 6.7."
+  },
+  {
+   "k": 9,
+   "idea": "Linux and Windows implement the protection ideas of this unit in concrete structures: mode bits and user ids on one side, security identifiers and access lists on the other.",
+   "depth": "Linux: uid and gid, nine mode bits plus setuid, setgid and sticky, chmod, chown, umask, access lists, sudo, Linux capabilities, PAM, SELinux and AppArmor, namespaces and cgroups in one line. Windows: security identifier, access token, security descriptor with DACL and SACL, order of ACE evaluation, privileges, UAC. One short comparison table. Only a few universities teach this topic, so skip kernel internals and keep to structures an exam can ask about.",
+   "figure": {
+    "type": "array",
+    "title": "Linux mode 754 and its three fields",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "chmod 754",
+      "cells": [
+       "7",
+       "5",
+       "4"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "bits",
+      "cells": [
+       "rwx",
+       "r-x",
+       "r--"
+      ],
+      "marks": {
+       "1": "live"
+      }
+     },
+     {
+      "label": "applies to",
+      "cells": [
+       "owner",
+       "group",
+       "others"
+      ]
+     }
+    ],
+    "aria": "The mode 754 splits into 7 for the owner which is rwx, 5 for the group which is r-x, and 4 for others which is r--."
+   },
+   "example": "A Linux file has mode 754, owner alice, group exam. User bob is in group exam. (a) Can bob write the file? Can he execute it? (b) A Windows file has this DACL in order: deny bob write, allow exam write, allow alice full control. Bob is in exam. Can bob write? Answer: (a) 754 gives owner 4+2+1 = 7 = rwx, group 4+1 = 5 = r-x, others 4 = r--. Bob is not the owner, so the group field applies: read and execute yes, write no. (b) No. Deny entries are checked before allow entries, so the first matching entry denies bob, and the later allow for exam never applies. Remove the deny entry and bob can write through the group allow.",
+   "trap": "Reading 754 as three unrelated digits instead of 4-2-1 sums. Second trap: in Windows, forgetting that deny entries are evaluated before allow entries, so a deny beats a group allow.",
+   "prereq": "6.1 to 6.5 for the concepts, 6.6 for the security defences these systems ship.",
+   "leave": "Kernel scheduling and memory internals to Units 2 and 4. Network protocol detail to a networks course."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the principles become a set of rights called a domain"
+  ],
+  [
+   2,
+   3,
+   "each domain becomes a row of the access matrix"
+  ],
+  [
+   3,
+   4,
+   "matrix columns become access lists and raise revocation"
+  ],
+  [
+   3,
+   5,
+   "matrix rows become capability lists"
+  ],
+  [
+   4,
+   5,
+   "access lists and capabilities are the two ways to store the same matrix"
+  ],
+  [
+   5,
+   6,
+   "unforgeable rights are what an attacker tries to steal"
+  ],
+  [
+   6,
+   7,
+   "network threats grow once many machines talk to each other"
+  ],
+  [
+   7,
+   8,
+   "message passing and no global clock set the file-cache problem"
+  ],
+  [
+   8,
+   9,
+   "real systems combine caching, protection and access lists"
+  ]
+ ]
+}
