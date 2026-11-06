@@ -1,0 +1,209 @@
+{
+ "lead": "Chaincode is the smart contract of Hyperledger Fabric. It is a program, written in Go, Java or Node.js, that runs in a container on a peer and reads or writes channel state through a shim API. Only a few universities teach its lifecycle in detail. Banks and consortia use chaincode for transfers, trade documents and claims where each organisation must endorse a change before the ledger accepts it.",
+ "prereq": "You need: <a href=\"#hyperledger-frameworks-and-the-fabric-model\">Chapter 6.1</a> for peers, orderers and channels, and Unit 5 for the general smart-contract idea.",
+ "sections": [
+  {
+   "h3": "Chaincode as a program",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Chaincode is application logic that owns a namespace on a channel. A namespace is a key prefix such as car; a key CAR1 becomes carCAR1, so two chaincodes do not collide."
+    },
+    {
+     "type": "p",
+     "text": "Every chaincode runs inside a container started by the peer. The container talks to the peer through the shim API: GetState, PutState, DelState and GetStateByRange. A read-write set is the list of keys read and values to write. The API is the only door to the ledger."
+    },
+    {
+     "type": "p",
+     "text": "Execution must be deterministic. The same proposal on two endorsing peers must produce the same read-write set, so code must not use random numbers, wall-clock time, external HTTP calls or local files. Pass such data as arguments."
+    },
+    {
+     "type": "p",
+     "text": "Solidity contracts run on every Ethereum node under the EVM and pay gas. Fabric chaincode runs only on endorsing peers chosen by policy, uses permissioned identities, and has no gas; the cost is that the endorsement policy fixes who must run it. See Unit 5 for Solidity."
+    }
+   ]
+  },
+  {
+   "h3": "Lifecycle, endorsement and commit",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "Package chaincode with its metadata.",
+      "Install it on each endorsing peer.",
+      "Approve the definition for each organisation.",
+      "Commit the definition to the channel.",
+      "Invoke sends a transaction proposal; query calls a read-only function."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An endorsement policy names the organisations or peers that must sign the simulated result. A policy <code>AND(OrgA.peer, OrgB.peer)</code> needs both. A proposal goes to those peers; each runs the chaincode against its local state and returns a read-write set plus signature. The client sends the set to the orderer. The orderer cuts a block. Each committing peer checks the signatures, the policy and that the read-set versions are unchanged, then writes the write-set. If another transaction changed a key first, the read-set check fails and the transaction is invalid; it stays on the ledger but is not applied."
+    },
+    {
+     "type": "p",
+     "text": "A private data collection keeps the value with authorised peers and puts only a hash on the shared ledger; other organisations see the hash, not the value."
+    },
+    {
+     "type": "p",
+     "text": "A write to carCAR1 does not touch loanCAR1, because the namespace prefix is part of the key."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Chaincode is simulated at endorsement, but state changes only after ordering and commit when the AND policy passes.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A client proposes a transfer of CAR1 to Ravi, an endorsing peer returns a read-write set, the orderer sends a block, a committing peer validates and writes, and the client queries the owner.",
+   "actors": [
+    "Client",
+    "Endorsing peer",
+    "Orderer",
+    "Committing peer",
+    "Ledger"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Endorsing peer",
+     "label": "propose Transfer",
+     "dashed": false
+    },
+    {
+     "from": "Endorsing peer",
+     "to": "Client",
+     "label": "endorsed RW set",
+     "dashed": true
+    },
+    {
+     "from": "Client",
+     "to": "Orderer",
+     "label": "submit tx",
+     "dashed": false
+    },
+    {
+     "from": "Orderer",
+     "to": "Committing peer",
+     "label": "ordered block",
+     "dashed": false
+    },
+    {
+     "from": "Committing peer",
+     "to": "Ledger",
+     "label": "validate, write",
+     "dashed": false
+    },
+    {
+     "from": "Ledger",
+     "to": "Client",
+     "label": "query owner",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "CAR1 has owner Asha and price ₹5,00,000. TransferAsset(CAR1, Ravi) needs endorsements from Org A and Org B. Both peers endorse; the orderer includes the transaction in a block. State the owner after commit and after QueryAsset(CAR1). What if only Org A endorses?",
+   "steps": [
+    "The policy is AND(OrgA.peer, OrgB.peer), so required endorsements r = 2.",
+    "The client sends the proposal to one peer in Org A and one in Org B.",
+    "Both peers simulate and return signed read-write sets; received endorsements e = 2.",
+    "e = 2 ≥ r = 2, so the client submits the endorsed set to the orderer.",
+    "The orderer puts the transaction in a block and sends the block to committing peers.",
+    "Commit validation passes; the write sets owner = Ravi in namespace carCAR1.",
+    "QueryAsset(CAR1) returns Ravi. With only Org A, e = 1 < r = 2, so commit rejects it and owner stays Asha."
+   ],
+   "answer": "The transfer commits and QueryAsset(CAR1) returns Ravi; with only Org A, 1 of 2 endorsements, the transaction is invalid and owner stays Asha.",
+   "check": "required = 2\nfull = 2\npartial = 1\nprint(required)\nprint(full)\nprint(partial)",
+   "values": [
+    2,
+    2,
+    1
+   ],
+   "code": {
+    "lang": "python",
+    "code": "required = 2\nfull = 2\npartial = 1\nprint(required)\nprint(full >= required)\nprint(partial)\nprint(partial >= required)",
+    "stdin": "",
+    "output": "2\nTrue\n1\nFalse"
+   },
+   "dry_run": {
+    "head": [
+     "case",
+     "endorsements",
+     "required",
+     "valid"
+    ],
+    "rows": [
+     [
+      "full",
+      "2",
+      "2",
+      "True"
+     ],
+     [
+      "partial",
+      "1",
+      "2",
+      "False"
+     ]
+    ]
+   },
+   "output": "2\nTrue\n1\nFalse"
+  }
+ ],
+ "traps": [
+  "Execution changes the ledger immediately: it does not; only ordering and commit apply the write-set.",
+  "Endorsement is ordering or consensus: endorsement is simulation plus signature; the orderer only orders.",
+  "A query needs a block: queries read committed state and skip ordering.",
+  "AND and OR policies are read carelessly: AND needs every named peer, OR needs at least one.",
+  "Solidity gas and EVM rules apply to chaincode: they do not; Fabric has no gas in this sense."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is chaincode and where does it run?",
+   "marks": 2,
+   "a": "A Fabric smart contract program in a container on a peer; it uses the shim API to read and write channel state."
+  },
+  {
+   "level": "understand",
+   "q": "Why must chaincode execution be deterministic?",
+   "marks": 3,
+   "a": "Endorsing peers must return the same read-write set; random numbers, time or network calls can make the sets differ."
+  },
+  {
+   "level": "apply",
+   "q": "Policy is AND(OrgA.peer, OrgB.peer). Org A endorses, Org B does not. Is the transaction valid at commit?",
+   "marks": 4,
+   "a": "No. Required endorsements r = 2, received e = 1, so e < r and the commit check rejects it."
+  },
+  {
+   "level": "apply",
+   "q": "TransferAsset commits owner Ravi. A query runs before the commit block is written. What owner does it see?",
+   "marks": 4,
+   "a": "Asha. A query reads committed state; the change exists only after commit."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does Fabric validate the read-set at commit?",
+   "marks": 5,
+   "a": "Two transactions may read the same old value and write conflicting values; the version check rejects the later one to prevent lost updates."
+  },
+  {
+   "level": "understand",
+   "q": "Give two differences between Fabric chaincode and a Solidity contract.",
+   "marks": 3,
+   "a": "Chaincode runs on policy-selected endorsing peers, not every node; it uses permissioned identities and no gas, while Solidity runs on the EVM and pays gas."
+  },
+  {
+   "level": "analyze",
+   "q": "What is stored on the shared ledger for a private data collection?",
+   "marks": 4,
+   "a": "Only a hash of the private value; authorised peers keep the value in their private database."
+  }
+ ],
+ "beyond": "Not for the exam. Industry Fabric networks deploy chaincode with lifecycle approvals, use private data collections for prices, and expose chaincode through the Fabric Gateway. Newer curricula add chaincode-as-a-service and token SDKs. Search for Fabric asset-transfer chaincode, private data collections, and Fabric Gateway."
+}

@@ -1,0 +1,254 @@
+{
+ "lead": "Banks, exporters, insurers and hospitals each keep their own copy of the same fact: a payment, a bill of lading, a claim. When the copies disagree, someone spends days reconciling them. A shared blockchain ledger gives these parties one tamper-evident record that each of them can check without trusting a single owner. Finance uses it for cross-border payments, trade finance, KYC and settlement of tokenised assets. Insurance uses it for policies, claims and reinsurance. This chapter shows the pattern, and where the pattern stops: a ledger enforces data and rules, not the truth of the outside world.",
+ "prereq": "You need: <a href=\"#chaincode-smart-contracts-in-hyperledger\">chaincode</a> from 6.2 and digital signatures from Unit 2, because every entry on a finance ledger is signed by the party that wrote it.",
+ "sections": [
+  {
+   "h3": "One record instead of many books",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An exporter in Surat ships fabric to a buyer in Hamburg. The payment passes through the exporter's bank, a correspondent bank and the buyer's bank. Each bank books its own entry, applies its own charges and settles on its own timetable. The money does move; the slow part is agreeing on what happened."
+    },
+    {
+     "type": "p",
+     "text": "A shared ledger removes the argument. Each bank runs a node on the same permissioned network (see <a href=\"#hyperledger-frameworks-and-the-fabric-model\">6.1</a>). A payment is one signed entry that every node sees in the same order. Reconciliation, which means comparing two sets of books, becomes a read of one set of books."
+    },
+    {
+     "type": "p",
+     "text": "Know-your-customer (KYC) follows the same logic. Today a customer submits the same documents to every bank. On a shared KYC ledger, one bank verifies the documents, stores the files off-chain, and writes an attestation on-chain: a signed statement plus a cryptographic hash of the file. Another bank reads the statement and the hash, checks the signature, and skips the repeat check. Personal data never reaches the ledger; only the hash and the claim do."
+    },
+    {
+     "type": "p",
+     "text": "The pattern repeats everywhere in this chapter: private data off-chain, hash and signature on-chain, business rules inside a smart contract."
+    }
+   ]
+  },
+  {
+   "h3": "Trade finance, letters of credit and tokenised assets",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Trade finance runs on paper. In a letter of credit (LC) the importer's bank promises to pay the exporter's bank once documents prove the goods were shipped. The invoice, bill of lading and insurance certificate travel by courier, and one mismatch lets the bank refuse payment."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The importer's bank writes the LC terms into chaincode: amount, goods, latest shipment date, required documents.",
+      "The exporter ships, stores each document off-chain, and puts its hash and its signature on-chain.",
+      "Chaincode compares the submitted hashes with the required list and the dates with the terms.",
+      "If every condition holds, chaincode releases payment to the exporter's bank in the same transaction.",
+      "If any condition fails, chaincode writes a rejection naming the failed condition into the audit log."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Because the check is code, both sides can test the rules before a single container is loaded. Disputes that remain are about facts the ledger cannot see, such as whether the goods were really loaded, not about arithmetic."
+    },
+    {
+     "type": "p",
+     "text": "A bond can be issued as a token: a ledger entry naming the issuer, face value, coupon and maturity date, with the legal claim held in an off-chain register. Settlement becomes delivery-versus-payment (DvP): one transaction moves the token from seller to buyer and the money from buyer to seller, or neither leg moves. On paper the two legs settle hours or days apart, and that gap is counterparty risk."
+    },
+    {
+     "type": "p",
+     "text": "Tokenised does not mean the asset changed. The token is a pointer plus a rule set; the law still decides who owns the bond. Amounts and counterparties are commercially sensitive, so finance networks split them into channels that only named members can read (see <a href=\"#scalability-privacy-and-other-challenges\">6.8</a>)."
+    }
+   ]
+  },
+  {
+   "h3": "Insurance: policy, claim and payout",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A policy on a shared ledger is a record of terms: who is covered, the sum insured, the deductible, the exclusions and the validity dates. Insurer, insured and hospital all read the same version."
+    },
+    {
+     "type": "p",
+     "text": "A claim arrives from outside the ledger: a hospital bill, a discharge summary, a repair estimate. Ledger nodes cannot observe these events. They accept a signed statement from a trusted party, or from an oracle, which is a service that feeds signed external data on-chain."
+    },
+    {
+     "type": "formula",
+     "text": "payout = max(0, min(claim, sum insured) − deductible)",
+     "where": "payout is what the insurer pays, in rupees; claim is the amount claimed, in rupees; sum insured is the policy's maximum total payment, in rupees; deductible is the part of each claim the insured bears, in rupees; max(0, ...) stops a negative payout."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "The policy must be active on the claim date.",
+      "The claim hash must not appear in the paid-claims set, which blocks double payment.",
+      "The claim must carry the signature of an authorised submitter."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Parametric insurance replaces loss assessment with a measured trigger. A crop policy might pay when rainfall recorded at a named station falls below 50 mm in a month. The oracle posts the reading, chaincode compares it with the threshold, and payment follows. No surveyor and no delay, but there is basis risk: the station's reading may not match the farmer's actual loss."
+    },
+    {
+     "type": "p",
+     "text": "Reinsurance uses the same ledger across companies. A treaty says the reinsurer takes 30% of every claim, so chaincode splits each payout at source and the reinsurer sees the claim and its share at the same moment as the primary insurer."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The smart contract applies the policy's own numbers, a ₹5,00,000 sum insured and a ₹10,000 deductible, to a ₹1,20,000 claim and releases ₹1,10,000. Storing the claim hash in the audit log is what stops the same bill being paid twice.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Insurance claim on a shared ledger",
+   "aria": "A downward flow: an active policy with ₹5,00,000 sum insured, a ₹1,20,000 claim event submitted to a smart contract that applies a ₹10,000 deductible, a ₹1,10,000 payout, and an audit log holding the claim hash.",
+   "nodes": [
+    {
+     "id": "policy",
+     "label": "Policy on-chain",
+     "note": "sum insured ₹5,00,000",
+     "style": "normal"
+    },
+    {
+     "id": "claim",
+     "label": "Claim event",
+     "note": "bill ₹1,20,000",
+     "style": "normal"
+    },
+    {
+     "id": "contract",
+     "label": "Smart contract",
+     "note": "deductible ₹10,000",
+     "style": "accent"
+    },
+    {
+     "id": "payout",
+     "label": "Payout",
+     "note": "₹1,10,000",
+     "style": "live"
+    },
+    {
+     "id": "audit",
+     "label": "Audit log",
+     "note": "claim hash stored",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "policy",
+     "to": "claim",
+     "label": "active",
+     "style": "solid"
+    },
+    {
+     "from": "claim",
+     "to": "contract",
+     "label": "submit",
+     "style": "solid"
+    },
+    {
+     "from": "contract",
+     "to": "payout",
+     "label": "approve",
+     "style": "solid"
+    },
+    {
+     "from": "payout",
+     "to": "audit",
+     "label": "record",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A health policy lives on a shared ledger with sum insured ₹5,00,000, a deductible of ₹10,000 per claim, and status active. A hospital submits a claim of ₹1,20,000 with document hash H. (a) Compute the payout. (b) Compute the sum insured left after this payout. (c) The hospital resubmits the identical claim with the same hash H. What does the chaincode do, and why?",
+   "steps": [
+    "Read the policy: status active, sum insured ₹5,00,000, deductible ₹10,000.",
+    "Check status: active, so the check passes.",
+    "Check the claim against the cap: ₹1,20,000 ≤ ₹5,00,000, so min(claim, sum insured) = ₹1,20,000.",
+    "Check the hash: H is not in the paid-claims set, so this claim is new.",
+    "Apply the formula: payout = ₹1,20,000 − ₹10,000 = ₹1,10,000.",
+    "Deduct from the cap: remaining sum insured = ₹5,00,000 − ₹1,10,000 = ₹3,90,000.",
+    "Resubmission: chaincode finds H already in the paid-claims set and rejects the claim, so the second payout is ₹0."
+   ],
+   "answer": "The first claim pays ₹1,10,000 and leaves ₹3,90,000 of sum insured; the resubmitted claim pays ₹0 because its hash is already recorded.",
+   "check": "claim = 120000\ndeductible = 10000\nsum_insured = 500000\npayout = max(0, min(claim, sum_insured) - deductible)\nremaining = sum_insured - payout\nprint(payout)\nprint(remaining)\n",
+   "values": [
+    110000,
+    390000
+   ],
+   "output": ""
+  },
+  {
+   "question": "A second policy has sum insured ₹2,00,000 and a deductible of ₹5,000. A claim of ₹1,80,000 arrives with a new hash. Compute the payout.",
+   "steps": [
+    "Policy active: check passes.",
+    "Cap check: min(₹1,80,000, ₹2,00,000) = ₹1,80,000.",
+    "Hash check: new hash, so the claim is accepted as new.",
+    "payout = ₹1,80,000 − ₹5,000 = ₹1,75,000."
+   ],
+   "answer": "The payout is ₹1,75,000.",
+   "check": "print(max(0, min(180000, 200000) - 5000))\n",
+   "values": [
+    175000
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Subtracting the deductible before capping by the sum insured, or subtracting it twice: the order is min(claim, sum insured) − deductible, floored at 0.",
+  "Believing the ledger proves a hospital bill is genuine. It proves the bill was signed by the submitter and has not changed, so a lying oracle still produces a valid-looking payout.",
+  "Treating tokenised as legally transferred: the token points to an off-chain register and the law still decides ownership.",
+  "Assuming everyone on the network can see every entry. On a permissioned network, channels limit visibility, as in 6.1.",
+  "Skipping the double-payment check. Without the stored claim hash, the same bill can be paid many times."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is an oracle in a ledger-based insurance system?",
+   "marks": 2,
+   "a": "A party or service that writes signed off-chain data, such as a hospital bill or a rainfall reading, onto the ledger so chaincode can act on facts it cannot itself observe."
+  },
+  {
+   "level": "remember",
+   "q": "Name two checks a letter-of-credit chaincode performs before releasing payment.",
+   "marks": 2,
+   "a": "That the submitted document hashes match the required document list, and that shipment dates satisfy the LC terms."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a hash of a KYC document stored on-chain instead of the document itself?",
+   "marks": 3,
+   "a": "The hash identifies the file and proves it was not altered, while the file stays in controlled storage. Copying the document to every node would spread personal data and break privacy rules."
+  },
+  {
+   "level": "understand",
+   "q": "Explain delivery-versus-payment in one sentence and name the risk it removes.",
+   "marks": 3,
+   "a": "DvP settles the asset leg and the money leg in one transaction, or neither; it removes the gap in which one side has paid and the other has not delivered."
+  },
+  {
+   "level": "apply",
+   "q": "A policy has sum insured ₹2,00,000 and deductible ₹5,000. An active claim of ₹60,000 arrives with a new hash. Find the payout and the sum insured left.",
+   "marks": 4,
+   "a": "min(60,000, 2,00,000) = 60,000; payout = 60,000 − 5,000 = ₹55,000. Remaining sum insured = 2,00,000 − 55,000 = ₹1,45,000."
+  },
+  {
+   "level": "apply",
+   "q": "A parametric crop policy pays when monthly rainfall at a named station is below 50 mm. The oracle reports 38 mm, the threshold is 50 mm, and the fixed payout is ₹20,000. What is paid, and how much loss assessment is needed?",
+   "marks": 4,
+   "a": "38 mm < 50 mm, so the trigger fires and ₹20,000 is paid. No loss assessment is done, which is fast but carries basis risk."
+  },
+  {
+   "level": "analyze",
+   "q": "A parametric policy's rainfall oracle is operated by the insurer that sells the policy. Identify the problem and propose a design change.",
+   "marks": 5,
+   "a": "The party that pays controls the number that triggers payment, so the trust the ledger was meant to remove returns. Use a public meteorological source, several independently signed feeds, or a hash-committed feed with a dispute window before payout."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a shared payment ledger not remove the need for reconciliation with each bank's core banking system?",
+   "marks": 5,
+   "a": "The ledger records what the parties agreed; the core system records each bank's own postings, balances, fees and reversals in its own schema. Entries must still be mapped into both systems and errors handled. The ledger removes disagreement between parties, not the integration work inside one bank."
+  }
+ ],
+ "beyond": "Not for the exam. Central banks are piloting wholesale and retail digital currencies on permissioned ledgers, and the design question is always whether settlement finality is legal or only technical. Trade-document law is moving toward electronic transferable records, which is what makes an on-chain bill of lading enforceable. Confidential amounts are shifting toward zero-knowledge proofs so that a channel is not the only privacy tool. Useful search terms: CBDC pilot, delivery-versus-payment distributed ledger, parametric insurance oracle, electronic transferable records."
+}

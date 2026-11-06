@@ -1,0 +1,260 @@
+{
+ "lead": "A supply chain ledger records each custody and quantity change as one hash-linked event: farm, transporter, warehouse, retailer. Each event stores the hash of the event before it, so a later edit breaks the chain and shows where the record changed. The ledger does not weigh goods or read thermometers. It proves the record you see now is the record written at handover. Exporters, food and pharma distributors, and e-commerce logistics teams use it for provenance, customs paperwork and fast recalls.",
+ "prereq": "You need <a href=\"#hyperledger-frameworks-and-the-fabric-model\">Chapter 6.1</a> for peers and channels, <a href=\"#chaincode-smart-contracts-in-hyperledger\">Chapter 6.2</a> for chaincode, and Unit 2 for hash pointers.",
+ "sections": [
+  {
+   "h3": "Custody events and batch identity",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Goods move through hands: farm, transporter, warehouse, retailer. Each handover is a custody change. <b>Provenance</b> is the origin and full history of a batch. <b>Chain of custody</b> is who held the goods, when, and for how long. The blockchain keeps one shared, tamper-evident record for parties who do not trust each other's databases."
+    },
+    {
+     "type": "p",
+     "text": "The unit is the <b>batch ID</b> or <b>lot ID</b> — the quantity produced or packed together, such as 100 kg of mangoes from one farm on one day. Every carton carries that ID, and every event carries it. Without a batch ID the ledger is only a diary."
+    },
+    {
+     "type": "formula",
+     "text": "event = H(batch_id ‖ actor ‖ action ‖ qty ‖ time ‖ doc_hash ‖ prev_hash)",
+     "where": "H is SHA-256; ‖ means concatenation; actor is the party's identity; action is dispatch, receive or store; qty is the quantity in kg or pieces; time is the timestamp; doc_hash is the hash of the attached paperwork; prev_hash is the hash of the previous event for the same batch. Changing any field changes H and breaks every later link."
+    },
+    {
+     "type": "p",
+     "text": "A past event sits inside the hash of every later event, and later events are held by other organisations. If the transporter edits 98 kg to 100 kg, the warehouse's prev_hash no longer matches, so the gap is visible."
+    }
+   ]
+  },
+  {
+   "h3": "On-chain hash, off-chain document",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Invoices, bills of lading, certificates and temperature logs are large and often confidential. Keep the file off-chain in the ERP or an object store, and put its SHA-256 hash into the event. The hash is a fingerprint; changing the file changes the hash."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Fetch the file from the ERP or document store.",
+      "Compute its SHA-256 hash.",
+      "Read doc_hash from the ledger event for that batch.",
+      "Compare the values: equal means the file is the one recorded at handover; different means it was edited after recording, so reject it and audit."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Cold chain: vaccines, milk, fish and some medicines must stay inside a temperature band. A sensor reading every few minutes is too many records. Batch the readings and store a Merkle root, or store min, max, count and any excursion. Chaincode rule example: above 8 °C for more than 30 minutes flags the batch."
+    },
+    {
+     "type": "p",
+     "text": "The ledger proves readings were recorded as written. It does not prove the sensor was honest or calibrated; that needs device identity and calibration records — see <a href=\"#blockchain-in-healthcare-agriculture-iot-and-smart-cities\">Chapter 6.5</a>."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Item",
+      "Where it lives",
+      "Why"
+     ],
+     "rows": [
+      [
+       "Batch event",
+       "On-chain",
+       "Shared and tamper-evident"
+      ],
+      [
+       "Invoice PDF",
+       "Off-chain, hash on-chain",
+       "Size and confidentiality"
+      ],
+      [
+       "Temperature readings",
+       "Off-chain, Merkle root on-chain",
+       "Volume"
+      ],
+      [
+       "Quantity",
+       "On-chain",
+       "Drives payment and loss"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Handovers, recalls and payment on delivery",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Loss at one handover = dispatched quantity − received quantity. Positive means goods were lost, spoiled or stolen on that leg. Negative usually means a recording error, not a gain. Total loss is first quantity minus last, but events show which leg to audit."
+    },
+    {
+     "type": "p",
+     "text": "Recalls become fast. For a contaminated lot, walk backwards on the batch ID to the farm and date; walk forwards to every shipment carrying that lot. All parties read the same hash-linked events, so they reach the same answer."
+    },
+    {
+     "type": "p",
+     "text": "Payment on delivery uses chaincode from <a href=\"#chaincode-smart-contracts-in-hyperledger\">Chapter 6.2</a>. The contract holds: when the retailer's receive event for batch B001 commits, release the agreed amount minus a penalty per kg lost beyond tolerance. This escrow removes argument about whether delivery happened."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "The ERP stays the system of record for inventory and accounting; an adapter writes selected events to the ledger.",
+      "Some syllabi call this supply chain insight from enterprise resource planning: the ledger adds cross-company proof to the ERP's internal numbers.",
+      "Never mirror whole ERP tables on-chain. Write only the events another company needs to verify.",
+      "Keep the ERP row ID in the event so an auditor can join the records."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Each event is linked to the previous one, so the 2 kg and 3 kg losses are visible at the handovers.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Chain of custody for batch B001",
+   "aria": "Farm records 100 kg, transporter records 98 kg, warehouse records 98 kg, and retailer records 95 kg, with hash pointers linking the events.",
+   "nodes": [
+    {
+     "id": "farm",
+     "label": "Farm",
+     "note": "100 kg",
+     "style": "normal"
+    },
+    {
+     "id": "trans",
+     "label": "Transporter",
+     "note": "98 kg",
+     "style": "accent"
+    },
+    {
+     "id": "ware",
+     "label": "Warehouse",
+     "note": "98 kg",
+     "style": "normal"
+    },
+    {
+     "id": "retail",
+     "label": "Retailer",
+     "note": "95 kg",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "farm",
+     "to": "trans",
+     "label": "hash pointer",
+     "style": "solid"
+    },
+    {
+     "from": "trans",
+     "to": "ware",
+     "label": "hash pointer",
+     "style": "solid"
+    },
+    {
+     "from": "ware",
+     "to": "retail",
+     "label": "hash pointer",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Batch B001 of mangoes leaves the farm with 100 kg. The transporter records 98 kg, the warehouse records 98 kg, and the retailer records 95 kg. (a) Compute the loss at each handover and the total recorded loss. (b) Compute the loss as a percentage of the quantity dispatched by the farm. (c) State which handovers an auditor should investigate.",
+   "steps": [
+    "q0 = 100 kg farm dispatch, q1 = 98 kg transporter, q2 = 98 kg warehouse, q3 = 95 kg retailer.",
+    "Leg 1: 100 − 98 = 2 kg. Leg 2: 98 − 98 = 0 kg. Leg 3: 98 − 95 = 3 kg.",
+    "Total = 2 + 0 + 3 = 5 kg = 100 − 95.",
+    "Percentage loss = (5 kg ÷ 100 kg) × 100 = 5.0 %.",
+    "Audit Leg 1 and Leg 3; Leg 2 matches."
+   ],
+   "answer": "Losses are 2 kg, 0 kg and 3 kg per leg, total 5 kg or 5.0 % of the 100 kg dispatched; audit the farm-to-transporter and warehouse-to-retailer handovers.",
+   "check": "qty = [100, 98, 98, 95]\nlosses = [qty[i-1] - qty[i] for i in range(1, 4)]\nprint(losses[0])\nprint(losses[1])\nprint(losses[2])\ntotal = qty[0] - qty[-1]\nprint(total)\nprint(total / qty[0] * 100)",
+   "values": [
+    2,
+    0,
+    3,
+    5,
+    5.0
+   ],
+   "output": ""
+  },
+  {
+   "question": "A sensor records milk temperature every 10 minutes for a 4-hour trip, giving 24 readings. The chaincode stores only the Merkle root of the 24 hashes on-chain and keeps the readings in cold storage. An auditor is shown the readings file later. State the check the auditor performs and what a mismatch means.",
+   "steps": [
+    "Recompute the SHA-256 hash of each of the 24 readings.",
+    "Rebuild the Merkle tree from the 24 leaf hashes and take the root.",
+    "Compare the computed root with the Merkle root stored in the ledger event for that batch.",
+    "If the roots match, the file is exactly the set of readings recorded during the trip.",
+    "If they differ, at least one reading was added, removed or edited after the event was committed; reject the file and audit the batch."
+   ],
+   "answer": "The auditor rebuilds the Merkle root of the 24 readings and compares it with the on-chain root; equality proves the readings are unchanged, and a mismatch proves the file was altered after recording.",
+   "check": "",
+   "values": [],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Believing a blockchain weighs the goods. The weight is typed in by a party; the ledger only proves the record was not changed afterwards.",
+  "Confusing provenance with quality. A ledger shows origin and history, not that the mangoes are safe or sweet.",
+  "Storing full invoices and temperature logs on-chain 'for safety'. That is expensive and leaks confidential data to every peer; store the hash.",
+  "Dropping the batch ID. Events not tied to a lot cannot support a recall, however tamper-evident they are.",
+  "Treating a negative loss as a gain without checking for a unit slip (kg versus pieces) or a recording error."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define provenance and chain of custody in a supply chain ledger.",
+   "marks": 2,
+   "a": "Provenance is the origin and full history of a batch. Chain of custody is the ordered record of which party held the goods, when, and for how long."
+  },
+  {
+   "level": "remember",
+   "q": "What goes on-chain for a shipping document, and what stays off-chain?",
+   "marks": 2,
+   "a": "On-chain: the SHA-256 hash and the batch ID. Off-chain: the document itself in the ERP or a document store."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a hash pointer between two custody events detect a later edit of the earlier event?",
+   "marks": 3,
+   "a": "The later event stores the hash of the earlier event. Editing the earlier event changes its hash, so the stored prev_hash no longer matches. Other organisations hold later copies, so the editor cannot repair every copy."
+  },
+  {
+   "level": "understand",
+   "q": "The ledger shows milk stayed at 4 °C. Why is that not proof that the milk was cold?",
+   "marks": 3,
+   "a": "The ledger proves the reading was recorded and not altered later. The sensor could be faulty, uncalibrated or spoofed. Proving the physical temperature needs device identity and calibration records."
+  },
+  {
+   "level": "apply",
+   "q": "A batch dispatches 500 kg from a farm, the transporter records 495 kg, the warehouse 490 kg and the retailer 480 kg. Compute the loss on each leg, the total loss, and the percentage loss against dispatch.",
+   "marks": 4,
+   "a": "Leg 1: 500 − 495 = 5 kg. Leg 2: 495 − 490 = 5 kg. Leg 3: 490 − 480 = 10 kg. Total = 20 kg. Percentage = (20 ÷ 500) × 100 = 4.0 %."
+  },
+  {
+   "level": "apply",
+   "q": "A retailer's chaincode event for batch B001 is committed with qty = 95 kg. The contract pays ₹60 per kg for 100 kg, minus ₹40 per kg lost beyond a 2 kg tolerance. Compute the payment.",
+   "marks": 5,
+   "a": "Loss = 100 − 95 = 5 kg. Penalised loss = 5 − 2 = 3 kg. Base value = 100 × 60 = ₹6000. Penalty = 3 × 40 = ₹120. Payment = 6000 − 120 = ₹5880."
+  },
+  {
+   "level": "analyze",
+   "q": "Why store a Merkle root of temperature readings instead of each reading in its own ledger event?",
+   "marks": 5,
+   "a": "Volume. A reading every few minutes creates thousands of events, which cost ordering, storage and validation work. One root commits all readings with one event; any single reading can still be proved against the root by its Merkle path. The trade-off is that readings stay off-chain and full proof needs the sibling hashes."
+  },
+  {
+   "level": "analyze",
+   "q": "Payment on delivery releases money when the retailer's receive event commits. Discuss what happens if the retailer's ERP is offline when the truck arrives.",
+   "marks": 6,
+   "a": "No receive event means no trigger, so the supplier is unpaid even though delivery happened. Fixes include a fallback signer (driver and retailer sign a delivery receipt), a timeout rule that pays with a hold-back when the event is missing, and monitoring. Each fix trades trust: a timeout weakens the guarantee that the goods really arrived."
+  }
+ ],
+ "beyond": "Not for the exam. Most industry work here is integration: GS1 EPCIS is a widely used event format for supply chain visibility, and pilots map EPCIS events onto ledger events. Digital product passports and hash-anchored electronic bills of lading are live use cases. Search for 'EPCIS blockchain', 'digital product passport', and 'Fabric supply chain reference'. Open problems are cheap proof of sensor honesty and zero-knowledge proofs that hide prices while proving quantity shipped."
+}
