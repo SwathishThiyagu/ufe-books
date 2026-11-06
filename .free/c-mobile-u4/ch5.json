@@ -1,0 +1,175 @@
+{
+ "lead": "An app shares data by sending a content:// URI in an intent with a temporary read grant. It does not copy files into a public folder or reveal a private path. The receiver asks Android for bytes through ContentResolver. This is how a report app sends a PDF to a viewer, a photo app sends an image to chat, and a receipt is attached to email. The grant is narrow: one URI, read only, for one activity. Only a few universities teach this advanced topic.",
+ "prereq": "You need <a href=\"#content-providers-using-and-creating-your-own\">Chapter 4.4</a> for content URIs and resolvers, and Unit 2 for implicit intents.",
+ "sections": [
+  {
+   "h3": "Share with an intent, not a folder",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An implicit intent names an action, not a target class. <code>ACTION_SEND</code> shares one item; <code>ACTION_SEND_MULTIPLE</code> shares many. Call <code>setType(\"application/pdf\")</code> so Android lists apps that accept that MIME type. Text goes in <code>Intent.EXTRA_TEXT</code>. A file goes in <code>Intent.EXTRA_STREAM</code> as a <code>content://</code> URI, never as a <code>File</code>. For many files, put an <code>ArrayList&lt;Uri&gt;</code> in the same extra. A wrong MIME type can hide the right receiver. Set the MIME type with <code>setType()</code> so Android can match receivers; <code>putExtra()</code> later does not change it. Do not call <code>setData()</code> after <code>setType()</code>, because <code>setData()</code> clears the type (and <code>setType()</code> clears the data)."
+    },
+    {
+     "type": "p",
+     "text": "<code>Intent.createChooser(send, \"Share report\")</code> opens the system share sheet; the string is its heading. The chooser does not copy the file. The selected app receives the same extras and URI. The receiver calls <code>getContentResolver().openInputStream(uri)</code>. This design exists because each app has a private data folder; guessing another app's path is unsafe and often impossible. It also lets Android apply a temporary grant instead of a broad folder permission. The URI points to the provider, not to a raw directory."
+    }
+   ]
+  },
+  {
+   "h3": "Publish your file with FileProvider",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Your app must turn a private <code>File</code> into a shareable URI. Use <code>FileProvider</code>, an AndroidX subclass of ContentProvider. Add a <code>&lt;provider&gt;</code> tag. Set <code>android:name=\"androidx.core.content.FileProvider\"</code>, <code>android:authorities=\"com.example.reportapp.fileprovider\"</code>, <code>android:exported=\"false\"</code>, and <code>android:grantUriPermissions=\"true\"</code>. Inside the <code>&lt;provider&gt;</code> tag add <code>&lt;meta-data android:name=\"android.support.FILE_PROVIDER_PATHS\" android:resource=\"@xml/file_paths\" /&gt;</code>. This line connects the provider to <code>file_paths.xml</code>; without it <code>getUriForFile</code> throws <code>IllegalArgumentException</code> (\"Failed to find configured root that contains ...\"). The authority is a name you invent; it must match the string in code. <code>exported=\"false\"</code> stops other apps from browsing the provider. <code>grantUriPermissions=\"true\"</code> lets an intent give a temporary pass to one URI."
+    },
+    {
+     "type": "p",
+     "text": "Add <code>res/xml/file_paths.xml</code>. It maps a public name to a private folder: <code>&lt;paths&gt;&lt;files-path name=\"reports\" path=\"reports/\" /&gt;&lt;/paths&gt;</code>. Here <code>reports/</code> is inside <code>getFilesDir()</code>. Then call <code>Uri uri = FileProvider.getUriForFile(this, \"com.example.reportapp.fileprovider\", file);</code>. If <code>file</code> is <code>.../files/reports/report.pdf</code>, the URI is <code>content://com.example.reportapp.fileprovider/reports/report.pdf</code>. The real path stays hidden. A <code>file://</code> URI is refused from Android 7 (API 24): sharing it throws <code>FileUriExposedException</code>."
+    }
+   ]
+  },
+  {
+   "h3": "Give one temporary read grant",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A content URI alone is not access. Add <code>send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)</code>. This flag travels with the intent and lets the chosen receiver read that URI. Without it, the receiver's <code>openInputStream</code> call fails with <code>SecurityException</code>."
+    },
+    {
+     "type": "p",
+     "text": "The grant lasts while the receiving activity is alive. It covers only the URI in the intent. It does not let the receiver list the <code>reports</code> folder, read other files, or write. If you share many files, add the flag once to the <code>ACTION_SEND_MULTIPLE</code> intent; each URI in <code>EXTRA_STREAM</code> gets the grant. The receiver opens the stream, copies or displays it, and closes it. The sender keeps ownership of the file. A mail app may attach a copy; a viewer may only display it. Do not promise permanent access in an answer. A grant is not a password and not a file permission on disk."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The figure shows the safe path: report.pdf of 1.5 MB becomes a content URI, the intent carries a read grant, and the viewer opens the stream.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Sharing a file safely",
+   "aria": "A report.pdf of 1.5 MB goes through FileProvider to a content URI, then into an ACTION_SEND intent with a read grant, and the receiver opens the stream.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Pick file",
+     "note": "report.pdf, 1.5 MB",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "FileProvider",
+     "note": "getUriForFile",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "content URI",
+     "note": "…/reports/report.pdf",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Intent plus grant",
+     "note": "ACTION_SEND, application/pdf",
+     "style": "accent"
+    },
+    {
+     "id": "e",
+     "label": "Receiver app",
+     "note": "opens the 1.5 MB stream",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "live"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A report app has report.pdf of 1.5 MB in .../files/reports/. Its authority is com.example.reportapp.fileprovider. Write the sharing code for any PDF viewer. State what the viewer may do.",
+   "steps": [
+    "Confirm the <code>&lt;provider&gt;</code> tag contains <code>&lt;meta-data android:name=\"android.support.FILE_PROVIDER_PATHS\" android:resource=\"@xml/file_paths\" /&gt;</code>, which connects the provider to <code>file_paths.xml</code>. Then confirm the folder is declared there: <code>&lt;files-path name=\"reports\" path=\"reports/\" /&gt;</code>.",
+    "Build the File object for report.pdf. Its size is 1.5 MB = 1572864 bytes.",
+    "Call <code>Uri uri = FileProvider.getUriForFile(this, \"com.example.reportapp.fileprovider\", file);</code>. The result is <code>content://com.example.reportapp.fileprovider/reports/report.pdf</code>.",
+    "Build the intent: <code>Intent send = new Intent(Intent.ACTION_SEND); send.setType(\"application/pdf\"); send.putExtra(Intent.EXTRA_STREAM, uri); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);</code>.",
+    "Start the chooser: <code>startActivity(Intent.createChooser(send, \"Share report\"));</code>.",
+    "The viewer may call <code>openInputStream(uri)</code> and read exactly 1572864 bytes of that one file. It cannot list the reports folder or write. The grant ends with the receiving activity."
+   ],
+   "answer": "The viewer gets a temporary read grant to one content URI for report.pdf of 1.5 MB (1572864 bytes); it cannot browse the folder or write.",
+   "check": "mb = 1.5\nb = int(mb * 1024 * 1024)\nprint(mb)\nprint(b)",
+   "values": [
+    1.5,
+    1572864
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Passing a <code>file://</code> URI (for example <code>Uri.fromFile(file)</code>) in <code>EXTRA_STREAM</code>, or as the intent data, throws <code>FileUriExposedException</code> on Android 7 (API 24) and later. Always pass the <code>content://</code> URI from FileProvider instead.",
+  "Leaving out FLAG_GRANT_READ_URI_PERMISSION gives the receiver SecurityException.",
+  "A grant is temporary and per URI; it is not permanent folder access.",
+  "The manifest authority and the getUriForFile authority must match exactly.",
+  "Forgetting setType, or using the wrong MIME type, can leave the chooser empty."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which action shares one item?",
+   "marks": 2,
+   "a": "Intent.ACTION_SEND."
+  },
+  {
+   "level": "remember",
+   "q": "Which extra carries a file URI?",
+   "marks": 2,
+   "a": "Intent.EXTRA_STREAM."
+  },
+  {
+   "level": "understand",
+   "q": "Why use a content:// URI instead of a file path?",
+   "marks": 3,
+   "a": "It hides the private path and allows a temporary read grant."
+  },
+  {
+   "level": "apply",
+   "q": "Authority is com.example.reportapp.fileprovider and the file is .../files/reports/report.pdf. What URI is returned?",
+   "marks": 4,
+   "a": "content://com.example.reportapp.fileprovider/reports/report.pdf."
+  },
+  {
+   "level": "analyze",
+   "q": "A receiver gets SecurityException when opening a shared PDF. What is the likely missing flag?",
+   "marks": 5,
+   "a": "FLAG_GRANT_READ_URI_PERMISSION on the sending intent."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can the receiver read report.pdf but not list the reports folder?",
+   "marks": 5,
+   "a": "The grant is for one URI only, not for the whole provider."
+  }
+ ],
+ "beyond": "Not for the exam. Modern Android adds scoped storage and the Storage Access Framework, where the user picks a document and the app receives a persistable URI permission. Photo Picker reduces broad gallery access. Industry share sheets use these same intents and grants. Search for FileProvider, scoped storage, and ACTION_SEND."
+}

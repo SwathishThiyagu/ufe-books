@@ -1,0 +1,266 @@
+{
+ "lead": "An app often needs a table, not a single value: a list of students, monthly expenses, cricket scores. SQLite is a small relational database engine built into Android. A whole database is one private file inside your app, and you talk to it in ordinary SQL. SQLiteOpenHelper creates that file on first use, upgrades it when you change the tables, and hands you an SQLiteDatabase to run insert, update, delete and query against. Nothing outside your app sees the data unless you publish it through a content provider.",
+ "prereq": "You need: activities and the life cycle from Unit 2, plus the idea of private, app-only storage from <a href=\"#saving-and-loading-user-preferences\">Chapter 4.1</a> and <a href=\"#file-storage-internal-storage-and-sd-card\">Chapter 4.2</a>.",
+ "sections": [
+  {
+   "h3": "The helper that owns the database file",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A SQLite database is one file, usually under <code>/data/data/&lt;your.package&gt;/databases/</code>. No other app can read it. The file survives restarts and is deleted when the user uninstalls."
+    },
+    {
+     "type": "p",
+     "text": "Tables must be created once, not on every launch. SQLiteOpenHelper does this with a version number stored inside the file. You subclass it and call <code>super(context, name, factory, version)</code>. <b>name</b> is the file name, say \"college.db\". <b>factory</b> is null in practice. <b>version</b> is your schema version, starting at 1 and going up whenever the table definitions change."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "getWritableDatabase() opens college.db read-write, creating the file if it is missing.",
+      "If the file is new, onCreate(db) runs once. Create your tables there.",
+      "If the file exists and its stored version is lower, onUpgrade(db, oldVersion, newVersion) runs.",
+      "If the versions match, neither method runs; you just get the open database.",
+      "getReadableDatabase() returns the same read-write object unless the disk is full or locked, when it falls back to read-only."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The version number is the whole trick. Bump it and onUpgrade fires on every phone holding an older file. Add a column without bumping it and old installs keep the old table, then crash on the missing column. Inside onUpgrade you run ALTER TABLE, or copy the rows into a new table and drop the old one."
+    }
+   ]
+  },
+  {
+   "h3": "Writing rows: execSQL, ContentValues and ?",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "execSQL() runs statements that return nothing: CREATE TABLE, ALTER TABLE, DROP TABLE. Your onCreate body looks like this:"
+    },
+    {
+     "type": "code",
+     "lang": "sql",
+     "code": "CREATE TABLE students(\n  _id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  marks INTEGER\n);",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "The first column is named <b>_id</b> on purpose. List adapters look for a column with exactly that name; without it the list stays empty even when the cursor holds rows. AUTOINCREMENT makes SQLite fill 1, 2, 3 for you."
+    },
+    {
+     "type": "p",
+     "text": "For row data, use the helper methods instead of pasting values into SQL strings."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "insert(\"students\", null, values) returns the new _id, or -1 on failure. ContentValues is a column-to-value map: <code>values.put(\"name\", \"Asha\"); values.put(\"marks\", 88);</code>",
+      "update(\"students\", values, \"marks > ?\", new String[]{\"60\"}) returns how many rows changed.",
+      "delete(\"students\", \"_id = ?\", new String[]{\"2\"}) returns how many rows went away."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Each ? is filled from the String array, left to right, and quoted safely. Never join the value into the WHERE clause with +. A name like O'Brien breaks the quotes, and text typed by a user becomes a free SQL injection."
+    }
+   ]
+  },
+  {
+   "h3": "Reading with a Cursor",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "query() takes seven arguments: table, columns, selection, selectionArgs, groupBy, having, orderBy. Pass null wherever you have nothing to say. It returns a <b>Cursor</b>, a pointer that starts just before the first row."
+    },
+    {
+     "type": "p",
+     "text": "<code>Cursor c = db.query(\"students\", null, \"marks > ?\", new String[]{\"60\"}, null, null, \"marks DESC\");</code> Then getCount() gives the row count, moveToFirst() jumps to the first row and returns false if the set is empty, moveToNext() advances one row. getColumnIndex(\"name\") gives the column position once; getString(i) and getInt(i) read the value at the current row."
+    },
+    {
+     "type": "p",
+     "text": "Call close() on the cursor in a finally block. An open cursor holds a file handle and a window of rows in memory; leaked cursors eventually exhaust the database."
+    },
+    {
+     "type": "p",
+     "text": "rawQuery(sql, selectionArgs) runs any SQL, including joins that query() cannot express, and its arguments still go through ?: <code>db.rawQuery(\"SELECT s.name, m.marks FROM students s JOIN marks m ON s._id = m.student_id WHERE m.marks > ?\", new String[]{\"60\"})</code>."
+    }
+   ]
+  },
+  {
+   "h3": "Transactions: all or nothing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "By default each insert is its own transaction, flushed to disk on its own. A thousand inserts take seconds. Wrap them:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Call db.beginTransaction().",
+      "Do all the inserts or updates.",
+      "Call db.setTransactionSuccessful().",
+      "Call db.endTransaction() in a finally block."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "setTransactionSuccessful() is the commit flag. If it is not called before endTransaction(), everything since beginTransaction() rolls back. That gives you all-or-nothing when two tables must agree, for example a student row and its marks row."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Three rows stored in insertion order; the pointer marks the row that comes first when the same rows are sorted by marks from high to low.",
+  "spec": {
+   "type": "array",
+   "aria": "A table with three columns _id, name and marks, three rows Asha 88, Ravi 72 and Meera 95, with a pointer on Meera's 95 marking it as the first row of a descending sort by marks.",
+   "title": "The students table after three inserts, ordered by marks",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "_id",
+     "cells": [
+      "1",
+      "2",
+      "3"
+     ]
+    },
+    {
+     "label": "name",
+     "cells": [
+      "Asha",
+      "Ravi",
+      "Meera"
+     ]
+    },
+    {
+     "label": "marks",
+     "cells": [
+      "88",
+      "72",
+      "95"
+     ],
+     "marks": {
+      "2": "accent"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 2,
+     "cell": 2,
+     "label": "top row of the DESC query"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Create a table students(_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, marks INTEGER). Insert Asha with 88, Ravi with 72 and Meera with 95. Then run SELECT _id, name, marks FROM students WHERE marks > 60 ORDER BY marks DESC. Give the SQL, the equivalent Android query() call, and the exact rows returned in order.",
+   "steps": [
+    "CREATE TABLE students(_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, marks INTEGER); the three inserts get _id 1 (Asha, 88), 2 (Ravi, 72), 3 (Meera, 95).",
+    "The filter marks > 60 keeps all three rows: 88, 72 and 95 are above 60.",
+    "ORDER BY marks DESC sorts 95, 88, 72, so the order is Meera, Asha, Ravi.",
+    "Raw SQL: rawQuery(\"SELECT _id, name, marks FROM students WHERE marks > 60 ORDER BY marks DESC\", null).",
+    "The same through the helper: query(\"students\", null, \"marks > ?\", new String[]{\"60\"}, null, null, \"marks DESC\").",
+    "The cursor returns 3 rows: (3, Meera, 95), (1, Asha, 88), (2, Ravi, 72), so getCount() is 3."
+   ],
+   "answer": "Three rows come back in the order Meera 95, Asha 88, Ravi 72, and getCount() returns 3.",
+   "check": "rows = [(\"Asha\", 88), (\"Ravi\", 72), (\"Meera\", 95)]\nkept = [r for r in rows if r[1] > 60]\nkept.sort(key=lambda r: -r[1])\nfor name, marks in kept:\n    print(marks)\nprint(len(kept))",
+   "values": [
+    95,
+    88,
+    72,
+    3
+   ],
+   "code": {
+    "lang": "python",
+    "code": "import sqlite3\n\ncon = sqlite3.connect(\":memory:\")\ncon.execute(\"CREATE TABLE students(_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, marks INTEGER)\")\ncon.executemany(\"INSERT INTO students(name, marks) VALUES(?, ?)\", [(\"Asha\", 88), (\"Ravi\", 72), (\"Meera\", 95)])\ncur = con.execute(\"SELECT _id, name, marks FROM students WHERE marks > 60 ORDER BY marks DESC\")\nfor _id, name, marks in cur.fetchall():\n    print(_id, name, marks)\nprint(\"count =\", con.execute(\"SELECT COUNT(*) FROM students WHERE marks > 60\").fetchone()[0])\ncon.close()",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "moveToNext() call",
+     "_id",
+     "name",
+     "marks"
+    ],
+    "rows": [
+     [
+      "1st",
+      "3",
+      "Meera",
+      "95"
+     ],
+     [
+      "2nd",
+      "1",
+      "Asha",
+      "88"
+     ],
+     [
+      "3rd",
+      "2",
+      "Ravi",
+      "72"
+     ],
+     [
+      "4th (returns false)",
+      "-",
+      "-",
+      "-"
+     ]
+    ]
+   },
+   "output": "3 Meera 95\n1 Asha 88\n2 Ravi 72\ncount = 3"
+  }
+ ],
+ "traps": [
+  "Forgetting to bump the version. onUpgrade runs only when the number passed to the helper is higher than the stored one, so a new column never reaches old installs and they crash on 'no such column'.",
+  "Building WHERE clauses with + instead of ? and selectionArgs. Quoting breaks on names like O'Brien, and text from a user becomes SQL injection.",
+  "Not calling close() on the Cursor. Each open cursor holds a file handle and a row window; enough of them and the database fails.",
+  "Calling endTransaction() without setTransactionSuccessful() and then wondering why nothing was saved. Without the flag the whole block rolls back.",
+  "Assuming getReadableDatabase() always returns a separate read-only object. Usually it hands back the same read-write database."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the version argument of the SQLiteOpenHelper constructor control?",
+   "marks": 2,
+   "a": "The schema version. When it is higher than the version stored in the database file, onUpgrade runs."
+  },
+  {
+   "level": "understand",
+   "q": "Why does onCreate not run on every launch of the app?",
+   "marks": 3,
+   "a": "onCreate is called only when the database file is being created for the first time. Later launches open the existing file, find matching versions, and skip both onCreate and onUpgrade."
+  },
+  {
+   "level": "apply",
+   "q": "The students table holds Asha 88, Ravi 72, Meera 95. What does query(\"students\", new String[]{\"name\"}, \"marks > ?\", new String[]{\"80\"}, null, null, \"marks DESC\") return?",
+   "marks": 4,
+   "a": "Only the name column, two rows, in the order Meera then Asha, because 95 and 88 pass the filter and sorting is descending. getCount() is 2."
+  },
+  {
+   "level": "apply",
+   "q": "Write the code that changes Ravi's marks to 80 using the helper methods.",
+   "marks": 4,
+   "a": "ContentValues v = new ContentValues(); v.put(\"marks\", 80); db.update(\"students\", v, \"name = ?\", new String[]{\"Ravi\"}); The return value is 1, the number of rows changed."
+  },
+  {
+   "level": "analyze",
+   "q": "A developer adds a column to the students table but does not change the helper version. Describe what happens on a phone that already has the app, and the fix.",
+   "marks": 5,
+   "a": "The stored version equals the passed version, so onUpgrade never fires and the old file keeps the old table. Any insert or query naming the new column throws a SQLiteException about a missing column. The fix is to increase the version and run ALTER TABLE students ADD COLUMN ... inside onUpgrade."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is setTransactionSuccessful() needed at all, when endTransaction() already closes the transaction?",
+   "marks": 4,
+   "a": "endTransaction() commits only if the success flag was set; otherwise it rolls back. Keeping the flag separate means an exception thrown midway leaves the database unchanged, without any explicit rollback call."
+  }
+ ],
+ "beyond": "Not for the exam. Hand-written SQLite code is now rare in Android apps: Room, the official persistence library, generates the helper, the cursor mapping and the version migrations from annotated classes, with the same SQLite file underneath. SQLite itself is widely used on embedded and edge devices and inside test suites, where a full server database would be overkill. Search for 'Room migration', 'SQLite WAL mode' and 'cursor window' to go further."
+}

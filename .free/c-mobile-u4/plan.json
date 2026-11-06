@@ -1,0 +1,415 @@
+{
+ "lead": "An app that forgets everything on restart feels broken. This unit shows the four places Android keeps data: a small preferences file, files on disk, an SQLite database, and a content provider that other apps can query. By the end you can save and reload a user's settings, run SQL inside your app, publish a database through a content:// URI, share a file safely with another app, and bind a data object straight to your layout.",
+ "about": "The unit moves from smallest storage to largest. Chapter 4.1 covers SharedPreferences, the key-value store for a handful of settings. Chapter 4.2 goes to plain files on internal and external storage, which handle logs, images and anything big. Chapter 4.3 puts real structure on that data with SQLite, using SQLiteOpenHelper to create and upgrade tables and a Cursor to read rows. Chapter 4.4 wraps the same database in a content provider so other apps can query it through a content:// URI, and Chapter 4.5 sends those URIs between apps with an intent and a temporary permission. Chapter 4.6 closes by replacing findViewById and setText with data binding, so a model object redraws the screen by itself. Each chapter assumes the one before it.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Preferences are a tiny key-value store, private to your app, saved by Android as one XML file, meant for a few settings and nothing more.",
+   "depth": "getSharedPreferences(name, MODE_PRIVATE), getPreferences(MODE_PRIVATE) for a single screen, and PreferenceManager.getDefaultSharedPreferences for the whole app. The Editor: putString, putInt, putBoolean, putLong, putFloat, remove, clear. Reading back with getString(key, default) and getInt(key, default). commit() versus apply(). Listening for changes with OnSharedPreferenceChangeListener. Show the file path /data/data/<package>/shared_prefs/<name>.xml and what the XML looks like. Mention that MODE_WORLD_READABLE and MODE_WORLD_WRITEABLE are deprecated and that preferences are not encrypted. Some syllabi call this simply 'preferences' or a 'key-value store'.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Saving one setting",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Settings screen",
+      "note": "score 4200, sound off",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "getSharedPreferences",
+      "note": "name, MODE_PRIVATE",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Editor",
+      "note": "putInt, putBoolean",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "apply() or commit()",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "XML file",
+      "note": "shared_prefs/settings.xml",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "live"
+     }
+    ]
+   },
+   "example": "A game settings screen saves a best score of 4200 (int) under the key best_score and a mute flag of false (boolean) under sound_on, into the file settings.xml. Question: write the code to save both values and the code to read them back after the app restarts, then state what the XML file contains. Answer: editor = getSharedPreferences(\"settings\", MODE_PRIVATE).edit(); editor.putInt(\"best_score\", 4200); editor.putBoolean(\"sound_on\", false); editor.apply(); Read back with score = prefs.getInt(\"best_score\", 0) and sound = prefs.getBoolean(\"sound_on\", true). On disk settings.xml holds <int name=\"best_score\" value=\"4200\" /> and <boolean name=\"sound_on\" value=\"false\" />.",
+   "trap": "apply() saves in the background and returns nothing, while commit() saves immediately and returns true or false. Writing commit() in an answer where the question says 'without blocking the UI' loses marks. A second trap is reading an int key with getString: the type is fixed at write time, so you get a ClassCastException, not a default value.",
+   "prereq": "Unit 2 for activities and the activity life cycle, because the right moment to save is onPause or onStop.",
+   "leave": "Lists, logs and images belong to 4.2 and 4.3; showing the saved values on screen is Unit 3 and Chapter 4.6."
+  },
+  {
+   "k": 2,
+   "idea": "Files give you unlimited size and full control, but you must choose the right folder: internal storage is private and always there, external storage is shared and can be missing.",
+   "depth": "Only a few universities teach this at this depth. openFileOutput and openFileInput with MODE_PRIVATE, MODE_APPEND and MODE_WORLD_READABLE (deprecated). getFilesDir(), getCacheDir(), getDir(), and getExternalFilesDir(type) for the app's own external folder. Environment.getExternalStorageState() and MEDIA_MOUNTED. READ_EXTERNAL_STORAGE and WRITE_EXTERNAL_STORAGE permissions, then scoped storage from Android 10 (API 29), the Storage Access Framework and MediaStore as the modern route for shared media. Buffered streams and try-with-resources for closing. Reading and writing a text file line by line.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Storage",
+     "style": "normal",
+     "children": [
+      {
+       "label": "Internal",
+       "note": "/data/data/<pkg>",
+       "style": "accent",
+       "children": [
+        {
+         "label": "files/",
+         "note": "filesDir"
+        },
+        {
+         "label": "cache/",
+         "note": "cacheDir"
+        },
+        {
+         "label": "shared_prefs/",
+         "note": "chapter 4.1",
+         "style": "muted"
+        }
+       ]
+      },
+      {
+       "label": "External",
+       "note": "may be unmounted",
+       "style": "next",
+       "children": [
+        {
+         "label": "App folder",
+         "note": "Android/data/<pkg>"
+        },
+        {
+         "label": "Public folders",
+         "note": "needs permission",
+         "style": "muted"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "An app writes a debug log of 3 lines to log.txt, about 96 bytes, and also keeps a thumbnail of 40 KB. Question: where do these two files go, and what changes after the app is uninstalled? Answer: the log goes to new File(getFilesDir(), \"log.txt\") because it is private and small; the thumbnail goes to getCacheDir() because it can be regenerated. Both are under /data/data/<pkg>/ and both are deleted on uninstall. If the log had to be a 5 MB file the app could instead use getExternalFilesDir(null), but it must first check that Environment.getExternalStorageState() equals MEDIA_MOUNTED, because the SD card may be removed.",
+   "trap": "Writing to external storage without checking its state. The call does not throw a friendly error, the file simply never appears. Also remember that internal files are wiped on uninstall, so an answer that keeps user data 'forever' in internal storage is wrong. Never touch a file from the main thread without saying so: long file work belongs on a background thread.",
+   "prereq": "Unit 2 for Context, the package name and the app's private directory.",
+   "leave": "Runtime permission dialogs and stored-file security go to Unit 5; publishing the app goes to Unit 5."
+  },
+  {
+   "k": 3,
+   "idea": "SQLite is a small relational database that lives inside your app, and SQLiteOpenHelper creates it, upgrades it, and hands you an SQLiteDatabase to run SQL against.",
+   "depth": "SQLiteDatabase and SQLiteOpenHelper: the constructor with name and version, onCreate, onUpgrade, getWritableDatabase, getReadableDatabase. Creating a table with execSQL, and the helper methods insert, update, delete and query that take ContentValues and selectionArgs. Reading with Cursor: moveToFirst, moveToNext, getColumnIndex, getString, getInt, getCount, close. rawQuery for joins. Transactions with beginTransaction, setTransactionSuccessful and endTransaction. The mandatory _id column for list adapters. Some syllabi word this as 'Introducing SQLite', 'In and Out of SQLite' or 'Hello Database'.",
+   "figure": {
+    "type": "array",
+    "title": "The students table after three inserts, ordered by marks",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "_id",
+      "cells": [
+       "1",
+       "2",
+       "3"
+      ]
+     },
+     {
+      "label": "name",
+      "cells": [
+       "Asha",
+       "Ravi",
+       "Meera"
+      ]
+     },
+     {
+      "label": "marks",
+      "cells": [
+       "88",
+       "72",
+       "95"
+      ],
+      "marks": {
+       "2": "accent"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 2,
+      "cell": 2,
+      "label": "top row of the DESC query"
+     }
+    ]
+   },
+   "example": "Create a table students(_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, marks INTEGER). Insert Asha with 88, Ravi with 72 and Meera with 95. Then run SELECT _id, name, marks FROM students WHERE marks > 60 ORDER BY marks DESC. Question: give the SQL, the Android query() call and the exact rows returned in order. Answer: rawQuery(\"SELECT _id, name, marks FROM students WHERE marks > 60 ORDER BY marks DESC\", null) or query(\"students\", null, \"marks > ?\", new String[]{\"60\"}, null, null, \"marks DESC\"). The cursor returns 3 rows: Meera 95, Asha 88, Ravi 72, and getCount() is 3.",
+   "trap": "Bumping nothing. onUpgrade runs only when the version number passed to the helper goes up, so adding a column without changing the version leaves old phones crashing. The second trap is building WHERE clauses by joining strings instead of using selectionArgs with ?. The third is forgetting to call close() on the Cursor.",
+   "prereq": "Unit 2 for activities; Chapter 4.1 and 4.2 for the idea of persistent storage.",
+   "leave": "Handing this table to other apps is Chapter 4.4; showing rows in a list is Unit 3 and Chapter 4.6."
+  },
+  {
+   "k": 4,
+   "idea": "A content provider publishes your data behind a content:// URI, and every app, including yours, reads it through ContentResolver instead of touching your files.",
+   "depth": "Only a few universities teach creating providers. URI anatomy content://authority/path/id, and why the authority must be unique. Reading a built-in provider such as contacts or media with getContentResolver().query(). Writing your own: extend ContentProvider and implement onCreate, query, getType, insert, delete and update; use a UriMatcher to map path to code; define a contract class with table and column constants. Declare it in the manifest with <provider android:name android:authorities android:exported>, and add android:readPermission and android:writePermission. CursorAdapters and MIME types vnd.android.cursor.dir and vnd.android.cursor.item.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "App",
+     "ContentResolver",
+     "MarksProvider",
+     "SQLite"
+    ],
+    "messages": [
+     {
+      "from": "App",
+      "to": "ContentResolver",
+      "label": "query /students/2"
+     },
+     {
+      "from": "ContentResolver",
+      "to": "MarksProvider",
+      "label": "query(uri, null, null)"
+     },
+     {
+      "from": "MarksProvider",
+      "to": "SQLite",
+      "label": "SELECT ... WHERE _id = 2"
+     },
+     {
+      "from": "SQLite",
+      "to": "MarksProvider",
+      "label": "row Ravi, 72"
+     },
+     {
+      "from": "MarksProvider",
+      "to": "ContentResolver",
+      "label": "Cursor"
+     },
+     {
+      "from": "ContentResolver",
+      "to": "App",
+      "label": "Cursor, 1 row"
+     }
+    ]
+   },
+   "example": "Your provider has authority com.example.marks and serves the students table from Chapter 4.3. Question: trace the call getContentResolver().query(Uri.parse(\"content://com.example.marks/students/2\"), null, null, null, null) and say what the caller receives. Answer: UriMatcher with addURI(\"com.example.marks\", \"students\", 1) and addURI(\"com.example.marks\", \"students/#\", 2) returns code 2, so the provider runs db.query(\"students\", null, \"_id = ?\", new String[]{\"2\"}, null, null, null). The Cursor holds 1 row: _id 2, name Ravi, marks 72, and getType() returns vnd.android.cursor.item/com.example.marks.students.",
+   "trap": "Declaring one authority in code and a different one in the manifest, so every URI returns NO_MATCH. Also: exported=\"false\" means other apps cannot see the provider at all, and forgetting the <provider> tag means the system never registers it. Do not open the database in query(); do it in onCreate().",
+   "prereq": "Chapter 4.3 for SQLite and Unit 2 for implicit intents and the manifest.",
+   "leave": "Sending a URI to another app is Chapter 4.5; permission abuse and mobile security are Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "Apps share data by sending a content:// URI in an intent with a temporary read grant, never by writing into a folder the other app can guess.",
+   "depth": "Only a few universities teach this. Implicit intents with ACTION_SEND and ACTION_SEND_MULTIPLE, setType, EXTRA_TEXT, EXTRA_STREAM and Intent.createChooser. Sharing your own file: FileProvider with a <provider> tag, android:exported=\"false\", android:grantUriPermissions=\"true\", a file_paths.xml resource, and FileProvider.getUriForFile. Adding FLAG_GRANT_READ_URI_PERMISSION. The receiver opening the stream with getContentResolver().openInputStream(uri). Why file:// URIs are refused from Android 7 (API 24) with FileUriExposedException.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Sharing a file safely",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Pick file",
+      "note": "report.pdf, 1.5 MB",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "FileProvider",
+      "note": "getUriForFile",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "content URI",
+      "note": "…/reports/report.pdf",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Intent plus grant",
+      "note": "ACTION_SEND, application/pdf",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Receiver app",
+      "note": "opens the 1.5 MB stream",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "live"
+     }
+    ]
+   },
+   "example": "A report app shares report.pdf of 1.5 MB with any PDF viewer. Question: write the sharing code and explain what the receiving app is allowed to do. Answer: Uri uri = FileProvider.getUriForFile(this, \"com.example.reportapp.fileprovider\", file); this gives content://com.example.reportapp.fileprovider/reports/report.pdf. Then Intent send = new Intent(Intent.ACTION_SEND); send.setType(\"application/pdf\"); send.putExtra(Intent.EXTRA_STREAM, uri); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(send, \"Share report\")). The viewer may read that one file, once, for the life of that activity. It cannot list the reports folder and cannot write.",
+   "trap": "Putting a File in EXTRA_STREAM. That produces a file:// URI and throws FileUriExposedException from Android 7 onward. The second trap is leaving out FLAG_GRANT_READ_URI_PERMISSION, so the receiver gets a SecurityException. Grants are temporary, so do not promise permanent access in an answer.",
+   "prereq": "Chapter 4.4 for content URIs and resolvers; Unit 2 for implicit intents.",
+   "leave": "Threats such as permission abuse and the app store publishing steps belong to Unit 5."
+  },
+  {
+   "k": 6,
+   "idea": "Data binding connects a data object to a layout, so a change in the object redraws the view without findViewById or setText.",
+   "depth": "Only a few universities teach this. Distinguish view binding (generated class, no expressions) from data binding. Turning on dataBinding in build.gradle, making <layout> the root with a <data> block and <variable name type>, the generated class name from the file name (activity_main.xml gives ActivityMainBinding), inflating with ActivityMainBinding.inflate(getLayoutInflater()) and setContentView(binding.getRoot()). Binding expressions with @{user.name}. Observable fields: ObservableField, ObservableInt, or BaseObservable with @Bindable and notifyPropertyChanged. Two-way binding with @={}. setLifecycleOwner for live data.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "From layout to live view",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "activity_main.xml",
+      "note": "<layout> plus <variable> user",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Generated class",
+      "note": "ActivityMainBinding",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "setUser(user)",
+      "note": "name Asha, score 88",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "TextView shows 88",
+      "note": "no setText call",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "score.set(95)",
+      "note": "ObservableInt",
+      "style": "next"
+     },
+     {
+      "id": "f",
+      "label": "notifyChange",
+      "note": "only that view redraws",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "dashed",
+      "label": "user taps +7"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "d",
+      "style": "live",
+      "label": "rebind"
+     }
+    ]
+   },
+   "example": "A User object has name \"Asha\" and an ObservableInt score holding 88. The layout shows them with @{user.name} and @{String.valueOf(user.score)}. Question: show the layout root, the binding code in onCreate, and what appears on screen after score.set(95). Answer: the root is <layout> containing <data><variable name=\"user\" type=\"com.example.app.User\"/></data> and the views. In onCreate: ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater()); setContentView(binding.getRoot()); binding.setUser(user); The screen first shows Asha and 88. After user.score.set(95) the same TextView shows 95 with no findViewById and no setText, because ObservableInt notified the binding.",
+   "trap": "Using a plain int field for score and expecting the view to refresh. Plain fields are read once; only ObservableField, ObservableInt or notifyPropertyChanged triggers a redraw. The other trap is forgetting the <layout> wrapper: without it no Binding class is generated and the build fails, and beginners then look for the error in the wrong file.",
+   "prereq": "Unit 3 for layouts, TextView and event handling; Chapter 4.1 and 4.3 for the data you bind.",
+   "leave": "LiveData, ViewModel and Room are beyond this unit; saving the bound values is still Chapter 4.1 or 4.3."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "preferences store a few settings; files store the big data"
+  ],
+  [
+   2,
+   3,
+   "a growing file of records needs a real database"
+  ],
+  [
+   3,
+   4,
+   "the same students table is published behind a content URI"
+  ],
+  [
+   4,
+   5,
+   "that content URI is what an intent carries to another app"
+  ],
+  [
+   1,
+   6,
+   "a saved preference is read into a model and bound to a view"
+  ],
+  [
+   5,
+   6,
+   "data received from another app can be bound straight into a layout"
+  ]
+ ]
+}

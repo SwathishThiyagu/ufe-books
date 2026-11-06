@@ -1,0 +1,198 @@
+{
+ "lead": "A content provider publishes an app's data behind a content:// URI. Other apps, and your own, read that data through ContentResolver, not by opening your database file. The provider owns the SQLite database and decides what each URI means. Android's contacts, media and call-log apps work this way. The same pattern lets two of your apps share a marks table safely. Reading a built-in provider takes a few lines. Creating one is advanced; only a few universities teach it. This chapter shows both, with URI anatomy, UriMatcher, a contract class and manifest permissions.",
+ "prereq": "You need <a href=\"#sqlite-databases-in-android\">Chapter 4.3</a> for SQLite, and Unit 2 for the manifest and implicit intents.",
+ "sections": [
+  {
+   "h3": "Reading through ContentResolver",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every provider has an authority, a unique string such as com.example.marks. The URI content://com.example.marks/students/2 has three parts. content:// is the scheme. com.example.marks is the authority. /students/2 is the path; 2 is the _id of one row. The authority must be unique on the phone, so start it with your package name."
+    },
+    {
+     "type": "p",
+     "text": "Call getContentResolver().query(uri, projection, selection, selectionArgs, sortOrder). It returns a Cursor, a pointer to result rows. projection lists columns; null means all. selection is a WHERE clause with ? placeholders; selectionArgs fills them. sortOrder is ORDER BY; null means none. Read rows with while (cursor.moveToNext()). Close the cursor. A CursorAdapter can bind a Cursor to a ListView."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Built-in example: ContactsContract.Contacts.CONTENT_URI.",
+      "The provider runs the SQL; the caller only sees a Cursor.",
+      "Never open another app's database file directly.",
+      "An empty result still returns a Cursor, with zero rows.",
+      "For a single row, the final path segment is the _id."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Creating a provider",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Write a contract class. It holds constants: AUTHORITY = \"com.example.marks\", TABLE = \"students\", COL_ID = \"_id\", COL_NAME = \"name\", COL_MARKS = \"marks\", and CONTENT_URI = Uri.parse(\"content://\" + AUTHORITY + \"/\" + TABLE)."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Extend ContentProvider. Implement onCreate, query, getType, insert, delete and update.",
+      "In onCreate, create the SQLiteOpenHelper database. Return true. Do not open it in query().",
+      "Build a UriMatcher. addURI(AUTHORITY, TABLE, 1) matches all rows. addURI(AUTHORITY, TABLE + \"/#\", 2) matches one row; # means a number. match(uri) returns 1, 2 or NO_MATCH.",
+      "query(): switch on match(uri). Code 1 runs db.query(TABLE, projection, selection, selectionArgs, null, null, sortOrder). Code 2 adds \"_id = ?\" and the last path segment. Return the Cursor.",
+      "insert(): db.insert(TABLE, null, values); return ContentUris.withAppendedId(CONTENT_URI, newId).",
+      "delete() and update(): use the same switch. For one row add \"_id = ?\". Return the changed row count.",
+      "getType(): vnd.android.cursor.dir/com.example.marks.students for many rows; vnd.android.cursor.item/com.example.marks.students for one row."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Manifest, permissions and MIME types",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Declare the provider in AndroidManifest.xml inside the application element. Use <code>android:name=\".MarksProvider\"</code>, <code>android:authorities=\"com.example.marks\"</code>, <code>android:exported=\"true\"</code>, <code>android:readPermission=\"com.example.marks.READ\"</code> and <code>android:writePermission=\"com.example.marks.WRITE\"</code>."
+    },
+    {
+     "type": "p",
+     "text": "android:name is the provider class; the leading dot means the app package. android:authorities is the unique authority; it must equal AUTHORITY. android:exported=\"true\" lets other apps call it, subject to permissions. exported=\"false\" hides it. The authority in code and manifest must match exactly. Define custom permissions with a permission element. Forget the provider element and the system never registers the provider. Use readPermission for query and writePermission for insert, update, delete."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "MIME types: vnd.android.cursor.dir means many rows; vnd.android.cursor.item means one row.",
+      "A CursorAdapter reads the Cursor and binds rows to a ListView.",
+      "Your own app can call an exported=false provider through ContentResolver.",
+      "The manifest entry is read at install time; a missing entry means no provider.",
+      "Custom permissions appear in the manifest as permission elements."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The app asks ContentResolver; the resolver finds MarksProvider; the provider queries SQLite for _id 2 and returns one Cursor row, Ravi with 72 marks.",
+  "spec": {
+   "type": "sequence",
+   "aria": "App calls ContentResolver for student 2; ContentResolver calls MarksProvider; MarksProvider queries SQLite; SQLite returns Ravi with 72; MarksProvider returns a Cursor to ContentResolver and App.",
+   "actors": [
+    "App",
+    "ContentResolver",
+    "MarksProvider",
+    "SQLite"
+   ],
+   "messages": [
+    {
+     "from": "App",
+     "to": "ContentResolver",
+     "label": "query /students/2"
+    },
+    {
+     "from": "ContentResolver",
+     "to": "MarksProvider",
+     "label": "query(uri, null, null)"
+    },
+    {
+     "from": "MarksProvider",
+     "to": "SQLite",
+     "label": "SELECT ... WHERE _id = 2"
+    },
+    {
+     "from": "SQLite",
+     "to": "MarksProvider",
+     "label": "row Ravi, 72"
+    },
+    {
+     "from": "MarksProvider",
+     "to": "ContentResolver",
+     "label": "Cursor"
+    },
+    {
+     "from": "ContentResolver",
+     "to": "App",
+     "label": "Cursor, 1 row"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Your provider has authority com.example.marks and serves the students table. Trace getContentResolver().query(Uri.parse(\"content://com.example.marks/students/2\"), null, null, null, null). What does the caller receive?",
+   "steps": [
+    "UriMatcher has addURI(\"com.example.marks\", \"students\", 1) and addURI(\"com.example.marks\", \"students/#\", 2).",
+    "Path students/2 has two segments; # matches 2; match returns code 2.",
+    "Code 2 runs db.query(\"students\", null, \"_id = ?\", new String[]{\"2\"}, null, null, null).",
+    "SQLite returns one row: _id = 2, name = Ravi, marks = 72.",
+    "getType returns vnd.android.cursor.item/com.example.marks.students."
+   ],
+   "answer": "The caller receives a Cursor with 1 row: _id 2, Ravi, 72 marks; match code 2 and the item MIME type.",
+   "check": "AUTHORITY = \"com.example.marks\"\nsegments = \"students/2\".split(\"/\")\ntable = segments[0]\npath_id = int(segments[1]) if len(segments) == 2 else None\nmatch_code = 1 if len(segments) == 1 else 2\nrow_count = 1\nmarks = 72\nprint(path_id)\nprint(row_count)\nprint(marks)\nprint(match_code)",
+   "values": [
+    2,
+    1,
+    72,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Authority in code and manifest differ; every URI returns NO_MATCH.",
+  "exported=\"false\" hides the provider from other apps; a missing provider element means no registration.",
+  "Opening the database in query() instead of onCreate() repeats work and can leak resources.",
+  "Calling another app's database file directly; use ContentResolver instead.",
+  "Forgetting to close the Cursor, or returning a Cursor without _id for a CursorAdapter."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which class does an app use to call a provider?",
+   "marks": 2,
+   "a": "ContentResolver."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the authority be unique?",
+   "marks": 3,
+   "a": "The system finds a provider by authority; duplicates would make routing ambiguous."
+  },
+  {
+   "level": "apply",
+   "q": "UriMatcher has students→1 and students/#→2. What code for content://com.example.marks/students/7?",
+   "marks": 2,
+   "a": "2."
+  },
+  {
+   "level": "analyze",
+   "q": "A provider returns NO_MATCH for every URI. Give two likely causes.",
+   "marks": 4,
+   "a": "Authority mismatch in code and manifest; path not added to UriMatcher."
+  },
+  {
+   "level": "understand",
+   "q": "Why open the database in onCreate() and not query()?",
+   "marks": 3,
+   "a": "onCreate runs once; query runs often. Opening each call wastes time and resources."
+  },
+  {
+   "level": "apply",
+   "q": "Write getType for all students and one student.",
+   "marks": 4,
+   "a": "Many: vnd.android.cursor.dir/com.example.marks.students; one: vnd.android.cursor.item/com.example.marks.students."
+  },
+  {
+   "level": "analyze",
+   "q": "What does android:exported=\"false\" change?",
+   "marks": 3,
+   "a": "Other apps cannot call the provider; your app still can."
+  },
+  {
+   "level": "remember",
+   "q": "Which six ContentProvider methods must you implement?",
+   "marks": 3,
+   "a": "onCreate, query, getType, insert, delete and update."
+  }
+ ],
+ "beyond": "Not for the exam. Production apps often keep SQLite private and publish only a small provider surface. Android's DocumentsProvider lets a file app appear inside the system file picker. Sync adapters use providers to move contacts and calendar data. Search for ContentProvider with Room, MIME types and URI permissions."
+}

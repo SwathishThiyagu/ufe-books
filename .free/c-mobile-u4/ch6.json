@@ -1,0 +1,214 @@
+{
+ "lead": "A layout with a TextView and a value in code usually needs one line of glue: textView.setText(user.name). Data binding removes that glue. You declare in the XML which object feeds which view, and Android writes the setText calls for you. Change the object and the view redraws. It is used in forms, score screens and dashboards where many views follow one object. Only a few universities teach this topic; most stop at findViewById.",
+ "prereq": "You need: layouts, TextView and event handling from Unit 3, and the data you bind from <a href=\"#saving-and-loading-user-preferences\">Chapter 4.1</a> or <a href=\"#sqlite-databases-in-android\">Chapter 4.3</a>.",
+ "sections": [
+  {
+   "h3": "Turning it on: layout, variable, generated class",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "View binding generates a class that holds only the view references, so you can skip findViewById. Data binding uses a generated class too, and also evaluates expressions written in the XML. Both are built from the layout file. Switch data binding on inside the android block of the module-level build.gradle, then sync:"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "android {\n    buildFeatures {\n        dataBinding true\n    }\n}",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "Rename the root of activity_main.xml to <layout>. Inside it a <data> block declares the variables, and the old root view follows. The file name decides the class name: activity_main.xml gives ActivityMainBinding."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "<layout>\n  <data>\n    <variable name=\"user\" type=\"com.example.app.User\"/>\n  </data>\n  <LinearLayout ... >\n    <TextView android:text=\"@{user.name}\" ... />\n  </LinearLayout>\n</layout>",
+     "output": ""
+    },
+    {
+     "type": "steps",
+     "items": [
+      "ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());",
+      "setContentView(binding.getRoot()); the root view, not the binding object.",
+      "binding.setUser(user); one setter is generated per <variable>."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Expressions and observable data",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "@{user.name} is read once, at the moment setUser runs. A plain int or String field never redraws the screen, because the binding has no way to know it changed."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "ObservableField<String> name: name.set(\"Asha\") notifies every view that reads it.",
+      "ObservableInt score: score.set(95) notifies; score.get() reads the value.",
+      "BaseObservable: mark the getter @Bindable, then call notifyPropertyChanged(BR.score) after a change. BR is the generated id class."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two-way binding writes back: android:text=\"@={user.name}\" copies what the user types in an EditText into the object. The expression must be assignable and the types must match. Make the field observable (ObservableField, LiveData, or BaseObservable with @Bindable) as well, otherwise a change made in code will not update the EditText. With LiveData, call binding.setLifecycleOwner(this) so the binding follows the activity lifecycle instead of leaking."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The generated class reads the layout, setUser pushes the object in, and an ObservableInt change redraws only the TextView that shows the score.",
+  "spec": {
+   "type": "blocks",
+   "aria": "A flow from the layout file to the generated ActivityMainBinding class, to setUser, to a TextView showing 88, then a tap sets the score to 95 and the binding redraws that same TextView.",
+   "direction": "down",
+   "title": "From layout to live view",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "activity_main.xml",
+     "note": "<layout> plus <variable> user",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Generated class",
+     "note": "ActivityMainBinding",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "setUser(user)",
+     "note": "name Asha, score 88",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "TextView shows 88",
+     "note": "no setText call",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "score.set(95)",
+     "note": "ObservableInt",
+     "style": "next"
+    },
+    {
+     "id": "f",
+     "label": "notifyChange",
+     "note": "only that view redraws",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "dashed",
+     "label": "user taps +7"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "d",
+     "style": "live",
+     "label": "rebind"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A User object has name \"Asha\" and an ObservableInt score holding 88. The layout shows them with @{user.name} and @{String.valueOf(user.score)}. Show the layout root, the binding code in onCreate, and what appears on screen after score.set(95). (6 marks)",
+   "steps": [
+    "Root of activity_main.xml: <layout>, containing <data><variable name=\"user\" type=\"com.example.app.User\"/></data>, then a LinearLayout with two TextViews.",
+    "First TextView: android:text=\"@{user.name}\". Second TextView: android:text=\"@{String.valueOf(user.score)}\", because an ObservableInt must be turned into text.",
+    "onCreate: ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater()); setContentView(binding.getRoot()); binding.setUser(user);",
+    "First screen: Asha in the first TextView, 88 in the second.",
+    "The user taps +7: user.score.set(88 + 7) = 95. ObservableInt tells the binding, which rebinds the second TextView.",
+    "Second screen: Asha and 95. The first TextView is untouched, and there is no findViewById and no setText anywhere."
+   ],
+   "answer": "The screen shows Asha and 88, then Asha and 95 after the tap; only the score TextView is redrawn.",
+   "check": "score = 88\nstep = 7\nprint(score)\nprint(score + step)",
+   "values": [
+    88,
+    95
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using a plain public int for score and expecting a redraw. A plain field is read once at setUser; only ObservableField, ObservableInt or notifyPropertyChanged triggers a rebind.",
+  "Forgetting the <layout> root. No Binding class is generated, the build fails, and the error points at generated code or R, not at your XML.",
+  "Writing setContentView(binding) instead of setContentView(binding.getRoot()); the root view must be passed.",
+  "Using @= with a non-observable field: typing still writes into the object, but a change made in code will not appear in the EditText. A mismatched or non-assignable expression fails the build.",
+  "Believing data binding saves data. It only displays values; saving is Chapter 4.1 or 4.3."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which class does Android generate for activity_main.xml when data binding is on?",
+   "marks": 2,
+   "a": "ActivityMainBinding, named from the file name in PascalCase plus Binding."
+  },
+  {
+   "level": "understand",
+   "q": "State one thing view binding can do, and one thing data binding can do that view binding cannot.",
+   "marks": 2,
+   "a": "View binding replaces findViewById with typed view references. Data binding also evaluates XML expressions such as @{user.name} and supports observable and two-way binding."
+  },
+  {
+   "level": "understand",
+   "q": "Why does changing a plain String field of the bound object not update the TextView?",
+   "marks": 3,
+   "a": "The expression is evaluated once when setUser runs. A plain field sends no notification, so the binding never re-evaluates it."
+  },
+  {
+   "level": "apply",
+   "q": "score is an ObservableInt holding 88 and the layout shows @{String.valueOf(user.score)}. The user taps +7. What is shown and which views redraw?",
+   "marks": 3,
+   "a": "score.set(88 + 7) = 95. The score TextView shows 95 and only that view rebinds; the name TextView keeps its text."
+  },
+  {
+   "level": "analyze",
+   "q": "A build fails with \"cannot find symbol: class ActivityMainBinding\". Give two likely causes and the fix for each.",
+   "marks": 4,
+   "a": "dataBinding is not enabled in build.gradle (add buildFeatures { dataBinding true } and sync), or the XML root is still LinearLayout instead of <layout> (wrap it and rebuild)."
+  },
+  {
+   "level": "analyze",
+   "q": "When should you use @= instead of @{}, and what does the field need?",
+   "marks": 4,
+   "a": "Use @= for input views such as an EditText whose value must go back into the object. The field must be observable and the view type must match the field type; otherwise write-back fails."
+  },
+  {
+   "level": "understand",
+   "q": "What does binding.setLifecycleOwner(this) do?",
+   "marks": 3,
+   "a": "It ties the binding to the activity lifecycle, so LiveData observers start and stop with the screen instead of leaking."
+  }
+ ],
+ "beyond": "Not for the exam. Jetpack Compose drops XML layouts and rebuilds the screen from state, so the same idea appears as a recomposition. MVVM architectures on Android keep the observable object in a ViewModel and let the binding watch it. Web frameworks use the same two-way idea in templates and in reactive stores. Search for \"Android data binding\", \"ObservableField\" and \"Jetpack Compose state\" to go further."
+}
