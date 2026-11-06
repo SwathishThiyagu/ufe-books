@@ -1,22 +1,20 @@
 # c-unix-u2: free-model run
 
 - Book: `books/cse/c-unix/c-unix-u2.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 19 (67,968 tokens in, 141,701 out), 5.3 minutes
 
 ## Checker
 
 ```
-c-unix-u2.html: 5 chapters, 10734 words, 6 figures, 119 KB
-PROBLEMS:
- - text contains "I cannot"
+c-unix-u2.html: 5 chapters, 10735 words, 6 figures, 119 KB
+OK
 ```
 
 ## For the reviewer
 
 - chapter 1: the figure cannot be drawn: note "commands" runs off the right edge; shorten it
 - chapter 1: worked example 1: the worked example states [5.0] but recomputing it gives [2148.0, 1.0, 2.0, 1.0, 1.0, 9.0, 4.0, 1.0]; fix the steps and the answer so they match the correct values
-- checker: text contains "I cannot"
 
 ## Reviewer notes (after any revision)
 
