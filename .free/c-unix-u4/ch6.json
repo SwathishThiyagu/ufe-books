@@ -1,0 +1,334 @@
+{
+ "lead": "Two ways to share one machine are common today. A virtual machine runs a whole guest operating system on emulated hardware, managed by a hypervisor such as KVM. A container runs a single process tree with its own view of the file system, managed by Docker on the host kernel. The first gives strong isolation and a free choice of operating system; the second starts in under a second and packs small. Administrators use both: containers for services, virtual machines for guests that need their own kernel.",
+ "prereq": "You need: <a href=\"#process-management-viewing-controlling-terminating-processes\">Chapter 4.1</a> on processes and signals, and <a href=\"#basic-linux-networking-administration\">Chapter 4.5</a> on ports and remote access.",
+ "sections": [
+  {
+   "h3": "Host, guest and hypervisor",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Virtualization runs more than one system on one physical computer. The real machine is the <b>host</b>. Each system it runs is a <b>guest</b>, and the guest believes it owns a complete computer: its own CPU count, memory, disks and network cards."
+    },
+    {
+     "type": "p",
+     "text": "The software that creates and supervises guests is the <b>hypervisor</b>. It hands out CPU time, memory, disk and network cards to each guest and keeps guests apart. Hypervisors come in two types."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Type 1 runs directly on the hardware, with nothing between guest instructions and the CPU. KVM, Xen and VMware ESXi are type 1.",
+      "Type 2 runs as an ordinary program on an installed operating system. VirtualBox and VMware Workstation are type 2; you start them like any application."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "KVM (Kernel-based Virtual Machine) is a Linux kernel module, so the host kernel itself acts as the hypervisor. It is classed as type 1 because guest code executes directly on the CPU. The module needs hardware virtualization support — Intel VT-x or AMD-V — switched on in the BIOS."
+    },
+    {
+     "type": "p",
+     "text": "Why bother? One server with 64 GB of RAM can hold ten guests of 4 GB instead of sitting half idle. A broken test guest is deleted and recreated. Two teams each get their own kernel version on one box. The cost is weight: every guest carries its own kernel, boot process and device drivers."
+    }
+   ]
+  },
+  {
+   "h3": "KVM: the guest has its own kernel",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Three parts make KVM work. The <code>kvm</code> module in the host kernel provides the device <code>/dev/kvm</code>; check it with <code>lsmod | grep kvm</code>, which usually shows <code>kvm_intel</code> or <code>kvm_amd</code>. QEMU emulates the guest's hardware — disk controller, network card, display — while KVM lets the guest's instructions run on the real CPU. libvirt is a service that stores each guest's XML definition and starts it."
+    },
+    {
+     "type": "p",
+     "text": "<code>virsh</code> talks to libvirt. <code>virsh list --all</code> shows every defined guest and its state: running, shut off or paused. <code>virsh start webvm</code> boots one. <code>virsh shutdown webvm</code> asks the guest to shut down cleanly."
+    },
+    {
+     "type": "p",
+     "text": "<code>virt-install</code> creates a new guest in one command:"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "virt-install --name webvm --ram 2048 --vcpus 2 \\\n  --disk path=/var/lib/libvirt/images/webvm.qcow2,size=10 \\\n  --cdrom /iso/debian.iso",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "The flags mean: <code>--name</code> is the guest name, <code>--ram</code> is memory in MB, <code>--vcpus</code> is virtual CPUs, <code>--disk</code> gives a disk image file and its size in GB, <code>--cdrom</code> is the install medium. The guest boots the installer once, installs its own kernel, and from then on boots that kernel itself. Only a few universities teach the KVM command set in detail; most want you to know that the guest owns a kernel and that <code>virsh</code> manages it."
+    }
+   ]
+  },
+  {
+   "h3": "Docker: image, container, one process",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <b>container</b> is a process, or a small tree of processes, started with three restrictions: Linux namespaces give it its own file system, its own process list and its own network; cgroups limit its CPU and memory. It uses the host kernel, not a second one."
+    },
+    {
+     "type": "p",
+     "text": "An <b>image</b> is a read-only bundle of files plus a starting command. A container is a running instance of an image with a thin writable layer on top, and that layer disappears when the container is removed. A Dockerfile describes the image:"
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "FROM nginx:alpine\nCOPY index.html /usr/share/nginx/html/\nEXPOSE 80\nCMD [\"nginx\", \"-g\", \"daemon off;\"]",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "<code>FROM</code> names the base image, <code>COPY</code> adds files, <code>EXPOSE</code> records the port the service listens on, and <code>CMD</code> is the process that becomes PID 1 inside the container. When that process exits, the container stops. A container is not a machine that idles."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<code>docker build -t web:v1 .</code> builds an image named web with tag v1. The dot is the build context — the directory sent to the builder, which must contain the Dockerfile.",
+      "<code>docker run -d -p 8080:80 --name web web:v1</code> starts a container. <code>-d</code> detaches it from the terminal, <code>--name</code> names it, <code>-p</code> publishes a port.",
+      "<code>docker ps</code> lists running containers with ID, image, command, ports and name; <code>docker ps -a</code> also shows stopped ones.",
+      "<code>docker stop web</code> sends SIGTERM, waits, then SIGKILL. <code>docker rm web</code> deletes the stopped container."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Port mapping reads host first, container second: <code>-p 8080:80</code> forwards host port 8080 to port 80 inside. A <b>bind mount</b> <code>-v /srv/site:/usr/share/nginx/html</code> puts a host directory inside the container, so edits appear at once. A <b>volume</b> <code>-v webdata:/var/lib/mysql</code> is storage Docker manages for you and keeps after the container is gone."
+    }
+   ]
+  },
+  {
+   "h3": "Container or virtual machine?",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A container shares the host kernel; a virtual machine runs its own. Everything else follows from that one line."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "Container",
+      "Virtual machine"
+     ],
+     "rows": [
+      [
+       "Kernel",
+       "host kernel",
+       "own guest kernel"
+      ],
+      [
+       "Start time",
+       "under a second",
+       "tens of seconds"
+      ],
+      [
+       "Image size",
+       "megabytes",
+       "gigabytes"
+      ],
+      [
+       "Isolation",
+       "process level",
+       "hardware level"
+      ],
+      [
+       "Guest OS",
+       "Linux-like only",
+       "any OS"
+      ],
+      [
+       "Density",
+       "hundreds per host",
+       "tens per host"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Use a container for a stateless web service, a build agent, or a database with a volume. Use a virtual machine when you need a different kernel or a different operating system, or when the workload is untrusted."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "KVM sits above the host kernel and runs a VM with its own guest kernel; Docker runs containers that share the host kernel.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "KVM and Docker layers",
+   "aria": "KVM sits above the host kernel and runs a VM with its own guest kernel; Docker runs containers that share the host kernel.",
+   "nodes": [
+    {
+     "id": "hw",
+     "label": "Hardware",
+     "style": "muted"
+    },
+    {
+     "id": "host",
+     "label": "Host kernel",
+     "style": "normal"
+    },
+    {
+     "id": "kvm",
+     "label": "KVM",
+     "note": "hypervisor",
+     "style": "accent"
+    },
+    {
+     "id": "vm",
+     "label": "VM guest",
+     "note": "own kernel",
+     "style": "normal"
+    },
+    {
+     "id": "docker",
+     "label": "Docker engine",
+     "note": "shares host kernel",
+     "style": "next"
+    },
+    {
+     "id": "cont",
+     "label": "Container",
+     "note": "one process tree",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "hw",
+     "to": "host",
+     "style": "solid"
+    },
+    {
+     "from": "host",
+     "to": "kvm",
+     "style": "solid"
+    },
+    {
+     "from": "kvm",
+     "to": "vm",
+     "style": "solid"
+    },
+    {
+     "from": "host",
+     "to": "docker",
+     "style": "solid"
+    },
+    {
+     "from": "docker",
+     "to": "cont",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An administrator builds a web image from a Dockerfile and runs it, then creates a KVM guest. The host port is 8080, the service port inside the container is 80, the image is web:v1, and the guest webvm gets 2 vCPUs and 2048 MB of RAM with a 10 GB disk. Give every command, the line docker ps prints, and state which of the two uses the host kernel.",
+   "steps": [
+    "Build the image: <code>docker build -t web:v1 .</code> The dot is the context; the Dockerfile in that directory is read and the image gets the name web and tag v1.",
+    "Run it detached: <code>docker run -d -p 8080:80 --name web web:v1</code>. Docker prints a container ID, for example a1b2c3. Host port 8080 now forwards to container port 80.",
+    "Check the ports: <code>docker ps</code> prints a line with ID a1b2c3, image web:v1, command \"nginx -g 'daemon off;'\", ports 0.0.0.0:8080->80/tcp and name web. A browser on the host at http://localhost:8080 reaches nginx on port 80 inside the container.",
+    "Stop and remove: <code>docker stop web</code>, then <code>docker rm web</code>. The writable layer is discarded; the image web:v1 stays on disk.",
+    "Create the guest: <code>virt-install --name webvm --ram 2048 --vcpus 2 --disk path=/var/lib/libvirt/images/webvm.qcow2,size=10 --cdrom /iso/debian.iso</code>. It gets 2 vCPUs, 2048 MB = 2 GB of RAM, and a 10 GB disk file.",
+    "Confirm the guest after installation: <code>virsh list --all</code> shows webvm in the running state.",
+    "Who shares the host kernel? The container does. Docker starts a process tree on the host kernel with namespaces and cgroups. The guest webvm runs its own kernel on the virtual CPUs that KVM schedules."
+   ],
+   "answer": "The container shares the host kernel; the guest webvm gets 2 vCPUs and 2048 MB (2 GB) of RAM with a 10 GB disk and boots its own kernel.",
+   "check": "host_port = 8080\ncontainer_port = 80\nvcpus = 2\nram_mb = 2048\nprint(host_port)\nprint(container_port)\nprint(vcpus)\nprint(ram_mb)\nprint(ram_mb / 1024)\n",
+   "values": [
+    8080,
+    80,
+    2,
+    2048,
+    2.0
+   ],
+   "code": {
+    "lang": "text",
+    "code": "",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "item",
+     "value",
+     "unit"
+    ],
+    "rows": [
+     [
+      "host port",
+      "8080",
+      "port"
+     ],
+     [
+      "container port",
+      "80",
+      "port"
+     ],
+     [
+      "vCPUs",
+      "2",
+      "count"
+     ],
+     [
+      "RAM",
+      "2048",
+      "MB"
+     ],
+     [
+      "RAM",
+      "2",
+      "GB"
+     ]
+    ]
+   },
+   "output": "8080\n80\n2\n2048\n2.0"
+  }
+ ],
+ "traps": [
+  "In <code>-p 8080:80</code> the host port comes first and the container port second. Writing <code>-p 80:8080</code> forwards host 80 to container 8080, which is the opposite of what most students mean.",
+  "A container is not a lightweight virtual machine. It has no own kernel, no init system by default and no idle state; its main process exiting ends it.",
+  "<code>docker stop</code> and <code>docker rm</code> are different: stop ends the process, rm deletes the container and its writable layer. Neither removes the image.",
+  "The dot in <code>docker build -t web:v1 .</code> is the build context, not decoration. Leave it out and the build fails with a missing Dockerfile or wrong path.",
+  "Without <code>-d</code>, <code>docker run</code> attaches to the terminal and holds it until the process exits. Examiners often show a missing <code>-d</code> as the reason a shell appeared to hang."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define image and container in one sentence each.",
+   "marks": 2,
+   "a": "An image is a read-only bundle of files plus a starting command. A container is a running instance of an image with a thin writable layer on top."
+  },
+  {
+   "level": "remember",
+   "q": "What does <code>virsh list --all</code> display, and which service does it query?",
+   "marks": 2,
+   "a": "Every defined guest and its state (running, shut off, paused). It queries the libvirt service."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a container stop as soon as its main process exits, while a virtual machine keeps running until you shut it down?",
+   "marks": 3,
+   "a": "The container is only a process tree wrapped in namespaces and cgroups; PID 1 exiting ends the tree, so nothing remains. A virtual machine runs its own kernel, which keeps running as a guest until the guest is shut down or the hypervisor stops it."
+  },
+  {
+   "level": "apply",
+   "q": "Write the commands to build an image tagged api:v2 from the current directory, then run it detached with name api so that host port 8000 reaches port 5000 inside.",
+   "marks": 4,
+   "a": "<code>docker build -t api:v2 .</code> then <code>docker run -d -p 8000:5000 --name api api:v2</code>."
+  },
+  {
+   "level": "apply",
+   "q": "A container is run with <code>-p 9090:80</code>. Which URL on the host reaches the service, and which port is the service listening on inside the container?",
+   "marks": 3,
+   "a": "http://localhost:9090 on the host; the service listens on port 80 inside the container."
+  },
+  {
+   "level": "analyze",
+   "q": "A team wants to replace twenty virtual machines with containers, but one service is a Windows-only application. What must stay a virtual machine and why?",
+   "marks": 5,
+   "a": "The Windows service must stay a virtual machine. Containers share the host Linux kernel, so they cannot provide a Windows kernel; a virtual machine runs its own guest kernel and can be Windows. The other nineteen Linux services can move to containers, saving RAM and boot time."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, containers are rarely run by hand: an orchestrator such as Kubernetes or Docker Swarm schedules them across many hosts, and Docker Compose starts a group of containers on one host. Newer designs blur the line — Kata Containers and Firecracker microVMs run each container inside a tiny virtual machine for stronger isolation. Search for runc, containerd, OCI image spec and libvirt XML to go deeper, and try <code>docker inspect</code> on a running container to see the namespaces and cgroups it actually uses."
+}

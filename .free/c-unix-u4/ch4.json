@@ -1,0 +1,272 @@
+{
+ "lead": "A service, also called a daemon, is a program that runs in the background with no terminal attached — a web server, the SSH daemon, the print spooler. Nobody types its name at a prompt, so something must start it at boot, keep it alive and stop it in a fixed order at shutdown. On modern Linux that something is systemd, the first process (PID 1), which reads plain-text unit files. This chapter shows how to start, stop, restart, reload, enable and inspect a service with systemctl, how the older service command relates to it, and where to read a service's log.",
+ "prereq": "You need: <a href=\"#process-management-viewing-controlling-terminating-processes\">Chapter 4.1</a> for PIDs and signals (stop means SIGTERM), and <a href=\"#user-and-group-management\">Chapter 4.2</a> for sudo, because every command that changes a service needs root.",
+ "sections": [
+  {
+   "h3": "What a service is, and who starts it",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A service runs for days, so an administrator does not launch it by hand at a prompt. On older SysV systems the job belonged to a directory of shell scripts, <code>/etc/init.d/</code>. Each script answered the words start, stop, restart and status, and the <code>service</code> command was a thin wrapper: <code>sudo service nginx restart</code> ran <code>/etc/init.d/nginx restart</code>. Those scripts still exist on many machines, and <code>service</code> still works, but on a systemd machine it simply forwards the request to <code>systemctl</code>."
+    },
+    {
+     "type": "p",
+     "text": "systemd is PID 1 (see <a href=\"#process-management-viewing-controlling-terminating-processes\">Chapter 4.1</a>). It reads unit files: plain text that describes what to run and how. A background service lives in a file ending in <code>.service</code>, for example <code>nginx.service</code>. Unit files are declarative — they state the wanted result, and systemd works out the commands. Three directories hold them:"
+    },
+    {
+     "type": "table",
+     "head": [
+      "Directory",
+      "Purpose"
+     ],
+     "rows": [
+      [
+       "<code>/usr/lib/systemd/system</code>",
+       "shipped by packages; leave it alone"
+      ],
+      [
+       "<code>/etc/systemd/system</code>",
+       "local units and overrides; wins over the copy above"
+      ],
+      [
+       "<code>/run/systemd/system</code>",
+       "created at runtime, lost on reboot"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "When you name a unit you may drop the suffix: <code>systemctl start nginx</code> and <code>systemctl start nginx.service</code> are the same command."
+    }
+   ]
+  },
+  {
+   "h3": "Starting, stopping and checking with systemctl",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every verb has the shape <code>systemctl [verb] [unit]</code>. Verbs that change state need root, so they take <code>sudo</code> (see <a href=\"#user-and-group-management\">Chapter 4.2</a>)."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<code>start</code> — launch the service now. It does not come back after a reboot.",
+      "<code>stop</code> — send SIGTERM, wait, then SIGKILL if the process ignores it (see <a href=\"#process-management-viewing-controlling-terminating-processes\">Chapter 4.1</a>).",
+      "<code>restart</code> — stop then start. The process gets a new PID and open connections drop.",
+      "<code>reload</code> — ask the running process to re-read its configuration, usually with SIGHUP, without dropping connections. It works only if the unit file defines <code>ExecReload</code>. If the unit file has no <code>ExecReload</code>, systemctl reload refuses the job with an error instead of re-reading anything.",
+      "<code>status</code> — the loaded line (which unit file, enabled or disabled), the active line (<code>active (running)</code> with the main PID, or <code>inactive (dead)</code>), and the last few log lines. Exit code 0 when active, 3 when not.",
+      "<code>is-active</code> — usually prints <code>active</code>, <code>inactive</code> or <code>failed</code>, and can briefly print <code>activating</code> or <code>deactivating</code> while a job is in progress. Made for scripts.",
+      "<code>enable</code> / <code>disable</code> — add or remove a symbolic link in the <code>.wants</code> directory of the target named in the unit's <code>[Install]</code> section — for nginx that is <code>/etc/systemd/system/multi-user.target.wants/</code> — so the service is pulled in at the next boot. Neither touches the running process.",
+      "<code>is-enabled</code> — prints <code>enabled</code>, <code>disabled</code> or <code>static</code>, and can also print <code>masked</code> (unit blocked from starting at all) or <code>indirect</code>/<code>generated</code> in special cases.",
+      "<code>list-unit-files --type=service</code> and <code>list-units --state=running</code> — inventory of what is installed and what is up."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Read the two status lines separately. <code>loaded: loaded</code> means systemd found and parsed the unit file. <code>active: active (running)</code> means the process is alive right now. A unit can be loaded and inactive, or loaded and failed, and the two lines answer different questions."
+    }
+   ]
+  },
+  {
+   "h3": "Targets and the journal",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A target is a named group of units that systemd brings up together. <code>multi-user.target</code> is the normal text-mode boot: networking, logging, SSH. <code>graphical.target</code> adds the display manager and pulls in multi-user.target first. Old runlevels map roughly onto them — runlevel 3 is multi-user.target, runlevel 5 is graphical.target."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<code>systemctl get-default</code> — the target reached at boot.",
+      "<code>sudo systemctl set-default multi-user.target</code> — make the next boot text-only.",
+      "<code>systemctl list-dependencies multi-user.target</code> — everything the target pulls in."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A service's output and errors go to the journal, not to a terminal. <code>journalctl -u nginx</code> shows only nginx's entries; without <code>-u</code> you get every unit on the machine. Add <code>-n 50</code> for the last fifty lines, <code>-f</code> to follow live, <code>-b</code> for the current boot, and <code>--since \"10 min ago\"</code> for a time window."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "$ systemctl status nginx\n$ systemctl is-active nginx\n$ systemctl is-enabled nginx\n$ journalctl -u nginx -n 50 --no-pager\n$ journalctl -u nginx -f",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "Writing your own unit files and fixing the exact order in which targets start services belongs to advanced administration. The verbs above cover day-to-day work."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Admin asks systemd to start nginx; systemd reads the unit file, launches the process and reports active (running); a later stop request sends SIGTERM and reports inactive.",
+  "spec": {
+   "type": "sequence",
+   "aria": "The administrator asks systemd to start nginx; systemd reads the unit file, starts nginx and reports active, then a stop request sends SIGTERM and reports inactive.",
+   "actors": [
+    "Admin",
+    "systemd",
+    "nginx"
+   ],
+   "messages": [
+    {
+     "from": "Admin",
+     "to": "systemd",
+     "label": "systemctl start nginx",
+     "dashed": false
+    },
+    {
+     "from": "systemd",
+     "to": "systemd",
+     "label": "read nginx.service",
+     "dashed": false
+    },
+    {
+     "from": "systemd",
+     "to": "nginx",
+     "label": "start process",
+     "dashed": false
+    },
+    {
+     "from": "systemd",
+     "to": "Admin",
+     "label": "active (running)",
+     "dashed": true
+    },
+    {
+     "from": "Admin",
+     "to": "systemd",
+     "label": "systemctl stop nginx",
+     "dashed": false
+    },
+    {
+     "from": "systemd",
+     "to": "nginx",
+     "label": "SIGTERM",
+     "dashed": false
+    },
+    {
+     "from": "systemd",
+     "to": "Admin",
+     "label": "inactive",
+     "dashed": true
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "On a lab server nginx is installed but not running; <code>systemctl is-active nginx</code> prints inactive. The administrator starts nginx. Status now shows active (running) with Main PID 812, and <code>curl -I http://localhost</code> returns HTTP/1.1 200 OK. She edits /etc/nginx/nginx.conf and restarts nginx; curl again returns HTTP/1.1 200 OK but the main PID is now 947. She then stops nginx. Give the is-active output after each of the four stages, count how many readings were active and how many inactive, and state the PID reported after the first start.",
+   "steps": [
+    "Stage 1, before anything: <code>systemctl is-active nginx</code> prints inactive. Active count = 0, inactive count = 1.",
+    "Stage 2, after <code>sudo systemctl start nginx</code>: is-active prints active. Status gives Main PID 812 and curl -I answers HTTP/1.1 200 OK, so the port is served. Active count = 1, inactive count = 1.",
+    "Stage 3, after <code>sudo systemctl restart nginx</code>: is-active prints active. The main PID is 947, not 812, because restart killed the old process and started a new one. Active count = 2, inactive count = 1.",
+    "Stage 4, after <code>sudo systemctl stop nginx</code>: systemd sent SIGTERM to PID 947 and the unit is down, so is-active prints inactive. Active count = 2, inactive count = 2.",
+    "Four readings in order: inactive, active, active, inactive. Two are active, two are inactive. The PID reported after the first start is 812; after the restart it is 947."
+   ],
+   "answer": "The four is-active readings are inactive, active, active, inactive — 2 active and 2 inactive — and the main PID after the first start is 812 (947 after the restart).",
+   "check": "readings = [\"inactive\", \"active\", \"active\", \"inactive\"]\nprint(readings.count(\"active\"))\nprint(readings.count(\"inactive\"))\npid_after_start = 812\nprint(pid_after_start)",
+   "values": [
+    2,
+    2,
+    812
+   ],
+   "dry_run": {
+    "head": [
+     "Stage",
+     "Command",
+     "is-active",
+     "Main PID"
+    ],
+    "rows": [
+     [
+      "1 before",
+      "(none)",
+      "inactive",
+      "-"
+     ],
+     [
+      "2 after start",
+      "systemctl start nginx",
+      "active",
+      "812"
+     ],
+     [
+      "3 after restart",
+      "systemctl restart nginx",
+      "active",
+      "947"
+     ],
+     [
+      "4 after stop",
+      "systemctl stop nginx",
+      "inactive",
+      "-"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "<b>enable is not start.</b> enable only creates a symlink so the unit is pulled in at boot; the service stays inactive until you start it or reboot.",
+  "<b>stop is not disable.</b> stop kills the process now; the service still starts at the next boot unless you disable it.",
+  "<b>restart or reload?</b> restart drops connections and changes the PID; reload re-reads the configuration in place. If the unit has no ExecReload, systemctl reload refuses the job with an error; check status afterwards.",
+  "<b><code>loaded: loaded</code> is not running.</b> A status block can show the unit file loaded while the active line says inactive (dead). Examiners show exactly this block.",
+  "<b>Do not grep for the word \"active\".</b> <code>systemctl status</code> exits 0 only when the unit is active; in scripts use <code>is-active</code> or test that exit code."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which directory holds a unit file that an administrator writes to override the copy shipped by a package?",
+   "marks": 2,
+   "a": "<code>/etc/systemd/system</code>. It has higher priority than <code>/usr/lib/systemd/system</code>, where packages install their units."
+  },
+  {
+   "level": "remember",
+   "q": "Which command tells you whether nginx will start at the next boot?",
+   "marks": 2,
+   "a": "<code>systemctl is-enabled nginx</code>, which prints enabled, disabled or static. <code>is-active</code> answers the different question of whether it is running now."
+  },
+  {
+   "level": "understand",
+   "q": "Why does <code>sudo systemctl enable nginx</code> leave the service inactive?",
+   "marks": 3,
+   "a": "enable only creates a symbolic link in the wants directory of a target, so the boot transaction will include the unit next time. Starting the process is a separate action, done by <code>start</code> or by the next boot."
+  },
+  {
+   "level": "understand",
+   "q": "Give one situation where reload is better than restart.",
+   "marks": 3,
+   "a": "A web server carrying live traffic. reload asks the running process (usually by SIGHUP) to re-read nginx.conf, so open connections survive and the PID stays the same; restart kills the process, drops connections and gives a new PID."
+  },
+  {
+   "level": "apply",
+   "q": "nginx is running and enabled. Stop it now, keep it from starting at the next boot, and confirm both states.",
+   "marks": 4,
+   "a": "<code>sudo systemctl stop nginx</code>, then <code>sudo systemctl disable nginx</code>. Confirm with <code>systemctl is-active nginx</code> (prints inactive) and <code>systemctl is-enabled nginx</code> (prints disabled)."
+  },
+  {
+   "level": "apply",
+   "q": "Write one command that shows only nginx's journal entries from the current boot, last 30 lines, without a pager.",
+   "marks": 4,
+   "a": "<code>journalctl -u nginx -b -n 30 --no-pager</code>. The -u flag restricts output to the unit, -b to this boot, -n 30 sets the line count and --no-pager prints straight to the screen."
+  },
+  {
+   "level": "analyze",
+   "q": "status shows active (running) with PID 812, but <code>curl -I http://localhost</code> cannot connect. Name two things to check and the command for each.",
+   "marks": 6,
+   "a": "First, whether the process is actually listening on port 80 and on which address: <code>sudo ss -ltnp | grep :80</code>. Second, whether a firewall drops the traffic: <code>sudo iptables -L</code> or <code>sudo firewall-cmd --list-all</code>. Read <code>journalctl -u nginx</code> as well. The unit can be active while the server listens on a different port or address than the one you tested (for example Listen 8080 in nginx.conf), or while a firewall drops the packet. A bind failure would make the unit failed, not active."
+  },
+  {
+   "level": "analyze",
+   "q": "A server must boot to a text console, not a graphical login, and still run nginx. Which target do you need and which commands do you use?",
+   "marks": 5,
+   "a": "multi-user.target. Check the current default with <code>systemctl get-default</code>, change it with <code>sudo systemctl set-default multi-user.target</code>, and make sure nginx is enabled so it sits in multi-user.target.wants and is pulled in at boot."
+  }
+ ],
+ "beyond": "Not for the exam. systemd has grown far past service control: <code>.timer</code> units replace cron for scheduled jobs, <code>.socket</code> units start a service only when a connection arrives, and cgroup settings inside a unit file cap memory and CPU for the whole service. Container images usually run a single process, so a container often skips systemd and the orchestrator does the restarting (see <a href=\"#virtualization-with-docker-and-kvm\">Chapter 4.6</a>). On a real server, read <code>man systemd.unit</code> and <code>man systemd.service</code>. Search for \"systemd unit file\", \"systemd socket activation\" and \"systemd timers\" when you meet one."
+}

@@ -1,0 +1,212 @@
+{
+ "lead": "Python and Ruby scripts automate administration by running ordinary Linux commands from code. The script builds a command, starts it, reads the exit code and output, then logs the result. A scheduler such as cron or a systemd timer starts the script at a fixed time. This is used for nightly backups, log cleanup, disk reports and remote checks over SSH. The shell runs one command; the Python script makes decisions around many commands.",
+ "prereq": "You need shell scripting and pipes from Unit 3, <a href=\"#process-management-viewing-controlling-terminating-processes\">Chapter 4.1</a> on processes, and <a href=\"#basic-linux-networking-administration\">Chapter 4.5</a> on SSH.",
+ "sections": [
+  {
+   "h3": "Calling a command from Python",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>subprocess.run</code> is the standard way for Python to start a Linux command. You give it a list. The first item is the program; the rest are arguments. The operating system runs the program directly, without a shell. The returned object has <code>returncode</code>, <code>stdout</code> and <code>stderr</code>. A return code of 0 means success. Any other value means failure. Set <code>capture_output=True</code> and <code>text=True</code> to collect output as strings. Test <code>returncode</code> yourself, or pass <code>check=True</code> and catch <code>subprocess.CalledProcessError</code>. Use <code>sys.exit(1)</code> to make the script fail, so cron or systemd sees the failure. Never join untrusted input into one shell string. A list keeps spaces and semicolons as data."
+    },
+    {
+     "type": "p",
+     "text": "Ruby has <code>system('tar', ...)</code>, which returns true or false, and <code>Open3.capture3</code>, which returns stdout, stderr and status. <code>FileUtils</code> copies and removes files. Only a few universities teach Ruby; Python is enough for exams. Some syllabi call this orchestration scripting."
+    }
+   ]
+  },
+  {
+   "h3": "Paths, logging and arguments",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Use <code>pathlib.Path</code> for paths: <code>Path('/backup') / f'www-{date}.tar.gz'</code>. <code>os.environ</code> reads variables. <code>shutil.copy2</code> copies a file with metadata; <code>shutil.rmtree</code> removes a directory tree. <code>argparse</code> gives options such as <code>--source</code>, <code>--dest</code> and <code>--days</code>, with defaults and a usage message. <code>logging</code> writes timestamped lines to a file. One line per run is enough: time, action, exit code. Logging inside the script is better than relying only on shell redirection, because the script knows which step failed. Return codes should be small: 0 success, 1 runtime failure, 2 bad arguments. Absolute paths protect against cron starting in the wrong directory. If a command must be shown in a log, use <code>shlex.join(args)</code> to quote it safely."
+    }
+   ]
+  },
+  {
+   "h3": "Scheduling with cron or systemd",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "cron reads a crontab file. Five time fields come before the command: minute, hour, day of month, month, weekday. <code>0 2 * * *</code> means 02:00 every day. cron gives the job a minimal environment and a home directory as working directory. Use absolute paths for the interpreter, the script and every command. A safe job line is <code>0 2 * * * /usr/bin/python3 /usr/local/bin/backup.py</code>. Add <code>>> /var/log/backup.log 2>&1</code> only when the script itself does not log. systemd timers are an alternative: a <code>.timer</code> unit starts a <code>.service</code> unit, and journald collects output. Use a lock so two runs do not overlap: <code>flock -n /run/backup.lock /usr/bin/python3 /usr/local/bin/backup.py</code>. For remote checks, <code>subprocess.run(['ssh', 'host', 'df', '-h'], ...)</code> runs a command over SSH; Paramiko is a Python library for the same job when you need more control. Keep SSH keys restricted and never put passwords in the script."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "cron starts the Python script at 02:00; the script runs a local or SSH command and writes the result to the log.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Cron-driven automation",
+   "nodes": [
+    {
+     "id": "cron",
+     "label": "cron",
+     "note": "02:00 daily",
+     "style": "muted"
+    },
+    {
+     "id": "py",
+     "label": "Python script",
+     "style": "accent"
+    },
+    {
+     "id": "cmd",
+     "label": "local or SSH",
+     "note": "run command",
+     "style": "normal"
+    },
+    {
+     "id": "log",
+     "label": "log file",
+     "note": "result and errors",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cron",
+     "to": "py",
+     "label": "starts",
+     "style": "solid"
+    },
+    {
+     "from": "py",
+     "to": "cmd",
+     "label": "calls",
+     "style": "solid"
+    },
+    {
+     "from": "py",
+     "to": "log",
+     "label": "writes",
+     "style": "dashed"
+    }
+   ],
+   "aria": "cron starts a Python script at 02:00; the script runs a local or SSH command and writes the result to a log file."
+  }
+ },
+ "examples": [
+  {
+   "question": "Write a Python script for a nightly backup. It runs at 02:00, copies /var/www (about 120 MB) to /backup/www-YYYYmmdd.tar.gz, deletes /backup/www-*.tar.gz older than 7 days, writes one line to /var/log/backup.log, and exits with code 1 if tar fails. Show the crontab line, the subprocess.run call, and the runnable demo output for BACKUP_DATE=20261106.",
+   "steps": [
+    "Set the date string. In production use <code>datetime.date.today().strftime('%Y%m%d')</code>; for a fixed run use <code>BACKUP_DATE=20261106</code>.",
+    "Compute the archive path: <code>/backup/www-20261106.tar.gz</code>. The source size is 120 MB = 120 × 1024 × 1024 = 125,829,120 bytes.",
+    "Run tar with a list argument: <code>subprocess.run(['/bin/tar', '-czf', archive, '-C', '/var/www', '.'], capture_output=True, text=True)</code>. The call does not raise by default; test <code>p.returncode</code>.",
+    "If <code>p.returncode != 0</code>, log the error line and call <code>sys.exit(1)</code>. If it is 0, log one success line.",
+    "For cleanup, loop over <code>Path('/backup').glob('www-*.tar.gz')</code>. Delete a file when <code>now - p.stat().st_mtime > 7 * 86400</code> seconds.",
+    "Install the job with <code>0 2 * * * /usr/bin/python3 /usr/local/bin/backup.py</code>. Use absolute paths because cron has a minimal PATH.",
+    "The runnable demo below uses a temporary source directory, sets the new archive time to 2026-11-06 02:00, creates one archive dated 8 days earlier, and deletes only the old one."
+   ],
+   "answer": "At 02:00 cron runs the script; tar creates /backup/www-YYYYmmdd.tar.gz from 120 MB (125,829,120 bytes) of /var/www, archives older than 7 days are deleted, one log line is written, and a tar failure exits with code 1.",
+   "check": "import math\nmb = 120\nbytes_ = mb * 1024 * 1024\ndays = 7\nhour = 2\nrc = 1\nprint(mb)\nprint(bytes_)\nprint(days)\nprint(hour)\nprint(rc)",
+   "values": [
+    120,
+    125829120,
+    7,
+    2,
+    1
+   ],
+   "code": {
+    "lang": "python",
+    "code": "import datetime\nimport os\nimport pathlib\nimport subprocess\nimport sys\nimport tempfile\n\nDATE = os.environ.get('BACKUP_DATE', '20261106')\nroot = pathlib.Path(tempfile.mkdtemp(prefix='backup-demo-'))\nsrc = root / 'var' / 'www'\ndst = root / 'backup'\nsrc.mkdir(parents=True)\n(src / 'index.html').write_text('hello\\n', encoding='utf-8')\ndst.mkdir()\narchive = dst / f'www-{DATE}.tar.gz'\nnow = datetime.datetime(2026, 11, 6, 2, 0, 0).timestamp()\n\ndef run_tar(source: pathlib.Path, target: pathlib.Path) -> int:\n    cmd = ['tar', '-czf', str(target), '-C', str(source.parent), source.name]\n    p = subprocess.run(cmd, capture_output=True, text=True)\n    if p.returncode != 0:\n        print(f'tar failed rc={p.returncode}: {p.stderr.strip()}')\n        return p.returncode\n    return 0\n\nrc = run_tar(src, archive)\nif rc != 0:\n    sys.exit(1)\n\nos.utime(archive, (now, now))\nprint(f'created {archive.name}')\nprint(f'size>0 {archive.stat().st_size > 0}')\n\nold = dst / 'www-20261030.tar.gz'\nold.write_text('old', encoding='utf-8')\nos.utime(old, (now - 8 * 86400, now - 8 * 86400))\n\nfor p in sorted(dst.glob('www-*.tar.gz')):\n    age_days = (now - p.stat().st_mtime) / 86400\n    if age_days > 7:\n        p.unlink()\n        print(f'deleted {p.name}')\n\nprint('done')\n",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "Action",
+     "Result"
+    ],
+    "rows": [
+     [
+      "1",
+      "DATE=20261106",
+      "archive=www-20261106.tar.gz"
+     ],
+     [
+      "2",
+      "tar -czf archive -C src.parent src.name",
+      "returncode=0"
+     ],
+     [
+      "3",
+      "stat archive",
+      "size>0 True"
+     ],
+     [
+      "4",
+      "www-20261030.tar.gz age",
+      "8 days"
+     ],
+     [
+      "5",
+      "age > 7",
+      "delete old archive"
+     ],
+     [
+      "6",
+      "script exit",
+      "0"
+     ]
+    ]
+   },
+   "output": "created www-20261106.tar.gz\nsize>0 True\ndeleted www-20261030.tar.gz\ndone"
+  }
+ ],
+ "traps": [
+  "cron has a minimal PATH and starts in the home directory; <code>python3</code> or <code>tar</code> may not be found. Use absolute paths.",
+  "<code>subprocess.run</code> does not raise on a non-zero exit code by default. Test <code>returncode</code>, or use <code>check=True</code> with a try block.",
+  "Building a shell string with user input and <code>shell=True</code> allows command injection. Pass a list of arguments instead.",
+  "In tar, <code>-C</code> changes directory before reading the named path. Wrong order or a relative path gives return code 2 and no archive.",
+  "A script that logs only to stdout loses messages when cron mail is disabled. Write a log file and use absolute log paths."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does return code 0 mean for <code>subprocess.run</code>?",
+   "marks": 2,
+   "a": "It means the command succeeded. A non-zero return code means failure."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a cron job need the absolute path to the Python interpreter?",
+   "marks": 3,
+   "a": "cron uses a minimal environment and a different PATH. A bare <code>python3</code> may not resolve. An absolute path such as <code>/usr/bin/python3</code> removes that dependency."
+  },
+  {
+   "level": "apply",
+   "q": "Write the <code>subprocess.run</code> call that runs <code>/bin/df -h</code>, captures text output, and does not raise automatically.",
+   "marks": 4,
+   "a": "<code>p = subprocess.run(['/bin/df', '-h'], capture_output=True, text=True)</code>. Then test <code>p.returncode</code> and read <code>p.stdout</code>."
+  },
+  {
+   "level": "analyze",
+   "q": "A script uses <code>subprocess.run('tar -czf ' + archive + ' ' + src, shell=True)</code>. State two risks.",
+   "marks": 5,
+   "a": "If <code>src</code> or <code>archive</code> comes from input, shell metacharacters allow command injection. Spaces or glob characters in a path are split or expanded by the shell. Use a list and <code>shell=False</code>."
+  },
+  {
+   "level": "apply",
+   "q": "Write the crontab line that runs <code>/usr/local/bin/b.py</code> with <code>/usr/bin/python3</code> at 02:00 every day and appends output to <code>/var/log/b.log</code>.",
+   "marks": 4,
+   "a": "<code>0 2 * * * /usr/bin/python3 /usr/local/bin/b.py >> /var/log/b.log 2>&1</code>."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between <code>sys.exit(1)</code> and <code>return 1</code> inside a Python function?",
+   "marks": 3,
+   "a": "<code>sys.exit(1)</code> raises <code>SystemExit</code> and ends the process with exit status 1. <code>return 1</code> only returns the value 1 to the caller; the process may still exit with 0."
+  },
+  {
+   "level": "analyze",
+   "q": "A nightly backup can run longer than 24 hours. How do you stop two runs from overlapping?",
+   "marks": 6,
+   "a": "Use a lock. In cron, prefix the command with <code>flock -n /run/backup.lock</code>. If the lock is held, the second run exits without starting. Inside Python, an exclusive lock file gives the same protection."
+  }
+ ],
+ "beyond": "Not for the exam. Production automation adds idempotency, secrets management and CI/CD pipelines. Configuration tools such as Ansible and orchestration platforms take over when many hosts must stay in a known state. Python libraries such as Paramiko and Fabric handle SSH at scale. Search next for <code>systemd timer</code>, <code>subprocess.run</code>, <code>pathlib</code>, <code>Paramiko</code> and idempotent scripts."
+}

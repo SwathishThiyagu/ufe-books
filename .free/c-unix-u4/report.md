@@ -1,0 +1,55 @@
+# c-unix-u4: free-model run
+
+- Book: `books/cse/c-unix/c-unix-u4.html`
+- Status: ok
+- Model calls so far: 24 (87,973 tokens in, 188,937 out), 5.2 minutes
+
+## Checker
+
+```
+c-unix-u4.html: 7 chapters, 14033 words, 8 figures, 154 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 1, 'Process, PID and state': The sentence 'The first user process is started by PID 1, which is init or systemd on modern systems' contradicts itself. PID 1 is itself the first user-space process; the kernel starts it, not another process. A student will read this as 'something with PID 1 starts init', which is wrong.
+- ch 1 [low] Worked example 1, steps 4-6, and quiz Q3: The answer says the process disappears with no STAT at all. In Linux the entry stays visible as STAT Z (zombie) from the moment it dies until its parent collects the exit status. An interactive shell usually reaps in microseconds, but on a busy or non-interactive parent a student who re-runs ps will see Z and think the book is wrong.
+- ch 1 [low] Worked example 1, question line: 'then stop the process with SIGTERM' uses 'stop' for 'terminate'. The chapter has already defined stopped as STAT T (Ctrl-Z, SIGTSTP), so this wording clashes with its own definition.
+- ch 1 [low] Section 3, nice and renice: 'only root can set a negative value' is incomplete. A normal user can only raise the nice value (lower the priority); lowering it at all, even from 10 to 5, also needs root or the CAP_SYS_NICE capability. As written, a student would expect renice -n 5 on their own process at nice 10 to succeed.
+- ch 1 [low] Section 1, foreground and background jobs paragraph: 'A background job runs without the terminal prompt' is unclear. The prompt does come back; what the job lacks is the terminal's foreground process group.
+- ch 1 [low] Quiz Q5: The question asks to 'list job 2' but the answer gives plain jobs, which lists all jobs, not job 2.
+- ch 1 [low] Worked example 1, step 4: 'A check with ps -p 4242 shows no row' is slightly off: ps still prints the header line (PID TTY TIME CMD) and only the data row is missing, which confuses students looking at the screen.
+- ch 2 [high] figure (Account files written by useradd): shadow node note and aria text: The figure says useradd writes a 'password hash, lock flag' to /etc/shadow. useradd never writes a real hash; it writes a locked placeholder such as ! or * until passwd is run. This contradicts the chapter's own sentence in Section 2: 'useradd does not set a password. The new account stays locked until passwd puts a hash in shadow.'
+- ch 2 [high] figure (Account files written by useradd): group node note and edge from useradd: The figure shows useradd writing ravi's membership with GID 2000 into /etc/group. With useradd -g students, the primary GID is stored only in field 4 of /etc/passwd; useradd does not add ravi to the member list of an existing group. Section 1 of the chapter states this correctly, so the figure contradicts the text.
+- ch 2 [low] Section 2, groupdel sentence: Saying 'groupdel project deletes an empty group' suggests groupdel refuses groups that have members. In fact groupdel deletes a group even when users list it as a supplementary group; it refuses only when the group is some user's primary group.
+- ch 2 [low] Section 2, userdel sentence: 'userdel ravi removes the passwd, shadow and group entries' can be read as deleting the students/project groups, which userdel never does.
+- ch 3 [low] Section 2, dpkg -l bullet (and Quiz Q3 answer, Beyond not affected): dpkg -l is described as listing 'installed packages'. It actually lists every package recorded in the dpkg database, including packages that were removed but still have configuration files left (state rc) and other non-installed states. A student who runs dpkg -l after apt remove nginx will see nginx listed with state rc and may think the remove failed.
+- ch 3 [low] Section 3, dnf update bullet: 'It refreshes metadata as part of the run, so a separate refresh step is often unnecessary' is too absolute. dnf reuses cached metadata until it expires (the metadata expiry timer), so a run soon after a previous one may use cached data and still show old versions.
+- ch 3 [low] Worked example 1, step 3: The example counts the kernel upgrade as exactly one new package. On real systems a kernel upgrade installs several packages (image, modules, headers) and keeps the old kernel installed, so 13 could be an undercount. The arithmetic is right for the stated data, but students may generalise wrongly.
+- ch 4 [high] Quiz Q7, answer: The last sentence says 'a bind error explains this exact picture, because the unit can be active while the server never opened the port.' This is wrong. If nginx cannot bind its port it exits, and systemd marks the unit failed, not active (running). The active-but-unreachable picture has other causes: the server listens on a different port or address, or a firewall drops the packets.
+- ch 4 [low] Section 2, is-enabled bullet: The list 'enabled, disabled or static' is incomplete. is-enabled can also print masked, masked-runtime, indirect, generated, transient and alias. A student who sees 'masked' in the lab will think the command is broken.
+- ch 4 [low] Section 2, reload bullet: 'If the unit has no ExecReload, reload does nothing useful' is not accurate. systemctl reload fails outright with 'Job type reload is not applicable for unit nginx.service' and returns a non-zero exit code, so the command visibly refuses rather than silently doing nothing.
+- ch 4 [low] Section 2, is-active bullet: is-active can also print activating, deactivating and reloading, not only active, inactive or failed. A slow-starting service shows activating and a script that tests only for 'failed' would misread it.
+- ch 4 [low] Quiz Q7, answer: ss -ltnp shows the process name and PID in the -p column only for processes owned by the user running it. Run without sudo, the nginx line shows no process, which confuses students checking their own answer.
+- ch 4 [low] Section 2, enable/disable bullet: The link is not always created under multi-user.target.wants. The directory comes from the WantedBy= line in the unit's [Install] section, so a unit with WantedBy=graphical.target or WantedBy=timers.target lands elsewhere.
+- ch 5 [high] Worked example 1, steps 5, 7 and 8 (and the figure): The setup says ping 10.0.0.5 prints Destination Host Unreachable, and step 5 explains this as the gateway having no route to 10.0.0.0/24 or ARP failing on the server's link. Either cause blocks TCP as well, so the NFS mount in step 7 and the scp in step 8 could not succeed as the example stands. The figure also shows the gateway reaching 10.0.0.5, which contradicts the failed ping. A student reads this as 'mount works even when the host is unreachable'.
+- ch 5 [low] Section 2, ss/netstat bullet; Quiz Q4: The text says netstat -tulnp does the same as ss -tlnp, but -u adds UDP sockets, so it is not a TCP-only listening list. Quiz Q4 repeats this as an equal alternative for 'listening TCP ports'.
+- ch 5 [low] Quiz Q3 (question and answer): The question says the host 'gets Destination Host Unreachable from 10.0.0.5', but that ICMP error comes from a router or the local host, not from 10.0.0.5. The answer then says 'ICMP filtering can also cause the error', while Section 2 teaches that a firewall dropping ICMP produces 'Request timed out', not host unreachable.
+- ch 5 [low] Section 3, first paragraph: 'telnet and rlogin are no longer used' is too absolute; telnet clients are still used in labs and for testing whether a TCP port is open, even though nobody should log in with them.
+- ch 5 [low] Section 4, Samba paragraph: smbpasswd -a priya fails unless priya already exists as a local Linux user; the text does not say this, so a student who runs the command on a fresh server gets an error and cannot see why.
+- ch 6 [low] Section 1, hypervisor types: The definition says type 1 runs 'with nothing between guest instructions and the CPU'. KVM is a kernel module inside a host Linux kernel, so there is a host operating system underneath it. A student reading the definition first and the KVM paragraph second sees a contradiction.
+- ch 6 [low] Section 3, first paragraph: 'started with three restrictions' is followed by two mechanisms (namespaces and cgroups), and the namespace sentence itself lists three things. The count does not match what is listed.
+- ch 6 [low] Worked example 1, step 3: The line printed by docker ps is said to show command "nginx -g 'daemon off;'". The Dockerfile starts FROM nginx:alpine, which sets ENTRYPOINT /docker-entrypoint.sh, so the COMMAND column really shows the entrypoint script followed by the CMD arguments, truncated by docker ps.
+- ch 6 [low] Exam traps, fourth trap: 'Leave it out and the build fails with a missing Dockerfile or wrong path' describes the wrong error. Running docker build -t web:v1 with no context fails because the command needs exactly one context argument, not because a Dockerfile is missing.
+- ch 6 [low] Worked example 1, dry run output: The RAM rows give 2048 MB and 2 GB, but the printed output line is 2.0. The shown output does not match the value in the table.
+- ch 6 [low] Section 4, comparison table, Guest OS row: 'Linux-like only' is loose. A container can hold any userspace that speaks the host kernel's system calls; it is the kernel that must match, and Windows containers need a Windows host, not a different guest kernel.
+- ch 7 [low] Section 2 (logging): The text says logging writes timestamped lines to a file, but Python's default logging format is only level:name:message. A student who calls logging.basicConfig(filename='/var/log/backup.log', level=logging.INFO) gets lines with no time in them.
+- ch 7 [low] Section 1 (Ruby): Kernel#system returns true on success and false on failure, but it returns nil when the command cannot be started at all. 'Returns true or false' hides that third case, and an if system(...) test treats nil as false without saying why.
+- ch 7 [low] Exam traps, tar -C point: 'Wrong order or a relative path gives return code 2 and no archive' is not correct as written. tar accepts relative paths without complaint (the working step 3 itself passes '.'). tar exits with 2 only when it cannot find or read the named file, which is what happens under cron when a relative path resolves against the home directory.
+- ch 7 [low] Worked example 1 (demo): The task says the script writes one line to /var/log/backup.log and the answer repeats that a log line is written, but the demo never imports logging, prints to stdout instead, and the shown output has no log line. A student cannot see how the required log line is produced.
+- ch 7 [low] Worked example 1, step 7 and dry run row 4: The old archive is named www-20261030.tar.gz, which is 7 days before 20261106, but step 7 and the dry run call it 8 days old (its mtime is set to now - 8*86400). The name and the age disagree, so a student checking the arithmetic sees a contradiction.

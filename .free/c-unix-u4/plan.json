@@ -1,0 +1,542 @@
+{
+ "lead": "This unit is the administrator's half of Linux: watch and control processes, manage users and groups, install software, run services, check a network, use Docker and KVM, and automate repeated work with Python or Ruby. After it you can read <code>ps</code> and <code>top</code>, use <code>systemctl</code>, mount an NFS share, and write a cron-driven script that checks its own errors.",
+ "about": "Unit 4 covers the daily work of a Linux administrator. Chapter 4.1 shows how processes are viewed and terminated, so later commands that start daemons make sense. Chapter 4.2 creates users and groups and explains authentication and access control. Chapter 4.3 installs, updates and removes packages that provide commands and service units. Chapter 4.4 starts and stops those services with systemd. Chapter 4.5 connects machines with IP addresses, routes, ping, SSH, NFS and Samba. Chapter 4.6 adds virtualization with Docker and KVM, and Chapter 4.7 automates the whole set with Python or Ruby scripts run from cron.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A process is a running program with a PID, a parent and a state, and an administrator controls it with signals.",
+   "depth": "Cover process, PID, PPID, parent and child, foreground and background jobs, <code>ps</code>, <code>ps aux</code>, <code>ps -ef</code>, <code>top</code>/<code>htop</code>, <code>jobs</code>, <code>bg</code>, <code>fg</code>, Ctrl-Z, Ctrl-C, <code>nice</code>/<code>renice</code>, and signals: SIGTERM (15), SIGKILL (9), SIGINT (2), SIGHUP (1). Show <code>kill</code>, <code>killall</code>, <code>pkill</code>, <code>pgrep</code>, <code>nohup</code>. Mention zombie and orphan processes as terms, but keep kernel detail out. Some syllabi call this process control or job control.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Process states and signals",
+    "nodes": [
+     {
+      "id": "new",
+      "label": "New",
+      "style": "muted"
+     },
+     {
+      "id": "ready",
+      "label": "Ready",
+      "style": "normal"
+     },
+     {
+      "id": "run",
+      "label": "Running",
+      "note": "on CPU",
+      "style": "accent"
+     },
+     {
+      "id": "wait",
+      "label": "Waiting",
+      "note": "I/O wait",
+      "style": "normal"
+     },
+     {
+      "id": "term",
+      "label": "Terminated",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "new",
+      "to": "ready",
+      "style": "solid"
+     },
+     {
+      "from": "ready",
+      "to": "run",
+      "label": "scheduled",
+      "style": "solid"
+     },
+     {
+      "from": "run",
+      "to": "ready",
+      "label": "preempt",
+      "style": "dashed"
+     },
+     {
+      "from": "run",
+      "to": "wait",
+      "label": "I/O wait",
+      "style": "solid"
+     },
+     {
+      "from": "wait",
+      "to": "ready",
+      "label": "I/O done",
+      "style": "solid"
+     },
+     {
+      "from": "run",
+      "to": "term",
+      "label": "exit or kill",
+      "style": "solid"
+     }
+    ],
+    "aria": "A five-state process diagram: new to ready, ready to running and back, running to waiting and back, and running to terminated.",
+    "caption": "The running process moves to waiting on I/O and back to ready; SIGKILL sends it straight to terminated."
+   },
+   "example": "A student runs <code>sleep 300 &</code>; the shell prints <code>[1] 4242</code> and the parent shell has PID 4100. Show the output of <code>ps -o pid,ppid,stat,cmd -p 4242</code>, then stop the process with SIGTERM and, if it is still alive after 5 s, with SIGKILL. What are PID, PPID and STAT before and after?",
+   "trap": "Sending SIGKILL first can leave locks or temporary files; the normal first signal is SIGTERM (15), and PID 1 must never be killed.",
+   "prereq": "Unit 1 (kernel, shell, basic commands); Unit 2 (file permissions).",
+   "leave": "task_struct, scheduler internals and signal delivery to Unit 5."
+  },
+  {
+   "k": 2,
+   "idea": "Linux users and groups give every process an identity and every file an owner, so access control starts with account management.",
+   "depth": "Cover <code>useradd</code>/<code>adduser</code>, <code>usermod</code>, <code>userdel</code>, <code>groupadd</code>, <code>groupmod</code>, <code>groupdel</code>, <code>passwd</code>, <code>chage</code>, <code>id</code>, <code>groups</code>. Explain /etc/passwd fields, /etc/shadow password hashes and ageing, /etc/group membership, UID ranges, primary and supplementary groups. Add security basics: authentication, access control, least privilege, <code>su</code> versus <code>sudo</code>, <code>visudo</code>, and locking an account. Some syllabi call this account management or user administration.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Account files written by useradd",
+    "nodes": [
+     {
+      "id": "root",
+      "label": "root admin",
+      "style": "muted"
+     },
+     {
+      "id": "add",
+      "label": "useradd",
+      "style": "accent"
+     },
+     {
+      "id": "passwd",
+      "label": "/etc/passwd",
+      "note": "user record",
+      "style": "normal"
+     },
+     {
+      "id": "shadow",
+      "label": "/etc/shadow",
+      "note": "password hash",
+      "style": "normal"
+     },
+     {
+      "id": "group",
+      "label": "/etc/group",
+      "note": "group members",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "root",
+      "to": "add",
+      "label": "runs",
+      "style": "solid"
+     },
+     {
+      "from": "add",
+      "to": "passwd",
+      "label": "writes",
+      "style": "solid"
+     },
+     {
+      "from": "add",
+      "to": "shadow",
+      "label": "writes",
+      "style": "solid"
+     },
+     {
+      "from": "add",
+      "to": "group",
+      "label": "writes",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A root administrator runs useradd, which writes a user record to /etc/passwd, a password hash to /etc/shadow and group membership to /etc/group.",
+    "caption": "useradd writes one record to passwd, shadow and group; group membership lives in /etc/group."
+   },
+   "example": "Create group <code>students</code> with GID 2000. Create user <code>ravi</code> with UID 1500, primary group <code>students</code>, home <code>/home/ravi</code>, shell <code>/bin/bash</code>. Add ravi to supplementary group <code>project</code>. Set a password and lock the account. Show the /etc/passwd line and the two <code>id ravi</code> outputs before and after locking.",
+   "trap": "<code>usermod -G</code> replaces the supplementary group list; <code>-aG</code> appends. <code>userdel</code> without <code>-r</code> leaves the home directory behind.",
+   "prereq": "Unit 2 (file ownership, users and groups, chmod).",
+   "leave": "PAM module details and LDAP or Active Directory integration to a security course."
+  },
+  {
+   "k": 3,
+   "idea": "A package manager keeps software, dependencies and updates consistent from a repository.",
+   "depth": "Cover package format versus package manager. Debian family: <code>apt update</code>, <code>apt upgrade</code>, <code>apt install</code>, <code>apt remove</code>, <code>apt purge</code>, <code>dpkg -l</code>, <code>dpkg -i</code>. Red Hat family: <code>dnf install</code>, <code>dnf update</code>, <code>dnf remove</code>, <code>rpm -qa</code>. Explain repositories, dependency resolution, package lists, cache clean, and why remove and purge differ. Some syllabi call this software management.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Debian package flow",
+    "nodes": [
+     {
+      "id": "repo",
+      "label": "Repository",
+      "style": "muted"
+     },
+     {
+      "id": "upd",
+      "label": "apt update",
+      "note": "refresh lists",
+      "style": "accent"
+     },
+     {
+      "id": "inst",
+      "label": "apt install",
+      "note": "fetch and unpack",
+      "style": "normal"
+     },
+     {
+      "id": "db",
+      "label": "dpkg database",
+      "note": "installed state",
+      "style": "normal"
+     },
+     {
+      "id": "rem",
+      "label": "apt remove",
+      "note": "keep config",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "repo",
+      "to": "upd",
+      "label": "metadata",
+      "style": "solid"
+     },
+     {
+      "from": "upd",
+      "to": "inst",
+      "label": "new list",
+      "style": "solid"
+     },
+     {
+      "from": "inst",
+      "to": "db",
+      "label": "record",
+      "style": "solid"
+     },
+     {
+      "from": "db",
+      "to": "rem",
+      "label": "lookup",
+      "style": "solid"
+     }
+    ],
+    "aria": "A package flows from a repository through apt update and apt install into the dpkg database, and apt remove later reads that database.",
+    "caption": "apt update refreshes metadata; apt install records files in the dpkg database; apt remove keeps configuration files."
+   },
+   "example": "A lab machine has 45 packages awaiting upgrade. Run <code>sudo apt update</code>, then <code>sudo apt upgrade -y</code>; 12 packages are upgraded and 1 new kernel package is installed. Next install <code>nginx</code>, check it with <code>nginx -v</code>, remove it with <code>apt remove nginx</code>, then purge it with <code>apt purge nginx</code>. State which command deletes /etc/nginx.",
+   "trap": "<code>apt update</code> only refreshes the package list; <code>apt upgrade</code> installs newer versions. <code>remove</code> keeps configuration files, while <code>purge</code> deletes them.",
+   "prereq": "Unit 2 (permissions); Chapter 4.2 (root and sudo).",
+   "leave": "Building packages from source and repository signing details to advanced administration."
+  },
+  {
+   "k": 4,
+   "idea": "systemd starts, stops and enables services by reading unit files.",
+   "depth": "Cover systemd units, <code>systemctl start</code>, <code>stop</code>, <code>restart</code>, <code>reload</code>, <code>status</code>, <code>enable</code>, <code>disable</code>, <code>is-active</code>, <code>is-enabled</code>; the older <code>service</code> command and /etc/init.d scripts; targets; <code>journalctl -u</code>; unit file locations. Some syllabi call this daemon control or service administration.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Admin",
+     "systemd",
+     "nginx"
+    ],
+    "messages": [
+     {
+      "from": "Admin",
+      "to": "systemd",
+      "label": "systemctl start nginx",
+      "dashed": false
+     },
+     {
+      "from": "systemd",
+      "to": "systemd",
+      "label": "read nginx.service",
+      "dashed": false
+     },
+     {
+      "from": "systemd",
+      "to": "nginx",
+      "label": "start process",
+      "dashed": false
+     },
+     {
+      "from": "systemd",
+      "to": "Admin",
+      "label": "active (running)",
+      "dashed": true
+     },
+     {
+      "from": "Admin",
+      "to": "systemd",
+      "label": "systemctl stop nginx",
+      "dashed": false
+     },
+     {
+      "from": "systemd",
+      "to": "nginx",
+      "label": "SIGTERM",
+      "dashed": false
+     },
+     {
+      "from": "systemd",
+      "to": "Admin",
+      "label": "inactive",
+      "dashed": true
+     }
+    ],
+    "aria": "The administrator asks systemd to start nginx; systemd reads the unit file, starts nginx and reports active, then a stop request sends SIGTERM and reports inactive.",
+    "caption": "systemd reads the unit file and starts nginx; stop sends SIGTERM and reports inactive."
+   },
+   "example": "nginx is inactive on a lab server. Run <code>systemctl status nginx</code>, start it, check with <code>curl -I http://localhost</code> (HTTP/1.1 200 OK), restart it after changing a configuration file, then stop it. Show <code>systemctl is-active nginx</code> after each of the four stages and note the nginx PID 812.",
+   "trap": "<code>enable</code> makes a service start at boot; it does not start the service now. Use <code>start</code> for now and <code>enable</code> for boot.",
+   "prereq": "Chapter 4.1 (processes and signals); Chapter 4.2 (sudo).",
+   "leave": "Writing custom unit files and boot target ordering to advanced administration."
+  },
+  {
+   "k": 5,
+   "idea": "Linux networking administration checks addresses, routes and remote access with ping, SSH, NFS and Samba.",
+   "depth": "Cover IPv4 address, subnet mask, CIDR, private ranges, default gateway, routing table; <code>ip addr</code>, <code>ip route</code>, <code>ping</code>, <code>traceroute</code>, <code>ss</code>/<code>netstat</code>. Remote access with <code>ssh</code>, <code>ssh-keygen</code>, <code>scp</code>. File sharing with NFS (<code>/etc/exports</code>, <code>exportfs</code>, <code>mount -t nfs</code>) and Samba (<code>/etc/samba/smb.conf</code>, <code>smbclient</code>, <code>mount -t cifs</code>). Some syllabi call this network administration.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "L",
+      "label": "192.168.1.10",
+      "x": 0,
+      "y": 1,
+      "note": "laptop",
+      "style": "accent"
+     },
+     {
+      "id": "R",
+      "label": "192.168.1.1",
+      "x": 1,
+      "y": 1,
+      "note": "default gateway",
+      "style": "normal"
+     },
+     {
+      "id": "D",
+      "label": "8.8.8.8",
+      "x": 2,
+      "y": 0,
+      "note": "DNS",
+      "style": "muted"
+     },
+     {
+      "id": "F",
+      "label": "10.0.0.5",
+      "x": 2,
+      "y": 2,
+      "note": "NFS and Samba",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "L",
+      "to": "R",
+      "label": "LAN",
+      "style": "solid"
+     },
+     {
+      "from": "R",
+      "to": "D",
+      "label": "route",
+      "style": "dashed"
+     },
+     {
+      "from": "R",
+      "to": "F",
+      "label": "10.0.0.0/24",
+      "style": "solid"
+     }
+    ],
+    "aria": "A laptop on 192.168.1.10/24 sends traffic to its default gateway 192.168.1.1, which routes to DNS 8.8.8.8 and file server 10.0.0.5.",
+    "caption": "The laptop's default route through 192.168.1.1 reaches the DNS server and the 10.0.0.0/24 file server."
+   },
+   "example": "A laptop has address 192.168.1.10/24 and default gateway 192.168.1.1. <code>ping 192.168.1.1</code> returns 4 packets with 0% loss. <code>ping 10.0.0.5</code> returns 'Destination Host Unreachable'. <code>ip route</code> shows default via 192.168.1.1. The file server 10.0.0.5 exports /data by NFS. Show the route check, the NFS mount command, and one SSH command to copy a file from the server.",
+   "trap": "A /24 mask gives 254 usable hosts; 192.168.1.10/24 and 10.0.0.5 are on different subnets, so traffic needs a router. A ping failure does not prove a host is down because ICMP may be blocked.",
+   "prereq": "Chapter 4.2 (users and sudo); Unit 1 (command line).",
+   "leave": "DNS server setup, subnetting practice and firewall rules to a networking course."
+  },
+  {
+   "k": 6,
+   "idea": "Docker packages one process with its files; KVM runs a full guest operating system.",
+   "depth": "Cover virtualization terms: host, guest, hypervisor type 1 and type 2, image, container, volume, port mapping. KVM basics: kernel module, <code>virsh list</code>, <code>virt-install</code>, <code>qemu</code>; Docker basics: <code>docker build</code>, <code>docker run</code>, <code>docker ps</code>, <code>docker stop</code>, <code>docker rm</code>, Dockerfile, <code>-p host:container</code>, bind mounts. Compare container and VM clearly. Only a few universities teach KVM commands in detail; keep KVM short and make Docker practical.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "KVM and Docker layers",
+    "nodes": [
+     {
+      "id": "hw",
+      "label": "Hardware",
+      "style": "muted"
+     },
+     {
+      "id": "host",
+      "label": "Host kernel",
+      "style": "normal"
+     },
+     {
+      "id": "kvm",
+      "label": "KVM",
+      "note": "hypervisor",
+      "style": "accent"
+     },
+     {
+      "id": "vm",
+      "label": "VM guest",
+      "note": "own kernel",
+      "style": "normal"
+     },
+     {
+      "id": "docker",
+      "label": "Docker engine",
+      "note": "shares host kernel",
+      "style": "next"
+     },
+     {
+      "id": "cont",
+      "label": "Container",
+      "note": "one process tree",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "hw",
+      "to": "host",
+      "style": "solid"
+     },
+     {
+      "from": "host",
+      "to": "kvm",
+      "style": "solid"
+     },
+     {
+      "from": "kvm",
+      "to": "vm",
+      "style": "solid"
+     },
+     {
+      "from": "host",
+      "to": "docker",
+      "style": "solid"
+     },
+     {
+      "from": "docker",
+      "to": "cont",
+      "style": "solid"
+     }
+    ],
+    "aria": "KVM sits above the host kernel and runs a VM with its own guest kernel; Docker runs containers that share the host kernel.",
+    "caption": "KVM runs a full guest kernel; Docker containers share the host kernel."
+   },
+   "example": "Build and run a web container: <code>docker build -t web:v1 .</code>, then <code>docker run -d -p 8080:80 --name web web:v1</code>. <code>docker ps</code> shows container ID <code>a1b2c3</code> and port <code>0.0.0.0:8080->80/tcp</code>. Stop and remove it. Then start a KVM guest with 2 vCPUs and 2048 MB RAM using <code>virt-install</code>. Which one uses the host kernel?",
+   "trap": "In <code>-p 8080:80</code> the host port is first and the container port second; a container is not a lightweight VM and does not run its own kernel.",
+   "prereq": "Chapter 4.1 (processes); Chapter 4.4 (services); Chapter 4.5 (ports and SSH).",
+   "leave": "Kubernetes orchestration, Swarm and storage drivers to a cloud or DevOps course."
+  },
+  {
+   "k": 7,
+   "idea": "Python or Ruby scripts automate repeated administration by calling commands, checking results and running from a scheduler.",
+   "depth": "Cover Python automation with <code>subprocess.run</code>, <code>os</code>, <code>pathlib</code>, <code>shutil</code>, <code>sys</code>, <code>argparse</code>, <code>logging</code>; Ruby equivalents with <code>system</code>, <code>Open3</code>, <code>FileUtils</code>. Show scheduling with cron and systemd timers, absolute paths, exit codes, and safe quoting. Mention SSH automation with <code>subprocess</code> or Paramiko but keep it brief. Some syllabi call this orchestration scripting. Only a few universities teach Ruby; Python is enough for exams.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Cron-driven automation",
+    "nodes": [
+     {
+      "id": "cron",
+      "label": "cron",
+      "note": "02:00 daily",
+      "style": "muted"
+     },
+     {
+      "id": "py",
+      "label": "Python script",
+      "style": "accent"
+     },
+     {
+      "id": "cmd",
+      "label": "local or SSH",
+      "note": "run command",
+      "style": "normal"
+     },
+     {
+      "id": "log",
+      "label": "log file",
+      "note": "result and errors",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cron",
+      "to": "py",
+      "label": "starts",
+      "style": "solid"
+     },
+     {
+      "from": "py",
+      "to": "cmd",
+      "label": "calls",
+      "style": "solid"
+     },
+     {
+      "from": "py",
+      "to": "log",
+      "label": "writes",
+      "style": "dashed"
+     }
+    ],
+    "aria": "cron starts a Python script at 02:00; the script runs a local or SSH command and writes the result to a log file.",
+    "caption": "cron starts the script; the script runs a command and logs success or failure."
+   },
+   "example": "Write a Python script that runs every day at 02:00, copies /var/www (about 120 MB) to /backup/www-YYYYmmdd.tar.gz, deletes archives older than 7 days, and writes one line to /var/log/backup.log. Show the crontab line, the <code>subprocess.run</code> call, and how the script exits with code 1 if the copy fails.",
+   "trap": "cron has a minimal PATH; use absolute paths and check return codes. Never build shell commands from untrusted input.",
+   "prereq": "Unit 3 (shell scripting, pipes); Chapter 4.1 (processes); Chapter 4.5 (SSH).",
+   "leave": "Full CI/CD pipelines and configuration management tools like Ansible to a DevOps course."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "processes run under user accounts"
+  ],
+  [
+   2,
+   3,
+   "sudo rights for package installs"
+  ],
+  [
+   3,
+   4,
+   "packages install service units"
+  ],
+  [
+   4,
+   5,
+   "services open network ports"
+  ],
+  [
+   5,
+   6,
+   "SSH and ports reach containers"
+  ],
+  [
+   6,
+   7,
+   "scripts start containers and VMs"
+  ],
+  [
+   2,
+   4,
+   "service accounts run daemons"
+  ]
+ ]
+}

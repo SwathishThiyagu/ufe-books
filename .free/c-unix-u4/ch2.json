@@ -1,0 +1,222 @@
+{
+ "lead": "Every file and every process in Linux carries numeric identity: a user ID (UID) and a group ID (GID). Account management is how an administrator creates those identities, stores them in /etc/passwd, /etc/shadow and /etc/group, and retires them safely. This matters on shared servers, lab machines and cloud virtual machines, where ten students may log in to one system and must not read each other's marks. The rules from file permissions only work when UIDs and GIDs are correct. This chapter shows the commands, the account files and the least-privilege habits behind them.",
+ "prereq": "You need Unit 2's file ownership and chmod rules, especially <a href=\"#files-directories-and-permissions\">Files, Directories and Permissions</a>.",
+ "sections": [
+  {
+   "h3": "Identity: UID, GID and the account files",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Linux is multi-user: each login and each process runs with a numeric user ID (UID) and group ID (GID). The kernel checks these numbers. Names such as ravi are only labels looked up in /etc/passwd."
+    },
+    {
+     "type": "p",
+     "text": "/etc/passwd holds one line per user with seven colon-separated fields: login name, password placeholder, UID, primary GID, comment, home directory, login shell. A typical line is ravi:x:1500:2000::/home/ravi:/bin/bash. The x means the real password data is elsewhere. Field 3 is the UID; field 4 is the primary GID."
+    },
+    {
+     "type": "p",
+     "text": "Password hashes live in /etc/shadow, which only root can read. Its fields are: login name, hash, days since 1 January 1970 when the password was last changed, minimum days before a change, maximum days a password lasts, warning days, inactive days, expiry date, reserved field. A leading ! in the hash field locks password login."
+    },
+    {
+     "type": "p",
+     "text": "/etc/group holds group records: group name, password placeholder, GID, comma-separated member list. The primary group of a user is the GID in passwd; supplementary groups are extra memberships listed in /etc/group. The command <code>id ravi</code> prints uid, gid and all groups. <code>groups ravi</code> prints only group names."
+    },
+    {
+     "type": "p",
+     "text": "UID 0 is root. Many distributions reserve 1-999 for system accounts and start ordinary users at 1000; older ones start at 500. Check /etc/login.defs rather than assuming. The same split exists for GIDs."
+    },
+    {
+     "type": "p",
+     "text": "Why this design: permission checks compare the process's UID and GID with the file owner and group IDs. Correct accounts are the first step in access control."
+    }
+   ]
+  },
+  {
+   "h3": "Creating, changing and removing accounts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Only root or a sudo user may manage accounts. <code>groupadd -g 2000 students</code> creates a group with GID 2000. <code>useradd -u 1500 -g students -d /home/ravi -m -s /bin/bash ravi</code> creates user ravi with UID 1500, primary group students (GID 2000), home /home/ravi, and Bash. -m creates the home directory. <code>adduser</code> is a friendlier wrapper on Debian and Ubuntu that asks questions."
+    },
+    {
+     "type": "p",
+     "text": "<code>usermod</code> changes an account. <code>usermod -aG project ravi</code> appends project to ravi's supplementary groups. Without -a, <code>-G</code> replaces the whole supplementary list, silently removing other groups. <code>usermod -g</code> changes the primary group; the group must already exist. <code>usermod -s /bin/sh ravi</code> changes the shell."
+    },
+    {
+     "type": "p",
+     "text": "<code>passwd ravi</code> sets a password as root. <code>passwd</code> alone changes your own. <code>passwd -l ravi</code> locks the password; <code>passwd -u ravi</code> unlocks it. <code>chage -l ravi</code> lists ageing. <code>chage -M 90 -W 7 ravi</code> makes the password expire after 90 days and warns 7 days before. <code>chage -E 0 ravi</code> expires the account immediately."
+    },
+    {
+     "type": "p",
+     "text": "<code>userdel ravi</code> removes ravi's lines from /etc/passwd and /etc/shadow and removes ravi from the member lists in /etc/group; the group records themselves stay. It leaves /home/ravi. <code>userdel -r ravi</code> also removes the home directory and mail spool. <code>groupmod -n newname oldname</code> renames a group; <code>groupdel project</code> deletes the group record, as long as no user has project as a primary group; it also removes project from users' supplementary lists. Never edit /etc/passwd or /etc/shadow directly with a normal editor; use <code>vipw</code> and <code>vigr</code>."
+    },
+    {
+     "type": "p",
+     "text": "<code>useradd</code> does not set a password. The new account stays locked until <code>passwd</code> puts a hash in shadow."
+    }
+   ]
+  },
+  {
+   "h3": "Least privilege: su, sudo and locking",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Authentication proves who you are; authorization decides what you may do. The shadow hash is authentication. UID and GID permission checks are authorization. Least privilege means giving the smallest rights for the shortest time."
+    },
+    {
+     "type": "p",
+     "text": "<code>su</code> switches to another user. <code>su - ravi</code> asks for ravi's password and starts a login shell with ravi's environment. <code>su -</code> switches to root and asks for the root password. Every person who needs one root command must then know the root password, which is poor control."
+    },
+    {
+     "type": "p",
+     "text": "<code>sudo</code> runs one command as another user, usually root. It checks /etc/sudoers and normally asks for your own password. A rule such as <code>ravi ALL=(ALL) ALL</code> lets ravi run any command as any user. <code>visudo</code> edits /etc/sudoers and refuses a file with syntax errors. Keep rules narrow: allow <code>/usr/bin/systemctl restart apache2</code> rather than all commands."
+    },
+    {
+     "type": "p",
+     "text": "Locking is not deleting. <code>passwd -l ravi</code> puts ! before the hash, so password logins fail. Existing sessions, SSH keys and cron jobs may continue; use <code>pkill -u ravi</code> and <code>chage -E 0</code> for a hard stop. A locked account keeps its UID, files and group memberships."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "useradd writes one record to passwd and one to shadow. The passwd record carries UID 1500 and primary GID 2000. The shadow record gets a locked placeholder, and a real hash is written only later by passwd. Group records and supplementary memberships are handled separately by groupadd and usermod.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Account files written by useradd",
+   "nodes": [
+    {
+     "id": "root",
+     "label": "root admin",
+     "style": "muted"
+    },
+    {
+     "id": "add",
+     "label": "useradd",
+     "style": "accent"
+    },
+    {
+     "id": "passwd",
+     "label": "/etc/passwd",
+     "note": "ravi UID 1500",
+     "style": "normal"
+    },
+    {
+     "id": "shadow",
+     "label": "/etc/shadow",
+     "note": "locked placeholder (!), no hash yet",
+     "style": "normal"
+    },
+    {
+     "id": "group",
+     "label": "/etc/group",
+     "note": "students GID 2000; members updated later by usermod",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "root",
+     "to": "add",
+     "label": "runs",
+     "style": "solid"
+    },
+    {
+     "from": "add",
+     "to": "passwd",
+     "label": "writes",
+     "style": "solid"
+    },
+    {
+     "from": "add",
+     "to": "shadow",
+     "label": "writes",
+     "style": "solid"
+    }
+   ],
+   "aria": "A root administrator runs useradd, which writes a user record with UID 1500 and primary GID 2000 to /etc/passwd and a locked password placeholder to /etc/shadow (a real hash is written only later by passwd). Group records are created separately by groupadd, and usermod -aG updates member lists later."
+  }
+ },
+ "examples": [
+  {
+   "question": "As root on a Linux server, create group students with GID 2000 and group project with GID 2001. Create user ravi with UID 1500, primary group students, home /home/ravi, login shell /bin/bash. Add ravi to supplementary group project. Set a password and lock the account. Write the /etc/passwd line and both id ravi outputs, before and after locking.",
+   "steps": [
+    "Create the groups: <code>groupadd -g 2000 students</code> and <code>groupadd -g 2001 project</code>. /etc/group now has students with GID 2000 and project with GID 2001.",
+    "Create the user: <code>useradd -u 1500 -g students -d /home/ravi -m -s /bin/bash ravi</code>. The passwd record gets name ravi, placeholder x, UID 1500, primary GID 2000, empty comment, home /home/ravi and shell /bin/bash.",
+    "Add the supplementary group: <code>usermod -aG project ravi</code>. The member list of project in /etc/group now contains ravi.",
+    "Set the password: <code>passwd ravi</code>, then type the password twice. A hash is written to the second field of ravi's line in /etc/shadow.",
+    "Read the passwd line: <code>grep '^ravi:' /etc/passwd</code> gives <code>ravi:x:1500:2000::/home/ravi:/bin/bash</code>.",
+    "Check identity before locking: <code>id ravi</code> gives <code>uid=1500(ravi) gid=2000(students) groups=2000(students),2001(project)</code>.",
+    "Lock the password: <code>passwd -l ravi</code> puts ! at the start of the hash field in /etc/shadow.",
+    "Check identity after locking: <code>id ravi</code> gives the same line, <code>uid=1500(ravi) gid=2000(students) groups=2000(students),2001(project)</code>. id reads passwd and group, not shadow, so the lock is invisible here. A password login is refused."
+   ],
+   "answer": "The passwd line is ravi:x:1500:2000::/home/ravi:/bin/bash; both id outputs are identical, uid=1500(ravi) gid=2000(students) groups=2000(students),2001(project), because locking changes only /etc/shadow.",
+   "check": "uid=1500\ngid=2000\nproject_gid=2001\nline=f\"ravi:x:{uid}:{gid}::/home/ravi:/bin/bash\"\nf=line.split(':')\nprint(int(f[2]))\nprint(int(f[3]))\nprint(project_gid)",
+   "values": [
+    1500,
+    2000,
+    2001
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "<code>usermod -G</code> replaces the supplementary group list. Use <code>usermod -aG</code> to append; otherwise other groups vanish.",
+  "<code>userdel</code> without <code>-r</code> leaves the home directory and mail spool behind. Deleting an account does not delete its files.",
+  "<code>passwd -l</code> locks password login only. Existing sessions, SSH keys and cron jobs may continue, and <code>id</code> output does not change.",
+  "UID 0 is root regardless of the name. A second account with UID 0 has full root power even if it is called backup.",
+  "<code>chage -E 0</code> expires the account date; it is not the same command as <code>passwd -l</code>, though both can stop logins."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In /etc/passwd, which fields hold the UID and the primary GID?",
+   "marks": 2,
+   "a": "Field 3 holds the UID and field 4 holds the primary GID."
+  },
+  {
+   "level": "understand",
+   "q": "Why are password hashes stored in /etc/shadow instead of /etc/passwd?",
+   "marks": 3,
+   "a": "/etc/passwd is world-readable, so hashes there could be copied by any user. /etc/shadow is readable only by root, which reduces offline password cracking."
+  },
+  {
+   "level": "apply",
+   "q": "Write the commands to create group staff with GID 2100 and user asha with UID 1600, primary group staff, home /home/asha and shell /bin/bash.",
+   "marks": 4,
+   "a": "groupadd -g 2100 staff; useradd -u 1600 -g staff -d /home/asha -m -s /bin/bash asha."
+  },
+  {
+   "level": "analyze",
+   "q": "ravi is in supplementary groups project and sports. Run usermod -G project ravi. What is the result?",
+   "marks": 4,
+   "a": "The supplementary list becomes only project. sports is removed because -G replaces the list; -aG would have kept both."
+  },
+  {
+   "level": "remember",
+   "q": "Which command lists password ageing information for ravi?",
+   "marks": 2,
+   "a": "chage -l ravi."
+  },
+  {
+   "level": "apply",
+   "q": "After passwd -l ravi, what does id ravi show and can ravi log in with a password?",
+   "marks": 3,
+   "a": "id ravi shows the same UID, GID and groups as before. Password login is refused because the shadow hash begins with !."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is sudo preferred over sharing the root password for one administrative command?",
+   "marks": 5,
+   "a": "sudo checks your own identity and a narrow rule in /etc/sudoers, logs the command, and can limit exactly what runs. Sharing the root password gives unlimited root power and no accountability."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between a primary group and a supplementary group?",
+   "marks": 3,
+   "a": "The primary group is the GID stored in /etc/passwd and is the default group for new files. Supplementary groups are extra memberships in /etc/group that grant additional access; id shows both."
+  }
+ ],
+ "beyond": "Not for the exam. In production, accounts often live in LDAP or Active Directory and reach Linux through SSSD or winbind, while PAM modules enforce password and session policy. Configuration tools such as Ansible create users and sudo rules from version-controlled files. Cloud systems add identity and access management roles on top of local accounts. Search for the sudoers manual page, PAM, SSSD and least privilege to go deeper."
+}

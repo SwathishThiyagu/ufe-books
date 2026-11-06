@@ -1,0 +1,233 @@
+{
+ "lead": "A Linux machine reaches the network through an address on each interface, a prefix that marks neighbours, and a routing table naming a default gateway. Network administration is reading those settings, testing the path with ping and traceroute, and opening remote access with SSH, NFS or Samba. One wrong gateway leaves a server unable to reach the file server down the corridor while local commands still look healthy.",
+ "prereq": "You need: <a href=\"#user-and-group-management\">Chapter 4.2</a> for users and sudo, and the command line from Unit 1.",
+ "sections": [
+  {
+   "h3": "Addresses, prefixes and the routing table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An IPv4 address is 32 bits, written as four numbers 0–255 separated by dots, such as 192.168.1.10. It has a network part, shared by the link, and a host part naming one machine."
+    },
+    {
+     "type": "p",
+     "text": "The prefix after the slash gives the network bits. 192.168.1.10/24 has 24 network bits and 8 host bits, the same split as mask 255.255.255.0. Eight host bits give 2⁸ = 256 addresses. The lowest, 192.168.1.0, is the network address; the highest, 192.168.1.255, is broadcast. So 254 addresses go to hosts."
+    },
+    {
+     "type": "formula",
+     "text": "usable hosts = 2<sup>(32 − p)</sup> − 2",
+     "where": "p is the prefix length in bits; p = 24 gives 2⁸ − 2 = 254 hosts."
+    },
+    {
+     "type": "p",
+     "text": "Private blocks are 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16; Internet routers do not forward them, and a NAT router rewrites addresses on the way out. Two hosts are on the same subnet when their network parts match after masking. Otherwise the kernel sends the packet to the default gateway, a router address on the local link."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "<code>ip addr show</code> lists interfaces and addresses.",
+      "<code>ip route show</code> prints the routing table; <code>default via</code> names the default gateway.",
+      "<code>ip addr add 192.168.1.10/24 dev eth0</code> adds an address (needs root).",
+      "<code>ip link set eth0 up</code> brings the interface up.",
+      "<code>ip route add default via 192.168.1.1</code> sets the default gateway."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Testing the path: ping, traceroute and sockets",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>ping</code> sends an ICMP echo request and waits for an echo reply. It prints round-trip time in milliseconds per reply, then packets transmitted, received, loss percentage and min/avg/max time. A reply proves the IP layer works both ways, not that a web server is running."
+    },
+    {
+     "type": "p",
+     "text": "The error text says where the packet stopped. Destination Host Unreachable usually comes from your machine or the last router: no route, or local address resolution failed. Request timed out means no reply arrived, which also happens when a firewall drops ICMP; a failed ping never proves a host is down."
+    },
+    {
+     "type": "p",
+     "text": "<code>traceroute</code> maps the path hop by hop. It sends packets with time-to-live 1, 2, 3 and so on; each router decrements the TTL, discards the packet at zero and returns an ICMP time-exceeded message. Line n is the nth router; a star marks a router that does not answer."
+    },
+    {
+     "type": "p",
+     "text": "<code>ss -tlnp</code> lists TCP sockets in listen state with port and owning process; <code>netstat -tlnp</code> does the same on older systems (<code>netstat -tulnp</code> also lists UDP). Check that sshd listens on port 22 before blaming the network."
+    }
+   ]
+  },
+  {
+   "h3": "Remote login and copying with SSH",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>ssh student@10.0.0.5</code> opens an encrypted shell as user student on 10.0.0.5, port 22 by default; <code>-p 2222</code> changes the port. Password and traffic travel inside the encrypted channel; telnet and rlogin send the password in clear text and are avoided for login."
+    },
+    {
+     "type": "p",
+     "text": "Keys replace passwords. <code>ssh-keygen -t ed25519</code> creates ~/.ssh/id_ed25519, the private key that never leaves the machine, and ~/.ssh/id_ed25519.pub, the public key. Append the public key to ~/.ssh/authorized_keys on the server; <code>ssh-copy-id student@10.0.0.5</code> does that. At login the server sends a challenge, the client signs it with the private key, and the server checks the signature against the stored public key."
+    },
+    {
+     "type": "p",
+     "text": "Server settings live in /etc/ssh/sshd_config: Port, PermitRootLogin no, PasswordAuthentication no. Restart the service after an edit (see <a href=\"#service-management-starting-and-stopping-services\">Chapter 4.4</a>) and keep one working session open until the new login succeeds."
+    },
+    {
+     "type": "p",
+     "text": "<code>scp report.pdf student@10.0.0.5:/home/student/</code> uploads over the same channel; swapping the arguments downloads. <code>-r</code> copies a directory. <code>sftp</code> gives an interactive session with ls, get and put."
+    }
+   ]
+  },
+  {
+   "h3": "Sharing files with NFS and Samba",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "NFS shares directories between Unix machines. The server lists them in /etc/exports, one line per directory: <code>/data 10.0.0.0/24(rw,sync,no_subtree_check)</code> gives every host in 10.0.0.0/24 read-write access to /data. <code>exportfs -ra</code> re-reads the file; <code>exportfs -v</code> prints the active list."
+    },
+    {
+     "type": "p",
+     "text": "The client runs <code>mount -t nfs 10.0.0.5:/data /mnt/data</code>; <code>showmount -e 10.0.0.5</code> lists exports first. NFS trusts the client's user IDs instead of asking for a password, so the export list and the network are the security boundary."
+    },
+    {
+     "type": "p",
+     "text": "Samba speaks SMB/CIFS, the protocol Windows uses. /etc/samba/smb.conf holds sections: [global] for server settings and one per share, for example [data] with path = /data, read only = no and valid users = priya. The SMB user must first exist as a Linux account (<code>useradd priya</code>); <code>smbpasswd -a priya</code> then stores the SMB password for that existing user. Restart smbd afterwards."
+    },
+    {
+     "type": "p",
+     "text": "A Windows client opens the share by its UNC path. From Linux, <code>smbclient //10.0.0.5/data -U priya</code> gives an ftp-like prompt with ls, get and put; <code>mount -t cifs //10.0.0.5/data /mnt/data -o username=priya</code> mounts the share into the file tree."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The laptop's default route through 192.168.1.1 reaches the DNS server and the 10.0.0.0/24 file server; notice that 10.0.0.5 sits behind the gateway, not on the laptop's link.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "L",
+     "label": "192.168.1.10",
+     "x": 0,
+     "y": 1,
+     "note": "laptop",
+     "style": "accent"
+    },
+    {
+     "id": "R",
+     "label": "192.168.1.1",
+     "x": 1,
+     "y": 1,
+     "note": "default gateway",
+     "style": "normal"
+    },
+    {
+     "id": "D",
+     "label": "8.8.8.8",
+     "x": 2,
+     "y": 0,
+     "note": "DNS",
+     "style": "muted"
+    },
+    {
+     "id": "F",
+     "label": "10.0.0.5",
+     "x": 2,
+     "y": 2,
+     "note": "NFS and Samba",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "L",
+     "to": "R",
+     "label": "LAN",
+     "style": "solid"
+    },
+    {
+     "from": "R",
+     "to": "D",
+     "label": "route",
+     "style": "dashed"
+    },
+    {
+     "from": "R",
+     "to": "F",
+     "label": "10.0.0.0/24",
+     "style": "solid"
+    }
+   ],
+   "aria": "A laptop on 192.168.1.10/24 sends traffic to its default gateway 192.168.1.1, which routes to DNS 8.8.8.8 and file server 10.0.0.5."
+  }
+ },
+ "examples": [
+  {
+   "question": "A laptop has address 192.168.1.10/24 and default gateway 192.168.1.1. <code>ping 192.168.1.1</code> prints 4 transmitted, 4 received, 0% loss. <code>ping 10.0.0.5</code> also prints 4 transmitted, 4 received, 0% loss, but <code>ping 10.0.0.99</code> prints Destination Host Unreachable; <code>ip route</code> shows default via 192.168.1.1 dev eth0. The file server 10.0.0.5 exports /data over NFS and runs SSH for user student. (a) How many usable host addresses has the laptop's subnet, and why is 10.0.0.5 not reachable directly? (b) Which two commands confirm the address and the route? (c) Write the NFS mount command and one SSH command that copies /data/report.pdf to the laptop.",
+   "steps": [
+    "Prefix p = 24, so host bits = 32 − 24 = 8.",
+    "Usable hosts = 2⁸ − 2 = 254.",
+    "Laptop network after masking is 192.168.1.0/24. Target 10.0.0.5 under /24 gives 10.0.0.0/24, a different network, so the packet goes to gateway 192.168.1.1.",
+    "Gateway ping: 4 sent, 4 received, loss = (4 − 4) ÷ 4 × 100 = 0%. Local link and gateway work.",
+    "Ping to 10.0.0.5 succeeds with 0% loss, so the path to the file server works.",
+    "Ping to 10.0.0.99 says Destination Host Unreachable. The message is about 10.0.0.99 only: no such host exists on 10.0.0.0/24, or the last router cannot resolve its address. It does not prove 10.0.0.5 is down.",
+    "Check: <code>ip addr show</code> shows inet 192.168.1.10/24; <code>ip route show</code> shows default via 192.168.1.1 dev eth0.",
+    "Mount: <code>sudo mkdir -p /mnt/data</code>, then <code>sudo mount -t nfs 10.0.0.5:/data /mnt/data</code>.",
+    "Copy: <code>scp student@10.0.0.5:/data/report.pdf .</code>"
+   ],
+   "answer": "The subnet has 254 usable host addresses; the hosts sit on different networks so traffic needs gateway 192.168.1.1; the ping to 10.0.0.5 succeeds, so mount with mount -t nfs 10.0.0.5:/data /mnt/data and copy with scp student@10.0.0.5:/data/report.pdf .",
+   "check": "prefix = 24\nhost_bits = 32 - prefix\nusable = 2**host_bits - 2\nprint(usable)\nsent = 4\nrecv = 4\nprint((sent - recv) / sent * 100)",
+   "values": [
+    254,
+    0.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A /24 has 256 addresses but only 254 usable hosts; network 192.168.1.0 and broadcast 192.168.1.255 cannot be assigned to a machine.",
+  "192.168.1.10/24 and 10.0.0.5/24 are different subnets; mask both before comparing, then send the packet to the router.",
+  "A failed ping does not prove a host is down, because ICMP is often filtered; check the service port instead.",
+  "Listening is not reachable: ss shows sshd on port 22 while a firewall may block that port from outside.",
+  "Keep the stacks apart: NFS uses /etc/exports, exportfs and mount -t nfs; Samba uses smb.conf, smbpasswd and mount -t cifs."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In 192.168.1.10/24, what does /24 mean?",
+   "marks": 2,
+   "a": "The first 24 bits are the network part and the last 8 the host part; the mask is 255.255.255.0."
+  },
+  {
+   "level": "remember",
+   "q": "Which command prints the routing table, and which line gives the default gateway?",
+   "marks": 2,
+   "a": "<code>ip route show</code>; the line beginning default via names the gateway."
+  },
+  {
+   "level": "understand",
+   "q": "A host 192.168.1.10/24 gets replies from 192.168.1.1 but gets Destination Host Unreachable while pinging 10.0.0.5. Explain both results.",
+   "marks": 3,
+   "a": "The gateway is on the same subnet, so ARP and ICMP work directly. 10.0.0.5 is on another subnet and can only be reached through the router; the unreachable message comes from a router, or from the local host when ARP for the next hop fails, not from 10.0.0.5. A firewall rejecting with ICMP unreachable is rarer; a silent drop gives Request timed out."
+  },
+  {
+   "level": "apply",
+   "q": "Give the command that lists listening TCP ports with owning processes, and the command that creates an ed25519 SSH key pair. Name the two files created.",
+   "marks": 4,
+   "a": "<code>ss -tlnp</code> (or <code>netstat -tlnp</code> on older systems; <code>netstat -tulnp</code> also lists UDP). <code>ssh-keygen -t ed25519</code> creates ~/.ssh/id_ed25519 (private) and ~/.ssh/id_ed25519.pub (public)."
+  },
+  {
+   "level": "apply",
+   "q": "Server 10.0.0.5 must export /data read-write to 10.0.0.0/24. Write the /etc/exports line, the command that applies it, and the client mount command.",
+   "marks": 4,
+   "a": "<code>/data 10.0.0.0/24(rw,sync,no_subtree_check)</code>; apply with <code>exportfs -ra</code>; mount with <code>mount -t nfs 10.0.0.5:/data /mnt/data</code>."
+  },
+  {
+   "level": "analyze",
+   "q": "Public-key SSH login still asks for a password. Give three checks that find the cause.",
+   "marks": 5,
+   "a": "Check permissions: ~/.ssh 700, authorized_keys 600, home directory not group-writable. Check the public key landed in the correct user's authorized_keys. Check sshd_config has PubkeyAuthentication yes and the right AuthorizedKeysFile, then restart sshd; run ssh -v to see which key is offered."
+  }
+ ],
+ "beyond": "Not for the exam. The ip commands come from iproute2, which replaced net-tools tools ifconfig, route and netstat on almost every distribution. Firewalls built on nftables, and address configuration by NetworkManager or systemd-networkd, sit on the same address, prefix and route ideas. Configuration management tools push the same ip, ssh and mount commands to hundreds of hosts at once. Natural next topics are NFSv4 with Kerberos, IPv6 addressing and VPN tunnels such as WireGuard."
+}
