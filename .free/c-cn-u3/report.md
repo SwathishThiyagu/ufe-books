@@ -1,21 +1,19 @@
 # c-cn-u3: free-model run
 
 - Book: `books/cse/c-cn/c-cn-u3.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 37 (151,713 tokens in, 300,458 out), 7.1 minutes
 
 ## Checker
 
 ```
-c-cn-u3.html: 9 chapters, 18209 words, 10 figures, 179 KB
-PROBLEMS:
- - text contains "I cannot"
+c-cn-u3.html: 9 chapters, 18210 words, 10 figures, 179 KB
+OK
 ```
 
 ## For the reviewer
 
 - chapter 8: the figure cannot be drawn: label "Destination" is too long for its box; use a shorter label
-- checker: text contains "I cannot"
 
 ## Reviewer notes (after any revision)
 
