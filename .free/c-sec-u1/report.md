@@ -1,15 +1,14 @@
 # c-sec-u1: free-model run
 
 - Book: `books/cse/c-sec/c-sec-u1.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 35 (134,402 tokens in, 219,546 out), 8.4 minutes
 
 ## Checker
 
 ```
-c-sec-u1.html: 7 chapters, 14561 words, 8 figures, 152 KB
-PROBLEMS:
- - chapter "network-attacks-dos-ddos-mitm-replay-port-scanning": 1901 words is too long (keep under 1900; 900-1600 is the target)
+c-sec-u1.html: 7 chapters, 14535 words, 8 figures, 152 KB
+OK
 ```
 
 ## For the reviewer
