@@ -1,0 +1,198 @@
+{
+ "lead": "TCP is reliable, but a fast sender can still drown a slow receiver. Flow control is the receiver's brake: each acknowledgment carries a window, the number of free bytes in the receiver's buffer, and the sender may not have more unacknowledged bytes in flight than that. This stops data being dropped when a slow phone pulls a file from a fast server. Only a few universities teach it as a separate topic.",
+ "prereq": "You need: the TCP header window field (<a href=\"#tcp-services-and-segment-format\">Chapter 5.3</a>) and an established connection (<a href=\"#tcp-connection-establishment-and-release\">Chapter 5.4</a>).",
+ "sections": [
+  {
+   "h3": "The advertised window",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The receiver buffers bytes that have arrived but not yet been read by the application. Two numbers fix its state: LastByteRcvd, the last byte received, and LastByteRead, the last byte the application has taken. The gap between them is data waiting in the buffer."
+    },
+    {
+     "type": "formula",
+     "text": "rwnd = BufSize − (LastByteRcvd − LastByteRead)",
+     "where": "rwnd is the free space in bytes, the receive window; BufSize is the receive buffer in bytes; LastByteRcvd and LastByteRead are byte counts."
+    },
+    {
+     "type": "p",
+     "text": "The receiver writes rwnd into the 16-bit window field of every segment it sends: how many bytes past the acknowledged byte it can still accept. It is not the buffer size."
+    },
+    {
+     "type": "p",
+     "text": "Sixteen bits cap the field at 65535 bytes, about 64 KB, too small for long fast links. The window scale option, agreed in the handshake, shifts it: real window = field × 2^S, with S from 0 to 14."
+    }
+   ]
+  },
+  {
+   "h3": "Zero window, probes, and silly window syndrome",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "When the application reads nothing and the buffer fills, rwnd = 0. The sender stops and starts a persist timer. On expiry it sends a window probe, one byte of new or already-acknowledged data, and the receiver's reply carries the current window. If that is still zero the timer doubles. Without probes, one lost window update would deadlock both sides."
+    },
+    {
+     "type": "p",
+     "text": "The opposite fault is silly window syndrome: a nearly full buffer with a byte-at-a-time reader makes the receiver advertise tiny windows and the sender emit 41-byte packets carrying one byte of data."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Receiver side (Clark's solution): never advertise less than min(half the buffer, one maximum segment size); advertise zero instead.",
+      "Sender side (Nagle's algorithm): while earlier data is unacknowledged, hold small segments until a full one is ready."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Each rule trades a little delay for far fewer packets."
+    }
+   ]
+  },
+  {
+   "h3": "rwnd is not cwnd",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The sender may have at most min(rwnd, cwnd) unacknowledged bytes in flight. rwnd is the receiver's free buffer and shrinks when the application is slow. cwnd is the sender's estimate of network capacity and shrinks when segments are lost."
+    },
+    {
+     "type": "p",
+     "text": "A receiver that never reads can drive rwnd to zero on a perfect network; a congested network can cut cwnd while the receiver has gigabytes free. The first is flow control; the second is congestion control (<a href=\"#tcp-congestion-control-slow-start-fast-retransmit\">Chapter 5.6</a>)."
+    },
+    {
+     "type": "p",
+     "text": "The window slides with every acknowledgment: if the ACK covers byte M and advertises W, the sender may send up to byte M + W. It costs nothing extra on the wire, riding in a field every ACK already carries. Both numbers move continuously, rwnd as the application reads, cwnd as ACKs and losses arrive."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The sender stops the moment the advertised window reaches zero, and the small probe after the timer is what lets it notice the window has reopened.",
+  "spec": {
+   "type": "gantt",
+   "unit": "s",
+   "lanes": [
+    {
+     "label": "Sender",
+     "bars": [
+      {
+       "label": "5 KB out",
+       "start": 0,
+       "end": 2,
+       "style": "live"
+      },
+      {
+       "label": "blocked",
+       "start": 2,
+       "end": 6,
+       "style": "muted"
+      },
+      {
+       "label": "probe",
+       "start": 6,
+       "end": 7,
+       "style": "next"
+      },
+      {
+       "label": "5 KB out",
+       "start": 7,
+       "end": 9,
+       "style": "live"
+      }
+     ]
+    },
+    {
+     "label": "rwnd (bytes)",
+     "bars": [
+      {
+       "label": "5000",
+       "start": 0,
+       "end": 2,
+       "style": "normal"
+      },
+      {
+       "label": "0",
+       "start": 2,
+       "end": 6,
+       "style": "accent"
+      },
+      {
+       "label": "8000",
+       "start": 6,
+       "end": 9,
+       "style": "normal"
+      }
+     ]
+    }
+   ],
+   "aria": "A timeline with two lanes: the sender transmits five kilobytes, blocks while the advertised window is zero for four seconds, sends one probe, then transmits again; the window lane shows 5000 bytes, then 0, then 8000."
+  }
+ },
+ "examples": [
+  {
+   "question": "A TCP receiver has an 8000-byte buffer. At one instant LastByteRead = 0 and LastByteRcvd = 3000. (a) What window is advertised? (b) The sender fills it: what is rwnd now, and what does the sender do? (c) The application reads all 8000 bytes: what is advertised?",
+   "steps": [
+    "Bytes waiting = 3000 − 0 = 3000.",
+    "(a) rwnd = 8000 − 3000 = 5000 bytes.",
+    "(b) LastByteRcvd = 8000, so rwnd = 8000 − 8000 = 0 bytes.",
+    "The sender stops and starts its persist timer; on expiry it sends a one-byte probe.",
+    "(c) LastByteRead = 8000, so rwnd = 8000 − (8000 − 8000) = 8000 bytes.",
+    "The receiver sends a window update of 8000; the sender resumes."
+   ],
+   "answer": "rwnd goes 5000 bytes, then 0 bytes, then 8000 bytes.",
+   "check": "buf = 8000\nlast_read = 0\nlast_rcvd = 3000\nrwnd_a = buf - (last_rcvd - last_read)\nprint(rwnd_a)\nlast_rcvd = buf\nrwnd_b = buf - (last_rcvd - last_read)\nprint(rwnd_b)\nlast_read = buf\nrwnd_c = buf - (last_rcvd - last_read)\nprint(rwnd_c)",
+   "values": [
+    5000,
+    0,
+    8000
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Calling the buffer size the window: an 8000-byte buffer holding 3000 unread bytes advertises 5000, not 8000.",
+  "Swapping rwnd and cwnd: rwnd is receiver buffer space, cwnd is the network estimate, and the limit is min of the two.",
+  "Forgetting window scaling: a field value of 65535 means 64 KB only when the scale factor S = 0.",
+  "Treating rwnd = 0 as a closed connection: it is open, and probes keep it alive until a window update arrives."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many bits hold the TCP window field, and what is the largest window it gives without scaling?",
+   "marks": 2,
+   "a": "16 bits; 65535 bytes."
+  },
+  {
+   "level": "understand",
+   "q": "Why advertise free space instead of the buffer size?",
+   "marks": 3,
+   "a": "Unread bytes still fill the buffer, so the total would let the sender overrun memory."
+  },
+  {
+   "level": "apply",
+   "q": "Buffer 12000 bytes, LastByteRead = 4000, LastByteRcvd = 9000. Find rwnd.",
+   "marks": 4,
+   "a": "12000 − (9000 − 4000) = 7000 bytes."
+  },
+  {
+   "level": "apply",
+   "q": "rwnd = 4000 bytes, cwnd = 6000 bytes, 2500 bytes in flight. How many more bytes may be sent?",
+   "marks": 4,
+   "a": "min(4000, 6000) − 2500 = 1500 bytes."
+  },
+  {
+   "level": "analyze",
+   "q": "A window update is lost and no persist timer exists. What happens?",
+   "marks": 5,
+   "a": "The sender waits at zero forever while the receiver waits for data; both block although the buffer is free. Probes would break the deadlock."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does Clark's solution sit at the receiver and Nagle's algorithm at the sender?",
+   "marks": 5,
+   "a": "Each end causes part of the problem and can fix only its own side: the receiver chooses what window to advertise, the sender chooses when to emit a small segment."
+  }
+ ],
+ "beyond": "Not for the exam. Linux autotunes the receive buffer through net.ipv4.tcp_rmem, and window scaling comes from RFC 7323. QUIC replaces the single byte window with per-stream and connection-level flow control, a good next search."
+}

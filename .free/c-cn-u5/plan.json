@@ -1,0 +1,641 @@
+{
+ "lead": "This unit is about how two programs on different machines hold a conversation, and what the network does when that conversation goes wrong. After it you can read a TCP header field by field, trace a connection through its handshake and close, compute a receiver window, follow congestion control on a graph, and explain what UDP, SCTP, RSVP and a token bucket each do.",
+ "about": "The transport layer is the first layer that talks to processes, not just hosts. Chapter 5.1 sets up the machinery: port numbers, sockets, multiplexing and demultiplexing. Chapter 5.2 cuts this to the minimum with UDP, and Chapter 5.3 builds TCP's twenty-byte header on the same ideas. Chapters 5.4 to 5.6 follow one TCP connection through its life: how it opens and closes, how the receiver's window holds a fast sender back, and how the sender's congestion window reacts to loss. Chapter 5.7 asks what happens when best effort is not enough. Chapter 5.8 introduces SCTP, which keeps TCP's reliability but changes the handshake and adds streams and multiple addresses. All of it rides on the IP layer from Unit 4.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "The transport layer turns host-to-host delivery into process-to-process delivery by adding a 16-bit port number to the IP address.",
+   "depth": "Duties of the transport layer: process-to-process delivery, port addressing, segmentation and reassembly, connection control; contrast with the network layer's host-to-host job. Port numbers are 16 bits, range 0-65535: well-known 0-1023, registered 1024-49151, dynamic or ephemeral 49152-65535. A socket address is an IP address plus a port. Multiplexing happens at the sender, demultiplexing at the receiver. Connectionless demux looks at the destination port only; connection-oriented demux looks at the four-tuple (source IP, source port, destination IP, destination port). Some syllabi call the port a TSAP and the IP-plus-port pair a socket. Distinguish the listening socket from the connection socket at a server.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Demultiplexing one arriving segment",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Segment from IP",
+      "note": "network layer hands up",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Read destination port",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Socket table lookup",
+      "note": "on IP + port",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Port 80",
+      "note": "web server process",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "Port 53",
+      "note": "DNS process",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "match",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "e",
+      "label": "match",
+      "style": "solid"
+     }
+    ],
+    "caption": "The socket-table lookup on IP address plus port number is the whole mechanism; the port alone does not identify a connection.",
+    "aria": "A block diagram where a segment arrives from IP, its destination port is read, the socket table is searched, and the data goes either to the web server on port 80 or to the DNS process on port 53."
+   },
+   "example": "A web server at 192.0.2.10:80 is serving two browsers on the same client host 203.0.113.7, using source ports 52000 and 52001. Write the four-tuple the server's transport layer uses to demultiplex each arriving segment, and say why the pair (192.0.2.10, 80) is the same for both. Answer: connection 1 is (203.0.113.7, 52000, 192.0.2.10, 80) and connection 2 is (203.0.113.7, 52001, 192.0.2.10, 80). Both share the server socket address, so the source port is the only field that separates them.",
+   "trap": "Demultiplexing TCP by destination port alone, which would mix up two clients of the same server; and calling port 80 'the connection' when it is only one end of the four-tuple.",
+   "prereq": "Unit 1 (layering, TCP/IP suite) and Unit 4 (IPv4 addresses, datagram delivery).",
+   "leave": "The socket API calls (socket, bind, listen, accept) to Unit 6; IP address formats and subnetting to Unit 4."
+  },
+  {
+   "k": 2,
+   "idea": "UDP is the smallest possible transport protocol: four header fields, no connection, no reliability, no congestion control.",
+   "depth": "Services: connectionless, unreliable, message-oriented, no flow control, no congestion control, checksum optional in IPv4 and mandatory in IPv6. Header is 8 bytes: source port (16 bits), destination port (16 bits), length (16 bits, header plus data), checksum (16 bits). The checksum is computed over a pseudo-header (source IP, destination IP, zero, protocol, UDP length) plus the UDP header and data. Maximum UDP data is 65535 - 8 = 65527 bytes. Typical users: DNS, DHCP, SNMP, RIP, TFTP, real-time voice and video, and any query-response that fits one packet. Mention that UDP is what multicast and broadcast traffic uses.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "UDP header and payload",
+    "nodes": [
+     {
+      "id": "sp",
+      "label": "Source port",
+      "note": "2 bytes",
+      "style": "normal"
+     },
+     {
+      "id": "dp",
+      "label": "Destination port",
+      "note": "2 bytes",
+      "style": "accent"
+     },
+     {
+      "id": "len",
+      "label": "Length",
+      "note": "2 bytes, header + data",
+      "style": "normal"
+     },
+     {
+      "id": "ck",
+      "label": "Checksum",
+      "note": "2 bytes, over pseudo-header",
+      "style": "normal"
+     },
+     {
+      "id": "data",
+      "label": "Application data",
+      "note": "0 to 65527 bytes",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "sp",
+      "to": "dp",
+      "style": "solid"
+     },
+     {
+      "from": "dp",
+      "to": "len",
+      "style": "solid"
+     },
+     {
+      "from": "len",
+      "to": "ck",
+      "style": "solid"
+     },
+     {
+      "from": "ck",
+      "to": "data",
+      "style": "solid"
+     }
+    ],
+    "caption": "Eight bytes of header cover everything UDP does; the length field counts the header itself, and the destination port is what demultiplexes the datagram.",
+    "aria": "A vertical block diagram of a UDP datagram: source port, destination port, length and checksum, four fields of two bytes each, followed by the application data."
+   },
+   "example": "A DNS query carries 40 bytes of application data. (a) What goes in the UDP length field? (b) An Ethernet link has an MTU of 1500 bytes and the IPv4 header is 20 bytes. What is the largest UDP payload that fits one frame? Answer: (a) length = 40 + 8 = 48 bytes. (b) UDP length = 1500 - 20 = 1480 bytes, so payload = 1480 - 8 = 1472 bytes.",
+   "trap": "Writing the payload size into the length field, which actually counts header plus data; and forgetting the pseudo-header when computing or verifying the checksum.",
+   "prereq": "Chapter 5.1 (ports, demultiplexing); Unit 4 (IPv4 header, MTU and fragmentation).",
+   "leave": "DHCP and DNS message formats to Unit 6; IPv4 fragmentation itself to Unit 4; RTP details are not part of this unit."
+  },
+  {
+   "k": 3,
+   "idea": "TCP gives a reliable, ordered byte stream between two processes, and its 20-byte header with sequence and acknowledgment numbers is what makes that possible.",
+   "depth": "Services: connection-oriented, reliable, ordered byte stream, full duplex, flow control and congestion control, one logical stream per connection. Byte numbering: sequence number is the number of the first data byte in the segment; acknowledgment number is the next byte expected. Segment format, 20 bytes fixed plus up to 40 bytes of options: source port (16), destination port (16), sequence number (32), acknowledgment number (32), data offset (4 bits, in 32-bit words, so 5 means 20 bytes), reserved bits plus flags URG, ACK, PSH, RST, SYN, FIN (and the later CWR and ECE bits), window (16 bits), checksum (16 bits, mandatory, same pseudo-header as UDP), urgent pointer (16 bits). Options: MSS (default 536 bytes if not sent), window scale, SACK permitted, timestamp. Because of options the header is 20 to 60 bytes.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "TCP header, word by word",
+    "nodes": [
+     {
+      "id": "w1",
+      "label": "Src port | Dst port",
+      "note": "bytes 0-3",
+      "style": "normal"
+     },
+     {
+      "id": "w2",
+      "label": "Sequence number",
+      "note": "bytes 4-7",
+      "style": "accent"
+     },
+     {
+      "id": "w3",
+      "label": "Acknowledgment number",
+      "note": "bytes 8-11",
+      "style": "accent"
+     },
+     {
+      "id": "w4",
+      "label": "Offset | Flags | Window",
+      "note": "bytes 12-15",
+      "style": "normal"
+     },
+     {
+      "id": "w5",
+      "label": "Checksum | Urgent pointer",
+      "note": "bytes 16-19",
+      "style": "normal"
+     },
+     {
+      "id": "w6",
+      "label": "Options",
+      "note": "0-40 bytes, MSS, window scale",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "w1",
+      "to": "w2",
+      "style": "solid"
+     },
+     {
+      "from": "w2",
+      "to": "w3",
+      "style": "solid"
+     },
+     {
+      "from": "w3",
+      "to": "w4",
+      "style": "solid"
+     },
+     {
+      "from": "w4",
+      "to": "w5",
+      "style": "solid"
+     },
+     {
+      "from": "w5",
+      "to": "w6",
+      "style": "solid"
+     }
+    ],
+    "caption": "The two 32-bit numbers in the middle are the reliability mechanism; the window field on the fourth word is the flow-control mechanism of chapter 5.5.",
+    "aria": "A vertical block diagram of the TCP header as six 32-bit words, with the sequence number and acknowledgment number highlighted and the variable options shown last."
+   },
+   "example": "A TCP sender starts a connection with initial sequence number 5000 and sends three segments carrying 1000, 1000 and 500 bytes of data. (a) Give the sequence number field of each segment. (b) Give the acknowledgment number the receiver returns after all three arrive. (c) Give the data offset value when the header carries a 4-byte MSS option. Answer: (a) 5000, 6000 and 7000. (b) 5000 + 2500 = 7500. (c) header = 20 + 4 = 24 bytes = 6 words, so data offset = 6.",
+   "trap": "Counting segments instead of bytes in the sequence number; and reading the acknowledgment number as the last byte received when it is the next byte expected.",
+   "prereq": "Chapter 5.1 (ports, four-tuple) and chapter 5.2 (checksum, pseudo-header); Unit 3 (sliding window) helps for chapter 5.5.",
+   "leave": "Encryption and TLS to Unit 6; the sliding-window ARQ mechanics themselves to Unit 3; how the connection is opened to chapter 5.4."
+  },
+  {
+   "k": 4,
+   "idea": "TCP opens a connection with a three-way handshake that agrees on two initial sequence numbers, and closes it with a four-way exchange plus TIME-WAIT.",
+   "depth": "Initial sequence number (ISN) and why it is not zero; SYN occupies one sequence number. Messages: SYN (seq = x), SYN + ACK (seq = y, ack = x+1), ACK (ack = y+1); data may ride on the third segment. Simultaneous open in one line. Release: FIN from each side, each acknowledged, so four segments; half-close, where one side keeps sending. TIME-WAIT lasts two maximum segment lifetimes and exists so that a lost final ACK can be resent and old duplicate segments die out. RST for refusing or aborting. List the states: CLOSED, LISTEN, SYN-SENT, SYN-RECEIVED, ESTABLISHED, FIN-WAIT-1, FIN-WAIT-2, CLOSE-WAIT, LAST-ACK, CLOSING, TIME-WAIT.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "Server"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "SYN, seq = x",
+      "dashed": false
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "SYN + ACK, seq = y, ack = x+1",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "ACK, ack = y+1",
+      "dashed": false
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "data, seq = x+1",
+      "dashed": false
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "ACK, ack = x+1001",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "FIN, seq = x+1001",
+      "dashed": false
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "ACK, ack = x+1002",
+      "dashed": true
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "FIN, seq = y+1",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "ACK, ack = y+2",
+      "dashed": false
+     }
+    ],
+    "caption": "Three segments to open, four to close; the SYN and the FIN each use up one sequence number, which is why the later acknowledgments are one higher.",
+    "aria": "A message sequence chart between client and server: SYN, SYN plus ACK, ACK, one data segment with its ACK, then FIN, ACK, FIN and ACK at the end."
+   },
+   "example": "A client opens a connection with x = 2000 and the server answers with y = 5000. The client then sends 1000 bytes of data. List the sequence and acknowledgment numbers of every segment up to the close. Answer: SYN seq 2000; SYN+ACK seq 5000 ack 2001; ACK ack 5001; data seq 2001 ack 5001; server ACK ack 3001; FIN seq 3001; ACK ack 3002; server FIN seq 5001; final ACK ack 5002.",
+   "trap": "Forgetting that SYN and FIN each consume one sequence number, so the ACK of a SYN is x+1 and not x; and treating close as a two-way exchange when it needs a FIN and an ACK from each side.",
+   "prereq": "Chapter 5.3 (sequence and acknowledgment number fields, flags).",
+   "leave": "Congestion behaviour during the handshake to chapter 5.6; the full state-transition diagram can be read once, not memorised."
+  },
+  {
+   "k": 5,
+   "idea": "The receiver tells the sender how much free buffer it has, and the sender must never have more unacknowledged bytes in flight than that window.",
+   "depth": "Only a few universities teach this as a separate topic; keep it short. Advertised window rwnd = buffer size minus (last byte received minus last byte read). The header window field is 16 bits, so without scaling it caps rwnd at 65535 bytes; the window scale option multiplies it by a power of two. Zero window: the sender stops and runs a persist timer, sending window probes. Window updates and the silly window syndrome, with Nagle's algorithm on the sender and Clark's solution on the receiver. State clearly that rwnd is flow control and cwnd is congestion control, and the sender may send min(rwnd, cwnd) bytes ahead of the last acknowledgment.",
+   "figure": {
+    "type": "gantt",
+    "unit": "s",
+    "lanes": [
+     {
+      "label": "Sender",
+      "bars": [
+       {
+        "label": "5 KB out",
+        "start": 0,
+        "end": 2,
+        "style": "live"
+       },
+       {
+        "label": "blocked",
+        "start": 2,
+        "end": 6,
+        "style": "muted"
+       },
+       {
+        "label": "probe",
+        "start": 6,
+        "end": 7,
+        "style": "next"
+       },
+       {
+        "label": "5 KB out",
+        "start": 7,
+        "end": 9,
+        "style": "live"
+       }
+      ]
+     },
+     {
+      "label": "rwnd (bytes)",
+      "bars": [
+       {
+        "label": "5000",
+        "start": 0,
+        "end": 2,
+        "style": "normal"
+       },
+       {
+        "label": "0",
+        "start": 2,
+        "end": 6,
+        "style": "accent"
+       },
+       {
+        "label": "8000",
+        "start": 6,
+        "end": 9,
+        "style": "normal"
+       }
+      ]
+     }
+    ],
+    "caption": "The sender stops the moment the advertised window reaches zero, and the small probe after the timer is what lets it notice the window has reopened.",
+    "aria": "A timeline with two lanes: the sender transmits five kilobytes, blocks while the advertised window is zero for four seconds, sends one probe, then transmits again; the window lane shows 5000 bytes, then 0, then 8000."
+   },
+   "example": "A receiver has an 8000-byte buffer. At one instant nothing has been read by the application (last byte read = 0) and the last byte received is 3000. (a) What window does the receiver advertise? (b) The sender uses it fully. What is the advertised window now? (c) The application then reads all 8000 bytes. What happens? Answer: (a) rwnd = 8000 - (3000 - 0) = 5000 bytes. (b) rwnd = 8000 - 8000 = 0, so the sender stops and starts its persist timer, sending one-byte probes. (c) rwnd = 8000 - (8000 - 8000) = 8000 bytes, and the receiver sends a window update that restarts the sender.",
+   "trap": "Quoting the buffer size as the window, when the window counts only the free space measured from the acknowledgment number; and mixing rwnd with the congestion window cwnd.",
+   "prereq": "Chapter 5.3 (window field) and chapter 5.4 (an established connection).",
+   "leave": "Congestion window and loss reaction to chapter 5.6; the sliding-window ARQ picture to Unit 3."
+  },
+  {
+   "k": 6,
+   "idea": "TCP treats a lost segment as a sign of congestion, so it grows a congestion window slowly at first, then linearly, and cuts it when loss appears.",
+   "depth": "cwnd measured in bytes or in MSS, and ssthresh. Slow start: cwnd starts at 1 MSS and doubles every round trip because each ACK adds one MSS. When cwnd reaches ssthresh, congestion avoidance adds about one MSS per round trip (additive increase). Timeout: ssthresh = cwnd/2, cwnd = 1 MSS, slow start again. Fast retransmit: three duplicate ACKs mean one segment is lost, so resend it without waiting for the timer. Fast recovery (Reno): ssthresh = cwnd/2, cwnd = ssthresh, then continue in congestion avoidance; Tahoe drops to 1 MSS instead. Mention multiplicative decrease, AIMD, and in one or two lines the router-side schemes some syllabi add: DECbit, where routers set a congestion bit, and RED, which keeps an average queue length and drops or marks arriving packets with a probability that rises between a minimum and a maximum threshold.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "round trip",
+     "min": 1,
+     "max": 12
+    },
+    "y": {
+     "label": "cwnd (MSS)",
+     "min": 0,
+     "max": 14
+    },
+    "series": [
+     {
+      "name": "cwnd",
+      "points": [
+       [
+        1,
+        1
+       ],
+       [
+        2,
+        2
+       ],
+       [
+        3,
+        4
+       ],
+       [
+        4,
+        8
+       ],
+       [
+        5,
+        9
+       ],
+       [
+        6,
+        10
+       ],
+       [
+        7,
+        11
+       ],
+       [
+        8,
+        12
+       ],
+       [
+        9,
+        6
+       ],
+       [
+        10,
+        7
+       ],
+       [
+        11,
+        8
+       ],
+       [
+        12,
+        9
+       ]
+      ],
+      "style": "accent"
+     },
+     {
+      "name": "ssthresh",
+      "points": [
+       [
+        1,
+        8
+       ],
+       [
+        8,
+        8
+       ],
+       [
+        9,
+        6
+       ],
+       [
+        12,
+        6
+       ]
+      ],
+      "style": "muted"
+     }
+    ],
+    "caption": "The steep climb is slow start, the gentle slope is congestion avoidance, and the drop at round 8 is fast recovery halving the window instead of restarting from one.",
+    "aria": "A line graph of congestion window in MSS against round trip number: it doubles from 1 to 8 over three rounds, rises by one per round to 12, then drops to 6 and rises again, while the threshold line falls from 8 to 6."
+   },
+   "example": "MSS = 1000 bytes, initial ssthresh = 8 MSS, cwnd = 1 MSS. Write cwnd at the start of each round trip until round 12 if three duplicate ACKs arrive at the end of round 8 (Reno). Answer: 1, 2, 4, 8, then congestion avoidance gives 9, 10, 11, 12 in rounds 5 to 8. Fast retransmit sets ssthresh = 12/2 = 6 MSS and cwnd = 6 MSS, so rounds 9 to 12 give 6, 7, 8, 9 MSS. With a timeout instead, ssthresh would still be 6 MSS but cwnd would fall to 1 MSS.",
+   "trap": "Thinking slow start is slower than congestion avoidance, when it is the faster doubling phase; and halving the wrong number, which should be the current cwnd, into ssthresh.",
+   "prereq": "Chapter 5.3 (window field) and chapter 5.5 (rwnd, so the two windows are not confused).",
+   "leave": "Router queue management (RED, DECbit) is only named here; scheduling and reservation belong to chapter 5.7."
+  },
+  {
+   "k": 7,
+   "idea": "Quality of service replaces best effort with classification, shaping, scheduling and, in integrated services, an actual reservation of resources per flow.",
+   "depth": "The four QoS parameters: reliability, delay, jitter and bandwidth. Scheduling: FIFO, priority queueing, weighted fair queueing. Traffic shaping and policing: leaky bucket enforces a fixed output rate, token bucket allows a burst. Integrated Services: a flow is described by a TSpec (token bucket rate, bucket depth, peak rate, minimum policed unit, maximum packet size); RSVP carries the reservation request through the routers; admission control accepts or rejects so existing flows keep their promises; two classes, guaranteed service and controlled load. Note the scaling problem that led to DiffServ in one line: DiffServ marks packets with a DSCP and gives per-class, not per-flow, treatment.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "What a reserved flow passes through",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Packet arrives",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Classifier",
+      "note": "which flow?",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Admission control",
+      "note": "RSVP reservation",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Token-bucket policer",
+      "note": "drop if over rate",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Per-flow queues",
+      "note": "weighted fair queueing",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Guaranteed service",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "admitted",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "label": "conforming",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     }
+    ],
+    "caption": "A flow is only promised delay and bandwidth after admission control accepts its reservation; the policer then keeps the flow inside the rate it asked for.",
+    "aria": "A flow diagram in which a packet is classified into a flow, passes admission control under RSVP, is policed by a token bucket, waits in a per-flow queue served by weighted fair queueing and leaves with a guarantee."
+   },
+   "example": "A token bucket has capacity b = 16000 bits and token rate r = 2 Mbps, and the bucket starts full. (a) How many bits can a flow send at full line rate in the first 4 s? (b) What is the largest burst it can send at t = 0? Answer: (a) b + r x t = 16000 + 2 x 10^6 x 4 = 16000 + 8000000 = 8016000 bits, about 1 MB, against 8000000 bits for a plain 2 Mbps limit. (b) b = 16000 bits = 2000 bytes.",
+   "trap": "Treating a token bucket as a peak-rate limiter, when it limits the long-run average and lets a burst of b bits through; and mixing up IntServ's per-flow reservation with DiffServ's per-class marking.",
+   "prereq": "Chapter 5.6 (why TCP alone cannot promise delay); Unit 3 (queueing basics) helps for weighted fair queueing.",
+   "leave": "Router architecture and packet scheduling hardware are outside this unit; MPLS and traffic engineering are not covered here."
+  },
+  {
+   "k": 8,
+   "idea": "SCTP carries several independent streams inside one association and can use several IP addresses at each end, so one lost message does not block the rest.",
+   "depth": "Association instead of connection; message-oriented (it keeps message boundaries), ordered or unordered delivery per stream, multi-streaming and multi-homing with one primary path and the others for failover and retransmission. Common header of 12 bytes: source port (16), destination port (16), verification tag (32), checksum (32, CRC-32C). Everything after it is a chunk with a 4-byte chunk header (type, flags, length); DATA chunks add a transmission sequence number, stream identifier, stream sequence number and payload protocol identifier. Four-way cookie handshake: INIT, INIT-ACK carrying a state cookie, COOKIE-ECHO, COOKIE-ACK, which avoids holding state for half-open associations. Also SACK chunks, HEARTBEAT, and SHUTDOWN with SHUTDOWN-ACK and SHUTDOWN-COMPLETE. Where it is used: telephony signalling over IP.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Host A",
+     "Host B"
+    ],
+    "messages": [
+     {
+      "from": "Host A",
+      "to": "Host B",
+      "label": "INIT, streams and address list",
+      "dashed": false
+     },
+     {
+      "from": "Host B",
+      "to": "Host A",
+      "label": "INIT ACK + state cookie",
+      "dashed": true
+     },
+     {
+      "from": "Host A",
+      "to": "Host B",
+      "label": "COOKIE ECHO",
+      "dashed": false
+     },
+     {
+      "from": "Host B",
+      "to": "Host A",
+      "label": "COOKIE ACK",
+      "dashed": true
+     },
+     {
+      "from": "Host A",
+      "to": "Host B",
+      "label": "DATA, stream 1, TSN 1",
+      "dashed": false
+     }
+    ],
+    "caption": "The server keeps no state until the cookie comes back, which is what protects it from a flood of half-open requests.",
+    "aria": "A message sequence chart between two hosts: INIT, INIT ACK with a state cookie, COOKIE ECHO, COOKIE ACK, then a data chunk labelled with its stream and transmission sequence number."
+   },
+   "example": "An SCTP association has primary path 10.0.0.1 and backup path 10.0.0.2. The path MTU is 1500 bytes including a 20-byte IP header, the common header is 12 bytes and a DATA chunk header is 16 bytes. (a) How many DATA chunks carry a 3000-byte message? (b) The primary path fails after chunk 1 is acknowledged and chunk 2 is lost. What happens? Answer: (a) room per chunk = 1500 - 20 - 12 - 16 = 1452 bytes, so two full chunks carry 2904 bytes and a third carries the remaining 96 bytes, three chunks in all. (b) The missing chunk is retransmitted on 10.0.0.2, the primary is marked inactive, and heartbeats decide when it can be used again.",
+   "trap": "Describing the SCTP association as a TCP-style connection with a three-way handshake; and expecting a lost message on stream 1 to hold up delivery on stream 2, which is exactly what TCP does and SCTP avoids.",
+   "prereq": "Chapters 5.2 and 5.3 (UDP and TCP headers, ports, checksum).",
+   "leave": "Application protocols over SCTP (for example SIP) to Unit 6; the full chunk type list is read once, not memorised."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "port numbers reappear as UDP's first two header fields"
+  ],
+  [
+   2,
+   3,
+   "UDP's four fields grow into TCP's twenty bytes"
+  ],
+  [
+   3,
+   4,
+   "sequence and acknowledgment numbers are fixed during the handshake"
+  ],
+  [
+   4,
+   5,
+   "an open connection needs a receiver window before data flows"
+  ],
+  [
+   5,
+   6,
+   "rwnd and cwnd together decide how much the sender may put in flight"
+  ],
+  [
+   6,
+   7,
+   "loss-based control is the problem that QoS tries to work around"
+  ],
+  [
+   3,
+   8,
+   "SCTP keeps TCP's reliability but redraws the header and the handshake"
+  ]
+ ]
+}

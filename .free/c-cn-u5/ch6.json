@@ -1,0 +1,330 @@
+{
+ "lead": "TCP congestion control decides how many bytes a sender may keep in the network without overloading it. It keeps a congestion window, cwnd, separate from the receiver's flow-control window. A lost segment is treated as a congestion signal: TCP grows cwnd from a small initial value, doubling each round trip (exponential), then linearly in congestion avoidance, and cuts it on loss. The main mechanisms are slow start, congestion avoidance, timeout, fast retransmit and fast recovery. The same logic runs in every TCP connection, from a UPI payment to a web page load.",
+ "prereq": "You need: <a href=\"#tcp-services-and-segment-format\">Chapter 5.3</a> for the TCP header and <a href=\"#tcp-flow-control\">Chapter 5.5</a> for rwnd, so cwnd is not confused with the receiver's window.",
+ "sections": [
+  {
+   "h3": "The congestion window and the threshold",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "IP routers have finite queues. If TCP senders send faster than a link can carry, queues fill and packets drop. TCP congestion control is sender-side: each sender estimates safe load from ACKs and losses."
+    },
+    {
+     "type": "p",
+     "text": "Each connection keeps two variables. The congestion window, cwnd, limits the sender's unacknowledged bytes in the network. It is measured in bytes or in MSS; 1 MSS is one maximum segment size, for example 1000 bytes. The slow-start threshold, ssthresh, is the cwnd value where TCP leaves slow start. Both are per connection."
+    },
+    {
+     "type": "p",
+     "text": "The send limit is min(cwnd, rwnd). rwnd is the receiver's advertised free buffer from <a href=\"#tcp-flow-control\">flow control</a>. cwnd protects the network; rwnd protects the receiver. A sender with cwnd = 8 MSS and rwnd = 5 MSS may have at most 5 MSS unacknowledged."
+    },
+    {
+     "type": "p",
+     "text": "TCP treats ACKs as permission to send more and losses as congestion signals. This gives additive increase, multiplicative decrease (AIMD): rise about one MSS per round trip, cut on loss."
+    }
+   ]
+  },
+  {
+   "h3": "Slow start and congestion avoidance",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Slow start begins with cwnd = 1 MSS. For every ACK of new data, add one MSS. With no loss, cwnd doubles each round trip: 1, 2, 4, 8 MSS. The name is historical; this phase is exponential and fills an empty pipe quickly."
+    },
+    {
+     "type": "p",
+     "text": "When cwnd reaches ssthresh, TCP enters congestion avoidance. Growth becomes roughly linear: about one MSS per round trip. The per-ACK rule is:"
+    },
+    {
+     "type": "formula",
+     "text": "cwnd ← cwnd + (MSS × MSS) ÷ cwnd",
+     "where": "cwnd is the current congestion window in bytes; MSS is the maximum segment size in bytes; the addition is done for each ACK of new data. In MSS units, cwnd ← cwnd + 1 ÷ cwnd per ACK, so cwnd ACKs add about 1 MSS."
+    },
+    {
+     "type": "p",
+     "text": "The usual test is: if cwnd < ssthresh, stay in slow start; otherwise use congestion avoidance. In the example, cwnd = 8 MSS equals ssthresh = 8 MSS, so round 5 adds one MSS, not doubles."
+    },
+    {
+     "type": "p",
+     "text": "AIMD keeps many connections probing upward by one MSS per RTT. On loss each halves cwnd, so total load falls. The rise is gentle; the cut is sharp. This is approximate fairness, not an exact guarantee."
+    }
+   ]
+  },
+  {
+   "h3": "Loss: timeout, fast retransmit, fast recovery",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "TCP has two loss signals. A retransmission timeout (RTO) means no ACK arrived before the timer. It is a strong signal. Set ssthresh = cwnd ÷ 2, set cwnd = 1 MSS, and re-enter slow start. Some stacks use max(cwnd ÷ 2, 2 MSS); the halving is the key."
+    },
+    {
+     "type": "p",
+     "text": "Duplicate ACKs are weaker. If one segment is lost but later segments arrive, the receiver repeats an ACK with the same expected sequence number. After three duplicate ACKs, the sender assumes one segment is lost. Fast retransmit resends it at once, without waiting for the RTO. Three duplicate ACKs mean four ACKs with the same number: the original plus three copies."
+    },
+    {
+     "type": "p",
+     "text": "Fast recovery, as in TCP Reno, avoids cwnd = 1. Set ssthresh = cwnd ÷ 2 and cwnd = ssthresh, then continue in congestion avoidance. TCP Tahoe, older, sets cwnd = 1 MSS after fast retransmit. Reno keeps more data in flight on long paths. Some textbooks write cwnd = ssthresh + 3 MSS during fast recovery; this chapter uses the simplified convention cwnd = ssthresh."
+    },
+    {
+     "type": "p",
+     "text": "The cycle is: slow start doubles cwnd; congestion avoidance adds about one MSS per RTT; a loss halves ssthresh; cwnd drops to ssthresh (Reno with duplicate ACKs) or 1 MSS (timeout or Tahoe). Fast retransmit needs three later segments, so tiny windows may still rely on the RTO."
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi add router-side signals. In DECbit, a router sets a congestion bit when its average queue is above a threshold. The receiver copies the bit into the ACK, and the sender slows down. Random Early Detection (RED) keeps an average queue length. Below a minimum threshold it drops nothing. Between minimum and maximum it drops or marks arriving packets with a probability that rises with the average queue. Above the maximum it drops all arrivals. The aim is early, randomized signalling, not a synchronized drop by many TCP flows. Modern data centres also use ECN, which marks instead of drops. Router queue management is only named here; scheduling and reservation belong to <a href=\"#quality-of-service-and-integrated-services\">Chapter 5.7</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The steep climb is slow start, the gentle slope is congestion avoidance, and the drop at the start of round 9 is Reno fast recovery halving the window instead of restarting from one.",
+  "spec": {
+   "type": "plot",
+   "x": {
+    "label": "round trip",
+    "min": 1,
+    "max": 12
+   },
+   "y": {
+    "label": "cwnd (MSS)",
+    "min": 0,
+    "max": 14
+   },
+   "series": [
+    {
+     "name": "cwnd",
+     "points": [
+      [
+       1,
+       1
+      ],
+      [
+       2,
+       2
+      ],
+      [
+       3,
+       4
+      ],
+      [
+       4,
+       8
+      ],
+      [
+       5,
+       9
+      ],
+      [
+       6,
+       10
+      ],
+      [
+       7,
+       11
+      ],
+      [
+       8,
+       12
+      ],
+      [
+       9,
+       6
+      ],
+      [
+       10,
+       7
+      ],
+      [
+       11,
+       8
+      ],
+      [
+       12,
+       9
+      ]
+     ],
+     "style": "accent",
+     "_pts": [
+      [
+       1.0,
+       1.0
+      ],
+      [
+       2.0,
+       2.0
+      ],
+      [
+       3.0,
+       4.0
+      ],
+      [
+       4.0,
+       8.0
+      ],
+      [
+       5.0,
+       9.0
+      ],
+      [
+       6.0,
+       10.0
+      ],
+      [
+       7.0,
+       11.0
+      ],
+      [
+       8.0,
+       12.0
+      ],
+      [
+       9.0,
+       6.0
+      ],
+      [
+       10.0,
+       7.0
+      ],
+      [
+       11.0,
+       8.0
+      ],
+      [
+       12.0,
+       9.0
+      ]
+     ]
+    },
+    {
+     "name": "ssthresh",
+     "points": [
+      [
+       1,
+       8
+      ],
+      [
+       8,
+       8
+      ],
+      [
+       9,
+       6
+      ],
+      [
+       12,
+       6
+      ]
+     ],
+     "style": "muted",
+     "_pts": [
+      [
+       1.0,
+       8.0
+      ],
+      [
+       8.0,
+       8.0
+      ],
+      [
+       9.0,
+       6.0
+      ],
+      [
+       12.0,
+       6.0
+      ]
+     ]
+    }
+   ],
+   "aria": "A line graph of congestion window in MSS against round trip number: it doubles from 1 to 8 over three rounds, rises by one per round to 12, then drops to 6 and rises again, while the threshold line falls from 8 to 6."
+  }
+ },
+ "examples": [
+  {
+   "question": "MSS = 1000 bytes, initial ssthresh = 8 MSS, cwnd = 1 MSS. Write cwnd at the start of each round trip until round 12 if three duplicate ACKs arrive at the end of round 8 (Reno).",
+   "steps": [
+    "Round 1 starts at cwnd = 1 MSS. Slow start doubles: rounds 1 to 4 give 1, 2, 4, 8 MSS.",
+    "cwnd = 8 MSS equals ssthresh, so congestion avoidance adds one MSS per RTT: rounds 5 to 8 give 9, 10, 11, 12 MSS.",
+    "The duplicate ACKs at the end of round 8 set ssthresh = 12 ÷ 2 = 6 MSS.",
+    "Reno fast recovery sets cwnd = ssthresh = 6 MSS at round 9; congestion avoidance then gives rounds 9 to 12: 6, 7, 8, 9 MSS.",
+    "With a timeout, ssthresh would still be 6 MSS but cwnd would restart at 1 MSS."
+   ],
+   "answer": "The cwnd values at rounds 1 to 12 are 1, 2, 4, 8, 9, 10, 11, 12, 6, 7, 8, 9 MSS, and ssthresh becomes 6 MSS.",
+   "check": "mss = 1000\nssthresh = 8\ncwnd = 1\nvals = []\nfor r in range(1, 13):\n    vals.append(cwnd)\n    if r == 8:\n        ssthresh = cwnd // 2\n        cwnd = ssthresh\n    elif cwnd < ssthresh:\n        cwnd *= 2\n    else:\n        cwnd += 1\nfor v in vals:\n    print(v)\nprint(ssthresh)\n",
+   "values": [
+    1,
+    2,
+    4,
+    8,
+    9,
+    10,
+    11,
+    12,
+    6,
+    7,
+    8,
+    9,
+    6
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Slow start is the faster doubling phase, not the slow one. The name means it starts from a small window.",
+  "Halve the current cwnd to get ssthresh, not the old ssthresh or the receiver's rwnd.",
+  "Fast retransmit needs three duplicate ACKs; one duplicate ACK or a timeout is not the same trigger.",
+  "cwnd is the network limit; rwnd is the receiver's buffer. The sender uses the smaller.",
+  "Reno sets cwnd = ssthresh after duplicate ACKs; Tahoe and timeout drop cwnd to 1 MSS."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define cwnd and ssthresh.",
+   "marks": 2,
+   "a": "cwnd is the sender's congestion window in bytes or MSS. ssthresh is the threshold where TCP changes from slow start to congestion avoidance."
+  },
+  {
+   "level": "remember",
+   "q": "Which event triggers fast retransmit?",
+   "marks": 2,
+   "a": "Three duplicate ACKs for the same acknowledgment number."
+  },
+  {
+   "level": "understand",
+   "q": "Why does slow start double cwnd each round trip?",
+   "marks": 3,
+   "a": "Each ACK adds one MSS. With cwnd ACKs per round trip, cwnd grows by cwnd MSS, so it doubles."
+  },
+  {
+   "level": "apply",
+   "q": "MSS = 1000 bytes, ssthresh = 16 MSS, cwnd = 1 MSS, no loss. Give cwnd at rounds 1 to 6.",
+   "marks": 4,
+   "a": "1, 2, 4, 8, 16, 17 MSS. At round 5 cwnd = 16 MSS equals the threshold, so congestion avoidance applies from round 5 and gives 17 MSS at round 6."
+  },
+  {
+   "level": "apply",
+   "q": "cwnd = 24 MSS when three duplicate ACKs arrive in Reno. Give new ssthresh and cwnd.",
+   "marks": 3,
+   "a": "ssthresh = 12 MSS; cwnd = 12 MSS."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a timeout set cwnd = 1 but three duplicate ACKs set cwnd = ssthresh?",
+   "marks": 5,
+   "a": "Timeout is a strong loss signal; duplicate ACKs show later segments still arrive, so the pipe is partly working. Reno keeps cwnd at half to avoid a full restart."
+  },
+  {
+   "level": "analyze",
+   "q": "In the figure, why does cwnd at round 5 equal 9, not 16?",
+   "marks": 4,
+   "a": "At round 4 cwnd = 8 equals ssthresh = 8, so TCP is in congestion avoidance and adds one MSS per RTT, not doubling."
+  },
+  {
+   "level": "understand",
+   "q": "What is multiplicative decrease?",
+   "marks": 2,
+   "a": "On a loss event, TCP cuts cwnd or ssthresh to about half, a multiplicative factor, rather than subtracting a fixed amount."
+  }
+ ],
+ "beyond": "Not for the exam. Modern Linux uses CUBIC by default, which grows cwnd as a cubic function of time since the last loss, and BBR, which models bottleneck bandwidth and round-trip time. Data-centre TCP variants such as DCTCP use ECN marks to react before drops. Search for CUBIC, BBR, DCTCP, ECN and AQM if you want the next layer. The core AIMD idea still explains why a single loss does not collapse every TCP flow."
+}

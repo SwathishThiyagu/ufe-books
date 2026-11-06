@@ -1,0 +1,227 @@
+{
+ "lead": "Best-effort delivery gives every packet the same treatment: no promise of bandwidth, no limit on delay. Quality of service (QoS) turns that into a contract. Packets are classified into flows, shaped to a rate, queued per flow and scheduled so each flow gets its promised share. Integrated Services goes further and reserves resources for a flow end to end, using RSVP to carry the request and admission control to accept or reject it. You meet this whenever a voice call must not wait behind a file download — a UPI payment, a hospital monitor, a live cricket stream.",
+ "prereq": "You need: <a href=\"#tcp-congestion-control-slow-start-fast-retransmit\">Chapter 5.6</a> for why TCP alone cannot promise delay, and the queueing basics from Unit 3, Data Link Layer and Medium Access.",
+ "sections": [
+  {
+   "h3": "The four parameters of quality of service",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "QoS is described by four parameters. <b>Reliability</b> is how much data is lost — the fraction of packets that never arrive. <b>Delay</b> is the time a packet takes from source to destination, in milliseconds. <b>Jitter</b> is the variation in that delay: if packet 1 takes 20 ms and packet 2 takes 55 ms, the jitter is 35 ms. <b>Bandwidth</b> is the rate the flow needs, in bits per second."
+    },
+    {
+     "type": "p",
+     "text": "Different applications care about different parameters. A file transfer needs reliability and bandwidth and can wait seconds. A voice call needs low delay (under about 150 ms one way), low jitter and only about 64 kbps, but tolerates a little loss. Video needs bandwidth and jitter control. A stock ticker needs reliability and delay together."
+    },
+    {
+     "type": "p",
+     "text": "Plain IP gives best effort: first come, first served, no guarantee for anyone. Adding bandwidth does not fix jitter, because a bigger pipe still lets one large packet push a small one aside at a router. QoS is the set of mechanisms that fixes this deliberately, by classifying packets and treating classes differently."
+    }
+   ]
+  },
+  {
+   "h3": "Scheduling and shaping inside a router",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A router with QoS classifies each packet into a flow, polices the flow's rate, queues it, and schedules it. <b>Scheduling</b> decides which queued packet leaves next."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>FIFO</b> (first in, first out): one queue, arrival order, no QoS.",
+      "<b>Priority queueing</b>: several queues with priorities; the highest non-empty priority always wins. Strict priority can starve low-priority traffic.",
+      "<b>Weighted fair queueing (WFQ)</b>: every flow gets its own queue and is served in proportion to a weight wᵢ. Flow i gets roughly wᵢ ÷ Σwⱼ of the link rate. With weights 1, 1, 2 on a 4 Mbps link, the third flow gets 2 Mbps and the other two get 1 Mbps each."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "<b>Shaping</b> delays excess packets; <b>policing</b> drops or marks them. The leaky bucket drains at a constant rate r, so its output rate never exceeds r whatever the input burst — bursty traffic becomes a smooth stream. The token bucket stores tokens that arrive at rate r, up to a depth b, and a packet of L bits leaves only if L tokens are present."
+    },
+    {
+     "type": "formula",
+     "text": "bits sent ≤ b + r × t",
+     "where": "b is the bucket depth in bits (the largest burst allowed at once); r is the token rate in bits per second (the long-run average); t is the elapsed time in seconds, starting with a full bucket."
+    },
+    {
+     "type": "p",
+     "text": "So a token bucket limits the average rate and permits a burst of b bits; a leaky bucket permits no burst at all."
+    }
+   ]
+  },
+  {
+   "h3": "Integrated Services: reserving per-flow resources",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Integrated Services (IntServ) makes a reservation before sending. Each flow is described by a <b>TSpec</b> (traffic specification), five numbers: token bucket rate r, token bucket depth b, peak rate p, minimum policed unit m, and maximum packet size M. This book writes r and p in bits per second and b in bits. The standard TSpec (RFC 2210) defines r, b, p, m and M all in bytes, with r and p in bytes per second. Convert before comparing with link rates."
+    },
+    {
+     "type": "p",
+     "text": "The sender states a service class and its TSpec. <b>RSVP</b> (Resource Reservation Protocol) carries the request hop by hop to every router on the path. Each router runs <b>admission control</b>: it adds the new TSpec to what is already promised and checks whether link capacity and queue budget still suffice. If yes, the flow is admitted and resources are committed; if no, the request is rejected and the sender is told. Existing flows keep their promises either way — that is the whole point."
+    },
+    {
+     "type": "p",
+     "text": "Two classes exist. <b>Guaranteed service</b> promises a firm upper bound on queueing delay for a flow that stays inside its TSpec. <b>Controlled load</b> promises only that the flow will see a lightly loaded network — very low loss and delay, but no firm number."
+    },
+    {
+     "type": "p",
+     "text": "The scaling problem: a core router may carry millions of flows, and per-flow state plus a reservation message per flow does not fit. DiffServ answers this by marking each packet with a DSCP (Differentiated Services Code Point) in the IP header and giving per-class, not per-flow, treatment."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "Admission control runs once at reservation setup: RSVP brings the TSpec, and the router admits or rejects the flow. After admission, every packet takes the per-packet path: classify, police with a token bucket, queue per flow for weighted fair queueing, then leave under guaranteed or controlled-load service.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "What a reserved flow passes through",
+   "nodes": [
+    {
+     "id": "r",
+     "label": "RSVP reservation request",
+     "note": "TSpec for the flow",
+     "style": "accent"
+    },
+    {
+     "id": "ac",
+     "label": "Admission control",
+     "note": "once per flow: admit or reject",
+     "style": "accent"
+    },
+    {
+     "id": "pkt",
+     "label": "Packet arrives",
+     "style": "normal"
+    },
+    {
+     "id": "cls",
+     "label": "Classifier",
+     "note": "which flow?",
+     "style": "normal"
+    },
+    {
+     "id": "pol",
+     "label": "Token-bucket policer",
+     "note": "drop if over rate",
+     "style": "normal"
+    },
+    {
+     "id": "q",
+     "label": "Per-flow queues",
+     "note": "weighted fair queueing",
+     "style": "normal"
+    },
+    {
+     "id": "out",
+     "label": "Output",
+     "note": "guaranteed or controlled-load service",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "r",
+     "to": "ac",
+     "label": "setup",
+     "style": "solid"
+    },
+    {
+     "from": "ac",
+     "to": "pkt",
+     "label": "admitted",
+     "style": "solid"
+    },
+    {
+     "from": "pkt",
+     "to": "cls",
+     "style": "solid"
+    },
+    {
+     "from": "cls",
+     "to": "pol",
+     "style": "solid"
+    },
+    {
+     "from": "pol",
+     "to": "q",
+     "label": "conforming",
+     "style": "solid"
+    },
+    {
+     "from": "q",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "A flow diagram in which RSVP brings a TSpec to admission control once per flow, which admits or rejects it. After admission each packet is classified into a flow, is policed by a token bucket, waits in a per-flow queue served by weighted fair queueing, and leaves under guaranteed or controlled-load service."
+  }
+ },
+ "examples": [
+  {
+   "question": "A token bucket at a router's ingress has depth b = 16 000 bits and token rate r = 2 Mbps. The bucket is full at t = 0 and the flow always has data ready. (a) How many bits can the flow send in the first 4 s? (b) What is the largest burst it can hand over at t = 0?",
+   "steps": [
+    "Write the data with units: r = 2 Mbps = 2 × 10⁶ bits/s, b = 16 000 bits, t = 4 s.",
+    "Part (b) first. At t = 0 the bucket holds b tokens, and a packet of L bits needs L tokens. So the largest instantaneous burst is b = 16 000 bits = 16 000 ÷ 8 = 2000 bytes.",
+    "Part (a). Tokens earned in 4 s: r × t = 2 × 10⁶ × 4 = 8 000 000 bits.",
+    "Add the tokens already in the bucket: b + r × t = 16 000 + 8 000 000 = 8 016 000 bits.",
+    "Check against a plain 2 Mbps limiter: it would allow 8 000 000 bits in 4 s. The token bucket allows 16 000 bits more — exactly the saved burst."
+   ],
+   "answer": "In the first 4 s the flow can send 8 016 000 bits (about 1 MB), and the largest burst at t = 0 is 16 000 bits, that is 2000 bytes.",
+   "check": "b = 16000\nr = 2 * 10**6\nt = 4\ntotal = b + r * t\nburst = b\nprint(total)\nprint(burst)\n",
+   "values": [
+    8016000,
+    16000
+   ],
+   "output": "8016000\n16000"
+  }
+ ],
+ "traps": [
+  "Treating a token bucket as a peak-rate limiter. It limits the long-run average to r and lets a burst of b bits through; only a leaky bucket forces a flat output rate.",
+  "Mixing up IntServ (per-flow reservation, RSVP, admission control, per-flow state) with DiffServ (per-class DSCP marking, no per-flow state).",
+  "Mixing bits and bytes when converting TSpec values. The standard TSpec defines r, b, p, m and M all in bytes (r and p in bytes per second); this book writes rates in bits per second. Convert before comparing with link rates.",
+  "Swapping shaping and policing: shaping delays excess traffic, policing drops or marks it.",
+  "Forgetting that admission control exists to protect flows already admitted, not to help the new one."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four QoS parameters and give the unit of each.",
+   "marks": 2,
+   "a": "Reliability (fraction of packets lost, no unit), delay (milliseconds), jitter (milliseconds, the variation in delay) and bandwidth (bits per second)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does upgrading a link from 10 Mbps to 100 Mbps not remove jitter?",
+   "marks": 3,
+   "a": "Jitter comes from queueing delay varying: a voice packet may find the queue empty one moment and behind a large data packet the next. A faster link shortens each wait but does not stop the queue depth from varying, so delay still varies unless scheduling gives each flow its own queue and a guaranteed share."
+  },
+  {
+   "level": "apply",
+   "q": "A 10 Mbps link uses weighted fair queueing with three flows of weights 1, 1 and 2. What rate does each flow get?",
+   "marks": 4,
+   "a": "Sum of weights = 1 + 1 + 2 = 4. Flow 1: (1/4) × 10 = 2.5 Mbps. Flow 2: 2.5 Mbps. Flow 3: (2/4) × 10 = 5 Mbps."
+  },
+  {
+   "level": "apply",
+   "q": "A token bucket has r = 1 Mbps and b = 8000 bits, full at t = 0. How many bits can the flow send in the first 2 s?",
+   "marks": 3,
+   "a": "r × t = 1 × 10⁶ × 2 = 2 000 000 bits. Add the bucket: 8000 + 2 000 000 = 2 008 000 bits."
+  },
+  {
+   "level": "analyze",
+   "q": "A router already carries flows whose TSpecs add up to 90% of a 100 Mbps link. A new flow asks for 15 Mbps. What does admission control decide, and why is that good for the existing flows?",
+   "marks": 5,
+   "a": "90 + 15 = 105 Mbps > 100 Mbps, so the request is rejected. Accepting it would make every flow miss its promised delay and bandwidth, so rejecting the newcomer keeps the existing guarantees true."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does DiffServ scale better than IntServ in the core of the Internet?",
+   "marks": 6,
+   "a": "IntServ keeps state and runs a reservation per flow, so an edge router or core router with millions of flows must store and process millions of records. DiffServ keeps no per-flow state: it sets a DSCP in the IP header and each router applies one of a few per-class behaviours, so the work per packet is constant however many flows pass through."
+  }
+ ],
+ "beyond": "Not for the exam. In practice, operators build QoS with Linux tc (htb for weighted fair queueing, tbf for token bucket), and RSVP still appears as RSVP-TE inside MPLS for traffic engineering. Mobile networks express the same idea as 5G QoS flows, each with a 5QI value that fixes delay and loss targets. DiffServ's expedited forwarding and assured forwarding classes are what carry voice in many carrier backbones. Search next for \"DiffServ assured forwarding\", \"RSVP-TE\" and \"5G QoS flow 5QI\" if you want to see the reservation idea deployed."
+}

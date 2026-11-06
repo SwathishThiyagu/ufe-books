@@ -1,0 +1,238 @@
+{
+ "lead": "SCTP is a transport protocol that carries several independent streams inside one association. A lost message blocks only its own stream, not the others. Each endpoint may also list several IP addresses, so a broken path is replaced without restarting anything. It keeps message boundaries instead of a byte stream, and it uses a four-message handshake with a cookie, so a server stores no state for a request that may be fake. Telephone signalling over IP is where it is most used. This chapter covers the association, the common header, the chunks and the cookie handshake.",
+ "prereq": "You need: ports and multiplexing from <a href=\"#transport-services-ports-multiplexing-and-demultiplexing\">Chapter 5.1</a>, header fields and checksum from <a href=\"#user-datagram-protocol-udp\">5.2</a> and <a href=\"#tcp-services-and-segment-format\">5.3</a>, and the TCP handshake from <a href=\"#tcp-connection-establishment-and-release\">5.4</a>.",
+ "sections": [
+  {
+   "h3": "Association, streams and addresses",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "TCP calls its end-to-end state a connection. SCTP calls it an association, because the state is larger: one association carries many streams and may span many address pairs."
+    },
+    {
+     "type": "p",
+     "text": "A stream is a one-way logical channel inside the association, numbered from 0. Each direction has its own stream numbers, agreed at setup. Data on stream 3 is ordered only with respect to other data on stream 3. A lost DATA chunk on stream 1 stalls stream 1 and nothing else. TCP, with a single byte stream, would stall everything; that is head-of-line blocking."
+    },
+    {
+     "type": "p",
+     "text": "SCTP is message-oriented. If the application writes one 3000-byte message, the receiver's read returns exactly 3000 bytes, never a merged or split message. The sender marks each message ordered (deliver in sequence within its stream) or unordered (deliver as soon as it arrives). Unordered service suits signalling, where each message stands alone."
+    },
+    {
+     "type": "p",
+     "text": "Multihoming: at setup each endpoint supplies a list of IP addresses. One address pair is the primary path; the others are alternates. SCTP sends normal traffic on the primary, retransmits lost chunks on an alternate when the primary looks dead, and probes every path with heartbeats. It does not spread load across paths by default."
+    }
+   ]
+  },
+  {
+   "h3": "The common header and the chunk",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every SCTP packet starts with a 12-byte common header."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Field",
+      "Size",
+      "Job"
+     ],
+     "rows": [
+      [
+       "Source port",
+       "16 bits",
+       "sender's process"
+      ],
+      [
+       "Destination port",
+       "16 bits",
+       "receiver's process"
+      ],
+      [
+       "Verification tag",
+       "32 bits",
+       "names the association"
+      ],
+      [
+       "Checksum",
+       "32 bits",
+       "CRC-32C over the packet"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Ports do the multiplexing of Chapter 5.1. The verification tag is chosen by each end during setup; a packet whose tag does not match the association is silently discarded, which kills stale packets and blind off-path injection. The checksum is CRC-32C, computed over the whole packet with the checksum field zeroed; the arithmetic is the CRC of Unit 3."
+    },
+    {
+     "type": "p",
+     "text": "Everything after the common header is a chunk. A chunk has a 4-byte header: type (8 bits), flags (8 bits), length (16 bits). The length counts the chunk header and the payload but not the padding that rounds the chunk to a multiple of 4 bytes. Several chunks may be bundled into one packet."
+    },
+    {
+     "type": "p",
+     "text": "A DATA chunk (type 0) adds four fields after the chunk header."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "TSN, 32 bits: transmission sequence number. It counts DATA chunks across the whole association and is what SACK acknowledges and what retransmission uses.",
+      "Stream identifier, 16 bits: the stream this chunk belongs to.",
+      "Stream sequence number, 16 bits: position of the message inside that stream; this is what orders stream 3 against stream 3.",
+      "Payload protocol identifier, 32 bits: tells the receiving application what kind of payload it is."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The DATA flags carry I (immediate, deliver without waiting for ordering), U (unordered), B (first fragment) and E (last fragment), so a large message is split and reassembled."
+    },
+    {
+     "type": "p",
+     "text": "SACK (type 3) acknowledges TSNs and reports gaps, so the sender sees exactly which chunks are missing. HEARTBEAT (4) and HEARTBEAT-ACK (5) probe paths. SHUTDOWN (7), SHUTDOWN-ACK (8) and SHUTDOWN-COMPLETE (9) close the association. Other chunk types exist; read the list once."
+    }
+   ]
+  },
+  {
+   "h3": "Four messages and a cookie",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Setup takes four messages, not three."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "INIT from the client: initiate tag, number of outbound and inbound streams, initial TSN, list of its IP addresses.",
+      "INIT-ACK from the server: its own tag, stream counts, its address list, and a state cookie.",
+      "COOKIE-ECHO: the client returns the cookie byte for byte.",
+      "COOKIE-ACK: the server accepts, and the association is up."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The cookie holds everything the server would otherwise have to remember (tags, TSNs, stream counts, addresses) plus a timestamp and a signature made with a secret only the server knows. After sending INIT-ACK the server keeps no per-association state; only the secret key used to sign and verify cookies is retained. A flood of INITs with forged source addresses therefore does not grow its memory; when a real COOKIE-ECHO returns, the cookie is verified and state is created then. COOKIE-ECHO may also carry DATA chunks, so the first message needs no extra round trip."
+    },
+    {
+     "type": "p",
+     "text": "Teardown is a three-message exchange: SHUTDOWN, SHUTDOWN-ACK, SHUTDOWN-COMPLETE."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The server keeps no state until the cookie returns, so a flood of half-open requests costs it nothing. The DATA chunk is labelled with its stream and its TSN.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A message sequence chart between two hosts: INIT, INIT ACK with a state cookie, COOKIE ECHO, COOKIE ACK, then a data chunk labelled with its stream and transmission sequence number.",
+   "actors": [
+    "Host A",
+    "Host B"
+   ],
+   "messages": [
+    {
+     "from": "Host A",
+     "to": "Host B",
+     "label": "INIT, streams and address list",
+     "dashed": false
+    },
+    {
+     "from": "Host B",
+     "to": "Host A",
+     "label": "INIT ACK + state cookie",
+     "dashed": true
+    },
+    {
+     "from": "Host A",
+     "to": "Host B",
+     "label": "COOKIE ECHO",
+     "dashed": false
+    },
+    {
+     "from": "Host B",
+     "to": "Host A",
+     "label": "COOKIE ACK",
+     "dashed": true
+    },
+    {
+     "from": "Host A",
+     "to": "Host B",
+     "label": "DATA, stream 1, TSN 1",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An SCTP association has primary path 10.0.0.1 and backup path 10.0.0.2. The path MTU is 1500 bytes including the 20-byte IP header, the common header is 12 bytes and each DATA chunk header is 16 bytes. (a) How many DATA chunks carry a single 3000-byte message? (b) The primary path fails after chunk 1 is acknowledged and chunk 2 is lost. What happens?",
+   "steps": [
+    "Payload room per packet = MTU − IP header − common header − DATA chunk overhead = 1500 − 20 − 12 − 16 = 1452 bytes, where DATA chunk overhead = 4-byte chunk header + 12 bytes of DATA fields = 16 bytes. Staying at this size avoids IP fragmentation (Unit 4).",
+    "Two full chunks carry 2 × 1452 = 2904 bytes.",
+    "Remaining = 3000 − 2904 = 96 bytes, so a third chunk carries 96 bytes. Total = 3 chunks.",
+    "Chunk 2's TSN is missing from the SACK gap blocks, so the retransmission timer fires for it (later SACKs can also trigger fast retransmit).",
+    "SCTP retransmits that DATA chunk on 10.0.0.2 and marks 10.0.0.1 inactive. Heartbeats keep probing 10.0.0.1; when they are answered, the path can become active again."
+   ],
+   "answer": "(a) Three DATA chunks with 1452, 1452 and 96 bytes of payload. (b) The lost chunk goes out on the backup path 10.0.0.2, and the primary is marked inactive until heartbeats succeed.",
+   "check": "mtu = 1500\nip = 20\ncommon = 12\ndch = 16\nmsg = 3000\nroom = mtu - ip - common - dch\nfull = msg // room\nrem = msg - full * room\nchunks = full + (1 if rem else 0)\nprint(room)\nprint(full * room)\nprint(rem)\nprint(chunks)",
+   "values": [
+    1452,
+    2904,
+    96,
+    3
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Calling the association a TCP connection with a three-way handshake. SCTP uses four messages and the state cookie is the whole point.",
+  "Expecting a lost message on stream 1 to hold up stream 2. TCP does that; SCTP orders per stream only.",
+  "Thinking multihoming balances load across paths. One path is primary; the rest are for retransmission and failover.",
+  "Confusing the verification tag with the checksum. The tag names the association; CRC-32C catches corruption.",
+  "Forgetting that the chunk length field includes the 4-byte chunk header but excludes the padding."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a stream in SCTP?",
+   "marks": 2,
+   "a": "A one-way logical channel inside the association, numbered from 0, with ordering kept only within that stream."
+  },
+  {
+   "level": "remember",
+   "q": "List the four fields of the SCTP common header with their sizes.",
+   "marks": 2,
+   "a": "Source port 16 bits, destination port 16 bits, verification tag 32 bits, checksum 32 bits (CRC-32C). Total 12 bytes."
+  },
+  {
+   "level": "understand",
+   "q": "Why does SCTP need a stream sequence number when it already has a TSN?",
+   "marks": 3,
+   "a": "The TSN orders DATA chunks across the whole association for acknowledgment and retransmission. The stream sequence number orders messages inside one stream, so each stream can be delivered independently."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the state cookie protect a server against an INIT flood?",
+   "marks": 3,
+   "a": "The server puts all needed state into the signed cookie and keeps nothing after INIT-ACK. Memory is used only when a valid COOKIE-ECHO returns, so forged INITs with fake source addresses create no state."
+  },
+  {
+   "level": "apply",
+   "q": "MTU is 1200 bytes including a 20-byte IP header, the common header is 12 bytes and a DATA chunk header is 16 bytes. How many chunks carry a 2500-byte message?",
+   "marks": 4,
+   "a": "Room = 1200 − 20 − 12 − 16 = 1152 bytes. Two full chunks = 2304 bytes, remainder 196 bytes, so 3 chunks: 1152, 1152, 196."
+  },
+  {
+   "level": "apply",
+   "q": "A DATA chunk carries 100 bytes of payload. What is its chunk length field, and how big is the whole SCTP packet if this is the only chunk?",
+   "marks": 3,
+   "a": "Length field = 4-byte chunk header + 12 bytes of DATA fields + 100-byte payload = 116. Packet = 12-byte common header + 116 = 128 bytes, already a multiple of 4, so no padding."
+  },
+  {
+   "level": "analyze",
+   "q": "Stream 1 loses the chunk with TSN 5 while stream 2 chunks with TSN 6 and 7 arrive safely. Does the receiver hold everything?",
+   "marks": 5,
+   "a": "No. Stream 2 messages are delivered once complete and in stream-sequence order, because TSN 5 belongs to stream 1 only. TSN 5 is retransmitted and only stream 1 waits, which is the head-of-line blocking SCTP removes."
+  }
+ ],
+ "beyond": "Not for the exam. WebRTC data channels run SCTP over DTLS over UDP inside browsers, so this header and these streams run on ordinary phones. Telephony signalling networks moved SS7-style messages onto SCTP because a lost message on one stream must not delay call setup on another. Search RFC 4960, \"SCTP multihoming\" and \"SCTP streams versus TCP head-of-line blocking\" to go further."
+}
