@@ -1,0 +1,45 @@
+# c-mobile-u1: free-model run
+
+- Book: `books/cse/c-mobile/c-mobile-u1.html`
+- Status: ok
+- Model calls so far: 30 (100,119 tokens in, 218,422 out), 5.0 minutes
+
+## Checker
+
+```
+c-mobile-u1.html: 8 chapters, 13129 words, 9 figures, 145 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 1, definition of mobile host; also Quiz Q1 and Q4: The definition says a mobile host changes its point of attachment 'while a session is open'. The standard definition does not require an open session: a phone that moves between cells while idle is still a mobile host, and the session is only what makes the problem hard. The chapter contradicts itself, because the Exam traps say location tracking finds an idle user, i.e. a mobile host with no session. A student will write the narrower definition and lose the point about idle hosts.
+- ch 1 [low] Section 1, 'Wireless is not the same as mobile'; repeated in Exam trap 1: The laptop on a train is said to have 'no radio at all'. With no network connection of any kind it is just a laptop with no network, so it is neither mobile nor wireless in the networking sense. The intended case is a laptop that stays connected by a cable.
+- ch 1 [low] Section 3, closing sentence: 'In every case the payload is small and the delay matters more than the data rate' is not true of fleet tracking. A GPS position pushed every few minutes can wait; that application is delay-tolerant and needs only that the position eventually arrives.
+- ch 1 [low] Section 2, Figure note and Exam trap 2: Saying middleware sits between the radio link and the Internet and never inside the phone contradicts Section 2 itself, which lists safe storage of keys as a middleware job; key storage happens on the handset. Standard middleware also has a client part (a sync client, a keystore).
+- ch 1 [low] Figure spec, node 'Fixed network': The note reads 'Internet and PSTN'. The PSTN is the circuit-switched telephone network and is not on the path of a UPI request; listing it next to the Internet in a data example misleads.
+- ch 1 [low] Exam trap on Mbps: Using 2²⁰ instead of 10⁶ changes the transmission time by about 5%, but it changes the total one-way time in the worked examples by well under 1%, because the 40 ms delay dominates. Saying 'the answer shifts by about 5%' overstates it.
+- ch 2 [low] Section 2, first two sentences of the GPRS paragraph: The phrase 'are an order of 100 kbps' and 'at an order of' is awkward English and can confuse readers whose first language is not English; the standard phrase is 'of the order of'.
+- ch 2 [low] Exam traps, second trap: 'They do not replace the air interface' can be read as 'the radio interface does not change at all', which is wrong: EDGE changes the modulation to 8-PSK and HSDPA adds a new shared downlink channel with 16-QAM. The true point is that no new generation of radio interface is introduced.
+- ch 2 [low] Section 3, 5G latency sentence: 'about 1 ms in the radio link' does not say which direction or which plane, so a student cannot tell what the 1 ms measures.
+- ch 2 [low] Section 1, 1G paragraph: AMPS is a frequency-division duplex system, so a call holds one uplink frequency and one downlink frequency, not a single frequency channel. The simplification can mislead about how the channel is used.
+- ch 2 [low] Section 2, last sentence (cross-reference): 'The internal GSM, GPRS and UMTS architecture' is vague; 'internal' does not tell the student what is in Chapter 1.3.
+- ch 2 [low] Worked example 1, step 1: The unit is written '40,000,000 bit' (singular) while the quantity is many bits; this is a small unit-writing slip in a chapter that asks students to be careful with units.
+- ch 3 [low] Figure: blocks diagram: The diagram runs MSC → 'PSTN and Internet' with the note 'GGSN for packets'. This suggests GPRS packet data passes through the MSC, but in the chapter text (correctly) packets go BSC → SGSN → GGSN and bypass the MSC. A student revising from the picture alone can get the data path wrong.
+- ch 4 [high] Section 2 / Figure (edge A–B label 'R'): The figure puts the label R on the line joining the centres of two touching cells (A to B). Section 1 defines R as the distance from a cell centre to a hexagon corner, so the centre-to-centre distance between two touching cells is √3·R ≈ 1.73R, not R. A student will conclude that the cell radius equals the spacing between neighbouring base stations, which contradicts D = R√(3N) used just above.
+- ch 4 [low] Quiz Q6: The question asks to 'compare', but the answer only describes the two schemes. It gives no point of comparison, so a student writing only this would lose marks.
+- ch 5 [high] Section 2, sentence 'The VLR record changes only when the serving MSC changes', and repeated in the figure caption: This contradicts the table in the same chapter, which says the VLR stores the current location area. Within one MSC area there are many location areas, and the VLR's stored LAI is updated at every location area change, so the VLR record does change without any MSC change. What stays the same is the identity of the serving VLR/MSC, not the record itself.
+- ch 5 [high] Section 2, sentence 'If the MS moves to a new MSC, the new MSC asks the old MSC or the HLR for the subscriber data': The new MSC/VLR does not ask the old MSC for subscriber data. The standard procedure is that the new VLR sends an update location to the HLR; the HLR sends cancel location to the old VLR and inserts the subscription data into the new VLR.
+- ch 5 [low] Section 1, sentence 'Soft handover needs code division multiple access': Stated as an absolute rule, this is too strong. Make-before-break operation is possible in systems that are not pure CDMA, for example dual connectivity in LTE and multi-connectivity in 5G, where the phone holds two links at once.
+- ch 6 [low] Section 2, registration bullets: The chapter says the mobile node sends the registration request through the foreign agent, but the previous bullet allows a co-located care-of address. With a co-located care-of address the mobile node sends the registration request directly to the home agent; no foreign agent is involved. The sentence as written can make a student think every registration goes through the FA.
+- ch 6 [low] Section 2, registration bullets: The foreign agent records the mobile node in its visitor list when it receives the registration request, not when it relays the reply. The sentence reverses the order and can mislead a student about when the visitor entry is created.
+- ch 7 [high] Beyond: The claim that 802.11ax (Wi-Fi 6) 'replaces pure contention with OFDMA and scheduled uplinks' is wrong. Wi-Fi 6 still uses CSMA/CA with EDCA contention; OFDMA and trigger-frame uplink scheduling are added on top of it, not in place of it.
+- ch 7 [low] Section 1: The Wi-Fi name a user picks and that appears in beacon frames is the SSID; ESSID is an older synonym for the identifier of an extended service set. Stating flatly that the ESSID is 'the Wi-Fi name you pick' blurs the term students will meet in the scan and association steps.
+- ch 7 [low] Quiz Q5: The pairing of CW = 15 slots with a 20 µs slot does not match a real PHY. In the standard, CWmin = 15 goes with the 9 µs OFDM slot, and CWmin = 31 goes with the 20 µs DSSS slot.
+- ch 7 [low] Section 4: 'A device active in two piconets forms a scatternet' is compressed enough to mislead. The scatternet is the combined set of piconets; the device is the shared node that links them.
+- ch 8 [high] Worked example 1 (and quiz Q5, which uses the same 5-node figure): The example includes E in the network ('C is a neighbour of E'). Under the flooding rule the chapter states in Section 2 — every node that is not the destination rebroadcasts a new request once — E also rebroadcasts C's copy, so there are 4 broadcast transmissions (A, B, C, E), not 3. Step 2 and the final answer undercount, and the figure note calling E a 'leaf' does not exempt it.
+- ch 8 [low] Figure: The plotted coordinates make C and D 1.80 units apart — exactly the A–B and B–D distances. Any radio range that turns A–B into a link also turns C–D into a link, so the picture shows a second 2-hop route A→C→D that the text and worked example do not intend, and D would receive the request twice.

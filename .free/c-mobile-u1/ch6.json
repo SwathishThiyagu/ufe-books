@@ -1,0 +1,194 @@
+{
+ "lead": "Mobile IP keeps one permanent IP address for a device that moves between networks. An IP address does two jobs at once: it names the device and it says where the device is. Move the device and the second job breaks, because routers still send packets to the old subnet. Mobile IP splits the two jobs: a home address that never changes, and a care-of address borrowed from the visited network. A home agent forwards traffic to the care-of address. The idea matters wherever a device must stay reachable at a fixed address while roaming, across operators or across a campus. Only a few universities teach this chapter.",
+ "prereq": "You need <a href=\"#handover-location-tracking-and-mobility-management\">Chapter 1.5</a> for handover and location tracking inside one operator's network, because this chapter pushes mobility across networks.",
+ "sections": [
+  {
+   "h3": "Why plain IP breaks when a node moves",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A router forwards a packet using only the destination prefix. A phone with address 10.20.30.4 that moves to a café in another city now sits behind a router that has never heard of 10.20.30.0/24. Packets aimed at the phone still travel to the home network and are dropped there. Giving the phone a local address fixes routing but breaks identity: TCP names a connection by its address pair, so every open connection dies, and the DNS name still points to the old address."
+    },
+    {
+     "type": "p",
+     "text": "Mobile IP keeps the address and moves the packets instead. It defines four entities:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Mobile node (MN)</b>: the device that moves, and keeps its home address.",
+      "<b>Home agent (HA)</b>: a router on the home network that tracks where the MN is now and forwards its traffic.",
+      "<b>Foreign agent (FA)</b>: a router in the visited network that helps the MN and can hand it tunneled packets.",
+      "<b>Correspondent node (CN)</b>: any host that talks to the MN."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The split is the whole idea. The <b>home address</b> is permanent; apps, DNS and TCP see only this. The <b>care-of address</b> (CoA) is temporary, belongs to the visited network, and is where packets are actually delivered."
+    }
+   ]
+  },
+  {
+   "h3": "Discovery and registration",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Before traffic can flow, the MN must learn a care-of address and tell its HA where it is."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Every HA and FA broadcasts an <b>agent advertisement</b> on its link: an ICMP router advertisement with a mobility extension, giving the agent's address, a lifetime, and flags saying whether it offers a foreign-agent care-of address.",
+      "A node that has just arrived and hears nothing sends an <b>agent solicitation</b>; the agent answers with an advertisement at once.",
+      "The MN takes the care-of address from the advertisement (an FA care-of address, shared by all visitors) or, if it configured itself by DHCP, uses a co-located care-of address.",
+      "It sends a <b>registration request</b> through the FA to its HA: home address, care-of address, requested lifetime, and an authentication extension.",
+      "The HA verifies the request and creates a <b>binding</b>: home address → care-of address, valid for the lifetime in seconds. The reply travels back through the FA, which adds the node to its visitor list.",
+      "The MN re-registers before the lifetime expires. An expired binding means the HA stops forwarding."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Nothing else in the network changes. The home address keeps working in DNS and in transport connections."
+    }
+   ]
+  },
+  {
+   "h3": "Tunnelling, decapsulation and the triangle route",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The CN sends to the home address, so ordinary routing delivers the datagram to the home network. The HA intercepts it — it answers ARP for the home address on behalf of the absent node — and encapsulates it: a new outer IP header with source = HA, destination = care-of address, protocol number 4 for IP-in-IP. The original datagram, headers and all, becomes the payload. That is the <b>tunnel</b>. The FA receives the outer packet, strips the outer header (<b>decapsulation</b>), and forwards the original datagram to the MN on the visited link. Replies normally go straight from the MN to the CN, with the home address as source. If the visited network filters packets whose source address is foreign to it, replies must also be tunnelled back through the HA."
+    },
+    {
+     "type": "p",
+     "text": "<b>Triangle routing.</b> The path CN → HA → FA is longer than CN → FA. Every packet makes the detour, and one HA carries the traffic of all its roaming nodes. <b>Route optimisation</b> removes the detour: the CN caches the node's binding and sends straight to the care-of address. Mobile IPv6 builds this in. It also drops the foreign agent: every IPv6 node forms its own care-of address by stateless autoconfiguration, registers it with the HA using a Binding Update, and can send Binding Updates to correspondents. Those updates are authenticated, because a forged one would redirect a victim's traffic."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "A packet reaches the home address, is wrapped in an outer header and tunnelled to the foreign agent, which unwraps it and delivers it. The dashed direct route is the shortcut that route optimisation uses.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Mobile IP: packet path through the home agent",
+   "nodes": [
+    {
+     "id": "cn",
+     "label": "Correspondent",
+     "note": "sends to home address"
+    },
+    {
+     "id": "ha",
+     "label": "Home agent",
+     "note": "home network",
+     "style": "accent"
+    },
+    {
+     "id": "fa",
+     "label": "Foreign agent",
+     "note": "visited network"
+    },
+    {
+     "id": "mn",
+     "label": "Mobile node",
+     "note": "care-of address",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cn",
+     "to": "ha",
+     "label": "to home address"
+    },
+    {
+     "from": "ha",
+     "to": "fa",
+     "label": "IP-in-IP tunnel",
+     "style": "dashed"
+    },
+    {
+     "from": "fa",
+     "to": "mn",
+     "label": "delivered"
+    },
+    {
+     "from": "cn",
+     "to": "fa",
+     "label": "direct route",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A packet from the correspondent goes to the home agent, is tunnelled to the foreign agent, and reaches the mobile node, with a dashed direct route also shown."
+  }
+ },
+ "examples": [
+  {
+   "question": "A mobile node receives a 100-byte payload. The original IP header is 20 bytes. The home agent tunnels the datagram to the foreign agent with a 20-byte outer IP header. (a) How many bytes cross the tunnel? (b) What is the tunnelling overhead as a percentage of the original datagram? (c) How long does the tunneled datagram take on a 2 Mbps link?",
+   "steps": [
+    "Original datagram = payload + inner header = 100 + 20 = 120 bytes.",
+    "Tunneled datagram = original datagram + outer header = 120 + 20 = 140 bytes, so 140 bytes cross the tunnel.",
+    "Overhead = outer header ÷ original datagram = 20 ÷ 120 = 0.1667, that is 16.7 percent.",
+    "Bits on the link = 140 × 8 = 1120 bits.",
+    "Transmission time = 1120 bits ÷ 2 000 000 bits/s = 0.00056 s = 0.56 ms."
+   ],
+   "answer": "140 bytes cross the tunnel, the overhead is 16.7 percent, and the datagram takes 0.56 ms on a 2 Mbps link.",
+   "check": "payload = 100\nip_hdr = 20\nouter = 20\ndatagram = payload + ip_hdr\ntunneled = datagram + outer\noverhead = outer / datagram * 100\nbits = tunneled * 8\ntime_ms = bits / 2_000_000 * 1000\nprint(datagram)\nprint(tunneled)\nprint(round(overhead, 1))\nprint(round(time_ms, 2))",
+   "values": [
+    120,
+    140,
+    16.7,
+    0.56
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Swapping home address and care-of address. The home address never changes; the care-of address is temporary and belongs to the visited network.",
+  "Saying IP-in-IP replaces the original header. It adds an outer header; the inner datagram is carried whole, so the packet grows.",
+  "Thinking the tunnel shortens the path. Basic Mobile IPv4 sends every packet through the home agent, which is a detour — that is exactly the triangle route.",
+  "Claiming a correspondent always knows the care-of address. In basic Mobile IPv4 only the home agent knows it; the CN learns it only after route optimisation.",
+  "Reversing registration: the mobile node registers its care-of address with the home agent, not the other way round."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four entities of Mobile IP and their one-line roles.",
+   "marks": 2,
+   "a": "Mobile node (moves, keeps home address), home agent (forwards traffic on the home network), foreign agent (serves the node in the visited network), correspondent node (any host talking to the mobile node)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a mobile node keep its home address instead of simply taking a new address from the visited network?",
+   "marks": 3,
+   "a": "The address is also the identity: TCP connections and DNS names are bound to it. A new address would break every open connection and leave the DNS entry pointing to a dead host."
+  },
+  {
+   "level": "understand",
+   "q": "A node arrives on a foreign link and hears no advertisement. What does it send, and what comes back?",
+   "marks": 2,
+   "a": "It broadcasts an agent solicitation; the foreign agent replies immediately with an agent advertisement."
+  },
+  {
+   "level": "apply",
+   "q": "A 500-byte payload travels with a 20-byte inner header and a 20-byte outer tunnel header. Find the bytes crossing the tunnel and the overhead percentage.",
+   "marks": 4,
+   "a": "Original datagram = 500 + 20 = 520 bytes. Tunneled = 520 + 20 = 540 bytes. Overhead = 20 ÷ 520 = 3.8 percent."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain triangle routing. Give one cost of route optimisation and one benefit.",
+   "marks": 5,
+   "a": "Packets go CN → HA → FA instead of CN → FA, so the path is longer and the HA is a bottleneck. Route optimisation cuts the path and unloads the HA (benefit), but correspondents must be told and must authenticate bindings, using cache memory and a security mechanism (cost)."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does Mobile IPv6 need no foreign agent?",
+   "marks": 4,
+   "a": "Every IPv6 node can form its own care-of address by stateless autoconfiguration and decapsulate its own tunnel, so no router in the visited network has to hand out addresses or forward on the node's behalf. Binding Updates to the home agent and to correspondents replace foreign-agent registration."
+  }
+ ],
+ "beyond": "Not for the exam. In 4G and 5G cores the anchoring job that the home agent did is now a software function — the packet gateway or the user plane function — and SDN places it while NFV runs it on ordinary servers. The principle is unchanged: one anchor keeps the IP address stable while the radio access changes underneath. GTP tunnels in the cellular core do what IP-in-IP does here. Search next for \"GTP tunnel\", \"UPF anchor\", \"Mobile IPv6 binding update\" and \"Proxy Mobile IPv6\"."
+}
