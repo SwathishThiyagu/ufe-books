@@ -18,123 +18,147 @@ const SC=[
 {s:1,k:'bookfig',term:"Figure 2.1.1 (bottom)",title:"Gradient descent and its limitations",view:[240,258,310,292],say:'Here is the rest of the loop: backward pass, the update, and one question. Is the loss flat? If not, the dashed arrow sends you back for another epoch. One pass, one update.',cues:{s1:'Here is the rest',s2:'Is the loss flat',s3:'dashed arrow',s4:'One pass, one update',cap:'another epoch'},steps:4,cap:'One pass, one update; the dashed edge starts the next epoch.',fig:{"vb": [0.0, 0.0, 720.0, 553.0], "defs": "<defs><marker id=\"ar-f2-1-1-n\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--accent)\" /></marker><marker id=\"ar-f2-1-1-m\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--line2)\" /></marker><marker id=\"ar-f2-1-1-l\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--live)\" /></marker><marker id=\"ar-f2-1-1-x\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--next)\" /></marker></defs>", "items": [[360.0, "<text x=\"360.0\" y=\"35.2\" font-size=\"15\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">One gradient descent step</text>", 1], [360.0, "<line x1=\"360.0\" y1=\"112.0\" x2=\"360.0\" y2=\"158.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-f2-1-1-n)\" />", 1], [360.0, "<line x1=\"360.0\" y1=\"218.0\" x2=\"360.0\" y2=\"264.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-f2-1-1-n)\" />", 1], [360.0, "<line x1=\"360.0\" y1=\"324.0\" x2=\"360.0\" y2=\"370.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-f2-1-1-n)\" />", 1], [360.0, "<line x1=\"360.0\" y1=\"430.0\" x2=\"360.0\" y2=\"476.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-f2-1-1-n)\" />", 1], [478.0, "<path d=\"M478.0,507.0 C526.0,507.0 526.0,189.0 480.0,189.0\" style=\"fill:none;stroke:var(--line2);stroke-width:2;stroke-dasharray:6 5\" marker-end=\"url(#ar-f2-1-1-m)\" />", 4], [502.7, "<rect x=\"502.7\" y=\"338.2\" width=\"22.6\" height=\"19.5\" rx=\"4\" style=\"fill:var(--fig)\" />", 4], [514.0, "<text x=\"514.0\" y=\"352.6\" font-size=\"13\" text-anchor=\"middle\" fill=\"currentColor\">no</text>", 4], [245.0, "<rect x=\"245.0\" y=\"57.0\" width=\"230.0\" height=\"52.0\" rx=\"10\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 1], [360.0, "<text x=\"360.0\" y=\"77.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">Full dataset</text>", 1], [360.0, "<text x=\"360.0\" y=\"98.5\" font-size=\"13\" text-anchor=\"middle\" fill=\"var(--muted)\">all N samples</text>", 1], [245.0, "<rect x=\"245.0\" y=\"163.0\" width=\"230.0\" height=\"52.0\" rx=\"10\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 1], [360.0, "<text x=\"360.0\" y=\"183.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">Forward pass</text>", 1], [360.0, "<text x=\"360.0\" y=\"204.6\" font-size=\"13\" text-anchor=\"middle\" fill=\"var(--muted)\">compute loss L</text>", 1], [245.0, "<rect x=\"245.0\" y=\"269.0\" width=\"230.0\" height=\"52.0\" rx=\"10\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\" />", 1], [360.0, "<text x=\"360.0\" y=\"289.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">Backprop gradient</text>", 1], [360.0, "<text x=\"360.0\" y=\"310.6\" font-size=\"13\" text-anchor=\"middle\" fill=\"var(--muted)\">average over N</text>", 1], [245.0, "<rect x=\"245.0\" y=\"375.0\" width=\"230.0\" height=\"52.0\" rx=\"10\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 1], [360.0, "<text x=\"360.0\" y=\"395.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">Update theta</text>", 1], [360.0, "<text x=\"360.0\" y=\"416.6\" font-size=\"13\" text-anchor=\"middle\" fill=\"var(--muted)\">θ ← θ − η∇L</text>", 1], [245.0, "<rect x=\"245.0\" y=\"481.0\" width=\"230.0\" height=\"52.0\" rx=\"10\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\" />", 1], [360.0, "<text x=\"360.0\" y=\"501.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">Loss flat?</text>", 1], [360.0, "<text x=\"360.0\" y=\"522.5\" font-size=\"13\" text-anchor=\"middle\" fill=\"var(--muted)\">stop if yes</text>", 1]]}},
 {s:1,k:'notebook',term:'Key ideas',title:'One step at a time',say:'Here is the algorithm in four lines. Pack every weight into one vector. Average the gradient over all the samples, then step against it by the learning rate. One pass is one epoch, and one epoch gives exactly one update.',cues:{i1:'Pack every weight',i2:'Average the gradient',i3:'step against it',i4:'One pass is one epoch'},items:[['Every weight and bias packed into one vector θ.','i1'],['Gradient = average of the per-sample slopes.','i2'],['θ ← θ − η∇L: one fixed η for all weights.','i3'],['One pass over the data = one epoch = one update. Only one.','i4']],vis:(c,u,b)=>`
 <g>${g('pop',tk(c,'i1'),`
-<rect x="20" y="20" width="600" height="130" rx="16" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<text x="40" y="58" font-size="24" font-weight="600" fill="var(--ink)">1 · every weight, one vector</text>
-<rect x="40" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="88" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="136" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="184" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="232" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="280" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="328" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="376" y="76" width="40" height="40" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<text x="440" y="106" font-size="28" fill="var(--ink)">θ</text>`)}</g>
+<rect x="20" y="20" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="64" font-size="26" font-weight="600" fill="var(--ink)">1 · every weight, one vector</text>
+<rect x="60" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="85" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₁</text>
+<rect x="114" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="139" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₂</text>
+<rect x="168" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="193" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₃</text>
+<rect x="222" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="247" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₄</text>
+<rect x="276" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="301" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₅</text>
+<rect x="330" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="355" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₆</text>
+<rect x="384" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="409" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₇</text>
+<rect x="438" y="90" width="50" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="463" y="122" font-size="22" text-anchor="middle" fill="var(--ink)">w₈</text>
+<path d="M500 100 L520 100" stroke="var(--ink)" stroke-width="3"/>
+<polygon points="520,94 536,100 520,106" fill="var(--ink)"/>
+<text x="550" y="126" font-size="28" fill="var(--ink)">θ</text>`)}</g>
 <g>${g('pop',tk(c,'i2'),`
-<rect x="20" y="170" width="600" height="130" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<text x="40" y="208" font-size="24" font-weight="600" fill="var(--ink)">2 · average over all samples</text>
-<circle cx="60" cy="258" r="12" fill="${BLU}"/><circle cx="100" cy="258" r="12" fill="${BLU}"/><circle cx="140" cy="258" r="12" fill="${BLU}"/>
-<line x1="176" y1="258" x2="250" y2="258" stroke="var(--ink)" stroke-width="3"/>
-<polygon points="250,252 266,258 250,264" fill="var(--ink)"/>
-<rect x="282" y="228" width="296" height="60" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<text x="430" y="266" font-size="24" text-anchor="middle" fill="var(--ink)">mean of the slopes</text>`)}</g>
+<rect x="20" y="180" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="222" font-size="26" font-weight="600" fill="var(--ink)">2 · average over all samples</text>
+<g transform="translate(60,250)">
+<line x1="0" y1="30" x2="40" y2="10" stroke="${BLU}" stroke-width="4"/>
+<line x1="0" y1="30" x2="40" y2="50" stroke="${BLU}" stroke-width="4"/>
+<line x1="0" y1="30" x2="40" y2="30" stroke="${BLU}" stroke-width="4"/>
+</g>
+<text x="120" y="256" font-size="22" fill="var(--muted)">per-sample slopes</text>
+<line x1="220" y1="255" x2="320" y2="255" stroke="var(--ink)" stroke-width="3"/>
+<polygon points="320,249 336,255 320,261" fill="var(--ink)"/>
+<rect x="350" y="225" width="260" height="60" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="480" y="263" font-size="24" text-anchor="middle" fill="var(--ink)">mean gradient ∇L</text>`)}</g>
 <g>${g('pop',tk(c,'i3'),`
-<rect x="20" y="320" width="600" height="130" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<text x="40" y="358" font-size="24" font-weight="600" fill="var(--ink)">3 · step against the gradient</text>
-<path d="M60 430 Q 150 360 260 428" fill="none" stroke="var(--accent)" stroke-width="4"/>
-<circle cx="150" cy="383" r="11" fill="${ORG}"/>
-<line x1="172" y1="396" x2="218" y2="420" stroke="${ORG}" stroke-width="4"/>
-<polygon points="218,414 236,424 216,430" fill="${ORG}"/>
-<text x="296" y="424" font-size="24" fill="var(--ink)">θ ← θ − η∇L</text>`)}</g>
+<rect x="20" y="340" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="382" font-size="26" font-weight="600" fill="var(--ink)">3 · step against the gradient</text>
+<path d="M50 420 Q 160 300 300 420" fill="none" stroke="var(--accent)" stroke-width="4"/>
+<circle cx="110" cy="365" r="11" fill="${ORG}"/>
+<line x1="110" y1="365" x2="160" y2="388" stroke="${ORG}" stroke-width="4"/>
+<polygon points="160,382 176,388 160,394" fill="${ORG}"/>
+<text x="200" y="400" font-size="24" fill="var(--ink)">θ ← θ − η∇L</text>
+<text x="200" y="436" font-size="20" fill="var(--muted)">one fixed η for all weights</text>`)}</g>
 <g>${g('pop',tk(c,'i4'),`
-<rect x="20" y="470" width="600" height="130" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<text x="40" y="508" font-size="24" font-weight="600" fill="var(--ink)">4 · one epoch, one update</text>
-<rect x="40" y="528" width="200" height="52" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<text x="140" y="562" font-size="24" text-anchor="middle" fill="var(--ink)">1 full pass</text>
-<line x1="256" y1="554" x2="336" y2="554" stroke="var(--ink)" stroke-width="3"/>
-<polygon points="336,548 352,554 336,560" fill="var(--ink)"/>
-<rect x="366" y="528" width="220" height="52" rx="10" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
-<text x="476" y="562" font-size="24" text-anchor="middle" fill="var(--ink)">1 update</text>`)}</g>`},
+<rect x="20" y="500" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="542" font-size="26" font-weight="600" fill="var(--ink)">4 · one epoch, one update</text>
+<rect x="60" y="560" width="180" height="56" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="150" y="596" font-size="24" text-anchor="middle" fill="var(--ink)">1 epoch</text>
+<line x1="256" y1="588" x2="340" y2="588" stroke="var(--ink)" stroke-width="3"/>
+<polygon points="340,582 356,588 340,594" fill="var(--ink)"/>
+<rect x="372" y="560" width="180" height="56" rx="10" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
+<text x="462" y="596" font-size="24" text-anchor="middle" fill="var(--ink)">1 update</text>
+<text x="200" y="638" font-size="24" fill="var(--muted)">only one</text>`)}</g>`},
 {s:1,k:'calc',term:"Worked example",title:"Worked example",say:`Take the loss as ${P('theta')} squared, start at four, learning rate zero point one. The gradient is two ${P('theta')}. At four that is eight. Step one: four minus zero point eight gives three point two. Then the gradient is six point four, then five point one two. Watch it shrink.`,cues:{fk:'learning rate zero point one',k1:'At four that is eight',k2:'four minus zero point eight',k3:'Then the gradient is six point four',k4:'then five point one two',a:'Watch it shrink'},q:['L(θ) = θ², θ₀ = 4, η = 0.1.','List θ₁, θ₂, θ₃.'],f:['∇L = 2θ','θ ← θ − η∇L'],hint:'Gradient of θ² is 2θ.',fk:'fk',steps:[["Gradient at θ₀","∇L = 2 × 4 = 8",'k1'],["Step 1","θ₁ = 4 − 0.1 × 8 = 3.2",'k2'],["Step 2","θ₂ = 3.2 − 0.1 × 6.4 = 2.56",'k3'],["Step 3","θ₃ = 2.56 − 0.1 × 5.12 = 2.048",'k4']],live:[0,1,2,3],ans:['θ: 4 → 3.2 → 2.56 → 2.048','a']},
 {s:1,k:'calc',term:"Worked example (η = 1.1)",title:"Worked example",say:'Each step multiplies the parameter by zero point eight, so the loss falls to zero point six four of itself. Now push the learning rate to one point one: the factor becomes minus one point two, the sign flips, and the loss grows.',cues:{fk:'Each step multiplies',k1:'zero point eight',k2:'loss falls to zero point six four',k3:'push the learning rate to one point one',k4:'the sign flips',a:'the loss grows'},q:['Same loss, η = 1.1.','What happens to the run?'],f:['θ ← (1 − 2η)θ','|1 − 2η| < 1 to converge'],hint:'Watch the factor, not the path.',fk:'fk',steps:[["Factor per step","θ ← (1 − 2η)θ = 0.8θ",'k1'],["Loss factor","0.8² = 0.64 per step",'k2'],["Now η = 1.1","1 − 2η = −1.2",'k3'],["Diverges","4 → −4.8 → 5.76",'k4']],live:[0,1,2,3],ans:['Shrinks ×0.64 per step; η = 1.1 diverges.','a']},
 {s:1,k:'trap2',term:'Exam trap',title:'Exam trap!',say:'The sharpest trap: the loss bounces, then turns into not a number. Students write that the model is stuck in a local minimum. No, that is divergence from a learning rate that is too large. Turn the step size down.',cues:{x:'The sharpest trap',w:'Students write that',r:'that is divergence'},wl:"Don't write",rl:'Write',wrong:['Loss bounces, then turns to not-a-number...','so the model is stuck in a local minimum.'],right:['That is divergence: the learning rate is too big.','Lower it and check the loss goes down.'],wv:(c,u,b)=>`
 <rect x="10" y="10" width="620" height="310" rx="14" fill="var(--fig)" stroke="var(--line2)" stroke-width="2"/>
-<text x="34" y="52" font-size="24" fill="var(--muted)">training loss</text>
-<path d="M40 250 C 100 236 130 120 190 118 C 246 116 262 246 320 250 C 378 254 398 84 466 72 C 516 63 560 108 596 146" fill="none" stroke="${RED}" stroke-width="4"/>
-<line x1="70" y1="60" x2="570" y2="286" stroke="${TRED}" stroke-width="10" stroke-opacity="${TOP}" stroke-linecap="round"/>
+<text x="40" y="52" font-size="26" fill="var(--muted)">training loss</text>
+<line x1="60" y1="250" x2="580" y2="250" stroke="var(--ink)" stroke-width="2"/>
+<line x1="60" y1="250" x2="60" y2="50" stroke="var(--ink)" stroke-width="2"/>
+<path d="M70 220 C 100 180 130 240 160 200 C 190 150 220 250 250 180 C 280 120 310 260 340 150 C 370 90 400 270 430 120 C 460 50 490 280 520 90" fill="none" stroke="${RED}" stroke-width="4"/>
+<line x1="60" y1="170" x2="580" y2="120" stroke="${TRED}" stroke-width="10" stroke-opacity="${TOP}" stroke-linecap="round"/>
 <text x="330" y="306" font-size="24" fill="${TRED}">local minimum?</text>`,rv:(c,u,b)=>`
 <rect x="10" y="10" width="620" height="310" rx="14" fill="var(--fig)" stroke="var(--line2)" stroke-width="2"/>
-<text x="34" y="52" font-size="24" fill="var(--muted)">training loss</text>
-<path d="M40 64 C 160 74 250 160 360 210 C 450 250 530 262 596 268" fill="none" stroke="${GRN}" stroke-width="4"/>
-<circle cx="60" cy="67" r="7" fill="${GRN}"/><circle cx="130" cy="82" r="7" fill="${GRN}"/><circle cx="210" cy="122" r="7" fill="${GRN}"/><circle cx="470" cy="252" r="7" fill="${GRN}"/>
+<text x="40" y="52" font-size="26" fill="var(--muted)">training loss</text>
+<line x1="60" y1="250" x2="580" y2="250" stroke="var(--ink)" stroke-width="2"/>
+<line x1="60" y1="250" x2="60" y2="50" stroke="var(--ink)" stroke-width="2"/>
+<path d="M70 220 C 150 200 250 160 350 140 C 450 120 520 110 550 105" fill="none" stroke="${GRN}" stroke-width="4"/>
+<circle cx="80" cy="215" r="7" fill="${GRN}"/><circle cx="170" cy="195" r="7" fill="${GRN}"/><circle cx="260" cy="170" r="7" fill="${GRN}"/><circle cx="350" cy="145" r="7" fill="${GRN}"/><circle cx="440" cy="125" r="7" fill="${GRN}"/>
 <text x="60" y="302" font-size="24" fill="${GRN}">small learning rate: loss falls</text>`},
 /* ---- part 2 ---- */
 {s:2,k:'part',n:2,term:"Part 2",say:`Part two. Stochastic and ${P('mini-batch')} descent: instead of all the samples, use one sample, or one small batch, for each update. Cheap steps, many more of them, and the noise actually helps.`,cues:{p:'Part two',o:'Stochastic and'},pts:["One sample, B samples, or all N", "Unbiased estimate, shrinking noise", "Shuffling and batch size"]},
 {s:2,k:'bookfig',term:"Figure 2.2.1",title:"Stochastic and mini-batch gradient descent",say:'Here is one epoch with twelve samples and batches of four. Batch one takes four samples and makes one update; the marked cell is the first sample of the batch. Three batches make an epoch, and the order is reshuffled before the next one.',cues:{s1:'Here is one epoch',s2:'batches of four',s3:'Three batches make an epoch',s4:'reshuffled',cap:'marked cell'},steps:4,cap:'Three batches of four make one epoch; reshuffle the deck each round.',fig:{"vb": [0.0, 0.0, 720.0, 191.0], "defs": "<defs><marker id=\"ar-f2-2-1-n\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--accent)\" /></marker><marker id=\"ar-f2-2-1-m\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--line2)\" /></marker><marker id=\"ar-f2-2-1-l\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--live)\" /></marker><marker id=\"ar-f2-2-1-x\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" style=\"fill:var(--next)\" /></marker></defs>", "items": [[360.0, "<text x=\"360.0\" y=\"35.2\" font-size=\"15\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">One epoch, batch size 4, 12 samples</text>", 2], [172.6, "<text x=\"172.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0</text>", 1], [212.6, "<text x=\"212.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">1</text>", 1], [252.6, "<text x=\"252.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">2</text>", 1], [292.6, "<text x=\"292.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">3</text>", 2], [332.6, "<text x=\"332.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">4</text>", 2], [372.6, "<text x=\"372.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">5</text>", 2], [412.6, "<text x=\"412.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">6</text>", 3], [452.6, "<text x=\"452.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">7</text>", 3], [492.6, "<text x=\"492.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">8</text>", 3], [532.6, "<text x=\"532.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">9</text>", 4], [572.6, "<text x=\"572.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">10</text>", 4], [612.6, "<text x=\"612.6\" y=\"69.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">11</text>", 4], [142.6, "<text x=\"142.6\" y=\"102.0\" font-size=\"13\" font-weight=\"600\" text-anchor=\"end\" fill=\"currentColor\">Epoch 1</text>", 1], [152.6, "<rect x=\"152.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\" />", 1], [172.6, "<text x=\"172.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">7</text>", 1], [192.6, "<rect x=\"192.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 1], [212.6, "<text x=\"212.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">3</text>", 1], [232.6, "<rect x=\"232.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 1], [252.6, "<text x=\"252.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">11</text>", 1], [272.6, "<rect x=\"272.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 2], [292.6, "<text x=\"292.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">2</text>", 2], [312.6, "<rect x=\"312.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--live-soft);stroke:var(--live);stroke-width:2\" />", 2], [332.6, "<text x=\"332.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">9</text>", 2], [352.6, "<rect x=\"352.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 2], [372.6, "<text x=\"372.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">5</text>", 2], [392.6, "<rect x=\"392.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 3], [412.6, "<text x=\"412.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">12</text>", 3], [432.6, "<rect x=\"432.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 3], [452.6, "<text x=\"452.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">1</text>", 3], [472.6, "<rect x=\"472.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\" />", 3], [492.6, "<text x=\"492.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">8</text>", 3], [512.6, "<rect x=\"512.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 4], [532.6, "<text x=\"532.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">4</text>", 4], [552.6, "<rect x=\"552.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 4], [572.6, "<text x=\"572.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">10</text>", 4], [592.6, "<rect x=\"592.6\" y=\"77.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 4], [612.6, "<text x=\"612.6\" y=\"101.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">6</text>", 4], [142.6, "<text x=\"142.6\" y=\"156.0\" font-size=\"13\" font-weight=\"600\" text-anchor=\"end\" fill=\"currentColor\">Epoch 2</text>", 1], [152.6, "<rect x=\"152.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\" />", 1], [172.6, "<text x=\"172.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">5</text>", 1], [192.6, "<rect x=\"192.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 1], [212.6, "<text x=\"212.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">12</text>", 1], [232.6, "<rect x=\"232.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 1], [252.6, "<text x=\"252.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">4</text>", 1], [272.6, "<rect x=\"272.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 2], [292.6, "<text x=\"292.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">8</text>", 2], [312.6, "<rect x=\"312.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--live-soft);stroke:var(--live);stroke-width:2\" />", 2], [332.6, "<text x=\"332.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">1</text>", 2], [352.6, "<rect x=\"352.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 2], [372.6, "<text x=\"372.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">10</text>", 2], [392.6, "<rect x=\"392.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 3], [412.6, "<text x=\"412.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">3</text>", 3], [432.6, "<rect x=\"432.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 3], [452.6, "<text x=\"452.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">7</text>", 3], [472.6, "<rect x=\"472.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\" />", 3], [492.6, "<text x=\"492.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">6</text>", 3], [512.6, "<rect x=\"512.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 4], [532.6, "<text x=\"532.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">2</text>", 4], [552.6, "<rect x=\"552.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 4], [572.6, "<text x=\"572.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">11</text>", 4], [592.6, "<rect x=\"592.6\" y=\"131.0\" width=\"40.0\" height=\"40.0\" rx=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\" />", 4], [612.6, "<text x=\"612.6\" y=\"155.9\" font-size=\"14\" font-weight=\"600\" text-anchor=\"middle\" fill=\"currentColor\">9</text>", 4]]}},
 {s:2,k:'notebook',term:'Key ideas',title:'Cheap and noisy',say:`Four lines again. Full batch averages the gradient over all the samples. ${P('mini-batch')} uses a small random batch, so each update is cheap and there are many more of them. The estimate is unbiased, its variance shrinks as the batch grows, and you shuffle every epoch.`,cues:{i1:'Full batch averages',i2:'mini-batch uses a',i3:'The estimate is unbiased',i4:'you shuffle every epoch'},items:[['Full batch: average gradient over all N samples.','i1'],['Mini-batch: B random samples, one cheaper update.','i2'],['Unbiased: E[gB] = g; variance shrinks like 1/B.','i3'],['Shuffle every epoch; retune η when you change B.','i4']],vis:(c,u,b)=>`
 <g>${g('pop',tk(c,'i1'),`
-<rect x="20" y="20" width="600" height="120" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<text x="40" y="56" font-size="24" font-weight="600" fill="var(--ink)">1 · full batch: all N</text>
-<rect x="40" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="84" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="128" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="172" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="216" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="260" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="304" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="348" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="392" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="436" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="480" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="524" y="72" width="34" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>`)}</g>
+<rect x="20" y="20" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="62" font-size="26" font-weight="600" fill="var(--ink)">1 · full batch: all N</text>
+<rect x="40" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="84" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="128" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="172" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="216" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="260" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="304" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="348" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="392" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="436" y="84" width="40" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="500" y="112" font-size="22" fill="var(--ink)">all N</text>
+<path d="M480 104 L500 104" stroke="var(--ink)" stroke-width="3"/>
+<polygon points="500,98 516,104 500,110" fill="var(--ink)"/>`)}</g>
 <g>${g('pop',tk(c,'i2'),`
-<rect x="20" y="170" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<text x="40" y="206" font-size="24" font-weight="600" fill="var(--ink)">2 · mini-batch: B at a time</text>
-<rect x="40" y="224" width="168" height="64" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="52" y="238" width="36" height="36" rx="6" fill="${ORG}"/>
-<rect x="94" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="136" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="172" y="238" width="24" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="236" y="224" width="168" height="64" rx="10" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<rect x="248" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="290" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="332" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="368" y="238" width="24" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="432" y="224" width="168" height="64" rx="10" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<rect x="444" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="486" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="528" y="238" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="564" y="238" width="24" height="36" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="2"/>`)}</g>
+<rect x="20" y="180" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="222" font-size="26" font-weight="600" fill="var(--ink)">2 · mini-batch: B at a time</text>
+<rect x="40" y="244" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="82" y="244" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="124" y="244" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="166" y="244" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<rect x="208" y="244" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<rect x="250" y="244" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<rect x="292" y="244" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<rect x="334" y="244" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<rect x="376" y="244" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<rect x="418" y="244" width="36" height="36" rx="6" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="470" y="274" font-size="22" fill="var(--muted)">B = 3</text>
+<line x1="252" y1="262" x2="340" y2="262" stroke="var(--ink)" stroke-width="3"/>
+<polygon points="340,256 356,262 340,268" fill="var(--ink)"/>
+<rect x="372" y="236" width="220" height="52" rx="10" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
+<text x="482" y="268" font-size="22" text-anchor="middle" fill="var(--ink)">1 cheap update</text>`)}</g>
 <g>${g('pop',tk(c,'i3'),`
-<rect x="20" y="330" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<text x="40" y="366" font-size="24" font-weight="600" fill="var(--ink)">3 · variance falls like 1 / B</text>
-<rect x="60" y="386" width="48" height="66" rx="6" fill="${GRN}"/>
-<rect x="140" y="418" width="48" height="34" rx="6" fill="${GRN}"/>
-<rect x="220" y="432" width="48" height="20" rx="6" fill="${GRN}"/>
-<text x="70" y="382" font-size="22" fill="var(--muted)">B=1</text>
-<text x="150" y="414" font-size="22" fill="var(--muted)">B=2</text>
-<text x="230" y="428" font-size="22" fill="var(--muted)">B=4</text>
-<text x="316" y="430" font-size="26" fill="var(--ink)">E[gB] = g, always</text>`)}</g>
+<rect x="20" y="340" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="382" font-size="26" font-weight="600" fill="var(--ink)">3 · variance falls like 1 / B</text>
+<text x="60" y="414" font-size="22" fill="var(--muted)">B=1</text>
+<path d="M60 410 Q90 360 120 410" fill="none" stroke="${GRN}" stroke-width="3"/>
+<text x="180" y="414" font-size="22" fill="var(--muted)">B=4</text>
+<path d="M180 410 Q197 375 214 410" fill="none" stroke="${GRN}" stroke-width="3"/>
+<text x="300" y="414" font-size="22" fill="var(--muted)">B=16</text>
+<path d="M300 410 Q308 385 316 410" fill="none" stroke="${GRN}" stroke-width="3"/>
+<text x="420" y="410" font-size="24" fill="var(--ink)">E[gB] = g</text>`)}</g>
 <g>${g('pop',tk(c,'i4'),`
-<rect x="20" y="490" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
-<text x="40" y="526" font-size="24" font-weight="600" fill="var(--ink)">4 · shuffle every epoch</text>
-<rect x="46" y="544" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="90" y="544" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="134" y="544" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<rect x="178" y="544" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
-<text x="62" y="570" font-size="22" fill="var(--ink)">1</text>
-<text x="106" y="570" font-size="22" fill="var(--ink)">2</text>
-<text x="150" y="570" font-size="22" fill="var(--ink)">3</text>
-<text x="194" y="570" font-size="22" fill="var(--ink)">4</text>
-<path d="M230 560 C 270 530 300 596 336 562" fill="none" stroke="var(--accent)" stroke-width="3"/>
-<polygon points="330,552 348,562 330,572" fill="var(--accent)"/>
-<rect x="366" y="544" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
-<rect x="410" y="544" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
-<rect x="454" y="544" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
-<rect x="498" y="544" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
-<text x="382" y="570" font-size="22" fill="var(--ink)">3</text>
-<text x="426" y="570" font-size="22" fill="var(--ink)">1</text>
-<text x="470" y="570" font-size="22" fill="var(--ink)">4</text>
-<text x="514" y="570" font-size="22" fill="var(--ink)">2</text>`)}</g>`},
+<rect x="20" y="500" width="600" height="140" rx="16" fill="var(--panel)" stroke="var(--line2)" stroke-width="2"/>
+<text x="40" y="542" font-size="26" font-weight="600" fill="var(--ink)">4 · shuffle every epoch</text>
+<text x="40" y="572" font-size="22" fill="var(--muted)">before</text>
+<rect x="110" y="556" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="128" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">1</text>
+<rect x="154" y="556" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="172" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">2</text>
+<rect x="198" y="556" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="216" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">3</text>
+<rect x="242" y="556" width="36" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+<text x="260" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">4</text>
+<line x1="290" y1="574" x2="370" y2="574" stroke="var(--ink)" stroke-width="3"/>
+<polygon points="370,568 386,574 370,580" fill="var(--ink)"/>
+<text x="360" y="556" font-size="20" fill="var(--muted)">shuffle</text>
+<rect x="408" y="556" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
+<text x="426" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">3</text>
+<rect x="452" y="556" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
+<text x="470" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">1</text>
+<rect x="496" y="556" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
+<text x="514" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">4</text>
+<rect x="540" y="556" width="36" height="36" rx="6" fill="var(--next-soft)" stroke="var(--next)" stroke-width="2"/>
+<text x="558" y="582" font-size="22" text-anchor="middle" fill="var(--ink)">2</text>`)}</g>`},
 {s:2,k:'calc',term:"Worked example",title:"Worked example",say:'A thousand transactions, batches of a hundred, twenty epochs. One epoch is a thousand over a hundred, so ten iterations. Twenty epochs give two hundred updates. Full batch would give just twenty.',cues:{fk:'One epoch is a thousand',k1:'a thousand over a hundred',k2:'Twenty epochs give',k3:'Full batch would give',a:'just twenty'},q:['N = 1000, B = 100, 20 epochs.','Iterations and updates?'],f:['iterations per epoch = N / B','updates = epochs × iterations'],hint:'An epoch is N/B updates, not one.',fk:'fk',steps:[["Iterations per epoch","1000 / 100 = 10",'k1'],["Updates in 20 epochs","20 × 10 = 200",'k2'],["Full batch, 20 epochs","20 × 1 = 20",'k3']],live:[0,1,2],ans:['10 per epoch, 200 updates, 20 full-batch','a']},
 {s:2,k:'calc',term:"Worked example (variance)",title:"Worked example",say:'One sample has gradient variance zero point four. Averaging a hundred samples divides it by a hundred: zero point zero zero four, and the standard deviation is about zero point zero six three.',cues:{fk:'Averaging a hundred samples',k1:'divides it by a hundred',k2:'zero point zero zero four',k3:'standard deviation',a:'about zero point zero six three'},q:['σ² = 0.4, B = 100.','Variance and sd of the batch gradient?'],f:['Var(gB) = σ² / B','sd = √variance'],hint:'Variance divides by B; the sd by √B.',fk:'fk',steps:[["Variance","0.4 / 100 = 0.004",'k1'],["Standard deviation","√0.004 ≈ 0.063",'k2'],["Answer","0.004 and 0.063",'k3']],live:[0,1,2],ans:['Var 0.004; sd ≈ 0.063','a']},
 {s:2,k:'trap2',term:'Exam trap',title:'Exam trap!',say:'The classic mix-up: an epoch is not an iteration. With a thousand samples and batches of a hundred, one epoch is ten iterations, and twenty epochs are two hundred updates, not twenty. Batch size changes the count.',cues:{x:'The classic mix-up',w:'an epoch is not an iteration',r:'With a thousand'},wl:"Don't write",rl:'Write',wrong:['One epoch is one iteration,','so 20 epochs give 20 updates.'],right:['One epoch is N/B iterations:','1000/100 = 10, so 20 epochs = 200 updates.'],wv:(c,u,b)=>`
