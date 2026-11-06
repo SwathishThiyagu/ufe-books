@@ -1,0 +1,229 @@
+{
+ "lead": "A device driver is kernel code that turns a hardware device into a file. It registers a major number for itself and minor numbers for each instance, then fills a table of function pointers. When a program calls read(), the kernel finds that table through the inode and calls the driver's own function, which copies bytes into the user buffer. Keyboards, serial ports and every disk in the machine are reached this way. The same pattern covers character drivers that move byte streams and block drivers that move disk sectors.",
+ "prereq": "You need: <a href=\"#linux-file-systems-inodes-proc-and-ext2\">5.6</a> on inodes and file_operations, and <a href=\"#virtual-address-space-and-paging-in-linux\">5.3</a> on user versus kernel addresses.",
+ "sections": [
+  {
+   "h3": "Device numbers: major and minor",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every device node carries two numbers. The <b>major number</b> selects the driver. The <b>minor number</b> selects one instance of the device that the driver handles. /dev/ttyS0 and /dev/ttyS1 share a major and differ in minor, because one driver serves both serial ports."
+    },
+    {
+     "type": "p",
+     "text": "The kernel stores the pair in <code>dev_t</code>, an integer type. The classic encoding packs 8 bits of major and 8 bits of minor into 16 bits. Newer kernels allow 12 bits of major and 20 of minor. Do not hand-shift in real code: <code>MKDEV(major, minor)</code> builds a dev_t, and <code>MAJOR(dev)</code> and <code>MINOR(dev)</code> take it apart again."
+    },
+    {
+     "type": "formula",
+     "text": "dev = (major << 8) | minor",
+     "where": "dev is the classic 16-bit dev_t; major is the driver number (0-255); minor is the instance number (0-255); << shifts the major 8 bits left and | merges the two fields. The modern encoding is 12 bits of major and 20 bits of minor."
+    },
+    {
+     "type": "p",
+     "text": "The node is made by <code>mknod /dev/mydrv c 240 3</code> — c for character, b for block, then major and minor — or automatically by udev when the driver registers. mknod creates only a name and a number. If no driver holds major 240, open() fails with ENODEV."
+    }
+   ]
+  },
+  {
+   "h3": "The character driver and its file_operations table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A character driver moves a byte stream: keyboard, serial port, /dev/null. There is no block size and no caching layer. The driver claims a major with <code>register_chrdev()</code> (older) or <code>alloc_chrdev_region()</code> plus <code>cdev_add()</code>, then fills a <code>struct file_operations</code> from &lt;linux/fs.h&gt; with function pointers: .open, .read, .write, .unlocked_ioctl, .release."
+    },
+    {
+     "type": "p",
+     "text": "read has the signature <code>ssize_t my_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)</code>. Here count is how many bytes the user asked for, f_pos is the current offset, and buf is a user virtual address that may be unmapped or paged out."
+    },
+    {
+     "type": "p",
+     "text": "The kernel must not touch buf directly. <code>copy_to_user(buf, kbuf, n)</code> copies n bytes from kernel memory kbuf to the user buffer and returns the number of bytes it could not copy, 0 on success. <code>copy_from_user()</code> does the reverse for write."
+    },
+    {
+     "type": "p",
+     "text": "Return the number of bytes actually transferred (at most count); return 0 at end of file; return a negative error code such as -EFAULT, -EINVAL or -ENOMEM. Update *f_pos by the same number of bytes. Never return -1: the kernel wants the error code itself, and libc turns -EFAULT into a return of -1 with errno set to EFAULT."
+    },
+    {
+     "type": "p",
+     "text": "The kernel has no libc. printk replaces printf, kmalloc/kfree replace malloc/free, and memcpy and memset are the kernel's own versions. A module that calls printf or malloc gets no symbol from the kernel and fails to load with an unresolved-symbol error. ioctl carries commands that are not plain bytes: baud rate, gain, reset."
+    }
+   ]
+  },
+  {
+   "h3": "Block drivers: gendisk, bio and the request queue",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A block driver serves a disk. Data moves in fixed-size sectors of 512 bytes, and the kernel keeps recently used blocks in the page cache, so two reads of the same block reach the driver only once."
+    },
+    {
+     "type": "p",
+     "text": "The driver describes the disk with <code>struct gendisk</code>: major, first_minor, minors (the number of minor numbers reserved for this disk, one for the disk plus one for each allowed partition), fops and queue. <code>alloc_disk()</code> and <code>blk_mq_init_queue()</code> set it up; <code>add_disk()</code> publishes it, and the /dev nodes appear."
+    },
+    {
+     "type": "p",
+     "text": "I/O does not arrive as a byte count. The block layer hands over a <code>struct bio</code> — a list of page-sized segments covering one operation — after merging and sorting many bios into a request queue. The driver takes requests, programs the controller with DMA, and completes them later from an interrupt."
+    },
+    {
+     "type": "p",
+     "text": "Layer order: VFS → page cache → block layer → request queue → driver → device. That complexity buys caching, merging, reordering, partitions and hotplug. brd, the RAM disk, is a small complete block driver worth reading."
+    }
+   ]
+  },
+  {
+   "h3": "Modules: loading, unloading and context",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A driver usually ships as a loadable module: module_init() names its load function, module_exit() its unload function, and MODULE_LICENSE(\"GPL\") declares the license."
+    },
+    {
+     "type": "p",
+     "text": "Two contexts matter. A read() runs in process context and may sleep, so kmalloc(GFP_KERNEL), mutex_lock and copy_to_user are allowed. An interrupt handler is atomic: it cannot sleep, must use GFP_ATOMIC and spinlocks, and must never call copy_to_user. Queue the work and finish it later in process context."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One read() call travels from the user, through the syscall and VFS, into the driver's file_operations table, and back out as a byte copy into the caller's buffer. Notice that the driver never writes to the user pointer directly; every byte passes through copy_to_user.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "read() to a char driver",
+   "aria": "A downward flowchart of seven boxes: read(fd, buf, 100), sys_read, VFS, file_operations, my_read, copy_to_user, and finally the user buffer.",
+   "nodes": [
+    {
+     "id": "u",
+     "label": "read(fd, buf, 100)"
+    },
+    {
+     "id": "s",
+     "label": "sys_read",
+     "style": "accent"
+    },
+    {
+     "id": "v",
+     "label": "VFS"
+    },
+    {
+     "id": "f",
+     "label": "file_operations"
+    },
+    {
+     "id": "d",
+     "label": "my_read",
+     "style": "live"
+    },
+    {
+     "id": "c",
+     "label": "copy_to_user"
+    },
+    {
+     "id": "b",
+     "label": "user buffer"
+    }
+   ],
+   "edges": [
+    {
+     "from": "u",
+     "to": "s"
+    },
+    {
+     "from": "s",
+     "to": "v"
+    },
+    {
+     "from": "v",
+     "to": "f"
+    },
+    {
+     "from": "f",
+     "to": "d"
+    },
+    {
+     "from": "d",
+     "to": "c"
+    },
+    {
+     "from": "c",
+     "to": "b"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A character driver named mydrv takes major 240 and minors 0 to 3. (a) What does <code>mknod /dev/mydrv c 240 3</code> create? (b) Give its dev_t value in the classic 16-bit encoding. (c) A user calls read(fd, buf, 100) and the driver has 100 bytes ready. What does the driver return, and what does the system call return?",
+   "steps": [
+    "(a) The letter c asks for a character device node. The two numbers after it are major 240 and minor 3: a node that reaches instance 3 of the driver holding major 240.",
+    "(b) Classic encoding: dev = (major << 8) | minor = (240 << 8) | 3.",
+    "240 << 8 = 240 × 256 = 61440.",
+    "61440 | 3 = 61440 + 3 = 61443. So dev_t = 61443.",
+    "(c) VFS takes the inode of the node, reads its major 240, finds mydrv's file_operations, and calls my_read with count = 100.",
+    "my_read puts the 100 bytes in a kernel buffer and calls copy_to_user(buf, kbuf, 100). It copies all 100 bytes and returns 0 bytes left over.",
+    "my_read therefore returns 100. The kernel passes that value straight back, so read() returns 100 to the user, with buf holding the 100 bytes."
+   ],
+   "answer": "(a) A character device node with major 240 and minor 3; (b) dev_t = 61443; (c) the driver returns 100 and the system call returns 100.",
+   "check": "major = 240\nminor = 3\nshifted = major << 8\ndev = shifted | minor\nprint(shifted)\nprint(dev)\nprint(100)\n",
+   "values": [
+    61440,
+    61443,
+    100
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "mknod makes a name and a number, not a driver. The node works only after some module registers that major; otherwise open() gives ENODEV.",
+  "Never dereference a user pointer in the kernel. copy_to_user and copy_from_user validate and page in the buffer; a plain memcpy to buf can panic the machine.",
+  "A driver returns a negative error code such as -EFAULT, not -1. libc converts it, so the user sees -1 with errno set while the kernel saw -14.",
+  "Major picks the driver, minor picks the instance. Swapping them in mknod gives a node that no driver answers.",
+  "copy_to_user may sleep, so it belongs in process context only — never inside an interrupt handler or while holding a spinlock."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which number selects the driver, and which selects the instance?",
+   "marks": 2,
+   "a": "The major number selects the driver; the minor number selects the instance of the device that the driver serves."
+  },
+  {
+   "level": "remember",
+   "q": "Which two macros mark a module's load and unload functions, and which macro declares the license?",
+   "marks": 2,
+   "a": "module_init() marks the load function, module_exit() the unload function, and MODULE_LICENSE(\"GPL\") declares the license."
+  },
+  {
+   "level": "understand",
+   "q": "Why must a driver never use memcpy to fill the buffer passed to read()?",
+   "marks": 3,
+   "a": "buf is a user virtual address. It may be unmapped or point to a page that is not in memory. copy_to_user checks the range, faults the page in safely and reports bytes not copied; memcpy would fault in kernel mode with no way to recover."
+  },
+  {
+   "level": "apply",
+   "q": "A block device node /dev/sdb2 has major 8 and minor 18. Give its dev_t in the classic 16-bit encoding.",
+   "marks": 3,
+   "a": "(8 << 8) | 18 = 2048 + 18 = 2066."
+  },
+  {
+   "level": "apply",
+   "q": "my_read copies 100 bytes and copy_to_user returns 0. What does my_read return, and what does the read() call return to the program?",
+   "marks": 3,
+   "a": "my_read returns 100; the system call returns 100 to the program."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a character driver not call copy_to_user from its interrupt handler?",
+   "marks": 4,
+   "a": "The handler runs in atomic context and must not sleep, but copy_to_user can sleep while faulting in the user page. Doing it there can deadlock or crash the machine. Save the data and do the copy later in process context, for example from a workqueue or after waking the reading process."
+  },
+  {
+   "level": "understand",
+   "q": "Give two reasons a block driver is more complex than a character driver.",
+   "marks": 3,
+   "a": "It works through the page cache and a request queue that merges and reorders bios, and it completes I/O asynchronously from interrupts after programming DMA, instead of copying bytes in the caller's context."
+  }
+ ],
+ "beyond": "Not for the exam. Mainline Linux now accepts drivers written in Rust alongside C, mainly for new device code where memory safety matters. io_uring lets applications submit many storage operations with few system calls, which changes how the block layer is exercised. Disks and network cards inside virtual machines usually appear as virtio devices, described by a device tree or an ACPI table rather than hard-coded numbers. Search for \"Linux device driver subsystem\", \"io_uring block layer\", \"virtio specification\", \"Rust for Linux\" and \"eBPF kernel tracing\" to go further."
+}

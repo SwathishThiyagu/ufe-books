@@ -1,0 +1,241 @@
+{
+ "lead": "Two CPUs can run kernel code at the same instant, and an interrupt handler can cut in on either of them. If both touch the same variable, one update can vanish. Kernel synchronization is the set of tools that prevents this: atomic counters, spinlocks for short sections that never sleep, semaphores and mutexes when a waiter may sleep, and wait queues that park a task until an event happens. Drivers, /proc counters, network buffers and file-system caches all depend on them.",
+ "prereq": "You need: <a href=\"#kernel-data-structures-task-structure-and-process-table\">5.1</a> for task states and <a href=\"#kernel-mechanisms-signals-interrupts-and-timers\">5.2</a> for interrupt context.",
+ "sections": [
+  {
+   "h3": "Race conditions and the critical section",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A race condition is a bug where the result depends on the order in which two CPUs, or a CPU and an interrupt handler, reach the same data. The lines of code that touch that shared data form the critical section. Only one execution path may be inside it at a time."
+    },
+    {
+     "type": "p",
+     "text": "The classic case is count++. The compiler turns it into three machine steps: read count, add 1, write it back. Two CPUs can both read the old value before either writes, so one update is lost. Both CPUs start from count = 5 in the figure below."
+    },
+    {
+     "type": "formula",
+     "text": "count++  →  r1 = count;  r2 = r1 + 1;  count = r2",
+     "where": "count is a shared int in kernel memory; r1 and r2 are per-CPU registers, so each CPU keeps its own copy of the intermediate values."
+    },
+    {
+     "type": "p",
+     "text": "For a plain counter the kernel uses atomic_t, a type that may be changed only through atomic operations. atomic_read(&v) returns the value, atomic_set(&v, n) sets it, atomic_inc(&v) and atomic_dec(&v) add or remove one, and atomic_add(n, &v) adds n. Each compiles to one locked instruction, so no lock is needed. atomic64_t does the same for 64-bit values, and refcount_t guards reference counts against overflow."
+    }
+   ]
+  },
+  {
+   "h3": "Spinlocks: waiting without sleeping",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A spinlock is a lock that a CPU waits for by looping, that is, spinning, until it becomes free. Declare spinlock_t l and initialise it with spin_lock_init(&l). spin_lock(&l) takes it and spin_unlock(&l) releases it. A CPU that finds the lock taken burns cycles until the holder finishes, so a spinlock protects a few instructions, never a long operation."
+    },
+    {
+     "type": "p",
+     "text": "The holder must never sleep. Sleeping means calling schedule(), which can switch to another task that wants the same lock; the holder is then not running, so nobody releases it. So no copy_to_user, no kmalloc(GFP_KERNEL) and no wait_event inside a spinlock."
+    },
+    {
+     "type": "p",
+     "text": "Interrupts need care. If a handler on the same CPU takes the lock that the interrupted process is holding, that CPU deadlocks with itself, because the handler will not let the process run again to unlock. The fix is spin_lock_irqsave(&l, flags), which disables interrupts on the local CPU and saves the old interrupt state in flags, an unsigned long. spin_unlock_irqrestore(&l, flags) restores that state."
+    },
+    {
+     "type": "p",
+     "text": "On a single-CPU kernel with preemption enabled, spinlocks are still required, because preemption can switch tasks in the middle of a critical section."
+    }
+   ]
+  },
+  {
+   "h3": "Semaphores, mutexes and completions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A semaphore is an integer count plus a wait queue. down(&s) tries to decrement the count; if the count is already zero, the caller goes to sleep until someone calls up(&s). up(&s) increments the count and wakes one sleeper. sema_init(&s, n) sets the starting count. A count of 1 behaves like a lock; a count of n allows n holders at once."
+    },
+    {
+     "type": "p",
+     "text": "Because down() may sleep, a semaphore suits process context and is forbidden in an interrupt handler. down_interruptible(&s) returns 0 on success and -EINTR if a signal wakes the task; drivers prefer it so that Ctrl-C works."
+    },
+    {
+     "type": "p",
+     "text": "A mutex is a semaphore with extra rules: the count is 0 or 1, the structure records the owner, and only the owner may unlock. The calls are mutex_lock(&m) and mutex_unlock(&m). It may sleep, so it cannot be used in interrupt context or inside a spinlock."
+    },
+    {
+     "type": "p",
+     "text": "A read-write semaphore lets many readers in together but writers alone: down_read/up_read and down_write/up_write. A completion is a one-shot signal: one task blocks in wait_for_completion(&c), another calls complete(&c), and the waiter runs."
+    }
+   ]
+  },
+  {
+   "h3": "Wait queues, kernel queues and deadlock",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A wait queue is the kernel's general sleep-and-wake mechanism. Declare wait_queue_head_t wq and call init_waitqueue_head(&wq). The short form is wait_event_interruptible(wq, condition): it tests condition, and if that is false it adds the task to the queue and calls schedule(). The matching wake_up_interruptible(&wq) wakes the sleepers, which test the condition again and sleep again if it is still false."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The task tests the condition; it is false.",
+      "The task sets its own state to TASK_INTERRUPTIBLE and links itself into the wait queue.",
+      "The task calls schedule(); the scheduler runs another task on that CPU.",
+      "Another thread changes the data and calls wake_up_interruptible(&wq).",
+      "The task becomes runnable, tests the condition again, finds it true and continues."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The retest loop matters because several sleepers may wake and only one may find the condition true. Deadlock is the other risk: task A holds lock 1 and wants lock 2 while task B holds lock 2 and wants lock 1, so both wait forever. The cure is a fixed lock order, always taking locks in the same sequence everywhere. Memory barriers such as smp_mb() and barrier() keep loads and stores in order when a lock alone is not enough."
+    },
+    {
+     "type": "p",
+     "text": "kfifo is the kernel's byte queue: kfifo_alloc() creates it, kfifo_in() pushes bytes and kfifo_out() pops them, for one producer and one consumer."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Each CPU reads the shared value before either writes it back, so the second write of 6 overwrites the first and one increment is lost.",
+  "spec": {
+   "type": "gantt",
+   "unit": "steps",
+   "lanes": [
+    {
+     "label": "CPU 0",
+     "bars": [
+      {
+       "label": "read 5",
+       "start": 0,
+       "end": 4,
+       "style": "accent"
+      },
+      {
+       "label": "write 6",
+       "start": 7,
+       "end": 11,
+       "style": "accent"
+      }
+     ]
+    },
+    {
+     "label": "CPU 1",
+     "bars": [
+      {
+       "label": "read 5",
+       "start": 2,
+       "end": 6,
+       "style": "live"
+      },
+      {
+       "label": "write 6",
+       "start": 9,
+       "end": 13,
+       "style": "live"
+      }
+     ]
+    }
+   ],
+   "aria": "Both CPUs read the value 5 before either writes, so the second write of 6 overwrites the first and one increment is lost."
+  }
+ },
+ "examples": [
+  {
+   "question": "count is a shared int holding 5. Two CPUs each execute count++ once. (a) Give an interleaving that leaves count = 6. (b) Both increments are now wrapped in spin_lock(&l) and spin_unlock(&l); what is the final value?",
+   "steps": [
+    "Each count++ is three machine steps: read count into a register, add 1, write the register back.",
+    "Case (a): CPU 0 reads 5 at step 0. CPU 1 reads 5 at step 2, before CPU 0 has written.",
+    "CPU 0 writes 6 at step 7 and CPU 1 writes 6 at step 9, so the second write overwrites the first.",
+    "Final value in case (a) is 6, but two increments should have given 7, so one update is lost.",
+    "Case (b): CPU 0 takes the lock, reads 5, writes 6 and unlocks; CPU 1 spins until then.",
+    "CPU 1 now reads 6, writes 7 and unlocks, so no update is lost."
+   ],
+   "answer": "(a) count = 6, one update lost. (b) count = 7.",
+   "check": "start = 5\nincrements = 2\nlost = start + 1\ncorrect = start + increments\nprint(lost)\nprint(correct)",
+   "values": [
+    6,
+    7
+   ],
+   "dry_run": {
+    "head": [
+     "Step",
+     "CPU 0",
+     "CPU 1",
+     "count"
+    ],
+    "rows": [
+     [
+      "0",
+      "read 5",
+      "-",
+      "5"
+     ],
+     [
+      "2",
+      "-",
+      "read 5",
+      "5"
+     ],
+     [
+      "7",
+      "write 6",
+      "-",
+      "6"
+     ],
+     [
+      "9",
+      "-",
+      "write 6",
+      "6"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A semaphore may sleep, so it can never be used in an interrupt handler or while a spinlock is held.",
+  "A spinlock must not be held across copy_to_user, kmalloc(GFP_KERNEL) or any call that can sleep.",
+  "spin_lock_irqsave must be matched by spin_unlock_irqrestore with the same saved flags, not by plain spin_unlock, or interrupts stay disabled.",
+  "A semaphore with count 3 admits three holders at once; it is not a lock, and only a mutex has an owner who must be the one to unlock."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define critical section and race condition in one line each.",
+   "marks": 2,
+   "a": "A critical section is the code that touches shared data; a race condition is a result that depends on the order in which two execution paths enter it."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a semaphore forbidden in an interrupt handler?",
+   "marks": 3,
+   "a": "down() may put the caller to sleep, and interrupt context has no task to sleep, so the kernel cannot schedule it away and back."
+  },
+  {
+   "level": "apply",
+   "q": "An atomic_t holds 10. Two CPUs each run atomic_add(3, &v) and a third runs atomic_dec(&v). What is the final value?",
+   "marks": 4,
+   "a": "Atomic operations never interleave, so the order does not matter: 10 + 3 + 3 − 1 = 15."
+  },
+  {
+   "level": "analyze",
+   "q": "A driver takes spin_lock(&l), then copies data to user space with copy_to_user. Explain the failure.",
+   "marks": 5,
+   "a": "copy_to_user can page-fault and sleep while holding the lock; the task leaves the CPU, no other CPU can take the lock, so the system stalls or deadlocks. Copy outside the lock."
+  },
+  {
+   "level": "understand",
+   "q": "State two differences between a spinlock and a mutex.",
+   "marks": 3,
+   "a": "A spinlock busy-waits and must not sleep; a mutex sleeps and may block. A mutex records its owner and only the owner unlocks; a spinlock does not."
+  },
+  {
+   "level": "analyze",
+   "q": "Task A takes lock 1 then lock 2; task B takes lock 2 then lock 1. Explain the deadlock and the fix.",
+   "marks": 4,
+   "a": "Each holds what the other needs and waits forever. Fix: one global lock order, for example always lock 1 before lock 2, so a cycle cannot form."
+  }
+ ],
+ "beyond": "Not for the exam. Read-copy-update (RCU) lets readers walk a linked list with no lock at all while a writer swaps in a new version and frees the old one later; only a few universities teach it, but it is everywhere in the networking stack. Production kernels ship lockdep, which watches the order in which locks are actually taken and reports a possible deadlock before it happens. Real-time kernels add priority inheritance to mutexes so a low-priority holder cannot block a high-priority task for long. Search for RCU, lockdep, PREEMPT_RT and per-CPU counters to go further."
+}

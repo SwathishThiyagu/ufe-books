@@ -1,0 +1,199 @@
+{
+ "lead": "An asynchronous event can arrive at any instruction. Hardware reports it to the kernel as an interrupt; a process receives it as a signal. A periodic timer tick gives the kernel a heartbeat for timekeeping, timeouts and scheduling. These three mechanisms let Linux react to devices, stop runaway programs, and keep time without busy-waiting. The path runs from a device IRQ or a kill command to the code that runs, and the boundary between kernel mode and user mode decides what that code may do.",
+ "prereq": "You need: <a href=\"#kernel-data-structures-task-structure-and-process-table\">task_struct and process states</a> from 5.1, and the shell's kill command from Unit 4.",
+ "sections": [
+  {
+   "h3": "Signals: asynchronous notices",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A signal is a small integer sent to a process by the kernel or another process. It reports an event. Standard signals carry no data; a signal sent with sigqueue() (or a real-time signal) can carry a small value. Common signals: 1 SIGHUP (terminal closed), 2 SIGINT (Ctrl-C), 9 SIGKILL (forced kill), 15 SIGTERM (polite terminate). Each <a href=\"#kernel-data-structures-task-structure-and-process-table\">task_struct</a> has a pending mask and a blocked mask. A blocked signal stays pending until the process unblocks it."
+    },
+    {
+     "type": "p",
+     "text": "Default actions are: terminate, ignore, dump core, or stop. A process can install a handler with signal() or sigaction(). sigaction() is preferred because its behaviour is reliable and portable; old signal() semantics differ between systems. The handler is ordinary user code. It runs in user mode, on the process stack, not in kernel mode."
+    },
+    {
+     "type": "p",
+     "text": "The kernel delivers a signal on the return path from kernel to user mode. It takes pending & ~blocked, clears that bit, and arranges the CPU to start the handler. If several are pending, Linux delivers the lowest-numbered signal first, so signal 9 is handled before signal 15. When the handler returns, a small trampoline calls sigreturn to restore the old context. SIGKILL (9) and SIGSTOP cannot be caught, blocked or ignored, so a runaway process can always be stopped. A blocked signal is not the same as an ignored one: ignored means discarded, blocked means held."
+    }
+   ]
+  },
+  {
+   "h3": "Interrupts and the system call gate",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A hardware device raises an interrupt request on an IRQ line. The interrupt controller gives the CPU a vector number. The CPU reads that entry in the IDT, the interrupt descriptor table, and jumps to the handler. On x86 the common C entry is do_IRQ()."
+    },
+    {
+     "type": "p",
+     "text": "The top half runs immediately with interrupts disabled on that CPU. It must be short: acknowledge the device, copy urgent bytes, then schedule deferred work. Slow work runs in a bottom half. Softirqs are a few statically defined handlers and may run on several CPUs at once. Tasklets are built on softirqs, but a given tasklet runs on only one CPU at a time, so it never races with itself; it still cannot sleep. Workqueues run in kernel threads and may sleep. This split keeps interrupt latency low."
+    },
+    {
+     "type": "p",
+     "text": "A system call enters the kernel through a controlled software interrupt. Old x86 uses int 0x80; modern x86-64 uses the syscall instruction. The call number indexes sys_call_table, an array of kernel function pointers, so user code cannot jump to an arbitrary kernel address. The return path from either an interrupt or a system call is where pending signals are noticed."
+    }
+   ]
+  },
+  {
+   "h3": "Timers, jiffies and boot time",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "HZ is the number of timer ticks per second chosen when the kernel is built, for example 250. Each tick increments jiffies, an unsigned long counter. jiffies is an integer count of ticks, not seconds: seconds = jiffies ÷ HZ. The tick drives timekeeping, timeouts, and scheduler decisions (see <a href=\"#multiprocessing-support-in-linux\">5.8</a> for run queues)."
+    },
+    {
+     "type": "p",
+     "text": "Kernel code arms a timer with add_timer() and changes its expiry with mod_timer(). The timer wheel groups timers by expiry so the tick can find due ones quickly. High-resolution timers, hrtimers, provide finer expiry where hardware allows. CLOCK_REALTIME is wall-clock time and can jump when NTP or an administrator changes it. CLOCK_MONOTONIC never goes backwards, so it is used for measuring intervals."
+    },
+    {
+     "type": "p",
+     "text": "At boot the kernel reads the real-time clock once to set CLOCK_REALTIME, then uses the tick and hrtimers to maintain time. The boot path: firmware, bootloader, start_kernel (which sets up traps and timers), then init. A timer interrupt is handled like other interrupts; its bottom half runs expired timers and wakes tasks."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A device raises an IRQ, the CPU enters through the IDT, do_IRQ runs the top half, then softirqs, tasklets or workqueues finish the slower work. The top half runs immediately with interrupts disabled.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Interrupt path",
+   "aria": "Blocks show a device raising an IRQ through an IDT entry to do_IRQ, then top half, with parallel outputs to softirq or tasklet and to workqueue.",
+   "nodes": [
+    {
+     "id": "dev",
+     "label": "Device"
+    },
+    {
+     "id": "irq",
+     "label": "IRQ line"
+    },
+    {
+     "id": "idt",
+     "label": "IDT entry"
+    },
+    {
+     "id": "do",
+     "label": "do_IRQ",
+     "style": "accent"
+    },
+    {
+     "id": "top",
+     "label": "top half"
+    },
+    {
+     "id": "soft",
+     "label": "softirq/tasklet",
+     "style": "live"
+    },
+    {
+     "id": "work",
+     "label": "workqueue"
+    }
+   ],
+   "edges": [
+    {
+     "from": "dev",
+     "to": "irq"
+    },
+    {
+     "from": "irq",
+     "to": "idt"
+    },
+    {
+     "from": "idt",
+     "to": "do"
+    },
+    {
+     "from": "do",
+     "to": "top"
+    },
+    {
+     "from": "top",
+     "to": "soft"
+    },
+    {
+     "from": "top",
+     "to": "work"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A kernel is built with HZ = 250. (a) How many jiffies are in 1 s and in 20 ms? (b) A 32-bit jiffies counter starts at 0 at HZ = 250. After how many seconds and days does it wrap? (c) A process blocks SIGINT, calls raise(SIGINT), then unblocks SIGINT. When does the handler run?",
+   "steps": [
+    "HZ = 250 ticks per second, so 1 s = 250 jiffies.",
+    "20 ms = 0.020 s; 0.020 × 250 = 5 jiffies.",
+    "The counter range is 0 to 2³² − 1, so it wraps after 2³² = 4,294,967,296 ticks.",
+    "Time = 4,294,967,296 ÷ 250 = 17,179,869.184 s.",
+    "Days = 17,179,869.184 ÷ 86,400 = 198.841... ≈ 198.84 days.",
+    "SIGINT remains pending while blocked; raise() marks it pending. After unblocking, the kernel delivers it on the return to user mode, so the handler runs then."
+   ],
+   "answer": "(a) 250 jiffies in 1 s and 5 jiffies in 20 ms; (b) 17,179,869.184 s, about 198.84 days; (c) after SIGINT is unblocked, on the return to user mode.",
+   "check": "hz = 250\nms = 20\nprint(hz)\nprint(int(ms / 1000 * hz))\nticks = 2**32\nseconds = ticks / hz\nprint(seconds)\nprint(round(seconds / 86400, 2))",
+   "values": [
+    250,
+    5,
+    17179869.184,
+    198.84
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A signal handler runs in user mode. It cannot call kernel-only functions or assume kernel privileges.",
+  "SIGKILL and SIGSTOP cannot be caught, blocked or ignored; kill -9 is not a polite request.",
+  "Blocked is not ignored: a blocked signal waits, an ignored signal is discarded.",
+  "jiffies is an integer tick count, not seconds. Divide by HZ to get time.",
+  "The top half runs with interrupts disabled; softirqs and tasklets cannot sleep, but workqueues can."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name signals 1, 2, 9 and 15, with one common meaning each.",
+   "marks": 2,
+   "a": "1 SIGHUP: terminal closed; 2 SIGINT: Ctrl-C; 9 SIGKILL: forced kill; 15 SIGTERM: polite terminate."
+  },
+  {
+   "level": "understand",
+   "q": "Why is sigaction() usually preferred over signal()?",
+   "marks": 3,
+   "a": "It has reliable, portable semantics and a full structure for flags and masks; old signal() behaviour varies."
+  },
+  {
+   "level": "apply",
+   "q": "HZ = 100. How many jiffies pass in 50 ms?",
+   "marks": 3,
+   "a": "50 ms = 0.050 s; 0.050 × 100 = 5 jiffies."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does Linux split interrupt work into a top half and bottom halves?",
+   "marks": 4,
+   "a": "The top half runs with interrupts disabled and must be short to limit latency; slow work is deferred to softirqs, tasklets or workqueues."
+  },
+  {
+   "level": "remember",
+   "q": "What is the IDT?",
+   "marks": 2,
+   "a": "Interrupt descriptor table: the CPU table of handler entry points indexed by interrupt vector."
+  },
+  {
+   "level": "apply",
+   "q": "A process blocks SIGTERM, another process sends SIGTERM, then the first unblocks it. It has no handler. What happens?",
+   "marks": 4,
+   "a": "SIGTERM stays pending while blocked; after unblock, the default action terminates the process on return to user mode."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between CLOCK_REALTIME and CLOCK_MONOTONIC?",
+   "marks": 3,
+   "a": "Realtime can jump when the wall clock is changed; monotonic never goes backwards, so it is used for intervals."
+  }
+ ],
+ "beyond": "Not for the exam. Real-time Linux work, such as PREEMPT_RT, changes interrupt and locking paths so that latency is bounded. Modern kernels use tickless operation, so an idle CPU may skip timer ticks. Tools such as ftrace and perf trace interrupt and signal activity. Search for hrtimer, tickless kernel and PREEMPT_RT to go deeper."
+}

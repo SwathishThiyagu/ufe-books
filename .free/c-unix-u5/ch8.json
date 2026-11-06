@@ -1,0 +1,175 @@
+{
+ "lead": "Linux symmetric multiprocessing (SMP) lets every CPU run kernel code and user tasks at the same time over one shared memory. That gives throughput, but shared data can be corrupted and some CPUs can sit idle. Linux therefore uses per-CPU data, spinlocks and atomic operations for safety, and one CFS run queue per CPU plus periodic load balancing for speed. Phones, servers and cloud machines all depend on it. Some syllabi say “multiprocessing” for multitasking; in this chapter it means SMP: many CPUs, one kernel.",
+ "prereq": "You need: <a href=\"#kernel-synchronization-queues-and-semaphores\">5.4</a> for locking, <a href=\"#kernel-data-structures-task-structure-and-process-table\">5.1</a> for <code>task_struct</code>, and <a href=\"#kernel-mechanisms-signals-interrupts-and-timers\">5.2</a> for IPIs and the timer tick.",
+ "sections": [
+  {
+   "h3": "CFS run queues and load balancing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Linux runs one CFS run queue per CPU. CFS means Completely Fair Scheduler. A run queue holds tasks that are ready to run on that CPU. Each task has a vruntime: the runtime it has received, scaled by its weight. A task with lower nice value has larger weight and its vruntime grows more slowly, so it is picked sooner. The queue is a red-black tree ordered by vruntime; the leftmost node is the next task. The scheduler picks that node, runs the task for a slice, then reinserts it. Because each CPU has its own tree, CPUs do not fight over one global list."
+    },
+    {
+     "type": "formula",
+     "text": "vruntime_new = vruntime_old + Δt × (w₀ ÷ w_task)",
+     "where": "Δt is actual CPU time in ns; w_task is the task's weight from its nice value; w₀ is the weight at nice 0; a larger weight makes vruntime grow more slowly."
+    },
+    {
+     "type": "p",
+     "text": "The periodic load balancer compares queue load. If one CPU has too many runnable tasks, it moves a task to a less loaded CPU. The move is a migration: the task is stopped on the old CPU, its <code>task_struct</code> is moved to the new run queue, and it resumes there. CPU affinity limits migration. <code>sched_setaffinity()</code> sets a CPU mask for a process, and <code>taskset -c 0 make</code> runs the program <code>make</code> only on CPU 0, because <code>taskset -c 0</code> restricts the process it launches to CPU 0. Affinity helps cache locality, but pinning too much work to one CPU can starve it while other CPUs idle."
+    },
+    {
+     "type": "p",
+     "text": "NUMA is an advanced extension: on some machines memory is closer to one CPU than another. Only a few universities teach NUMA placement; the basic exam picture is one flat memory shared by all CPUs."
+    }
+   ]
+  },
+  {
+   "h3": "Bringing CPUs up and per-CPU data",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "UP means uniprocessor: one CPU. SMP means symmetric multiprocessing: several identical CPUs share memory and run the same kernel. At boot one CPU, the boot CPU, starts first. It brings the other CPUs, called application processors (APs), online by sending an INIT IPI and then a STARTUP IPI (together INIT-SIPI). The STARTUP IPI gives a startup address; the AP enters the kernel there, initialises its local state, and joins the scheduler."
+    },
+    {
+     "type": "p",
+     "text": "Per-CPU variables give each CPU its own copy of a value. The kernel accesses the current CPU's copy with <code>this_cpu_inc()</code> or <code>get_cpu()</code>. <code>get_cpu()</code> disables preemption and returns the CPU number; <code>put_cpu()</code> re-enables preemption. While preemption is off, the task cannot move to another CPU, so the copy it uses is its own. That copy is safe without a lock only from its own CPU. Another CPU or an interrupt handler can still change its own copy, so shared logical state still needs a lock. Per-CPU counters, caches and statistics use this pattern."
+    }
+   ]
+  },
+  {
+   "h3": "Shared data: spinlocks, atomics, barriers, IPIs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Shared kernel data needs protection because two CPUs can read and write it at the same time. A spinlock is a lock that busy-waits: the CPU repeats a test until the lock is free. The holder must finish quickly and must not sleep. Spinlocks are used in interrupt context and for short critical sections. An atomic operation, such as <code>atomic_inc()</code> on an <code>atomic_t</code>, reads, changes and writes a value as one indivisible step, so no lock is needed."
+    },
+    {
+     "type": "p",
+     "text": "RCU (read-copy-update) lets readers walk a shared structure without locks while a writer publishes a new version and waits for existing readers to finish. Memory barriers stop the compiler or CPU from reordering memory accesses around a point; <code>smp_mb()</code> is a full barrier. An IPI, inter-processor interrupt, runs a function on another CPU. Linux uses IPIs for TLB shootdown, scheduler wakeups and synchronisation. The main exam trap: a spinlock is not a sleeping lock. If the critical section may sleep, use a mutex or semaphore from <a href=\"#kernel-synchronization-queues-and-semaphores\">5.4</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Eight ready tasks are split four and four between CPU 0 and CPU 1 after load balancing; notice that each CPU has its own run queue and a task is migrated to the shorter queue.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Load balancing across CPUs",
+   "aria": "A flowchart starts with eight ready tasks, places four in CPU 0's run queue, then load balance moves work to CPU 1's run queue.",
+   "nodes": [
+    {
+     "id": "ready",
+     "label": "8 tasks ready"
+    },
+    {
+     "id": "c0",
+     "label": "CPU 0 rq",
+     "note": "4 tasks",
+     "style": "accent"
+    },
+    {
+     "id": "lb",
+     "label": "load balance",
+     "style": "live"
+    },
+    {
+     "id": "c1",
+     "label": "CPU 1 rq",
+     "note": "4 tasks",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ready",
+     "to": "c0",
+     "label": "queued"
+    },
+    {
+     "from": "c0",
+     "to": "lb",
+     "label": "too long"
+    },
+    {
+     "from": "lb",
+     "to": "c1",
+     "label": "migrate task"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Eight equal-weight CPU-bound tasks start on a 4-CPU machine with no affinity. (a) What share of one CPU does each task get? (b) A programmer pins four of them to CPU 0 with <code>taskset -c 0</code>. What does each task get now?",
+   "steps": [
+    "In (a), total capacity is 4 CPUs. Eight equal tasks share it. Each task gets 4 ÷ 8 = 0.5 CPU, that is 50% of one CPU.",
+    "In (b), four pinned tasks share CPU 0. CPU 0 capacity is 1 CPU. Each pinned task gets 1 ÷ 4 = 0.25 CPU, that is 25% of one CPU.",
+    "The other four tasks can run on CPUs 1, 2 and 3, total 3 CPUs. Each gets 3 ÷ 4 = 0.75 CPU, that is 75% of one CPU.",
+    "The load balancer keeps CPUs 1–3 roughly balanced; affinity stops pinned tasks from moving to those CPUs."
+   ],
+   "answer": "With no affinity each task gets 0.5 CPU (50%); after pinning, each pinned task gets 0.25 CPU (25%) and each unpinned task gets 0.75 CPU (75%).",
+   "check": "cpus = 4\ntasks = 8\nshare_no_affinity = cpus / tasks\npinned = 4\nshare_pinned = 1 / pinned\nother_cpus = 3\nother_tasks = 4\nshare_unpinned = other_cpus / other_tasks\nprint(share_no_affinity)\nprint(share_pinned)\nprint(share_unpinned)",
+   "values": [
+    0.5,
+    0.25,
+    0.75
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A single-threaded program does not run faster just because the machine has more CPUs; it has one instruction stream.",
+  "A per-CPU variable is safe without a lock only from its own CPU with preemption disabled. From another CPU it is just shared data.",
+  "A spinlock busy-waits and cannot be held across sleep; use a mutex or semaphore for code that may sleep.",
+  "CPU affinity is a restriction, not a promise of more speed; pinning all work to CPU 0 leaves other CPUs idle.",
+  "Some syllabi use “multiprocessing” for multitasking. In this unit it means symmetric multiprocessing: several CPUs sharing one kernel and memory."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define SMP and UP. What is the main hardware difference?",
+   "marks": 2,
+   "a": "UP has one CPU; SMP has several identical CPUs sharing memory and running one kernel."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a per-CPU variable safe without a lock only when accessed from its own CPU with preemption disabled?",
+   "marks": 3,
+   "a": "Each CPU has its own copy of the variable. With preemption disabled the task cannot migrate, so the copy it reads or writes is always the one belonging to the CPU it is running on. Without that, the task could be moved to another CPU between taking the CPU number and the access, and would then touch a different CPU's copy while that CPU is using it."
+  },
+  {
+   "level": "apply",
+   "q": "Six equal CPU-bound tasks run on a 3-CPU machine with no affinity. Then three are pinned to CPU 0. (a) What share of one CPU does each get with no affinity? (b) What does each pinned and each unpinned task get after pinning?",
+   "marks": 4,
+   "a": "(a) 3 CPUs ÷ 6 tasks = 0.5 CPU each. (b) Pinned: 1 CPU ÷ 3 tasks = 0.33 CPU each. Unpinned: 2 CPUs ÷ 3 tasks = 0.67 CPU each."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does Linux use one run queue per CPU instead of one global run queue?",
+   "marks": 4,
+   "a": "A per-CPU run queue avoids a global lock and cache contention; each CPU schedules locally, and the load balancer moves tasks when queues differ."
+  },
+  {
+   "level": "understand",
+   "q": "What is vruntime and how does nice value affect it?",
+   "marks": 3,
+   "a": "vruntime is scaled runtime; larger weight from lower nice makes it grow more slowly, so the task is picked more often."
+  },
+  {
+   "level": "remember",
+   "q": "What is an IPI and name one use.",
+   "marks": 2,
+   "a": "An inter-processor interrupt runs a function on another CPU; it is used for TLB shootdown or scheduler wakeups."
+  },
+  {
+   "level": "analyze",
+   "q": "A load balancer sees CPU 0 with eight runnable tasks and CPU 1 idle. What does it do, and what can stop it?",
+   "marks": 4,
+   "a": "It migrates a task from CPU 0 to CPU 1 if affinity and cache rules allow; CPU affinity or pinning can stop migration."
+  }
+ ],
+ "beyond": "Not for the exam. Real kernels add NUMA-aware balancing, cgroup CPU sets and real-time scheduling classes on top of CFS. Cloud operators tune CPU affinity and isolation for latency-sensitive services. Kernel trace tools show migrations, IPIs and run-queue latency. Search for CFS vruntime, sched_setaffinity, RCU grace period and TLB shootdown if you want the next layer."
+}

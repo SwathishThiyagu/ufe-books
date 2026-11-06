@@ -1,0 +1,528 @@
+{
+ "key_terms": [
+  {
+   "term": "task_struct",
+   "meaning": "Kernel structure that describes one process: its PID, state, stack pointer, memory map, open files and links to parent and children.",
+   "chapter": 1
+  },
+  {
+   "term": "Process table",
+   "meaning": "All task_structs held in linked lists and hash tables, so the kernel can find a task by PID or walk the parent-child tree.",
+   "chapter": 1
+  },
+  {
+   "term": "PID",
+   "meaning": "Positive integer that names a task; PID 1 is init, and the kernel reuses numbers after a wrap.",
+   "chapter": 1
+  },
+  {
+   "term": "Interrupt",
+   "meaning": "Hardware event that makes the CPU save its context and jump to a handler; identified by an IRQ line and a vector number.",
+   "chapter": 2
+  },
+  {
+   "term": "Signal",
+   "meaning": "Asynchronous notification sent to a process (SIGTERM, SIGKILL, SIGCHLD) with a default action and an optional handler.",
+   "chapter": 2
+  },
+  {
+   "term": "jiffies",
+   "meaning": "Counter of timer ticks since boot; one tick lasts 1/HZ seconds, where HZ is a build-time constant.",
+   "chapter": 2
+  },
+  {
+   "term": "Virtual address",
+   "meaning": "Address a program uses; the MMU translates it through page tables into a physical frame address.",
+   "chapter": 3
+  },
+  {
+   "term": "Page fault",
+   "meaning": "Exception raised when a virtual page has no valid mapping; the kernel handler either builds the mapping or kills the process.",
+   "chapter": 3
+  },
+  {
+   "term": "Spinlock",
+   "meaning": "Busy-wait lock; the holder must not sleep, so it suits short critical sections shared with interrupt handlers.",
+   "chapter": 4
+  },
+  {
+   "term": "Kernel semaphore",
+   "meaning": "Sleeping lock with a counter; down() blocks when the count is zero and up() wakes a waiter.",
+   "chapter": 4
+  },
+  {
+   "term": "Wait queue",
+   "meaning": "List of sleeping tasks protected by a lock; wake_up() moves them to the run queue, used by the wait_event macros.",
+   "chapter": 4
+  },
+  {
+   "term": "Pipe",
+   "meaning": "Kernel byte buffer with a read end and a write end, carrying one-way data between related processes.",
+   "chapter": 5
+  },
+  {
+   "term": "Socket",
+   "meaning": "Kernel endpoint for two-way communication, named by a file descriptor and, for inet sockets, by an IP address and port.",
+   "chapter": 5
+  },
+  {
+   "term": "ptrace",
+   "meaning": "System call by which one process (the tracer) stops, reads and writes the registers and memory of another (the tracee).",
+   "chapter": 5
+  },
+  {
+   "term": "Inode",
+   "meaning": "Object holding a file's metadata: type, mode, owner, size, timestamps and block pointers, plus operation tables in the VFS.",
+   "chapter": 6
+  },
+  {
+   "term": "VFS",
+   "meaning": "Virtual File System switch: one inode, dentry, file and superblock interface, so every file system looks the same to system calls.",
+   "chapter": 6
+  },
+  {
+   "term": "Major number",
+   "meaning": "Number in a device file that selects which driver handles the device.",
+   "chapter": 7
+  },
+  {
+   "term": "Minor number",
+   "meaning": "Number in a device file that selects which instance (disk, partition, tty) the driver should serve.",
+   "chapter": 7
+  },
+  {
+   "term": "file_operations",
+   "meaning": "Table of function pointers (open, read, write, ioctl, release) that a driver fills so file operations reach device code.",
+   "chapter": 7
+  },
+  {
+   "term": "Per-CPU variable",
+   "meaning": "Data with one copy per CPU, read and written without locking because only the local CPU touches its copy.",
+   "chapter": 8
+  }
+ ],
+ "takeaways": [
+  "Every running program is one task_struct, and the process table is the set of lists that finds it by PID or by parent.",
+  "Interrupts travel from hardware to the kernel, signals travel from the kernel to a process; both arrive without warning.",
+  "The timer tick keeps time, expires timeouts, and gives the scheduler its regular chance to switch tasks.",
+  "A process only ever sees virtual addresses; Linux fills in the translation map lazily, page by page, as faults arrive.",
+  "Kernel data is shared between CPUs and interrupt handlers, so each critical section needs a lock chosen to match that context.",
+  "Pipes and sockets are kernel buffers reached through file descriptors, and ptrace is a kernel channel for one process to control another.",
+  "The VFS inode and its operation tables make ext2 on disk and /proc in memory answer the same read() call.",
+  "A device is a major number, a minor number and a file_operations table.",
+  "Multiprocessor Linux buys correctness with locking and speed with per-CPU data plus a load balancer."
+ ],
+ "bank_note": "Long answers here almost always ask you to trace one event — a kill, a page fault, a read() on a device — through the kernel structures it touches, so name each structure, the field used and the step in order.",
+ "bank": [
+  {
+   "group": "remember-understand",
+   "level": "remember",
+   "q": "Draw a task_struct and label the fields used for lookup: pid, state, parent and children links, mm and files. Explain how the process table finds a task by PID and how it lists that task's children.",
+   "marks": 10,
+   "outline": [
+    "task_struct is the process descriptor, allocated in kernel memory",
+    "pid field plus the PID hash table gives O(1) lookup",
+    "parent and children/sibling links form the process tree",
+    "state field values: running, interruptible, stopped, zombie",
+    "mm holds the address space, files holds the open file table"
+   ],
+   "chapters": [
+    1
+   ]
+  },
+  {
+   "group": "remember-understand",
+   "level": "understand",
+   "q": "Explain how a hardware interrupt reaches its handler: the inter-request line, the vector, saving the context and returning. Say why Linux splits handling into a top half and a bottom half, with one example of each.",
+   "marks": 13,
+   "outline": [
+    "device raises IRQ, interrupt controller signals the CPU",
+    "CPU reads the vector and indexes the interrupt descriptor table",
+    "current context saved on the kernel stack, interrupts disabled on that CPU",
+    "top half runs quickly: acknowledge device, copy urgent data",
+    "bottom half (softirq, tasklet, workqueue) does the long work with interrupts on",
+    "return path restores context, possibly reschedules"
+   ],
+   "chapters": [
+    2
+   ]
+  },
+  {
+   "group": "remember-understand",
+   "level": "remember",
+   "q": "Define a signal. List four common signals with their default actions, and describe how a pending signal is delivered and what happens after a handler returns.",
+   "marks": 10,
+   "outline": [
+    "signal is an asynchronous notification, numbered 1 to 64",
+    "SIGTERM terminates, SIGKILL terminates and cannot be caught, SIGCHLD notifies parent, SIGSEGV core dumps",
+    "pending bit set on the task, blocked by the signal mask",
+    "delivered when the process returns from kernel to user mode",
+    "handler runs on the user stack, then sigreturn restores the old context",
+    "default action taken if no handler is installed"
+   ],
+   "chapters": [
+    2
+   ]
+  },
+  {
+   "group": "remember-understand",
+   "level": "understand",
+   "q": "Explain address translation in Linux: virtual address, page, page frame, page table and TLB. Then give the steps of handling a page fault on a valid but not yet mapped page.",
+   "marks": 13,
+   "outline": [
+    "virtual address splits into page number and offset",
+    "page table maps page number to frame number plus permission bits",
+    "TLB caches recent translations",
+    "fault traps to kernel, faulting address read from a control register",
+    "handler checks the VMA for the address",
+    "valid: read from disk or zero-fill a frame, install mapping, return and retry the instruction",
+    "invalid: send SIGSEGV"
+   ],
+   "chapters": [
+    3
+   ]
+  },
+  {
+   "group": "remember-understand",
+   "level": "understand",
+   "q": "Compare spinlocks, kernel semaphores and wait queues. For each, state whether the holder may sleep and where the kernel uses it.",
+   "marks": 10,
+   "outline": [
+    "spinlock busy-waits, non-preemptible section, holder must not sleep",
+    "used for short sections shared with interrupt handlers",
+    "semaphore counts, down() sleeps the caller, used for longer holds",
+    "mutex is a semaphore with count one and an owner",
+    "wait queue holds sleeping tasks until a condition becomes true",
+    "wake_up moves tasks to the run queue",
+    "rule: never sleep inside interrupt context"
+   ],
+   "chapters": [
+    4
+   ]
+  },
+  {
+   "group": "remember-understand",
+   "level": "understand",
+   "q": "Describe byte-stream pipes: how one is created, the read and write ends, what read() returns at end-of-file, and why the pipe has a fixed capacity.",
+   "marks": 8,
+   "outline": [
+    "pipe() returns two file descriptors",
+    "anonymous pipe exists only through these descriptors",
+    "writer blocks when the buffer is full, reader blocks when empty",
+    "read() returns 0 when all write ends are closed",
+    "SIGPIPE if the reader has gone",
+    "fixed capacity keeps memory bounded and gives natural flow control"
+   ],
+   "chapters": [
+    5
+   ]
+  },
+  {
+   "group": "apply",
+   "level": "apply",
+   "q": "A user program calls read() on the device file of a character driver. Trace the call from the system call entry to the copy of bytes into user memory. State where the major number, the minor number and the file_operations table are used.",
+   "marks": 13,
+   "outline": [
+    "syscall entry, arguments checked, file descriptor looked up in the file table",
+    "file points to a dentry and inode; inode type says character device",
+    "major number selects the driver through the character device table",
+    "minor number is passed to the driver to pick the instance",
+    "VFS calls the read entry of the driver's file_operations",
+    "driver copies data with copy_to_user and returns the count",
+    "return value and errors handled at the syscall exit"
+   ],
+   "chapters": [
+    6,
+    7
+   ]
+  },
+  {
+   "group": "apply",
+   "level": "apply",
+   "q": "Two CPUs increment the same kernel counter without protection and one update is lost. Show how the race happens, then remove it once with an atomic operation and once with a spinlock. Explain why a semaphore is the wrong choice when the code also runs in an interrupt handler.",
+   "marks": 13,
+   "outline": [
+    "read-modify-write is not one instruction at the memory bus level",
+    "interleaving of load and store loses an update",
+    "atomic_t or atomic_inc uses a single locked instruction",
+    "spinlock gives mutual exclusion around a longer section",
+    "spin_lock_irqsave also disables local interrupts to avoid deadlock",
+    "a semaphore may sleep, and sleeping is illegal in interrupt context",
+    "keep the critical section short to limit contention"
+   ],
+   "chapters": [
+    4,
+    8
+   ]
+  },
+  {
+   "group": "apply",
+   "level": "apply",
+   "q": "Trace the shell command kill -TERM <pid> from the kill system call to the target process running its handler. Cover PID lookup, the permission check, the pending bit, waking a sleeping task and delivery on return to user mode.",
+   "marks": 13,
+   "outline": [
+    "kill() enters the kernel with a PID and a signal number",
+    "process table lookup by PID fails with ESRCH if absent",
+    "permission check: same user or a privileged process",
+    "signal bit set in the pending set of the target",
+    "if the target sleeps interruptibly it is woken",
+    "signal delivered at the next return to user mode",
+    "handler installed by the process runs, else the default action"
+   ],
+   "chapters": [
+    1,
+    2
+   ]
+  },
+  {
+   "group": "apply",
+   "level": "apply",
+   "q": "A process touches a heap address it has never used before. Trace the event from the instruction to every possible outcome, including the case where the process is killed.",
+   "marks": 10,
+   "outline": [
+    "MMU finds no valid translation and raises a page fault",
+    "faulting address and error code passed to the handler",
+    "kernel searches the VMAs of the task for the address",
+    "inside a VMA: allocate a zeroed frame, insert the mapping",
+    "page table updated, TLB flushed if needed",
+    "instruction restarted and now succeeds",
+    "outside every VMA: SIGSEGV delivered",
+    "under memory pressure: reclaim or OOM kill"
+   ],
+   "chapters": [
+    3
+   ]
+  },
+  {
+   "group": "analyze-evaluate",
+   "level": "analyze",
+   "q": "Analyse demand paging with lazy allocation in Linux. What does the kernel save, what does each fault cost, and how can overcommit end in the OOM killer?",
+   "marks": 13,
+   "outline": [
+    "pages are mapped only when first touched",
+    "saves memory and start-up time for large sparse programs",
+    "each fault costs a trap, a frame allocation and often disk I/O",
+    "overcommit allows total virtual size to exceed RAM plus swap",
+    "reclaim, swap and page cache shrink under pressure",
+    "when reclaim fails the OOM killer picks a task",
+    "tuning knobs change how strict overcommit is"
+   ],
+   "chapters": [
+    3
+   ]
+  },
+  {
+   "group": "analyze-evaluate",
+   "level": "analyze",
+   "q": "Explain how a debugger uses ptrace to set a breakpoint and read a register of the program under test. Then analyse why ptrace is treated as a security-sensitive interface.",
+   "marks": 12,
+   "outline": [
+    "tracer attaches with PTRACE_ATTACH or starts the child with PTRACE_TRACEME",
+    "tracee stops at each signal and syscall boundary",
+    "tracer writes a trap instruction over the target byte",
+    "SIGTRAP returns control to the tracer, original byte restored",
+    "PTRACE_PEEK/POKE read and write memory, GETREGS reads registers",
+    "a tracing process can read and change another process's memory",
+    "hence the same-user rule and restrictions on setuid programs"
+   ],
+   "chapters": [
+    5
+   ]
+  },
+  {
+   "group": "analyze-evaluate",
+   "level": "evaluate",
+   "q": "Compare the on-disk inode of ext2 with the in-memory inode of the VFS. Evaluate how the operation tables in the in-memory inode let /proc answer the same read() call as a file on disk.",
+   "marks": 13,
+   "outline": [
+    "on-disk inode holds mode, owner, size, times, direct and indirect block pointers",
+    "no function pointers on disk, fixed layout",
+    "VFS inode built in memory when the file is first touched",
+    "inode_operations and file_operations hold function pointers",
+    "address space operations connect the page cache to the backing store",
+    "ext2 read goes through the block device; proc read builds text",
+    "uniform interface: the system call never knows which file system it hit"
+   ],
+   "chapters": [
+    6
+   ]
+  },
+  {
+   "group": "analyze-evaluate",
+   "level": "evaluate",
+   "q": "Linux once serialised kernel code with one global lock and now runs it on many CPUs at once. Evaluate the change: per-CPU data, spinlocks, cache behaviour on contended locks, and the job of the load balancer.",
+   "marks": 16,
+   "outline": [
+    "global lock gave correctness but no scaling",
+    "per-CPU data removes sharing for counters and caches",
+    "spinlock protects genuinely shared state, cost rises with contention",
+    "cache line bouncing makes a hot lock expensive",
+    "lock ordering rules prevent deadlock",
+    "load balancer moves runnable tasks between CPUs",
+    "affinity and NUMA placement affect performance",
+    "trade-off: fine-grained locking is harder to get right"
+   ],
+   "chapters": [
+    4,
+    8
+   ]
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Process descriptor",
+   "def": "The task_struct in kernel memory that holds everything the kernel knows about one process."
+  },
+  {
+   "term": "Process table",
+   "def": "The lists and hash tables that hold all process descriptors and allow lookup by PID or by parent."
+  },
+  {
+   "term": "init",
+   "def": "The first user process, always PID 1, which starts the rest of the system."
+  },
+  {
+   "term": "Zombie",
+   "def": "A finished process whose descriptor stays until its parent collects the exit status."
+  },
+  {
+   "term": "IDT",
+   "def": "Interrupt descriptor table; holds the handler entry point for each interrupt vector."
+  },
+  {
+   "term": "Top half",
+   "def": "The interrupt handler that runs immediately with interrupts partly disabled and must be short."
+  },
+  {
+   "term": "Bottom half",
+   "def": "Deferred interrupt work done later, as a softirq, tasklet or workqueue, with interrupts enabled."
+  },
+  {
+   "term": "Signal handler",
+   "def": "User function that runs instead of a signal's default action when the process has installed one."
+  },
+  {
+   "term": "HZ",
+   "def": "Build-time constant giving timer ticks per second; jiffies counts those ticks."
+  },
+  {
+   "term": "MMU",
+   "def": "Memory management unit; hardware that translates virtual addresses to physical addresses using page tables."
+  },
+  {
+   "term": "Page",
+   "def": "Fixed-size block of virtual memory, commonly 4 KiB on x86."
+  },
+  {
+   "term": "Page frame",
+   "def": "Fixed-size block of physical memory that holds one page."
+  },
+  {
+   "term": "Page table",
+   "def": "Per-process table that maps page numbers to frame numbers and holds permission bits."
+  },
+  {
+   "term": "TLB",
+   "def": "Translation lookaside buffer; a small cache of recent virtual-to-physical translations."
+  },
+  {
+   "term": "Demand paging",
+   "def": "Loading a page into memory only when it is first touched, not when it is mapped."
+  },
+  {
+   "term": "Critical section",
+   "def": "Code that touches shared data and must run as if it were alone."
+  },
+  {
+   "term": "Atomic operation",
+   "def": "An operation that completes as one indivisible step, so no other CPU sees a half-done result."
+  },
+  {
+   "term": "Mutex",
+   "def": "Sleeping lock with a single owner, used when the critical section may block."
+  },
+  {
+   "term": "FIFO",
+   "def": "Named pipe; a pipe that has a path in the file system so unrelated processes can open it."
+  },
+  {
+   "term": "Unix domain socket",
+   "def": "Socket that stays inside one machine and is addressed by a file-system path."
+  },
+  {
+   "term": "Dentry",
+   "def": "Directory entry object that links a file name to its inode and caches path lookups."
+  },
+  {
+   "term": "Superblock",
+   "def": "In-memory object describing one mounted file system."
+  },
+  {
+   "term": "Character device",
+   "def": "Device read and written as a stream of bytes, such as a terminal or serial port."
+  },
+  {
+   "term": "ioctl",
+   "def": "System call that passes device-specific commands and arguments straight to a driver."
+  },
+  {
+   "term": "Load balancing",
+   "def": "Scheduler activity that moves runnable tasks to idle CPUs to keep every CPU busy."
+  }
+ ],
+ "textbooks": [
+  {
+   "title": "Linux Kernel Development",
+   "authors": "Robert Love",
+   "edition": "3rd edition",
+   "pointer": "Process management, interrupts and interrupt handlers, kernel synchronisation, memory management."
+  },
+  {
+   "title": "Understanding the Linux Kernel",
+   "authors": "Daniel P. Bovet and Marco Cesati",
+   "edition": "3rd edition",
+   "pointer": "Processes, memory management, signals, interrupts and exceptions, file systems, IPC."
+  },
+  {
+   "title": "Linux Device Drivers",
+   "authors": "Jonathan Corbet, Alessandro Rubini and Greg Kroah-Hartman",
+   "edition": "3rd edition",
+   "pointer": "Major and minor numbers, file_operations, character and block drivers, concurrency."
+  },
+  {
+   "title": "Linux System Programming",
+   "authors": "Robert Love",
+   "edition": "2nd edition",
+   "pointer": "File I/O, signals, process management, memory mapping and advanced IPC."
+  }
+ ],
+ "web": [
+  {
+   "title": "Linux man-pages — ptrace(2)",
+   "url": "https://man7.org/linux/man-pages/man2/ptrace.2.html"
+  },
+  {
+   "title": "Linux man-pages — signal(7)",
+   "url": "https://man7.org/linux/man-pages/man7/signal.7.html"
+  },
+  {
+   "title": "Linux man-pages — pipe(7)",
+   "url": "https://man7.org/linux/man-pages/man7/pipe.7.html"
+  },
+  {
+   "title": "The Linux Kernel documentation",
+   "url": "https://www.kernel.org/doc/html/latest/"
+  },
+  {
+   "title": "GNU C Library reference manual",
+   "url": "https://www.gnu.org/software/libc/manual/"
+  }
+ ],
+ "wikipedia": [
+  "Linux kernel",
+  "Process control block",
+  "Page fault",
+  "Spinlock",
+  "Inode"
+ ]
+}

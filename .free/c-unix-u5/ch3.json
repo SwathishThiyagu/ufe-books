@@ -1,0 +1,237 @@
+{
+ "lead": "A process never sees physical RAM. It works in virtual addresses, and the memory management unit (MMU) translates each one page by page into a physical frame. Linux does not build that translation eagerly. It records what the process asked for and fills in page tables only when a page is first touched, through a page fault. That is why malloc returns instantly, why two processes can share one library, and why one bad pointer kills only its own program with SIGSEGV.",
+ "prereq": "You need: <a href=\"#kernel-data-structures-task-structure-and-process-table\">5.1</a> for task_struct and mm_struct, and Unit 1 for the kernel/user split.",
+ "sections": [
+  {
+   "h3": "Pages, tables and the MMU",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "RAM is divided into frames of 4 KB. A process's memory is divided into pages of the same size. The MMU translates a virtual address to a physical address one page at a time. The offset inside the page is copied unchanged, because page and frame are both 4 KB and aligned."
+    },
+    {
+     "type": "p",
+     "text": "On 32-bit x86 the address has 32 bits: 10 bits choose an entry in the page directory, 10 bits choose an entry in one page table, and 12 bits are the offset (2¹² = 4096). Two levels cover the 4 GB space."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Bits",
+      "Field",
+      "Values"
+     ],
+     "rows": [
+      [
+       "31–22",
+       "directory index",
+       "0–1023"
+      ],
+      [
+       "21–12",
+       "table index",
+       "0–1023"
+      ],
+      [
+       "11–0",
+       "offset",
+       "0–4095"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "x86-64 uses four levels — PGD (page global directory), PUD, PMD and PTE — each index 9 bits, plus 12 offset bits, giving 48-bit virtual addresses. The register CR3 holds the physical base of the PGD. A context switch loads the new process's CR3."
+    },
+    {
+     "type": "formula",
+     "text": "physical address = frame number × 4096 + offset",
+     "where": "frame number is the page-table entry with its low 12 flag bits removed (PTE >> 12); on a 64-bit PTE, mask the address field (bits 12–51) before shifting: frame = (PTE & 0x000FFFFFFFFFF000) >> 12. 4096 is the page size in bytes; offset is the low 12 bits of the virtual address, 0 to 4095."
+    },
+    {
+     "type": "p",
+     "text": "A page-table entry (PTE) is a 32-bit or 64-bit word. The low bits are flags: bit 0 present, bit 1 writable, bit 2 user-accessible. The remaining bits, shifted right by 12, give the frame number."
+    },
+    {
+     "type": "p",
+     "text": "The TLB is a small cache of recent translations inside the CPU. When the kernel changes a PTE it must flush the stale entry: INVLPG for one page, or reloading CR3 for the whole set."
+    }
+   ]
+  },
+  {
+   "h3": "mm_struct, VMAs and demand paging",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every process has one mm_struct (some syllabi call it the address space or memory map). It points to the top-level page table, counts the pages, and keeps a list of vm_area_struct objects, each called a VMA. A VMA is one contiguous range, such as code, data, heap, stack or a mapped file, with a start, an end and permission bits."
+    },
+    {
+     "type": "p",
+     "text": "Linux fills page tables lazily. A VMA only promises space. No frame is assigned until the page is touched."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The CPU fails the translation and raises a page fault, pushing the faulting address into CR2.",
+      "The kernel finds the VMA containing that address. No VMA, or a permission mismatch, means the access is invalid.",
+      "Minor fault: the page is already in memory, in the page cache or an allocated frame. The kernel writes the PTE and returns; no disk I/O.",
+      "Major fault: the page sits on disk or in swap. The process sleeps while the kernel reads it, then maps it.",
+      "Invalid fault: the kernel delivers SIGSEGV to the process."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "malloc and mmap return immediately because they only create or extend a VMA. The first read or write to each page faults, and only then does a frame appear. A loop writing one byte per 4 KB touches many frames; writing 4 KB contiguously touches one."
+    }
+   ]
+  },
+  {
+   "h3": "Copy-on-write, mmap, zones and reclaim",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "fork does not copy memory. Parent and child share frames, and both sets of PTEs are marked read-only. When either side writes, the handler sees a write to a shared page, copies the frame, points the writer's PTE at the new frame and marks that PTE writable; the other process keeps its read-only PTE pointing at the original frame (it stays read-only for as long as the frame is shared). This is copy-on-write (COW). A following exec discards the old mm_struct and builds a fresh one."
+    },
+    {
+     "type": "p",
+     "text": "mmap adds a VMA without reading the file. File-backed pages arrive on fault from the page cache, and a shared mapping lets several processes see the same frames."
+    },
+    {
+     "type": "p",
+     "text": "Physical memory is grouped into zones: DMA (low addresses for old devices that cannot address high RAM), NORMAL, and HIGHMEM (32-bit only, not permanently mapped by the kernel). The kernel also keeps a direct map, where physical RAM (all of it on 64-bit; everything except high memory on 32-bit) appears at a fixed virtual offset, so frame number to kernel virtual address is addition, not a page walk."
+    },
+    {
+     "type": "p",
+     "text": "When free frames run low, page reclaim runs: kswapd drops clean file-backed pages and writes anonymous pages to swap. Slab allocation belongs to <a href=\"#kernel-synchronization-queues-and-semaphores\">5.4</a>; file-page caching is in <a href=\"#linux-file-systems-inodes-proc-and-ext2\">5.6</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "CR3 gives the top-level page directory. Directory index 1 picks a page table, table index 3 picks the entry, and that entry points to frame 0x12 — physical address 0x12ABC for our offset. Notice the offset never passes through the tables.",
+  "spec": {
+   "type": "tree",
+   "aria": "A tree from CR3 to the page directory, through directory index 1 and table index 3, to page frame 0x12 at physical address 0x12ABC.",
+   "shape": "box",
+   "root": {
+    "label": "CR3 → PGD",
+    "style": "muted",
+    "children": [
+     {
+      "label": "page table 1",
+      "edge": "index 1",
+      "children": [
+       {
+        "label": "PTE 3",
+        "style": "accent",
+        "children": [
+         {
+          "label": "frame 0x12",
+          "note": "phys 0x12ABC",
+          "style": "live",
+          "_d": 3,
+          "children": [],
+          "_x": 360.0,
+          "_y": 264
+         }
+        ],
+        "_d": 2,
+        "_x": 360.0,
+        "_y": 190
+       }
+      ],
+      "_d": 1,
+      "_x": 360.0,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   }
+  }
+ },
+ "examples": [
+  {
+   "question": "On a 32-bit x86 machine with 4 KB pages, a process reads virtual address 0x00403ABC. The page-directory entry at index 1 points to a page table, and entry 3 of that table holds 0x00012007. Find the directory index, the table index, the offset, the frame number and the physical address, and name the flag bits that are set.",
+   "steps": [
+    "4 KB pages need 12 offset bits, so 32 − 12 = 20 bits are left. On 32-bit x86 these split 10 + 10.",
+    "Write the address in binary: 0x00403ABC = 0000 0000 0100 0000 0011 1010 1011 1100.",
+    "Group as 10 | 10 | 12: 0000000001 = 1, 0000000011 = 3, 1010 1011 1100 = 0xABC = 2748.",
+    "Directory index = 1, table index = 3, offset = 2748 bytes.",
+    "The low 12 bits of 0x00012007 are flags. Shift right by 12: 0x00012007 >> 12 = 0x00012 = 18, the frame number.",
+    "Physical address = 18 × 4096 + 2748 = 73728 + 2748 = 76476 = 0x12ABC.",
+    "Flags = 0x007 = binary 111: bit 0 present = 1, bit 1 writable = 1, bit 2 user-accessible = 1."
+   ],
+   "answer": "Directory index 1, table index 3, offset 2748 bytes, frame number 18, physical address 76476 (0x12ABC); the PTE has present, writable and user bits set (flag value 7).",
+   "check": "va = 0x00403ABC\npte = 0x00012007\noff = va & 0xFFF\nti = (va >> 12) & 0x3FF\ndi = (va >> 22) & 0x3FF\nframe = pte >> 12\nphys = frame * 4096 + off\nflags = pte & 0xFFF\nprint(di)\nprint(ti)\nprint(off)\nprint(frame)\nprint(phys)\nprint(flags)\n",
+   "values": [
+    1,
+    3,
+    2748,
+    18,
+    76476,
+    7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The offset is copied unchanged, not translated. Only the page number goes through the page tables.",
+  "malloc reserves virtual space, not frames. Frames arrive on first touch, so a successful malloc proves nothing about free RAM.",
+  "The PTE is not the physical address. Mask off the low 12 flag bits (or shift right by 12) before multiplying by 4096.",
+  "A page fault is normal, not an error. Only a fault with no matching VMA or a wrong permission becomes SIGSEGV.",
+  "After changing a PTE the TLB may still hold the old translation. Without INVLPG or a CR3 reload the CPU keeps using stale data."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does CR3 hold, and when does the kernel change it?",
+   "marks": 2,
+   "a": "The physical base address of the top-level page table (PGD). It changes on a context switch, when the incoming task's mm_struct is loaded."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three outcomes of a page fault.",
+   "marks": 2,
+   "a": "Minor fault (page already in memory, just map it), major fault (read from disk or swap, then map), invalid fault (deliver SIGSEGV)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does malloc return before any physical frame is allocated?",
+   "marks": 3,
+   "a": "It only creates or extends a VMA in the mm_struct. Page tables and frames are filled lazily by the fault handler when each page is first touched."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the kernel not translate the offset field?",
+   "marks": 3,
+   "a": "Pages and frames are both 4 KB and aligned, so the byte position inside a page is identical to its position inside the frame. Only the page number needs lookup."
+  },
+  {
+   "level": "apply",
+   "q": "Same 32-bit machine, virtual address 0x00403ABC, but the PTE at directory index 1, table index 3 is 0x00045007. Find the frame number and the physical address.",
+   "marks": 4,
+   "a": "Offset = 0xABC = 2748. Frame = 0x00045007 >> 12 = 0x45 = 69. Physical = 69 × 4096 + 2748 = 282624 + 2748 = 285372 = 0x45ABC."
+  },
+  {
+   "level": "analyze",
+   "q": "After fork, both parent and child PTEs are marked read-only. Explain why, and what happens on the child's first write.",
+   "marks": 5,
+   "a": "Read-only forces a fault on any write so the kernel can detect sharing. The fault handler copies the frame for the writer, updates its PTE to the new frame with write permission, and leaves the other process on the original frame. This is copy-on-write."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does x86-64 need four levels when 32-bit x86 needs two?",
+   "marks": 4,
+   "a": "A 48-bit virtual address needs 48 − 12 = 36 index bits. Four levels of 9 bits give 36 bits, while two levels of 10 bits give only 20, enough for 4 GB."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the TLB be flushed after the kernel edits a PTE?",
+   "marks": 3,
+   "a": "The TLB may hold the old translation. Without a flush the CPU keeps reading or writing the old frame, ignoring the new mapping and its permissions."
+  }
+ ],
+ "beyond": "Not for the exam. Production kernels use huge pages of 2 MB and 1 GB to cut TLB pressure, and newer x86-64 CPUs add a fifth level for 57-bit addresses. Page reclaim is now driven by memory cgroups, so a container is capped without killing the host. KSM merges identical anonymous pages, and NUMA balancing moves pages toward the CPU that uses them. Search for \"Linux page table walk\", \"hugepages\" and \"memory cgroup reclaim\" to go deeper."
+}

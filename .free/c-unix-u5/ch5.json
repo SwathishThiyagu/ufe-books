@@ -1,0 +1,174 @@
+{
+ "lead": "Two processes cannot read each other's memory, so they meet inside the kernel. The kernel keeps a small set of objects that carry data between processes: the pipe, a one-way byte queue reached through two file descriptors; the socket, the same idea but addressed, working on one machine or across a network; and ptrace, which lets one process stop another and read or change its registers and memory. Shell pipelines, database servers, gdb and strace all rest on these three objects.",
+ "prereq": "You need: file descriptors and files_struct from <a href=\"#kernel-data-structures-task-structure-and-process-table\">5.1</a>, wait queues and wakeups from <a href=\"#kernel-synchronization-queues-and-semaphores\">5.4</a>, and the shell pipeline from Unit 3.",
+ "sections": [
+  {
+   "h3": "Pipes: a byte queue behind two file descriptors",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A pipe is a kernel buffer with two ends. The call <code>pipe(fd)</code> fills an array of two ints: <code>fd[0]</code> reads, <code>fd[1]</code> writes. Both are ordinary file descriptors, so <code>read</code>, <code>write</code> and <code>close</code> work on them. The shell command <code>ls | grep txt</code> creates exactly this pair, with one descriptor in each child process. Inside the kernel the pipe is an inode on a private file system called pipefs, and the data sits in a ring of 16 pages attached to that inode."
+    },
+    {
+     "type": "formula",
+     "text": "capacity = 16 pages × 4096 bytes = 65536 bytes",
+     "where": "16 is the number of pages in the default pipe ring, 4096 bytes is the page size, and 65536 bytes is the largest amount the pipe can hold. PIPE_BUF is 4096 bytes: the largest write the kernel guarantees is not interleaved with another writer's bytes."
+    },
+    {
+     "type": "p",
+     "text": "A write copies bytes into free pages and sleeps on a wait queue when the ring is full; a read copies bytes out and wakes the writer. A read returns only what is available, up to the count asked, so one 4 KB write can come back as two reads. When every writer has closed <code>fd[1]</code>, read returns 0, which is end of file. A write after every reader has closed raises SIGPIPE, whose default action kills the process. <code>mkfifo(\"/tmp/f\", 0600)</code> creates a named pipe, a FIFO with a path, so programs that never shared a fork can open it by name."
+    }
+   ]
+  },
+  {
+   "h3": "Sockets and other kernel channels",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A socket is a pipe with an address. <code>socket(AF_UNIX, SOCK_STREAM, 0)</code> creates a local byte stream; the server binds a path with <code>bind</code>, calls <code>listen</code>, and <code>accept</code> returns a new descriptor for each client. <code>socketpair(AF_UNIX, SOCK_STREAM, 0, sv)</code> makes two already-connected ends with no path at all. AF_INET with SOCK_STREAM gives TCP: the same <code>read</code>, <code>write</code>, <code>send</code> and <code>recv</code> calls, going through the VFS like any file, so one function can serve a socket and a disk file alike."
+    },
+    {
+     "type": "p",
+     "text": "Each socket keeps a send buffer and a receive buffer in the kernel; a blocking write sleeps when the send buffer is full, exactly like a pipe. For many descriptors, <code>select</code> and <code>poll</code> report who is ready, while <code>epoll</code> keeps the interest set inside the kernel. Shared memory (<code>mmap</code> with MAP_SHARED, or the older <code>shmget</code>) maps one set of physical pages into two address spaces and copies nothing, but it needs a semaphore to order access. Message queues keep record boundaries where a pipe has none."
+    }
+   ]
+  },
+  {
+   "h3": "ptrace: one process controls another",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>ptrace</code> is a debugging hook built into the kernel. The tracer calls <code>ptrace(PTRACE_ATTACH, pid)</code> and the tracee stops; the tracer then calls <code>waitpid(pid, &status, 0)</code> and sees that stop. From then on the tracee runs only when the tracer says so."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "PTRACE_ATTACH, then waitpid: the tracee is now stopped and ready to inspect.",
+      "PTRACE_PEEKTEXT reads one word of the tracee's text at an address; PTRACE_POKETEXT writes one word, which is how a breakpoint byte 0xcc is planted.",
+      "PTRACE_GETREGS fills a user_regs_struct with rip, rsp, rax and the other registers; PTRACE_SETREGS changes them.",
+      "PTRACE_SINGLESTEP runs exactly one instruction and stops again; PTRACE_CONT resumes until a signal or breakpoint.",
+      "PTRACE_DETACH lets the tracee go and ends the relation."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "gdb uses these calls for breakpoints and stepping; strace uses PTRACE_SYSCALL to stop at every system call and print its number and arguments. Permission is controlled by <code>/proc/sys/kernel/yama/ptrace_scope</code>: 0 means any process of the same user may attach, 1 means only descendants (the default on many distributions), 2 means admin only, 3 means no attach at all. That is why gdb normally starts the program itself instead of attaching to a stranger's PID."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The writer fills the whole 65536-byte ring, the reader is woken, drains 8192 bytes, and the freed space lets the writer continue.",
+  "spec": {
+   "type": "sequence",
+   "aria": "The writer fills the pipe buffer, the reader is woken and drains 8192 bytes, and the freed space wakes the writer.",
+   "actors": [
+    "Writer",
+    "Pipe buffer",
+    "Reader"
+   ],
+   "messages": [
+    {
+     "from": "Writer",
+     "to": "Pipe buffer",
+     "label": "write 65536 B",
+     "dashed": false
+    },
+    {
+     "from": "Pipe buffer",
+     "to": "Reader",
+     "label": "wake reader",
+     "dashed": false
+    },
+    {
+     "from": "Reader",
+     "to": "Pipe buffer",
+     "label": "read 8192 B",
+     "dashed": false
+    },
+    {
+     "from": "Pipe buffer",
+     "to": "Writer",
+     "label": "space free",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A pipe has capacity 65536 bytes and is empty. It was opened O_NONBLOCK on the write end. A writer calls write(fd, buf, 70000). A reader then reads 8192 bytes. The writer then calls write for the 4464 bytes still left in its own buffer. Give each return value and the number of bytes left in the pipe.",
+   "steps": [
+    "Free space before the first write is 65536 bytes; the writer asks for 70000 bytes.",
+    "A non-blocking write copies only what fits: min(70000, 65536) = 65536 bytes. The first write returns 65536. Bytes still in user space: 70000 − 65536 = 4464 bytes.",
+    "The reader reads 8192 bytes and read returns 8192. The pipe now holds 65536 − 8192 = 57344 bytes.",
+    "Free space is now 65536 − 57344 = 8192 bytes. The second write asks for 4464 bytes, which is less than 8192, so all of it fits and the write returns 4464.",
+    "Bytes in the pipe afterwards: 57344 + 4464 = 61808 bytes."
+   ],
+   "answer": "The first write returns 65536, the read returns 8192 and leaves 57344 bytes, the second write returns 4464, and the pipe holds 61808 bytes.",
+   "check": "cap = 65536\nfirst = min(70000, cap)\nleft = 70000 - first\nafter_read = cap - 8192\nsecond = min(left, cap - after_read)\nprint(first)\nprint(left)\nprint(8192)\nprint(after_read)\nprint(second)\nprint(after_read + second)\n",
+   "values": [
+    65536,
+    4464,
+    8192,
+    57344,
+    4464,
+    61808
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A pipe has no message boundaries: 4 KB written may be read as 3 KB then 1 KB, and end of file is read returning 0, never −1.",
+  "Pipe capacity (65536 bytes) is not PIPE_BUF (4096 bytes). PIPE_BUF is the atomicity limit for one write, not the size of the buffer.",
+  "SIGPIPE is a signal, not an error code. You see EPIPE as errno only after SIGPIPE has been ignored or blocked.",
+  "Leaving the unused end of a pipe open in a forked child keeps a writer alive, so the reader waits forever instead of getting end of file.",
+  "PTRACE_PEEKTEXT on a running tracee fails with ESRCH: the tracee must first be attached and reaped with waitpid."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does pipe(fd) return, and which end is which?",
+   "marks": 2,
+   "a": "It returns 0 on success. fd[0] is the read end and fd[1] is the write end; both are file descriptors."
+  },
+  {
+   "level": "remember",
+   "q": "What is the default capacity of a Linux pipe, and how is it built?",
+   "marks": 2,
+   "a": "65536 bytes, a ring of 16 pages of 4096 bytes each."
+  },
+  {
+   "level": "understand",
+   "q": "Why can one 4 KB write to a pipe arrive as two reads?",
+   "marks": 3,
+   "a": "A pipe is a byte stream with no boundaries. read returns as soon as any bytes are available, so the reader's count controls the split, not the writer's."
+  },
+  {
+   "level": "understand",
+   "q": "What does read return when all writers have closed, and what happens on a write when all readers have closed?",
+   "marks": 3,
+   "a": "read returns 0, which is end of file. A write raises SIGPIPE, and if that signal is ignored the write fails with EPIPE."
+  },
+  {
+   "level": "apply",
+   "q": "A pipe holds 60000 bytes of its 65536-byte capacity. The reader reads 5000 bytes. A writer with O_NONBLOCK then writes 20000 bytes. What does write return and how much is in the pipe?",
+   "marks": 4,
+   "a": "After the read the pipe holds 55000 bytes, so free space is 10536 bytes. The write copies 10536 bytes and returns 10536; the pipe is now full at 65536 bytes."
+  },
+  {
+   "level": "apply",
+   "q": "A program makes a pipe, forks, and the child writes one line then exits. The parent reads. What must the parent close before read can return 0?",
+   "marks": 3,
+   "a": "The parent must close its own copy of fd[1], the write end. Otherwise a writer still exists on the pipe and read blocks instead of reaching end of file."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does gdb on a default hardened system fail to attach to an unrelated process of the same user?",
+   "marks": 5,
+   "a": "ptrace_scope is 1, so the Yama module allows a process to trace only its own descendants. gdb must fork and exec the program itself, or an administrator must relax the scope; the same rule stops one user program from reading another's keys."
+  }
+ ],
+ "beyond": "Not for the exam. ptrace is now fenced off in production: seccomp filters, container runtimes and Android block it because it is an easy way to steal secrets from another process. eBPF and perf trace watch system calls without stopping the target, and io_uring replaces some pipe and socket handoffs with shared rings. Reading fs/pipe.c, net/socket.c and kernel/ptrace.c in the kernel source is the natural next step, together with the Yama LSM notes on ptrace_scope."
+}

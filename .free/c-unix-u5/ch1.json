@@ -1,0 +1,264 @@
+{
+ "lead": "Every process and every kernel thread in Linux is represented by one C structure, task_struct. The kernel cannot use the process's own memory to describe the process, so this record lives in kernel memory. Because thousands of tasks may exist, the kernel also keeps indexes: a doubly linked list of all tasks, a hash table keyed by PID, and a parent-child tree. Together these are loosely called the process table. The same mechanism lets ps list processes, lets the scheduler pick the next task, and lets a parent collect a child's exit status.",
+ "prereq": "You need: Unit 1 (kernel, shell and user space) and Unit 4 (viewing and controlling processes).",
+ "sections": [
+  {
+   "h3": "One record per task",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Linux describes every schedulable entity with one C structure, <code>task_struct</code>. A user process, a thread and a kernel thread all have one. Some syllabi call this the process descriptor or the process control block (PCB). It lives in kernel memory, never in the process's own address space, because the kernel must be able to describe a process whose user memory is unmapped, swapped or damaged."
+    },
+    {
+     "type": "p",
+     "text": "The structure is large: identity, state, memory pointers, open files, signal state, credentials, scheduling data and links to other tasks. It is allocated from a dedicated slab cache, so creating and destroying tasks reuses memory instead of calling the page allocator every time. The kernel stack is a separate small region used while the task executes a system call or interrupt in kernel mode."
+    }
+   ]
+  },
+  {
+   "h3": "Fields that matter",
+   "blocks": [
+    {
+     "type": "table",
+     "head": [
+      "State",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "TASK_RUNNING",
+       "Runnable or currently running"
+      ],
+      [
+       "TASK_INTERRUPTIBLE",
+       "Sleeping; a signal can wake it"
+      ],
+      [
+       "TASK_UNINTERRUPTIBLE",
+       "Sleeping; signals do not wake it"
+      ],
+      [
+       "TASK_STOPPED",
+       "Stopped by a signal such as SIGSTOP"
+      ],
+      [
+       "TASK_ZOMBIE",
+       "Exited; parent has not called wait()"
+      ]
+     ]
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<code>pid</code> is the task's number; <code>tgid</code> is the thread-group id. For a single-threaded process <code>tgid</code> equals <code>pid</code>; threads share the leader's <code>tgid</code>.",
+      "<code>ppid</code> is not a field in <code>task_struct</code>. The ppid that user space reads from <code>/proc</code> is computed from <code>real_parent->pid</code>; the structure itself stores <code>real_parent</code> and <code>parent</code> pointers.",
+      "<code>mm</code> points to the <code>mm_struct</code> that describes the address space; it is NULL for a kernel thread.",
+      "<code>files</code> points to the open-file table (<code>files_struct</code>), and <code>fs</code> holds the root and current directory.",
+      "<code>signal</code> holds shared signal state for the thread group, while <code>sighand</code> holds the handler table.",
+      "<code>cred</code> holds user and group ids and capabilities.",
+      "<code>prio</code> is the dynamic priority and <code>policy</code> is the scheduling policy.",
+      "<code>tasks</code> links the task into the global list; <code>children</code> and <code>sibling</code> build the parent-child tree."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "The process table: list, hash and tree",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Linux does not keep the process table as an array indexed by PID. It keeps three indexes over tasks: a global list of <code>task_struct</code> objects, a PID hash of <code>struct pid</code> entries, and a parent-child tree of <code>task_struct</code> objects."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Global task list: a circular doubly linked list through every task's <code>tasks</code> field. Walking it visits every process; ps and the OOM killer use this kind of sweep.",
+      "PID hash table: the numeric PID is hashed to a bucket chain of <code>struct pid</code> entries. A <code>struct pid</code> is a small kernel record that names one PID number for a task in a namespace and points to its <code>task_struct</code>. Lookup computes the bucket and walks that chain; average lookup is O(1).",
+      "Parent-child tree: <code>children</code> and <code>sibling</code> links let the kernel find a parent's children and a child's siblings. PID 1, init, is the ancestor of normal user-space processes; kernel threads have no user parent."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "bucket = PID mod B",
+     "where": "PID is the process id; B is the number of hash buckets; mod gives the remainder. In the example PID 1201 and B = 512 give bucket 177."
+    }
+   ]
+  },
+  {
+   "h3": "Where the structures live",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>task_struct</code> comes from a slab cache. Slab keeps preallocated objects of one size, so a fork does not search for free pages. Small kernel pieces such as a path buffer use <code>kmalloc</code>, which returns physically contiguous memory. Large areas use <code>vmalloc</code>, which returns virtually contiguous memory that may be scattered in physical RAM."
+    },
+    {
+     "type": "p",
+     "text": "None of this memory is swapped: the kernel has no user address space to fault back to and no disk backing for its own structures, so kernel pages stay resident. The kernel stack is also resident and small, often 8 KB or 16 KB. Deep recursion or a large local array in kernel code can overflow it."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The task list head links every task_struct by next and prev; task 1201 also points to its address space, open files, signal state and kernel stack. Notice that the list links are separate from these resource pointers.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "task_struct and the task list",
+   "aria": "A block diagram shows a task list head linked by next and prev to task 1201 and task 1202, with task 1201 pointing to mm, files, signal and its kernel stack.",
+   "nodes": [
+    {
+     "id": "head",
+     "label": "task list head",
+     "style": "muted"
+    },
+    {
+     "id": "t1",
+     "label": "task 1201",
+     "note": "state RUNNING",
+     "style": "accent"
+    },
+    {
+     "id": "t2",
+     "label": "task 1202",
+     "note": "state SLEEPING",
+     "style": "normal"
+    },
+    {
+     "id": "mm",
+     "label": "mm",
+     "note": "mm_struct"
+    },
+    {
+     "id": "files",
+     "label": "files",
+     "note": "files_struct"
+    },
+    {
+     "id": "sig",
+     "label": "signal",
+     "note": "signal_struct"
+    },
+    {
+     "id": "stack",
+     "label": "kernel stack",
+     "note": "thread_info nearby"
+    }
+   ],
+   "edges": [
+    {
+     "from": "head",
+     "to": "t1",
+     "label": "next"
+    },
+    {
+     "from": "t1",
+     "to": "t2",
+     "label": "next"
+    },
+    {
+     "from": "t2",
+     "to": "head",
+     "label": "prev"
+    },
+    {
+     "from": "t1",
+     "to": "mm",
+     "label": "mm"
+    },
+    {
+     "from": "t1",
+     "to": "files",
+     "label": "files"
+    },
+    {
+     "from": "t1",
+     "to": "sig",
+     "label": "signal"
+    },
+    {
+     "from": "t1",
+     "to": "stack",
+     "label": "stack"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "The PID hash table has 512 buckets. (a) Which bucket holds PID 1201? (b) The task in that bucket has state TASK_RUNNING, with mm and files pointers set. What changes when the process calls exit() and the parent has not yet waited?",
+   "steps": [
+    "Write the bucket rule: bucket = PID mod B.",
+    "Substitute PID = 1201 and B = 512: 1201 mod 512.",
+    "512 × 2 = 1024, and 1201 − 1024 = 177, so bucket = 177.",
+    "(b) exit() changes state to TASK_ZOMBIE and stores the exit code.",
+    "The kernel detaches mm and frees the address space, closes the files table, releases the fs, namespace, semaphore and shared-memory resources, but keeps task_struct, the PID slot, the exit status, the credentials and the signal state until the parent calls wait() and the task is finally released."
+   ],
+   "answer": "PID 1201 hashes to bucket 177; on exit without a wait, the task becomes TASK_ZOMBIE and keeps its task_struct, PID slot, exit status, credentials and signal state until reaped.",
+   "check": "pid = 1201\nbuckets = 512\nprint(pid % buckets)\nprint(pid // buckets)",
+   "values": [
+    177,
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The process table is not an array indexed by PID. It is a global task list plus a PID hash table plus a parent-child tree.",
+  "User data does not live on the kernel stack. The kernel stack holds kernel frames, saved registers and return addresses while the task runs in kernel mode.",
+  "TASK_RUNNING means runnable, not necessarily using a CPU. A runnable task may be waiting in the run queue.",
+  "Threads share a tgid but have different pids. A single-threaded process has tgid equal to pid.",
+  "A zombie has already freed its address space but still owns its task_struct and PID until the parent calls wait()."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the five common task states and give one line for each.",
+   "marks": 2,
+   "a": "TASK_RUNNING: runnable or running. TASK_INTERRUPTIBLE: sleeping, wakeable by a signal. TASK_UNINTERRUPTIBLE: sleeping, not wakeable by a signal. TASK_STOPPED: stopped by a signal such as SIGSTOP. TASK_ZOMBIE: exited, waiting for the parent's wait()."
+  },
+  {
+   "level": "understand",
+   "q": "Why does task_struct live in kernel memory instead of the process's user address space?",
+   "marks": 3,
+   "a": "The kernel must describe a process even when its user memory is unmapped, swapped or damaged. User memory can also be changed by the process, so it is not a safe place for kernel bookkeeping."
+  },
+  {
+   "level": "apply",
+   "q": "A PID hash table has 512 buckets. PID 4098 arrives. Which bucket is searched?",
+   "marks": 3,
+   "a": "Compute 4098 mod 512. 512 × 8 = 4096, so the remainder is 2. Bucket 2 is searched, then its chain is walked comparing PIDs."
+  },
+  {
+   "level": "analyze",
+   "q": "A task_struct has mm equal to NULL. What kind of task is this, and what does that imply about its memory?",
+   "marks": 4,
+   "a": "It is a kernel thread. It has no user address space, so it does not fault in user pages and runs only kernel code. It still has a kernel stack and scheduling fields."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between the tasks list and the children/sibling links?",
+   "marks": 3,
+   "a": "The tasks list is a global circular list through every task. The children and sibling links form the parent-child tree, used to find a parent's children and a child's siblings."
+  },
+  {
+   "level": "apply",
+   "q": "A child calls exit() before its parent calls wait(). What is the child's state, and which fields are still meaningful?",
+   "marks": 4,
+   "a": "The child is TASK_ZOMBIE. Its exit code is stored, its PID slot remains, and its task_struct remains. Its mm and files are released, so those pointers no longer describe a live address space or open-file table."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is kernel memory not swapped out to disk?",
+   "marks": 4,
+   "a": "The kernel has no user address space to fault back into and no disk backing for its own structures. Swapping kernel pages would require the kernel to handle a page fault using structures that may themselves be swapped, so kernel memory stays resident."
+  },
+  {
+   "level": "remember",
+   "q": "For a single-threaded process, how do pid and tgid compare?",
+   "marks": 2,
+   "a": "They are equal. For threads in one process, tgid equals the leader's pid, while each thread has its own pid."
+  }
+ ],
+ "beyond": "Not for the exam. Kernel developers inspect these structures with crash dumps and with BPF programs attached to tracepoints. Containers add PID namespaces, so the same task_struct has a different PID inside and outside a container. Real-time systems care about the priority and policy fields. Search for task_struct, pid namespace and BPF tracepoints to go deeper."
+}

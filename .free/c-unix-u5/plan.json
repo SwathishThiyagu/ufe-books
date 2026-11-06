@@ -1,0 +1,538 @@
+{
+ "lead": "This unit opens the kernel: how Linux stores a process, delivers a signal, translates an address, locks shared data, moves bytes between processes and reaches a disk. After it you can read a task_struct dump, trace a page fault to a physical frame, size an ext2 file and explain why a driver must be SMP-safe.",
+ "about": "The unit goes inside the kernel. Chapter 5.1 shows how a process is stored as a task_struct and found through the process table. 5.2 follows signals, interrupts and timer ticks into that process. 5.3 walks a virtual address through the page tables to a physical frame. 5.4 covers the locks and wait queues that keep shared data correct. 5.5 explains pipes, sockets and ptrace. 5.6 opens the file system layer: inodes, /proc and ext2. 5.7 turns a user read() into a device driver call. 5.8 puts all of it on several CPUs at once. Each chapter builds on the structures the earlier ones defined.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Every running program is a task_struct in the kernel, and the process table is the set of lists and hash tables that finds those structures by PID and by parent.",
+   "depth": "Open task_struct field by field: state (TASK_RUNNING, TASK_INTERRUPTIBLE, TASK_UNINTERRUPTIBLE, TASK_STOPPED, TASK_ZOMBIE), pid, tgid, ppid, mm, files, fs, signal, sighand, cred, prio, policy, the tasks list links and the children/sibling links. Show the process table as a doubly linked list of all tasks plus a PID hash table plus the parent-child tree, with the init task at PID 1. Cover the kernel stack and thread_info hanging off the task, and dynamic memory: task_struct comes from a slab cache, kmalloc for small pieces, vmalloc for large virtually contiguous areas, and why kernel memory is never swapped. Some syllabi say process descriptor or PCB for task_struct, and task list for process table.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "task_struct and the task list",
+    "nodes": [
+     {
+      "id": "head",
+      "label": "task list head",
+      "style": "muted"
+     },
+     {
+      "id": "t1",
+      "label": "task 1201",
+      "note": "state RUNNING",
+      "style": "accent"
+     },
+     {
+      "id": "t2",
+      "label": "task 1202",
+      "note": "state SLEEPING"
+     },
+     {
+      "id": "mm",
+      "label": "mm_struct"
+     },
+     {
+      "id": "files",
+      "label": "files_struct"
+     },
+     {
+      "id": "sig",
+      "label": "signal_struct"
+     },
+     {
+      "id": "stack",
+      "label": "kernel stack"
+     }
+    ],
+    "edges": [
+     {
+      "from": "head",
+      "to": "t1",
+      "label": "next"
+     },
+     {
+      "from": "t1",
+      "to": "t2",
+      "label": "next"
+     },
+     {
+      "from": "t2",
+      "to": "head",
+      "label": "prev"
+     },
+     {
+      "from": "t1",
+      "to": "mm",
+      "label": "mm"
+     },
+     {
+      "from": "t1",
+      "to": "files",
+      "label": "files"
+     },
+     {
+      "from": "t1",
+      "to": "sig",
+      "label": "signal"
+     },
+     {
+      "from": "t1",
+      "to": "stack",
+      "label": "stack"
+     }
+    ]
+   },
+   "example": "The PID hash table has 512 buckets. (a) Which bucket holds PID 1201? (b) The task in that bucket has state TASK_RUNNING, with mm and files pointers set. What changes when the process calls exit() and the parent has not yet waited? Answer: (a) 1201 = 2 × 512 + 177, so bucket 177, then the chain is walked comparing pids. (b) state becomes TASK_ZOMBIE, mm is detached and the address space freed, the files table is closed, the exit code is stored, and the task_struct stays until the parent reaps it.",
+   "trap": "The process table is not an array indexed by PID, and user data does not live on the kernel stack.",
+   "prereq": "Unit 1 (kernel, shell and user space) and Unit 4 (viewing and controlling processes).",
+   "leave": "Scheduling policy to 5.8, signal delivery to 5.2, inodes and files to 5.6, ps and kill commands to Unit 4."
+  },
+  {
+   "k": 2,
+   "idea": "Asynchronous events reach the kernel as interrupts and reach a process as signals, while a periodic timer tick drives timekeeping, timeouts and the scheduler.",
+   "depth": "Signals: numbers 1 SIGHUP, 2 SIGINT, 9 SIGKILL, 15 SIGTERM; pending and blocked masks in task_struct; default actions (terminate, ignore, core dump, stop); a handler runs in user mode, not kernel mode; SIGKILL and SIGSTOP cannot be caught or ignored; sigaction versus signal; delivery happens on the return path from kernel to user mode. Interrupts: IRQ line, IDT entry, do_IRQ, the top half running with interrupts disabled, and the bottom halves (softirq, tasklet, workqueue) that do the slow work. The system call entry as a software interrupt (int 0x80 or syscall) indexing sys_call_table. Timers: HZ, jiffies, add_timer/mod_timer, the timer wheel, high-resolution timers in one line, CLOCK_REALTIME versus CLOCK_MONOTONIC, RTC read at boot. Boot path in three sentences: firmware, bootloader, start_kernel setting up traps and timers, then init.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Interrupt path",
+    "nodes": [
+     {
+      "id": "dev",
+      "label": "Device"
+     },
+     {
+      "id": "irq",
+      "label": "IRQ line"
+     },
+     {
+      "id": "idt",
+      "label": "IDT entry"
+     },
+     {
+      "id": "do",
+      "label": "do_IRQ",
+      "style": "accent"
+     },
+     {
+      "id": "top",
+      "label": "top half"
+     },
+     {
+      "id": "soft",
+      "label": "softirq/tasklet",
+      "style": "live"
+     },
+     {
+      "id": "work",
+      "label": "workqueue"
+     }
+    ],
+    "edges": [
+     {
+      "from": "dev",
+      "to": "irq"
+     },
+     {
+      "from": "irq",
+      "to": "idt"
+     },
+     {
+      "from": "idt",
+      "to": "do"
+     },
+     {
+      "from": "do",
+      "to": "top"
+     },
+     {
+      "from": "top",
+      "to": "soft"
+     },
+     {
+      "from": "soft",
+      "to": "work"
+     }
+    ]
+   },
+   "example": "(a) HZ = 250. How many jiffies are in 1 s and in 20 ms? (b) A 32-bit jiffies counter at HZ = 250 wraps after how many days? (c) A process blocks SIGINT, calls raise(SIGINT), then unblocks it. When does the handler run? Answer: (a) 250 jiffies in 1 s, and 20 ms = 0.02 × 250 = 5 jiffies. (b) 2³² ÷ 250 = 17,179,869 s, about 198.8 days. (c) SIGINT stays pending while blocked; the handler runs on the return to user mode after the mask is cleared.",
+   "trap": "A signal handler is not kernel code, SIGKILL cannot be caught, and jiffies is an integer counter, not a floating-point time.",
+   "prereq": "5.1 (task_struct, state) and Unit 4 (sending signals from the shell).",
+   "leave": "The driver side of interrupts to 5.7, run-queue decisions on each tick to 5.8, service management to Unit 4."
+  },
+  {
+   "k": 3,
+   "idea": "A process works in virtual addresses that the MMU maps page by page to physical frames, and Linux fills in that map lazily through page faults.",
+   "depth": "Pages of 4 KB, the virtual address split into offset, page-table index and directory index, two levels on 32-bit x86, four levels (PGD, PUD, PMD, PTE) on x86-64, CR3 holding the top-level base. mm_struct and its list of vm_area_struct regions. Demand paging and the three page-fault cases: minor (page in memory, map it), major (read from disk or swap), invalid (SIGSEGV). Copy-on-write after fork, mmap, TLB and its flush. Memory zones DMA, NORMAL, HIGHMEM in one line; swap and page reclaim in one line; the kernel direct map. Some syllabi say address space or memory map for mm_struct.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "CR3 → PGD",
+     "style": "muted",
+     "children": [
+      {
+       "label": "PMD 1",
+       "edge": "index 1",
+       "children": [
+        {
+         "label": "PTE 0",
+         "style": "muted"
+        },
+        {
+         "label": "PTE 3",
+         "style": "accent",
+         "children": [
+          {
+           "label": "frame 0x12",
+           "note": "phys 0x12ABC",
+           "style": "live"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "example": "A 32-bit machine, 4 KB pages, virtual address 0x00403ABC, and the page-table entry at index 3 holds 0x00012007. Find the directory index, table index, offset and physical address, and name the flags. Answer: 0x00403ABC = 0000 0000 01 | 00 0000 0011 | 1010 1011 1100, so directory index 1, table index 3, offset 0xABC = 2748. The frame number is 0x00012, so physical = 0x12000 + 0xABC = 0x12ABC. Flag bits: bit 0 = 1 present, bit 1 = 1 writable, bit 2 = 1 user-accessible.",
+   "trap": "The offset is copied unchanged, not translated. malloc reserves virtual space; physical frames arrive only on first touch.",
+   "prereq": "5.1 (mm_struct) and Unit 1 (kernel versus user space).",
+   "leave": "Slab allocator details and swap policy stay out; file-backed pages go to 5.6, fork and COW behaviour to Unit 4."
+  },
+  {
+   "k": 4,
+   "idea": "Kernel code shares data between CPUs and interrupt handlers, so it protects critical sections with atomic operations, spinlocks, semaphores, mutexes and wait queues.",
+   "depth": "Race condition and critical section, atomic_t and atomic_inc. Spinlock: spin_lock, spin_lock_irqsave, holder must never sleep, used for short sections even on one CPU with preemption. Semaphore: integer count, down() and up(), may sleep, good for longer waits. Mutex as a binary semaphore with an owner; read-write semaphore; completion. Wait queues: wait_queue_head_t, add_wait_queue, prepare_to_wait, wake_up, the sleep-and-wake cycle that uses TASK_INTERRUPTIBLE. Kernel queues such as kfifo in one line. Deadlock and lock ordering, memory barriers, preemption. RCU only as a short advanced note: only a few universities teach it.",
+   "figure": {
+    "type": "gantt",
+    "unit": "steps",
+    "lanes": [
+     {
+      "label": "CPU 0",
+      "bars": [
+       {
+        "label": "read 5",
+        "start": 0,
+        "end": 4,
+        "style": "accent"
+       },
+       {
+        "label": "write 6",
+        "start": 7,
+        "end": 11,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "CPU 1",
+      "bars": [
+       {
+        "label": "read 5",
+        "start": 2,
+        "end": 6,
+        "style": "live"
+       },
+       {
+        "label": "write 6",
+        "start": 9,
+        "end": 13,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "Both CPUs read the value 5 before either writes, so the second write of 6 overwrites the first and one increment is lost."
+   },
+   "example": "count = 5 and two CPUs each run count++. (a) Give an interleaving that leaves count = 6. (b) Wrap both increments in spin_lock(&l) and spin_unlock(&l); what is the final value? Answer: (a) CPU 0 reads 5, CPU 1 reads 5, CPU 0 writes 6, CPU 1 writes 6, so count = 6 and one update is lost. (b) One CPU takes the lock, reads 5, writes 6, releases; the second then reads 6, writes 7, so count = 7.",
+   "trap": "A semaphore may sleep, so it cannot be used in interrupt context; a spinlock must not be held across a sleep or a copy_to_user.",
+   "prereq": "5.1 (task states) and 5.2 (interrupt context).",
+   "leave": "Run-queue locking and load balancing to 5.8; pipe, socket and ptrace buffer locking to 5.5."
+  },
+  {
+   "k": 5,
+   "idea": "Processes exchange data through kernel objects: byte-stream pipes, sockets that work locally or over a network, and ptrace, which lets one process inspect and control another.",
+   "depth": "pipe() returns two file descriptors; the pipe buffer is 16 pages, 64 KB by default; the pipe is an inode in pipefs; blocking read and write, EOF when every writer closes, SIGPIPE when every reader closes; FIFOs made with mkfifo. Sockets: socket(AF_UNIX, SOCK_STREAM) and socketpair for local use, AF_INET and TCP through the same VFS calls, send and receive buffers, select/poll/epoll in one line. Shared memory in one line. ptrace: tracer and tracee, PTRACE_ATTACH, PTRACE_PEEKTEXT and POKETEXT, GETREGS, SINGLESTEP, CONT, waitpid on the tracee, why gdb and strace use it, and the ptrace_scope restriction.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Writer",
+     "Pipe buffer",
+     "Reader"
+    ],
+    "messages": [
+     {
+      "from": "Writer",
+      "to": "Pipe buffer",
+      "label": "write 4 KB",
+      "dashed": false
+     },
+     {
+      "from": "Pipe buffer",
+      "to": "Reader",
+      "label": "wake reader",
+      "dashed": false
+     },
+     {
+      "from": "Reader",
+      "to": "Pipe buffer",
+      "label": "read 4 KB",
+      "dashed": false
+     },
+     {
+      "from": "Pipe buffer",
+      "to": "Writer",
+      "label": "space free",
+      "dashed": false
+     }
+    ],
+    "aria": "The writer fills the pipe buffer, the reader is woken and drains 4 KB, and the freed space wakes the writer."
+   },
+   "example": "A pipe holds at most 65536 bytes. It is empty. A writer calls write(fd, buf, 70000), then a reader reads 8192 bytes, then the writer writes the rest of its buffer. Give each return value and the bytes left in the pipe. Answer: first write returns 65536 and blocks with 4464 bytes still in user space; the read removes 8192, leaving 57344; the remaining 4464 bytes fit, so the second write returns 4464 and the pipe holds 61808 bytes.",
+   "trap": "A pipe is a byte stream with no message boundaries, and a read returns only what is available, not the whole write.",
+   "prereq": "5.1 (files_struct) and 5.4 (wait queues, locks); Unit 3 (shell pipes).",
+   "leave": "Network configuration to Unit 4, inode structure to 5.6, signal numbers to 5.2."
+  },
+  {
+   "k": 6,
+   "idea": "The VFS describes every file by an inode plus an operation table, so ext2 on disk and /proc in memory look the same to a read() call.",
+   "depth": "The four VFS objects: superblock, inode, dentry, file; file descriptor to struct file to dentry to inode; inode number and link count; hard link versus symbolic link. ext2 layout: 1 KB boot block, block groups, superblock, group descriptors, block bitmap, inode bitmap, inode table, data blocks; 4-byte block pointers in the inode: 12 direct, 1 single indirect, 1 double indirect, 1 triple indirect. /proc as a pseudo file system built at read time: /proc/PID/status, /proc/meminfo, /proc/cpuinfo; /sys in one line. Some syllabi say index node for inode.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "ext2 on disk",
+    "nodes": [
+     {
+      "id": "boot",
+      "label": "Boot block",
+      "note": "1 KB"
+     },
+     {
+      "id": "sb",
+      "label": "Superblock",
+      "style": "accent"
+     },
+     {
+      "id": "gd",
+      "label": "Group descriptors"
+     },
+     {
+      "id": "bb",
+      "label": "Block bitmap"
+     },
+     {
+      "id": "ib",
+      "label": "Inode bitmap"
+     },
+     {
+      "id": "it",
+      "label": "Inode table",
+      "style": "live"
+     },
+     {
+      "id": "data",
+      "label": "Data blocks"
+     }
+    ],
+    "edges": [
+     {
+      "from": "boot",
+      "to": "sb"
+     },
+     {
+      "from": "sb",
+      "to": "gd"
+     },
+     {
+      "from": "gd",
+      "to": "bb"
+     },
+     {
+      "from": "bb",
+      "to": "ib"
+     },
+     {
+      "from": "ib",
+      "to": "it"
+     },
+     {
+      "from": "it",
+      "to": "data"
+     }
+    ]
+   },
+   "example": "Ext2 uses 1 KB blocks and 4-byte pointers, with 12 direct, 1 single, 1 double and 1 triple indirect pointers. (a) What is the largest file size? (b) Which pointer reaches byte offset 300000? Answer: (a) one pointer covers 1024 ÷ 4 = 256 blocks, so blocks = 12 + 256 + 256² + 256³ = 16,843,020, giving 16,843,020 KB ≈ 16 GiB. (b) Direct covers bytes 0–12287, single covers 12288–274431, so 300000 is in the double indirect range: (300000 − 274432) ÷ 1024 = 24.9, so indirect entry 24, covering bytes 299008–300031.",
+   "trap": "An inode has no filename; names live in directory entries. /proc files occupy no disk blocks.",
+   "prereq": "5.1 (files_struct) and Unit 2 (file types, ls -i, ln, chmod).",
+   "leave": "Permissions and ownership to Unit 2; mkfs and mount commands to Unit 4; page cache writeback only in one line."
+  },
+  {
+   "k": 7,
+   "idea": "A driver is kernel code that registers a major and minor number and fills a file_operations table, so a user read() becomes a byte copy from the device.",
+   "depth": "Device numbers: major selects the driver, minor selects the instance; dev_t, MKDEV, MAJOR, MINOR; /dev nodes created by mknod or udev. Character driver: file_operations with open, read, write, ioctl, release; copy_to_user and copy_from_user; returning a byte count or a negative error such as EFAULT; the kernel cannot call libc. Block driver: gendisk, request queue, bio, 512-byte sectors, page cache, and why block drivers are more complex. Modules: module_init and module_exit, insmod, rmmod, modprobe, lsmod, the license line. Sleeping context versus atomic context.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "read() to a char driver",
+    "nodes": [
+     {
+      "id": "u",
+      "label": "read(fd, buf, 100)"
+     },
+     {
+      "id": "s",
+      "label": "sys_read",
+      "style": "accent"
+     },
+     {
+      "id": "v",
+      "label": "VFS"
+     },
+     {
+      "id": "f",
+      "label": "file_operations"
+     },
+     {
+      "id": "d",
+      "label": "my_read",
+      "style": "live"
+     },
+     {
+      "id": "c",
+      "label": "copy_to_user"
+     },
+     {
+      "id": "b",
+      "label": "user buffer"
+     }
+    ],
+    "edges": [
+     {
+      "from": "u",
+      "to": "s"
+     },
+     {
+      "from": "s",
+      "to": "v"
+     },
+     {
+      "from": "v",
+      "to": "f"
+     },
+     {
+      "from": "f",
+      "to": "d"
+     },
+     {
+      "from": "d",
+      "to": "c"
+     },
+     {
+      "from": "c",
+      "to": "b"
+     }
+    ]
+   },
+   "example": "A character driver named mydrv takes major 240 and minors 0–3. (a) What does mknod /dev/mydrv c 240 3 create? (b) Give its dev_t value in the classic 16-bit encoding. (c) A user calls read(fd, buf, 100); the driver has 100 bytes ready. What does the driver return, and what does the system call return? Answer: (a) a character device node whose major is 240 and minor is 3. (b) (240 << 8) | 3 = 61440 + 3 = 61443. (c) the driver copies the bytes and returns 100; the system call returns 100 to the user.",
+   "trap": "mknod creates a name and a number, not a driver. Never dereference a user pointer directly; always use copy_to_user or copy_from_user.",
+   "prereq": "5.6 (inodes, file_operations) and 5.3 (user and kernel addresses).",
+   "leave": "Interrupt and bottom-half detail to 5.2; module packaging and service files to Unit 4; disk layout to 5.6."
+  },
+  {
+   "k": 8,
+   "idea": "Linux runs kernel code on many CPUs at once, using per-CPU data, spinlocks and a load balancer to keep every CPU busy without corrupting shared state.",
+   "depth": "SMP versus UP; booting the application processors with INIT-SIPI from the boot CPU; per-CPU variables and get_cpu/put_cpu; spinlocks and atomic operations on shared data; RCU in one line. Scheduler: one CFS run queue per CPU, vruntime, the red-black tree, nice weights, periodic load balancing, CPU affinity with sched_setaffinity and taskset, migration of a task. NUMA in one line as advanced: only a few universities teach it. Memory barriers and IPIs. Note the term: some syllabi use multiprocessing for multitasking, but here it means symmetric multiprocessing.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Load balancing across CPUs",
+    "nodes": [
+     {
+      "id": "ready",
+      "label": "8 tasks ready"
+     },
+     {
+      "id": "c0",
+      "label": "CPU 0 rq",
+      "note": "4 tasks",
+      "style": "accent"
+     },
+     {
+      "id": "lb",
+      "label": "load balance",
+      "style": "live"
+     },
+     {
+      "id": "c1",
+      "label": "CPU 1 rq",
+      "note": "4 tasks",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ready",
+      "to": "c0",
+      "label": "queued"
+     },
+     {
+      "from": "c0",
+      "to": "lb",
+      "label": "too long"
+     },
+     {
+      "from": "lb",
+      "to": "c1",
+      "label": "migrate task"
+     }
+    ]
+   },
+   "example": "Eight equal-weight CPU-bound tasks start on a 4-CPU machine with no affinity. (a) What share of one CPU does each task get? (b) A programmer pins four of them to CPU 0 with taskset -c 0. What does each task get now? Answer: (a) the eight tasks share 4 CPUs, so each gets 4 ÷ 8 = 0.5 of a CPU, that is 50%. (b) the four pinned tasks share CPU 0, so each gets 0.25 of a CPU (25%); the other four share CPUs 1–3, so each gets 3 ÷ 4 = 0.75 of a CPU (75%).",
+   "trap": "A single-threaded program does not speed up just because the machine has more CPUs, and a per-CPU variable is safe without a lock only from its own CPU with preemption disabled.",
+   "prereq": "5.4 (locking) and 5.1 (task_struct); 5.2 (IPIs and the timer tick).",
+   "leave": "Full CFS policy and scheduling commands to Unit 4; virtualisation to Unit 4; driver locking to 5.7."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "task state changes when a signal arrives"
+  ],
+  [
+   2,
+   3,
+   "a page fault arrives as an interrupt"
+  ],
+  [
+   3,
+   6,
+   "the page cache holds file pages"
+  ],
+  [
+   4,
+   5,
+   "wait queues and locks sit inside pipes"
+  ],
+  [
+   5,
+   6,
+   "pipes are inodes in pipefs"
+  ],
+  [
+   6,
+   7,
+   "VFS calls the driver file_operations"
+  ],
+  [
+   4,
+   8,
+   "SMP needs locks and per-CPU run queues"
+  ],
+  [
+   7,
+   8,
+   "drivers run on any CPU and must be SMP-safe"
+  ]
+ ]
+}

@@ -1,0 +1,215 @@
+{
+ "lead": "A read() call does not need to know whether bytes come from a hard disk or from kernel memory. The virtual file system (VFS) describes every open file with an inode plus an operation table, so ext2 on disk and /proc in memory use the same calls. This chapter follows one file descriptor down to its inode, opens an ext2 disk layout, counts what its block pointers can reach, and shows how /proc builds files at read time. These ideas explain <code>ls -i</code>, hard links, and why <code>cat /proc/meminfo</code> works with no disk file.",
+ "prereq": "You need <a href=\"#kernel-data-structures-task-structure-and-process-table\">5.1</a> for the file-descriptor table in task_struct, and Unit 2 for file types, <code>ls -i</code>, <code>ln</code> and permissions.",
+ "sections": [
+  {
+   "h3": "Four VFS objects",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The virtual file system (VFS) is the kernel layer that gives every file one set of calls, whatever stores it. It keeps four objects. A superblock describes one mounted file system: block size, root inode and operation table. An inode describes one file: type, size, owner, times, link count, block map and file_operations. Some syllabi call the inode an index node. A dentry ties a name to an inode. A struct file is one open file description: offset, flags and a pointer to the dentry."
+    },
+    {
+     "type": "p",
+     "text": "An open file descriptor is a small integer indexing the process's descriptor table in task_struct. The entry points to a struct file, which points to a dentry, which points to the inode. The inode's operation table is what turns read() into ext2 or proc code."
+    },
+    {
+     "type": "p",
+     "text": "An inode number is unique inside one file system. <code>ls -i</code> shows it. A hard link is another name for the same inode; <code>ln a b</code> raises the link count to 2. Data is freed only when the link count falls to 0 and no process holds the file open. A symbolic link is a new inode whose data is a path; it can cross file systems and can dangle. An inode has no filename: names live in directory entries."
+    }
+   ]
+  },
+  {
+   "h3": "ext2 on disk",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ext2 starts with a 1 KB boot block. The rest of the partition is split into block groups, so metadata sits near its data. Each group has a copy of the superblock, group descriptors, a block bitmap, an inode bitmap, an inode table and data blocks. The superblock records block size, inode count and free counts. The bitmaps hold one bit per block or inode. The inode table holds fixed-size records, usually 128 bytes."
+    },
+    {
+     "type": "p",
+     "text": "An ext2 inode stores 15 block pointers: 12 direct, one single indirect, one double indirect and one triple indirect. A pointer is 4 bytes. With 1 KB blocks, one pointer block holds 1024 ÷ 4 = 256 entries. Direct pointers cover 12 × 1 KB = 12 KB. The single indirect pointer covers 256 × 1 KB = 256 KB. The double indirect pointer covers 256² × 1 KB = 64 MiB. The triple indirect pointer covers 256³ × 1 KB = 16 GiB. The worked example adds them."
+    },
+    {
+     "type": "p",
+     "text": "Direct pointers keep small files fast: no extra block read. Large files pay one, two or three extra reads to reach a data block. ext2 has no journal, so a crash during a write can leave inconsistent metadata; ext3 added a journal."
+    }
+   ]
+  },
+  {
+   "h3": "/proc: files built at read time",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "/proc is a pseudo file system: it uses inodes and the VFS, but stores no file data on disk. When a process reads /proc/meminfo, the kernel's read handler formats current memory counters into text. /proc/PID/status gives one process's Name, State, Pid, PPid and VmRSS. /proc/cpuinfo describes CPUs. Most files are read-only views; a few are writable knobs."
+    },
+    {
+     "type": "p",
+     "text": "Because values are made when read, two reads can differ, and <code>ls -l</code> often shows size 0. Deleting or creating a process changes /proc/PID entries immediately. /sys (sysfs) is a similar in-memory file system that shows devices, drivers and kernel objects as directories with one value per file."
+    },
+    {
+     "type": "p",
+     "text": "The VFS makes /proc look ordinary: <code>open</code>, <code>read</code> and <code>close</code> work, and tools such as <code>cat</code>, <code>ps</code>, <code>top</code> and <code>free</code> need no special calls. The inode's operation table points to proc handlers instead of disk blocks. That is the same mechanism a device driver uses (see <a href=\"#device-drivers-character-and-block-devices\">5.7</a>)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "ext2 layout: the boot block comes first, then per-group metadata, with the inode table pointing into data blocks. Notice that the inode table, not the filename, holds the block pointers.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "ext2 on disk",
+   "nodes": [
+    {
+     "id": "boot",
+     "label": "Boot block",
+     "note": "1 KB",
+     "style": "normal"
+    },
+    {
+     "id": "sb",
+     "label": "Superblock",
+     "style": "accent"
+    },
+    {
+     "id": "gd",
+     "label": "Group descriptors",
+     "style": "normal"
+    },
+    {
+     "id": "bb",
+     "label": "Block bitmap",
+     "style": "normal"
+    },
+    {
+     "id": "ib",
+     "label": "Inode bitmap",
+     "style": "normal"
+    },
+    {
+     "id": "it",
+     "label": "Inode table",
+     "style": "live"
+    },
+    {
+     "id": "data",
+     "label": "Data blocks",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "boot",
+     "to": "sb"
+    },
+    {
+     "from": "sb",
+     "to": "gd"
+    },
+    {
+     "from": "gd",
+     "to": "bb"
+    },
+    {
+     "from": "bb",
+     "to": "ib"
+    },
+    {
+     "from": "ib",
+     "to": "it"
+    },
+    {
+     "from": "it",
+     "to": "data"
+    }
+   ],
+   "aria": "A vertical block diagram shows the ext2 disk layout from the 1 KB boot block through the superblock, group descriptors, bitmaps and inode table to data blocks."
+  }
+ },
+ "examples": [
+  {
+   "question": "Ext2 uses 1 KB blocks and 4-byte block pointers. It has 12 direct, 1 single indirect, 1 double indirect and 1 triple indirect pointers. (a) What is the largest file size in KB and GiB? (b) Which data block in the pointer scheme reaches byte offset 300000, and what byte range does that block cover?",
+   "steps": [
+    "One pointer block holds 1024 ÷ 4 = 256 pointers.",
+    "Blocks reachable = 12 + 256 + 256² + 256³ = 12 + 256 + 65536 + 16777216 = 16843020 blocks.",
+    "Each block is 1 KB, so largest size = 16843020 KB. In GiB: 16843020 ÷ 1024² = 16.06 GiB (17,247,252,480 bytes).",
+    "Direct bytes = 12 × 1024 = 12288, offsets 0 to 12287.",
+    "Single indirect bytes = 256 × 1024 = 262144, offsets 12288 to 274431.",
+    "Double indirect starts at 274432. Offset 300000 is inside it.",
+    "Offset inside double area = 300000 − 274432 = 25568 bytes. Block index = floor(25568 ÷ 1024) = 24.",
+    "Since 24 < 256, the top-level double-indirect entry is 0 and the second-level entry is 24.",
+    "Block 24 starts at 274432 + 24 × 1024 = 299008 and ends at 299008 + 1023 = 300031."
+   ],
+   "answer": "Largest file = 16,843,020 KB ≈ 16.06 GiB; offset 300000 lies in double-indirect data block index 24 (top-level entry 0, second-level 24), covering bytes 299008–300031.",
+   "check": "B=1024\nP=B//4\nblocks=12+P+P**2+P**3\nprint(blocks)\nprint(round(blocks/1024/1024,2))\ndirect=12*B\nsingle=P*B\ndouble_start=direct+single\noff=300000\nidx=(off-double_start)//B\nstart=double_start+idx*B\nend=start+B-1\nprint(idx)\nprint(start)\nprint(end)",
+   "values": [
+    16843020,
+    16.06,
+    24,
+    299008,
+    300031
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "An inode has no filename. A hard link is a directory entry, not a copy of the inode.",
+  "A larger inode number does not mean a newer file; ext2 allocates inodes in its own order.",
+  "/proc files use no disk blocks. Their reported size is often 0 even when <code>cat</code> prints many lines.",
+  "Direct pointers cover 12 KB with 1 KB blocks, not 12 MB; unit slips are common.",
+  "An unlinked but open file keeps its data until the last close, even when link count is 0."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four VFS objects.",
+   "marks": 2,
+   "a": "Superblock, inode, dentry and struct file."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an inode not store a filename?",
+   "marks": 3,
+   "a": "Names belong to directory entries; one inode can have many names through hard links."
+  },
+  {
+   "level": "apply",
+   "q": "With 1 KB blocks and 4-byte pointers, how many bytes does one single-indirect pointer cover?",
+   "marks": 3,
+   "a": "1024 ÷ 4 = 256 pointers; 256 × 1024 = 262144 bytes = 256 KB."
+  },
+  {
+   "level": "apply",
+   "q": "Which pointer reaches offset 300000 in the worked example, and at which block index?",
+   "marks": 4,
+   "a": "Direct ends at 12287, single at 274431, so double indirect; (300000 − 274432) ÷ 1024 = 24.9, block index 24."
+  },
+  {
+   "level": "analyze",
+   "q": "A file has link count 2. One name is removed while a process still has it open. When is the data freed?",
+   "marks": 4,
+   "a": "When the last open descriptor closes and link count is 0; after the first unlink link count is 1, so not freed."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can <code>ls -l /proc/meminfo</code> show size 0 while <code>cat</code> prints text?",
+   "marks": 4,
+   "a": "It is a pseudo file; data is formatted by a kernel handler at read time, not stored in disk blocks."
+  },
+  {
+   "level": "remember",
+   "q": "What does the ext2 block bitmap record?",
+   "marks": 2,
+   "a": "One bit per block: 1 if the block is in use, 0 if free."
+  },
+  {
+   "level": "understand",
+   "q": "What does the dentry cache save?",
+   "marks": 3,
+   "a": "It saves repeated path-name to inode lookups by keeping recent dentries in memory."
+  }
+ ],
+ "beyond": "Not for the exam. Real disks mostly use ext4, XFS or Btrfs: ext4 adds extents and a journal, XFS scales on large servers, and Btrfs adds checksums and snapshots. Containers stack overlayfs over image layers, so one path can cross several file systems. Observability tools read /proc and /sys constantly, and FUSE lets a normal program serve a file system in user space. Search next for ext4 extents, journaling, overlayfs and FUSE."
+}
