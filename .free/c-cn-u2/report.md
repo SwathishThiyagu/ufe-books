@@ -1,15 +1,14 @@
 # c-cn-u2: free-model run
 
 - Book: `books/cse/c-cn/c-cn-u2.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 42 (171,940 tokens in, 331,843 out), 10.3 minutes
 
 ## Checker
 
 ```
-c-cn-u2.html: 8 chapters, 14220 words, 9 figures, 154 KB
-PROBLEMS:
- - chapter "guided-and-unguided-transmission-media": 2008 words is too long (keep under 1900; 900-1600 is the target)
+c-cn-u2.html: 8 chapters, 14092 words, 9 figures, 154 KB
+OK
 ```
 
 ## For the reviewer
