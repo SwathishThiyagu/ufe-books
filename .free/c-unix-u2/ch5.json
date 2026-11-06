@@ -1,0 +1,249 @@
+{
+ "lead": "A Linux file carries two owners: one user and one group. The kernel stores them as numbers, a uid and a gid, and compares them with the numbers of the process asking for access. This matters on every shared machine: a lab server, a web root, a database directory. The rule is simple but strict. Root is checked first. Then the file's owner bits, then its group bits, then the other bits. The first match decides, and later triplets are never consulted. This chapter shows how those numbers are set and how to change them.",
+ "prereq": "You need: the permission bits and chmod from <a href=\"#file-permissions-and-chmod\">Chapter 2.4</a>.",
+ "sections": [
+  {
+   "h3": "Users are numbers, not names",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every file has two owners: one user and one group. The kernel stores numbers, not names. A user identifier (uid) is the number of one account. A group identifier (gid) is the number of one group. The superuser, root, has uid 0. Any account given uid 0 is also the superuser, so the kernel can test for root with one comparison of the number."
+    },
+    {
+     "type": "p",
+     "text": "<code>/etc/passwd</code> lists local accounts with seven colon-separated fields. Field 1 is the login name, field 3 the uid, field 4 the primary gid, field 6 the home directory, field 7 the login shell. Field 2 is usually x because the password hash is in <code>/etc/shadow</code>. Field 5 is a description."
+    },
+    {
+     "type": "p",
+     "text": "<code>/etc/group</code> lists groups. Field 1 is the group name, field 3 the gid, field 4 a comma-separated list of supplementary members. A user has exactly one primary group from <code>/etc/passwd</code> and may have many supplementary groups. A new file takes your primary group, unless the directory has the setgid bit; then it takes the directory's group. Lab sharing usually means making a group, adding people, and giving that group read or write permission. See <a href=\"#file-permissions-and-chmod\">Chapter 2.4</a> for the bits."
+    }
+   ]
+  },
+  {
+   "h3": "Changing the owner and the group",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>whoami</code> prints your login name. <code>id</code> prints your uid, primary gid and all groups. <code>groups</code> prints group names only. Sample <code>id</code> output: uid=1001(ravi) gid=1001(ravi) groups=1001(ravi),1002(students). Read it as: uid 1001, primary group ravi with gid 1001, supplementary group students with gid 1002."
+    },
+    {
+     "type": "p",
+     "text": "<code>newgrp students</code> starts a new shell whose primary group is students. It does not add you to the group; it chooses among groups you already have. Exit the shell to return."
+    },
+    {
+     "type": "p",
+     "text": "<code>chown</code> changes the owner. <code>chgrp</code> changes the group. Only root can change the owner. The owner may change the group to a group the owner belongs to. Forms: <code>chown user file</code>, <code>chgrp group file</code>, <code>chown user:group file</code>. Add <code>-R</code> to recurse into a directory. Recurse with care: <code>chown -R ravi /home/ravi/project</code> changes every file and directory below project. A wrong path can change the whole system. Check with <code>ls -l</code> before and after."
+    }
+   ]
+  },
+  {
+   "h3": "The check stops at the first match",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The kernel checks in a fixed order. First, if the process's effective uid is 0, read and write are allowed; execute still needs at least one execute bit. Second, if the effective uid equals the file's uid, only the owner triplet applies. Third, if the file's gid is in the process's group list, only the group triplet applies. Fourth, the other triplet applies. The first match decides; later triplets are never read. A user who owns a file never falls through to the group or other bits. If owner bits are r-- and group bits are rw-, the owner cannot write even when also in the file's group."
+    },
+    {
+     "type": "p",
+     "text": "In the worked example, Priya is not the owner but is in students, so group bits decide. Arjun is neither owner nor in students, so other bits decide. Root is not decided by the owner bits; root skips the check."
+    },
+    {
+     "type": "p",
+     "text": "Access control lists (ACLs) add per-user entries to the three triplets. Only a few universities teach this, so keep the idea: <code>setfacl -m u:arjun:r report.txt</code> grants read to arjun alone. <code>getfacl report.txt</code> shows the entries. The owner and group stay unchanged. Adding an entry recalculates the mask, shown in place of the group bits in <code>ls -l</code>. Here the mask is r--, so students keep read; if the mask were smaller, group access would shrink. A plus sign after the mode in <code>ls -l</code> marks a file with an ACL."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "For read and write, root is allowed before any triplet; execute still needs an x bit. Otherwise the owner triplet, then the group triplet, then the other triplet is tried, and the first match decides.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Which bits decide",
+   "aria": "A flowchart of the permission check: root is allowed at once, otherwise a matching owner uid uses the owner bits, then the group bits if the gid is in the group list, then the other bits.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Process asks for access",
+     "style": "accent"
+    },
+    {
+     "id": "b",
+     "label": "effective uid is 0?",
+     "note": "root skips the check"
+    },
+    {
+     "id": "h",
+     "label": "allow read and write; execute needs an x bit",
+     "style": "live"
+    },
+    {
+     "id": "c",
+     "label": "effective uid equals file uid?"
+    },
+    {
+     "id": "d",
+     "label": "owner bits apply",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "in the file's group?"
+    },
+    {
+     "id": "f",
+     "label": "group bits apply",
+     "style": "live"
+    },
+    {
+     "id": "g",
+     "label": "other bits apply"
+    },
+    {
+     "id": "i",
+     "label": "allow or deny",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b"
+    },
+    {
+     "from": "b",
+     "to": "h",
+     "label": "yes"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "label": "no"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "yes"
+    },
+    {
+     "from": "c",
+     "to": "e",
+     "label": "no"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "label": "yes"
+    },
+    {
+     "from": "e",
+     "to": "g",
+     "label": "no"
+    },
+    {
+     "from": "d",
+     "to": "i"
+    },
+    {
+     "from": "f",
+     "to": "i"
+    },
+    {
+     "from": "g",
+     "to": "i"
+    },
+    {
+     "from": "h",
+     "to": "i"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "The file /home/ravi/project/report.txt is owned by ravi, group students, mode 640. The users are: ravi (uid 1001, primary group ravi, also in students), priya (uid 1002, groups priya and students), arjun (uid 1003, group arjun). (a) For priya and arjun, say read, write, execute allowed or denied, and which triplet decided it. (b) root runs cat report.txt. Allowed? Why? (c) Write the command, run by root, that changes the file's group to arjun. (d) After (c), who can read it: priya or arjun? What did the students get and lose? (e) Give a better way to let arjun read it without moving the group.",
+   "steps": [
+    "Mode 640 in octal means owner 6 = rw-, group 4 = r--, other 0 = ---.",
+    "Priya has uid 1002, which is not the owner uid 1001. Priya is in students, the file's group, so the group triplet r-- decides. Read allowed, write denied, execute denied.",
+    "Arjun has uid 1003, not the owner, and is not in students. The other triplet --- decides. Read denied, write denied, execute denied.",
+    "root has effective uid 0. The root rule allows the read before any triplet is read. cat succeeds, but not because of the owner bits.",
+    "As root: chgrp arjun /home/ravi/project/report.txt. The owner ravi cannot do this himself, because he is not a member of arjun.",
+    "After the change the file's group is arjun and the mode is still 640. Priya is not in arjun, so other bits --- decide: read denied. Arjun is in arjun, so group bits r-- decide: read allowed. The students are no longer the file's group, so they lose the read access they had; they gain nothing.",
+    "Better: setfacl -m u:arjun:r /home/ravi/project/report.txt. The group stays students, so priya and the other students keep read, and arjun gets read from the ACL entry. Adding the entry sets the ACL mask to r--, shown in place of the group bits; a smaller mask would shrink group access."
+   ],
+   "answer": "Priya read=1, write=0, execute=0 by the group triplet; Arjun read=0, write=0, execute=0 by the other triplet; root is allowed by the root rule; after <code>chgrp arjun</code>, Priya read=0, Arjun read=1, and another student read=0; keep the group and run <code>setfacl -m u:arjun:r /home/ravi/project/report.txt</code>.",
+   "check": "mode = 0o640\nowner_uid = 1001\nfile_group = 'students'\nusers = {\n    'priya': {'uid': 1002, 'groups': {'priya', 'students'}},\n    'arjun': {'uid': 1003, 'groups': {'arjun'}},\n}\ndef triple(user, group):\n    if user['uid'] == owner_uid:\n        b = (mode >> 6) & 7\n    elif group in user['groups']:\n        b = (mode >> 3) & 7\n    else:\n        b = mode & 7\n    return [1 if b & 4 else 0, 1 if b & 2 else 0, 1 if b & 1 else 0]\np = triple(users['priya'], file_group)\na = triple(users['arjun'], file_group)\nfor v in p + a:\n    print(v)\nafter_group = 'arjun'\np2 = triple(users['priya'], after_group)\na2 = triple(users['arjun'], after_group)\nother_student = {'uid': 1004, 'groups': {'students'}}\ns2 = triple(other_student, after_group)\nprint(p2[0])\nprint(a2[0])\nprint(s2[0])\n",
+   "values": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not read the other bits for a user who is in the file's group. One user is matched by exactly one triplet.",
+  "Root bypasses file permission checks; it is not allowed by the owner bits. Root still needs an execute bit to run a program.",
+  "chgrp changes the group only. It does not change the owner, and it does not add users to the new group.",
+  "The owner of a file cannot give it away with chown; only root can change the uid.",
+  "A user's primary group and supplementary groups are different. id shows both, and newgrp changes only the primary group in a new shell."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the uid of root, and why does the kernel test for it first?",
+   "marks": 2,
+   "a": "root has uid 0. A single comparison finds root, and root skips the owner, group and other checks for read and write."
+  },
+  {
+   "level": "remember",
+   "q": "Which file lists groups, and which field holds the supplementary members?",
+   "marks": 2,
+   "a": "/etc/group. Field 4 holds a comma-separated list of supplementary members."
+  },
+  {
+   "level": "understand",
+   "q": "Why can an owner who is also in the file's group not use the group bits to gain extra access?",
+   "marks": 4,
+   "a": "The kernel stops at the first match. If the effective uid equals the file's uid, only the owner triplet applies. The group triplet is never read for that process."
+  },
+  {
+   "level": "apply",
+   "q": "A file has owner ravi, group students, mode 750. Priya is not the owner and is in students. State her read, write and execute results and the triplet used.",
+   "marks": 4,
+   "a": "Mode 750 gives owner rwx, group r-x, other ---. Priya is in students, so group bits r-x apply. Read allowed, write denied, execute allowed."
+  },
+  {
+   "level": "analyze",
+   "q": "After chgrp arjun report.txt, why does Priya lose read access even though her account did not change?",
+   "marks": 5,
+   "a": "Priya was matched through the group students. After the group changes to arjun, Priya is no longer in the file's group. The other bits are ---, so read is denied."
+  },
+  {
+   "level": "apply",
+   "q": "Write the command that gives user arjun read access to report.txt without changing the file's group.",
+   "marks": 3,
+   "a": "setfacl -m u:arjun:r report.txt. The group stays as it was, and arjun gets a per-user ACL entry."
+  },
+  {
+   "level": "analyze",
+   "q": "root runs cat on a file with mode 000. Is the read allowed? Explain.",
+   "marks": 3,
+   "a": "Yes. root has effective uid 0 and bypasses the read and write permission checks. The mode 000 does not stop root from reading."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between a primary group and a supplementary group?",
+   "marks": 4,
+   "a": "A user has exactly one primary group, recorded in /etc/passwd field 4. A user may have many supplementary groups, listed in /etc/group. New files normally take the primary group unless the directory's setgid bit applies."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems use POSIX ACLs, NFSv4 ACLs and container user namespaces, where a container's root is mapped to an ordinary host uid. The mapping is the security boundary: a file owned by uid 0 inside a container may be owned by uid 100000 on the host. Search for setfacl, getfacl, NFS uid mapping and user namespaces to go further."
+}
