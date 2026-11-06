@@ -1,0 +1,193 @@
+{
+ "lead": "An app can send a short message without owning a radio stack. On Android, SmsManager hands text to the phone's SMS service; e-mail goes through an intent to a mail app. This keeps account setup, retries and carrier billing outside your code. Apps use it for OTP alerts, delivery updates, support replies, UPI receipts and sharing invoices. Only a few universities teach this chapter; some syllabi call it SMS messaging and sending e-mail.",
+ "prereq": "You need: Unit 2 intents and built-in apps, and Unit 1 SMS as a mobile service.",
+ "sections": [
+  {
+   "h3": "SMS through SmsManager",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SmsManager is the Android class that talks to the telephony service. Declare the <code>SEND_SMS</code> permission in the manifest and request SEND_SMS at runtime on Android 6.0 and later. Without it, the call throws SecurityException."
+    },
+    {
+     "type": "p",
+     "text": "A single 7-bit GSM SMS carries 160 characters. A long message is concatenated: each part carries a user data header of 6 bytes, and after 7-bit packing that header takes 7 of the 160 characters, leaving 153 characters of payload per part (160 − 7 = 153). Use <code>divideMessage(text)</code>, which returns a list of strings already split at safe boundaries. Do not cut at 160 yourself."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Call <code>SmsManager sms = SmsManager.getDefault()</code>. On API 31 and later use <code>context.getSystemService(SmsManager.class)</code>, which also supports per-SIM managers; getDefault() is deprecated from Android 12 (API 31).",
+      "Call <code>ArrayList<String> parts = sms.divideMessage(body)</code>.",
+      "Build a sent PendingIntent and a delivered PendingIntent for each part.",
+      "For each part call <code>sms.sendTextMessage(phone, null, part, sentPI, deliveredPI)</code>.",
+      "Check the result code in the sent receiver; handle <code>RESULT_ERROR_GENERIC_FAILURE</code> and <code>RESULT_ERROR_RADIO_OFF</code>."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The sent intent fires when the part leaves the phone for the carrier. The delivered intent fires when the recipient's phone acknowledges it. Billing is per part, so a 320-character message is three chargeable SMS. Keep the destination in E.164 form, for example +919876543210."
+    }
+   ]
+  },
+  {
+   "h3": "E-mail with intents",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Your app does not log in to an SMTP server. It asks a mail app to compose. For an e-mail-only action use <code>Intent.ACTION_SENDTO</code> with a <code>mailto:</code> URI. For general sharing use <code>Intent.ACTION_SEND</code> with type <code>text/plain</code> and wrap it in <code>Intent.createChooser</code>."
+    },
+    {
+     "type": "p",
+     "text": "For ACTION_SENDTO put the address in the URI, for example <code>Uri.parse(\"mailto:someone@example.com\")</code>; EXTRA_EMAIL is not reliable there and some mail apps ignore it. EXTRA_EMAIL is used when you attach recipients to ACTION_SEND or ACTION_SEND_MULTIPLE. Other fields go in extras: <code>EXTRA_SUBJECT</code>, <code>EXTRA_TEXT</code> for body, and <code>EXTRA_STREAM</code> for an attachment. An attachment must be a <code>content://</code> URI, not <code>file://</code>; add <code>FLAG_GRANT_READ_URI_PERMISSION</code> so the mail app can read it."
+    },
+    {
+     "type": "p",
+     "text": "The chooser shows every app that can handle the intent. With createChooser the chooser itself shows its own message when no app matches. The try/catch for <code>ActivityNotFoundException</code> is needed when you start ACTION_SENDTO, or any implicit intent, directly without a chooser. The user still taps Send inside the mail app, so your app never sees the final message."
+    },
+    {
+     "type": "p",
+     "text": "E-mail needs a configured account and internet; SMS needs carrier signal and balance. Test on a real phone: emulators often lack a SIM and a mail account."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A 320-character message becomes three SMS parts of at most 153 characters; the carrier bills each part and the recipient rejoins them.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "SMS send path",
+   "aria": "A 320-character message is split into 153-character parts, producing three SMS parts that the carrier delivers and the recipient rejoins.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Compose 320 chars",
+     "note": "app calls SmsManager",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Split 153/part",
+     "note": "6-byte header takes 7 chars",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "3 SMS parts",
+     "note": "320 ÷ 153 → 3",
+     "style": "live"
+    },
+    {
+     "id": "d",
+     "label": "Carrier sends",
+     "note": "per-part billing",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "Recipient joins",
+     "note": "same reference number",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An Android app sends a 320-character SMS in 7-bit GSM encoding. A single SMS carries 160 characters. Each part of a concatenated SMS carries 153 characters because the 6-byte user data header takes 7 characters of the 160. How many SMS parts are sent? At ₹0.20 per part, what is the cost?",
+   "steps": [
+    "Payload per concatenated part = 153 characters.",
+    "Number of parts n = ⌈320 ÷ 153⌉ = ⌈2.09⌉ = 3.",
+    "Cost = 3 parts × ₹0.20 per part = ₹0.60."
+   ],
+   "answer": "3 SMS parts are sent; the cost is ₹0.60.",
+   "check": "import math\nL = 320\nper = 153\nparts = math.ceil(L / per)\ncost = parts * 0.20\nprint(parts)\nprint(round(cost, 2))",
+   "values": [
+    3,
+    0.6
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using 160 characters per part for a long SMS; the 6-byte concatenation header takes 7 characters, leaving 153 characters per part in 7-bit GSM.",
+  "Treating the sent PendingIntent as proof of delivery; sent means handed to the carrier, delivered means the recipient phone acknowledged.",
+  "Forgetting the runtime SEND_SMS permission and getting SecurityException.",
+  "Using ACTION_SEND when only e-mail apps should answer; ACTION_SENDTO with a mailto: URI restricts the chooser to e-mail.",
+  "Passing a file:// attachment; use a content:// URI with FLAG_GRANT_READ_URI_PERMISSION."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which Android permission is required to call SmsManager.sendTextMessage?",
+   "marks": 2,
+   "a": "android.permission.SEND_SMS."
+  },
+  {
+   "level": "understand",
+   "q": "Why does divideMessage use 153 characters per part, not 160?",
+   "marks": 3,
+   "a": "A concatenated SMS carries a 6-byte user data header; after 7-bit packing the header takes 7 of the 160 characters, leaving 153 characters of payload per part in 7-bit GSM."
+  },
+  {
+   "level": "apply",
+   "q": "A 400-character 7-bit SMS is split at 153 characters per part. How many parts, and at ₹0.25 per part what is the cost?",
+   "marks": 4,
+   "a": "⌈400 ÷ 153⌉ = ⌈2.61⌉ = 3 parts. Cost = 3 × ₹0.25 = ₹0.75."
+  },
+  {
+   "level": "analyze",
+   "q": "An app gets a sent result but no delivery result. Which PendingIntent is missing, and what does it mean?",
+   "marks": 4,
+   "a": "The delivered PendingIntent is missing. It fires only when the recipient's phone acknowledges the message; the sent intent only shows handoff to the carrier."
+  },
+  {
+   "level": "apply",
+   "q": "Which intent sends e-mail only to a chosen address?",
+   "marks": 3,
+   "a": "Intent.ACTION_SENDTO with a mailto: URI carrying the address."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between ACTION_SENDTO and ACTION_SEND.",
+   "marks": 3,
+   "a": "ACTION_SENDTO targets a URI scheme such as mailto: and limits handlers; ACTION_SEND shares content by MIME type and may show many apps."
+  },
+  {
+   "level": "remember",
+   "q": "Which extra carries an attachment, and what URI scheme should it use?",
+   "marks": 2,
+   "a": "EXTRA_STREAM; use a content:// URI."
+  },
+  {
+   "level": "analyze",
+   "q": "Why wrap an e-mail intent in createChooser?",
+   "marks": 4,
+   "a": "The chooser lets the user pick among mail apps and gives a clear fallback when several apps match; the app does not need to know the user's mail app."
+  }
+ ],
+ "beyond": "Not for the exam. Production apps often avoid direct SMS for OTP and use the SMS Retriever API or push messages, because SEND_SMS is a sensitive permission. RCS, WhatsApp Business and e-mail APIs handle richer messages. Search for Android SMS Retriever, SmsManager delivery reports, ACTION_SENDTO, FileProvider and RCS."
+}

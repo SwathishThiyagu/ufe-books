@@ -1,0 +1,290 @@
+{
+ "lead": "A debug build is not shippable: it uses a throwaway key, lets a debugger attach, and is not shrunk. Publishing makes a release build: a versioned, signed, optimised package that a store or phone accepts. The signing key is created once and kept for the app's life. versionCode must rise on every upload; versionName labels each release.",
+ "prereq": "You need the Android project and SDK tools from Unit 2, and Unit 4 data storage. <a href=\"#mobile-security-issues\">Chapter 5.4</a> covers attacks on keys and credentials.",
+ "sections": [
+  {
+   "h3": "Build types and the two version numbers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Gradle builds every Android app in a build type. Debug is for your emulator or phone: the SDK signs it with a per-machine debug key, a debugger can attach, and nothing is shrunk. Release is for users: signed with your key, not debuggable, code and resources shrunk. Same source, different output."
+    },
+    {
+     "type": "p",
+     "text": "Both builds read two version values from defaultConfig in build.gradle."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Field",
+      "Type",
+      "Seen by",
+      "Rule"
+     ],
+     "rows": [
+      [
+       "versionCode",
+       "positive integer",
+       "Android and the store",
+       "must strictly increase on every upload"
+      ],
+      [
+       "versionName",
+       "text, for example 1.2.4",
+       "users and store listing",
+       "no ordering rule, free form"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "versionCode is the update counter. A phone compares it with the store listing; the store keeps the highest accepted code for the package and refuses anything not greater."
+    },
+    {
+     "type": "p",
+     "text": "versionName is a label. Teams use major.minor.patch: major for a redesign, minor for features, patch for fixes. 1.2.3 to 1.2.4 is a patch release."
+    },
+    {
+     "type": "p",
+     "text": "targetSdkVersion also gates publishing: stores require a recent target and stop accepting old API levels."
+    }
+   ]
+  },
+  {
+   "h3": "Signing with a release keystore",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An APK is a zip of code and resources. Signing adds a certificate block over the file. The signature ties the APK to the holder of the private key; it is how Android recognises an update to the same app and detects later byte changes. Android verifies it before installing."
+    },
+    {
+     "type": "p",
+     "text": "Identity is package name plus signing certificate. An installed app updates only from an APK with the same package name and certificate. A different certificate gives INSTALL_FAILED_UPDATE_INCOMPATIBLE on a phone and a rejection on a store."
+    },
+    {
+     "type": "p",
+     "text": "The certificate lives in a keystore: a file, usually .jks, holding private keys under aliases, protected by a store password and key password. Create it once with keytool — <code>keytool -genkeypair -v -keystore release.jks -alias appkey -keyalg RSA -keysize 2048 -validity 10000</code> — then keep two backups, one offline."
+    },
+    {
+     "type": "p",
+     "text": "Point the release build at the keystore, and keep passwords out of version control."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "android {\n  signingConfigs {\n    release {\n      storeFile file(\"release.jks\")\n      keyAlias \"appkey\"\n      storePassword System.getenv(\"KS_PASS\")\n      keyPassword System.getenv(\"KEY_PASS\")\n    }\n  }\n  buildTypes {\n    release {\n      signingConfig signingConfigs.release\n      minifyEnabled true\n      shrinkResources true\n    }\n  }\n}",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "With Play App Signing, Google holds the app signing key and you sign uploads with an upload key. A lost upload key can be reset; a lost app signing key on an app not enrolled cannot."
+    }
+   ]
+  },
+  {
+   "h3": "Shrinking the build and testing the release",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "minifyEnabled true runs R8: it deletes unreachable code, renames classes and members to short names, and with shrinkResources true deletes unused resources. The package shrinks, which helps metered data, and renaming hinders reverse engineering."
+    },
+    {
+     "type": "p",
+     "text": "Renaming breaks text-name lookups: reflection, JSON model filling, JNI entry points, XML-inflated views. Protect those classes with keep rules in proguard-rules.pro."
+    },
+    {
+     "type": "p",
+     "text": "Then test the release build, not the debug one."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Build: <code>./gradlew assembleRelease</code> writes app-release.apk; <code>./gradlew bundleRelease</code> writes app-release.aab.",
+      "Install the signed APK on a phone and run sign-in, payment, and any API key tied to a certificate (maps, see <a href=\"#displaying-maps-in-apps\">5.2</a>). Register both debug and release SHA-1 fingerprints in the console and test both builds: a key for one fingerprint fails in the other build.",
+      "Confirm logs are off, no test server address is compiled in, and crash reports arrive."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Deploying the APK",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two artifacts come from a release build. The APK installs on one device. The AAB is a publishing format: Play splits it into per-device APKs, so each phone downloads only what it needs."
+    },
+    {
+     "type": "p",
+     "text": "Route A, a store. Create the app, fill listing, content rating and data safety form, upload the AAB, and roll out. Later uploads need a higher versionCode; the store refuses an accepted code."
+    },
+    {
+     "type": "p",
+     "text": "Route B, direct install, called sideloading."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Copy the signed APK to the phone by USB, download link or messaging app.",
+      "Allow installs from that source (Settings, then Install unknown apps).",
+      "Tap the file and install.",
+      "Check the version under Settings, then Apps."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Businesses ship this way to staff phones, warehouses and kiosks; some stores accept plain APKs."
+    },
+    {
+     "type": "p",
+     "text": "Update rules, both routes: same package name, same certificate, higher versionCode. Change one and you install a different app, not an update."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The release pipeline: versionCode rises to 8, the build is compiled and shrunk, signed with the release key, tested, then deployed. Testing follows signing, so the bytes tested are the bytes shipped.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Release APK pipeline",
+   "aria": "The release pipeline sets a higher version code, builds and shrinks the APK, signs it with the release keystore, tests the signed APK, then deploys it to a store or by direct install.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Set versionCode 8",
+     "note": "versionName 1.2.4",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Build release APK",
+     "note": "shrink and minify",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Sign with keystore",
+     "note": "release key",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Test signed APK",
+     "note": "same key as update",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "Deploy APK",
+     "note": "store or sideload",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An app has versionCode 7 and versionName 1.2.3. You publish one patch update that fixes two bugs and adds nothing new. What are the new versionCode and versionName? Why can versionCode 7 not be uploaded again?",
+   "steps": [
+    "versionCode is the machine counter and must rise on every upload: 7 + 1 = 8.",
+    "versionName is the display label. A patch keeps major 1 and minor 2 and raises patch 3 to 4, so 1.2.4.",
+    "The store already holds 7 for this package. An upload with 7 is not greater, so it is rejected as a duplicate; a phone on 7 sees no update.",
+    "Change: versionCode 7 → 8, versionName 1.2.3 → 1.2.4."
+   ],
+   "answer": "versionCode 8 and versionName 1.2.4; 7 cannot be reused because a versionCode must be strictly greater than every code already accepted for the package.",
+   "check": "version_code = 7\nmajor, minor, patch = 1, 2, 3\nnew_code = version_code + 1\nnew_patch = patch + 1\nprint(new_code)\nprint(new_patch)\n",
+   "values": [
+    8,
+    4
+   ],
+   "code": {
+    "lang": "python",
+    "code": "version_code = 7\nmajor, minor, patch = 1, 2, 3\nnew_code = version_code + 1\nnew_patch = patch + 1\nprint(new_code)\nprint(new_patch)\n",
+    "stdin": ""
+   },
+   "output": "8\n4"
+  }
+ ],
+ "traps": [
+  "Reusing or lowering versionCode. A store compares numbers, so 7 after 7, or 6 after 7, is rejected and no device updates.",
+  "Confusing versionName with versionCode. Writing 1.2.5 while versionCode stays 7 updates nobody; only versionCode is compared.",
+  "Losing the upload keystore, alias or password. You then cannot sign an update for the same identity; back the file up offline and record the alias.",
+  "Publishing a debug build. The debug key is per machine and not your release identity, so later release-signed updates will not install over it.",
+  "Testing only the debug build. Shrinking (R8 renaming or deleting reflectively used classes) fails only in release. A certificate-restricted API key works only in builds signed with that certificate: keys registered with the debug SHA-1 fail in release, and release-SHA-1 keys fail in debug. Register both fingerprints and test both builds."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define versionCode and versionName.",
+   "marks": 2,
+   "a": "versionCode is a positive integer used by Android and the store as an update counter; users never see it. versionName is a display string such as 1.2.4 with no ordering rule."
+  },
+  {
+   "level": "remember",
+   "q": "What is a keystore?",
+   "marks": 2,
+   "a": "A .jks file holding private keys under aliases, protected by a store password and key password. The release build is signed with one key from it."
+  },
+  {
+   "level": "understand",
+   "q": "Why must every update of an app be signed with the same certificate?",
+   "marks": 3,
+   "a": "Android identifies an installed app by package name plus signing certificate. An update signed with another key fails the signature check, so existing users cannot be updated."
+  },
+  {
+   "level": "understand",
+   "q": "What does R8 do when minifyEnabled is true?",
+   "marks": 3,
+   "a": "It removes unreachable code, renames classes and members to short names, and with shrinkResources true removes unused resources. The package shrinks; keep rules protect names reached only by reflection."
+  },
+  {
+   "level": "apply",
+   "q": "An app has versionCode 41 and versionName 2.7.0. You ship a release that adds one feature and fixes two bugs. Give the new values.",
+   "marks": 4,
+   "a": "versionCode rises by at least 1: 41 + 1 = 42. A feature raises minor: 2.7.0 → 2.8.0, patch back to 0. So 42 and 2.8.0."
+  },
+  {
+   "level": "apply",
+   "q": "Which file do you upload to Play, and which do you send to a warehouse phone that installs by hand?",
+   "marks": 4,
+   "a": "The AAB goes to Play, which splits it into per-device APKs. The signed APK goes to the warehouse phone for direct install."
+  },
+  {
+   "level": "analyze",
+   "q": "Play rejects an upload with the message that version code 12 has already been used. Give two ways out and say why 11 does not work.",
+   "marks": 5,
+   "a": "Bump to versionCode 13 or higher. If an old draft release caused the clash, remove or halt that draft before re-uploading with the higher code. 11 fails because codes must be strictly greater than the highest accepted, 12."
+  },
+  {
+   "level": "analyze",
+   "q": "An app works in debug but crashes only in the release build, right after shrinking is switched on. Explain and fix.",
+   "marks": 5,
+   "a": "R8 renamed or deleted classes reached by text names, such as JSON model classes, JNI entry points or XML-inflated views. Add keep rules for those classes in proguard-rules.pro and rebuild."
+  }
+ ],
+ "beyond": "Not for the exam. Play has required AAB for new apps since 2021, and Play App Signing is the default, so upload key and app signing key are separate things to protect. Teams automate: a CI job reads keystore passwords from encrypted secrets, builds, signs, runs release tests, and publishes. Releases often use staged rollout to a small share, so a bad build can be halted. Search for Play App Signing, R8 keep rules, staged rollout and Gradle Play Publisher next."
+}

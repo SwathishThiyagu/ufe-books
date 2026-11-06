@@ -1,0 +1,195 @@
+{
+ "lead": "Location data is the phone's estimate of where it is: latitude, longitude and an accuracy radius. Location-based services (LBS) turn that stream of fixes into an answer — what is near me, did the user enter my zone, where is my rider, which offer fits this shop. Ride-hailing, food delivery and geofenced alerts all run on it. This chapter shows how Android gives an app location, and how the app uses it. Only a few universities teach this chapter.",
+ "prereq": "You need: activities and the permission model from Unit 2, plus the tracking idea from Unit 1 (see Unit 1, Handover, location tracking and mobility management).",
+ "sections": [
+  {
+   "h3": "Fine versus coarse, and the providers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Android guards location because it reveals where a person lives and works. ACCESS_FINE_LOCATION gives accuracy to a few metres; ACCESS_COARSE_LOCATION gives about a kilometre. Coarse suits weather or city-level offers; ask for fine only when a map pin or a 100 m geofence needs it. The manifest declaration alone is not enough on modern Android: the app must also request the permission at runtime and handle a refusal."
+    },
+    {
+     "type": "p",
+     "text": "Below the permission sits a provider, the actual source of fixes."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "GPS: satellites, accurate to metres outdoors, slow first fix, fails indoors, heavy on battery.",
+      "Network: Wi-Fi and cell-tower lookup, fast, works indoors, accuracy tens to hundreds of metres.",
+      "Passive: fixes other apps already requested, free, arrives unpredictably."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "LocationManager is in the platform; you name the provider yourself. FusedLocationProviderClient, from Google Play services, merges GPS, Wi-Fi and sensors into one better fix. Both return a Location: latitude and longitude in degrees, accuracy in metres, and a time stamp."
+    }
+   ]
+  },
+  {
+   "h3": "Requesting and stopping updates",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "getLastKnownLocation(provider) returns the last cached fix — possibly null, possibly minutes old — without waking any radio. Show it as a placeholder, then request live updates."
+    },
+    {
+     "type": "formula",
+     "text": "requestLocationUpdates(provider, minTime, minDistance, listener)",
+     "where": "minTime is the minimum gap between fixes in milliseconds; minDistance is the minimum movement in metres before a new fix is delivered; listener is the LocationListener that receives each Location."
+    },
+    {
+     "type": "p",
+     "text": "Both numbers are filters, not a schedule: the system may deliver later, never earlier. Stop with removeUpdates(listener) in onPause() and register again in onResume(); a paused activity that keeps GPS alive only drains the battery. The fused client uses requestLocationUpdates(request, callback, Looper) and removeLocationUpdates(callback), with the interval and displacement held in a LocationRequest."
+    },
+    {
+     "type": "p",
+     "text": "Test every fix with getAccuracy(); 900 m is a city, not a doorstep. Throw away stale fixes by comparing getTime() with the current clock."
+    }
+   ]
+  },
+  {
+   "h3": "Geocoding, proximity alerts and LBS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Geocoding maps an address to latitude and longitude; reverse geocoding maps coordinates to a street address. Geocoder returns lists and is slow, so call it off the main thread. addProximityAlert(latitude, longitude, radius, expiration, pendingIntent) fires an Intent when the device enters or leaves a circle of radius metres, and the Play services geofencing API does the same for many zones with less battery."
+    },
+    {
+     "type": "p",
+     "text": "Typical services: nearby search for an ATM, tracking a delivery rider, a school-zone alert, a mall coupon when you walk in. To draw the fix on a map, see <a href=\"#displaying-maps-in-apps\">Chapter 5.2</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "An app takes runtime permission, picks a provider, asks for fixes every 20 s with a 100 m distance filter, and uses each fix. Notice that permission comes before any provider is chosen.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Location update pipeline",
+   "aria": "An app gets runtime location permission, chooses a provider, requests updates every 20 seconds with a 100-metre distance filter, and receives fixes for map or location-based services use.",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Runtime permission",
+     "note": "fine or coarse",
+     "style": "accent"
+    },
+    {
+     "id": "b",
+     "label": "Choose provider",
+     "note": "GPS or network",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Request updates",
+     "note": "20 s, 100 m",
+     "style": "live"
+    },
+    {
+     "id": "d",
+     "label": "Location fix",
+     "note": "lat, lon, accuracy",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "Use in app",
+     "note": "map or LBS",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A delivery app requests location updates every 20 s with a minimum distance of 100 m. A rider moves at 18 km/h. What is the maximum number of updates per minute, and how far does the rider move between two time ticks?",
+   "steps": [
+    "Speed in metres per second: 18 km/h = 18000 m ÷ 3600 s = 5 m/s.",
+    "Distance moved in one 20 s tick: 5 m/s × 20 s = 100 m.",
+    "100 m is not less than the 100 m filter, so the distance filter is met at every tick; the time filter alone decides.",
+    "Updates per minute: 60 s ÷ 20 s = 3."
+   ],
+   "answer": "At most 3 updates per minute, with the rider moving exactly 100 m between ticks.",
+   "check": "speed = 18 * 1000 / 3600\ndist = speed * 20\nupdates = 60 / 20\nprint(speed)\nprint(dist)\nprint(updates)",
+   "values": [
+    5.0,
+    100.0,
+    3.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Manifest permission alone is not enough on modern Android; ask for fine or coarse location at runtime and handle a denial.",
+  "minTime is in milliseconds: 20 s must be written 20000, not 20.",
+  "minTime and minDistance are lower bounds. The system can deliver later, never earlier.",
+  "getLastKnownLocation can return null or a stale fix; it never wakes the GPS.",
+  "A user may grant only coarse even when you asked for fine; check the accuracy you actually received."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three Android location providers and one property of each.",
+   "marks": 2,
+   "a": "GPS: metres accurate outdoors, slow, battery heavy. Network: fast indoors, hundreds of metres. Passive: free, unpredictable."
+  },
+  {
+   "level": "understand",
+   "q": "Why ask for location at runtime when the manifest already declares the permission?",
+   "marks": 3,
+   "a": "The manifest records intent only. The user grants at runtime, so a downloaded app cannot silently track; a refusal or a coarse-only grant must be handled."
+  },
+  {
+   "level": "apply",
+   "q": "Updates are requested every 30 s with a 50 m minimum distance. A user walks at 1.2 m/s. How many updates per minute at most?",
+   "marks": 4,
+   "a": "In 30 s the user covers 1.2 × 30 = 36 m < 50 m, so no fix is delivered at the tick. 50 m takes 50 ÷ 1.2 ≈ 41.7 s, so at most one update per 41.7 s, about 1.4 per minute."
+  },
+  {
+   "level": "analyze",
+   "q": "A tracking screen shows fixes with 800 m accuracy inside a city. Give two causes and two fixes.",
+   "marks": 5,
+   "a": "Causes: only coarse permission granted, or the network provider used with no GPS view of the sky. Fixes: request fine permission and read the grant result; use the fused client at high accuracy and wait for an outdoor fix."
+  },
+  {
+   "level": "understand",
+   "q": "Give the difference between geocoding and reverse geocoding.",
+   "marks": 2,
+   "a": "Geocoding turns an address into latitude and longitude. Reverse geocoding turns coordinates into an address. Both are slow, so run them off the main thread."
+  },
+  {
+   "level": "analyze",
+   "q": "Why call removeUpdates in onPause()?",
+   "marks": 4,
+   "a": "A paused activity cannot show fixes, but GPS keeps the radio and battery busy and the listener holds the activity; removing stops both."
+  }
+ ],
+ "beyond": "Not for the exam. Indoors, GPS fails and Wi-Fi round-trip time plus Bluetooth beacons take over. Android now offers an approximate-location switch and treats background location as a separate, justified permission. Geofencing APIs batch many zones so the radio wakes rarely. Surveying uses RTK correction for centimetre fixes. Search for \"Android location permissions\", \"FusedLocationProviderClient\" and \"geofencing API\" next."
+}
