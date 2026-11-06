@@ -1,0 +1,286 @@
+{
+ "lead": "A running program has three open channels: one for input, one for normal results, one for error messages. The shell numbers them 0, 1 and 2 and can point any of them at a file instead of the terminal, before the program starts. That is what file input and output means in a script: the script still reads stdin and writes stdout, but the shell has already swapped the destination. Nightly backups, cron jobs and log-writing scripts all rest on this one idea.",
+ "prereq": "You need: <a href=\"#shell-basics-bourne-shell-and-bash\">3.1 Shell basics</a>, <a href=\"#shell-variables-and-operators\">3.2 Shell variables and operators</a> for quoting, <a href=\"#conditionals-and-loops-in-shell-scripts\">3.3 Conditionals and loops</a> for while, and the Unit 2 notes on file permissions to know who may read the file.",
+ "sections": [
+  {
+   "h3": "Standard input, standard output, standard error",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every process starts with three open channels called file descriptors. A file descriptor is a small whole number the kernel uses to name an open file. Number 0 is standard input, or stdin: the stream that <code>read</code> and <code>cat</code> take text from. Number 1 is standard output, or stdout: where <code>echo</code> and <code>printf</code> write results. Number 2 is standard error, or stderr: where error messages go. By default all three are attached to your terminal."
+    },
+    {
+     "type": "p",
+     "text": "Why keep output and errors apart? Stdout carries data, clean lines that a program or a person will use later. Stderr carries complaints about the run. If both shared one channel, a line like <code>cannot open file</code> would sit inside your clean result. Separating them lets you save data in one file and warnings in another."
+    },
+    {
+     "type": "p",
+     "text": "Redirection is done by the shell, not by the program. The program never learns a file name; it just writes to fd 1. So <code>ls > list.txt</code> works for every command, including ones written decades before you were born."
+    },
+    {
+     "type": "table",
+     "head": [
+      "fd",
+      "Name",
+      "Default",
+      "Symbol"
+     ],
+     "rows": [
+      [
+       "0",
+       "stdin",
+       "keyboard",
+       "<"
+      ],
+      [
+       "1",
+       "stdout",
+       "terminal",
+       "> or >>"
+      ],
+      [
+       "2",
+       "stderr",
+       "terminal",
+       "2>"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Redirection: pointing a descriptor at a file",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "<code>cmd > file</code> sends fd 1 to file. The shell creates the file, or empties it if it already exists, before cmd runs.",
+      "<code>cmd >> file</code> appends instead of truncating.",
+      "<code>cmd < file</code> opens file as fd 0.",
+      "<code>cmd 2> file</code> moves only the error stream; stdout still reaches the terminal.",
+      "<code>cmd &> file</code> (Bash) sends both streams to the same file.",
+      "<code>2>&1</code> means point fd 2 at wherever fd 1 points right now. It is an instruction about order, not a file name."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Order decides the result. <code>./run.sh > out.txt 2>&1</code> puts everything in out.txt, because fd 1 moves first and fd 2 then copies it. <code>./run.sh 2>&1 > out.txt</code> first points fd 2 at the terminal, then moves fd 1 to the file, so errors still appear on screen."
+    },
+    {
+     "type": "p",
+     "text": "<code>/dev/null</code> is a device that discards whatever is written to it and returns end of file on read. <code>find / -name \"*.conf\" 2> /dev/null</code> hides permission errors while you keep the real matches."
+    },
+    {
+     "type": "p",
+     "text": "Several redirections can sit on one command line. <code>./count.sh < data.txt > out.txt 2> err.txt</code> gives the script a file as input, a file for results and a third file for errors, all at once."
+    }
+   ]
+  },
+  {
+   "h3": "Reading a file line by line",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>read</code> takes one line from stdin and cuts it into fields using IFS, the internal field separator. IFS is an ordinary shell variable holding the characters treated as separators; by default these are space, tab and newline."
+    },
+    {
+     "type": "p",
+     "text": "In <code>read -r a b</code>, the first field goes to a and the rest of the line goes to b. The <code>-r</code> means raw: a backslash stays a backslash instead of escaping the next character."
+    },
+    {
+     "type": "p",
+     "text": "The standard loop is <code>while IFS= read -r line; do ...; done < file</code>. Writing <code>IFS=</code> sets IFS to empty for that one command, so leading and trailing spaces survive. The <code>< file</code> after <code>done</code> attaches the file to stdin for the whole loop, so the file is opened once and read forward."
+    },
+    {
+     "type": "p",
+     "text": "Avoid <code>for line in $(cat file)</code>. Command substitution splits on spaces, so a name like <code>Ravi Kumar</code> becomes two items, a blank line vanishes, and the whole file is loaded into memory first."
+    },
+    {
+     "type": "p",
+     "text": "A here-document feeds lines to stdin without a file. <code>cat <<EOF</code>, the lines, then <code>EOF</code> on its own line. Variables expand inside it; quote the marker as <code><<'EOF'</code> to keep text literal. It is handy for writing a config file or feeding SQL to a client."
+    },
+    {
+     "type": "p",
+     "text": "<code>tee</code> copies a stream: <code>cmd | tee log.txt</code> shows the output and saves the same bytes in log.txt. At end of file <code>read</code> returns a non-zero status, which simply stops the while loop. That is normal, not a failure."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The script reads data.txt on fd 0 and writes results on fd 1 and errors on fd 2. Without the redirection symbols, both output streams land on the terminal.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Three file descriptors",
+   "nodes": [
+    {
+     "id": "src",
+     "label": "data.txt",
+     "note": "input file",
+     "style": "normal"
+    },
+    {
+     "id": "sc",
+     "label": "Script reads stdin",
+     "note": "fd 0",
+     "style": "accent"
+    },
+    {
+     "id": "so",
+     "label": "stdout fd 1",
+     "note": "out.txt",
+     "style": "live"
+    },
+    {
+     "id": "se",
+     "label": "stderr fd 2",
+     "note": "err.txt",
+     "style": "next"
+    },
+    {
+     "id": "te",
+     "label": "Terminal",
+     "note": "default destination",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "src",
+     "to": "sc",
+     "label": "<"
+    },
+    {
+     "from": "sc",
+     "to": "so",
+     "label": "echo"
+    },
+    {
+     "from": "so",
+     "to": "te",
+     "label": "no >"
+    },
+    {
+     "from": "sc",
+     "to": "se",
+     "label": "errors"
+    },
+    {
+     "from": "se",
+     "to": "te",
+     "label": "no 2>"
+    }
+   ],
+   "aria": "A script reads data.txt on standard input, sends normal output toward out.txt on file descriptor 1 and errors toward err.txt on file descriptor 2; without redirection both go to the terminal."
+  }
+ },
+ "examples": [
+  {
+   "question": "A script count.sh contains only the loop body <code>while read -r a b; do echo $((a + b)); done</code>. It is run as <code>./count.sh < data.txt > out.txt 2> err.txt</code>. The file data.txt holds exactly three lines: \"1 2\", \"3 4\" and \"5 6\". State the contents of out.txt, the contents of err.txt and the exit status of the script.",
+   "steps": [
+    "Before the script runs, the shell opens data.txt as fd 0, creates out.txt as fd 1 and creates err.txt as fd 2. No command in the script names a file.",
+    "Pass 1: read takes the line \"1 2\" and splits it on the space, so a = 1 and b = 2. $((1 + 2)) = 3, and echo writes 3 plus a newline to fd 1, which is out.txt.",
+    "Pass 2: a = 3, b = 4, so $((3 + 4)) = 7 goes to out.txt.",
+    "Pass 3: a = 5, b = 6, so $((5 + 6)) = 11 goes to out.txt.",
+    "Pass 4: read finds no characters left, returns a non-zero status, and the while loop ends. Nothing failed, so nothing is written to fd 2.",
+    "The script's exit status is the status of its last command, the loop, which ended normally: 0."
+   ],
+   "answer": "out.txt holds 3, 7 and 11 on three separate lines (7 bytes), err.txt is empty (0 bytes), and the exit status is 0.",
+   "check": "pairs = [(1, 2), (3, 4), (5, 6)]\nsums = [a + b for a, b in pairs]\nfor s in sums:\n    print(s)\nprint(0)\nprint(len(b''.join(str(s).encode() + b'\\n' for s in sums)))\n",
+   "values": [
+    3,
+    7,
+    11,
+    0,
+    7
+   ],
+   "code": {
+    "lang": "text",
+    "code": "#!/bin/sh\nwhile read -r a b; do\n    echo $((a + b))\ndone\n",
+    "stdin": "1 2\n3 4\n5 6\n"
+   },
+   "dry_run": {
+    "head": [
+     "Line read",
+     "a",
+     "b",
+     "a + b"
+    ],
+    "rows": [
+     [
+      "1 2",
+      "1",
+      "2",
+      "3"
+     ],
+     [
+      "3 4",
+      "3",
+      "4",
+      "7"
+     ],
+     [
+      "5 6",
+      "5",
+      "6",
+      "11"
+     ],
+     [
+      "(end of file)",
+      "-",
+      "-",
+      "loop stops"
+     ]
+    ]
+   },
+   "output": "3\n7\n11"
+  }
+ ],
+ "traps": [
+  "<code>></code> empties the target before the command starts, so <code>sort marks.txt > marks.txt</code> leaves an empty file. Write to a second file, then move it.",
+  "<code>2>&1</code> copies where fd 1 points at that moment. Putting it before <code>> out.txt</code> sends errors to the terminal, not to the file.",
+  "Without <code>-r</code>, <code>read</code> treats a backslash as an escape and silently drops it, so Windows-style paths change when read.",
+  "A failing <code>read</code> at end of file is how the loop stops. Do not test it as an error and do not print a message for it.",
+  "<code>done < file</code> opens the file once for the whole loop; writing <code>read -r line < file</code> inside the body reopens and restarts the file every pass, giving an endless loop."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three standard file descriptors and their numbers.",
+   "marks": 2,
+   "a": "fd 0 is standard input (stdin), fd 1 is standard output (stdout), fd 2 is standard error (stderr)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the shell keep stdout and stderr on separate descriptors?",
+   "marks": 3,
+   "a": "Stdout carries the data the user or the next program wants; stderr carries messages about the run. Separating them keeps error text out of a saved data file and lets each stream be redirected independently."
+  },
+  {
+   "level": "apply",
+   "q": "Write one command line that runs ./backup.sh and saves both its normal output and its errors in backup.log, discarding nothing.",
+   "marks": 4,
+   "a": "./backup.sh > backup.log 2>&1 . fd 1 moves to backup.log first, then fd 2 is copied from fd 1, so both streams end in the file."
+  },
+  {
+   "level": "apply",
+   "q": "What does <code>while IFS= read -r name; do echo \"[$name]\"; done < guests.txt</code> print for a line \"  Anil  \"?",
+   "marks": 4,
+   "a": "IFS= stops trimming, so the leading and trailing spaces survive: [  Anil  ]."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does <code>grep root /etc/passwd > hits.txt 2>&1</code> work as intended, while <code>grep root /etc/passwd 2>&1 > hits.txt</code> still shows \"Permission denied\" on the terminal?",
+   "marks": 5,
+   "a": "In the second form fd 2 is copied from fd 1 while fd 1 still points at the terminal; only afterwards does fd 1 move to hits.txt. Redirections are applied left to right, so order matters."
+  },
+  {
+   "level": "analyze",
+   "q": "A script reads a file with <code>for line in $(cat list.txt)</code>. Two file names with spaces are read wrongly and a blank line disappears. Explain the cause and the fix.",
+   "marks": 5,
+   "a": "Unquoted command substitution undergoes word splitting and globbing, so spaces break a name into pieces and empty fields are dropped. Fix: <code>while IFS= read -r line; do ...; done < list.txt</code>, which reads one whole line at a time."
+  }
+ ],
+ "beyond": "Not for the exam. Named pipes made with <code>mkfifo</code>, process substitution such as <code>diff <(cmd1) <(cmd2)</code>, and extra descriptors opened with <code>exec 3<file</code> are the next step; they let one script use several input streams at once. In production, <code>tee</code> in a pipeline keeps a copy of logs while systemd or Docker captures stdout and stderr separately. Search these terms next: process substitution, named pipe, /proc/PID/fd, and shellcheck redirection warnings."
+}

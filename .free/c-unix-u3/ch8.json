@@ -1,0 +1,260 @@
+{
+ "lead": "Scripts fail: a file is missing, an argument is wrong, a command is absent. Error handling makes those failures visible and controlled. You check the exit status, stop when a defined step fails, print a message to standard error, and leave a trace of what ran. Debugging is the other half: turn on tracing, read the trace, fix the first wrong command. Every reliable shell script uses these habits. The tools are status codes, set options, and trap cleanup.",
+ "prereq": "You need: exit status in <a href=\"#conditionals-and-loops-in-shell-scripts\">Chapter 3.3</a>, functions in <a href=\"#shell-functions-and-command-line-arguments\">Chapter 3.4</a>, and stderr in <a href=\"#file-input-and-output-in-scripts\">Chapter 3.5</a>.",
+ "sections": [
+  {
+   "h3": "Exit status: the shell's report card",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every command ends with an exit status, an integer from 0 to 255. 0 means success. Any non-zero value means failure. The shell stores the status of the last command in <code>$?</code>, read as dollar question. After <code>grep root /etc/passwd</code>, <code>$?</code> is 0 if a line matched and 1 if none matched."
+    },
+    {
+     "type": "p",
+     "text": "Common codes: 0 success; 1 general error; 2 misuse of a shell builtin or wrong option; 126 found but cannot execute; 127 command not found; 128+n killed by signal n. For example, a script killed by signal 9 reports status 137, because 128+9=137."
+    },
+    {
+     "type": "p",
+     "text": "Test a command directly with <code>if</code>. <code>if cp \"$1\" /backup; then echo copied; else echo \"copy failed\" >&2; exit 1; fi</code>. The <code>if</code> reads the command's status; no <code>$?</code> test is needed. If you must print <code>$?</code>, save it first: <code>cp \"$1\" /backup; s=$?; echo \"status $s\" >&2</code>. The next command overwrites <code>$?</code>."
+    },
+    {
+     "type": "p",
+     "text": "Send error text to stderr with <code>>&2</code>. stdout may be redirected to a data file, so errors on stdout would be lost or mixed into data. stderr stays on the terminal or goes to a log file."
+    }
+   ]
+  },
+  {
+   "h3": "Fail fast with set -e, trace with set -x",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Put options after the shebang. <code>set -e</code> exits the script when a command returns non-zero. <code>set -u</code> exits when an unset variable is used. <code>set -x</code> prints each command after expansion, prefixed by +, to stderr. <code>set -o pipefail</code> makes a pipeline fail if any command in it fails, not only the last one. A common first line is <code>set -euxo pipefail</code>."
+    },
+    {
+     "type": "p",
+     "text": "<code>set -e</code> has limits. It is ignored for a command used as an <code>if</code> or <code>while</code> condition, in a <code>&&</code> or <code>||</code> list except the last command, and after <code>!</code>. So <code>if grep -q root /etc/passwd; then ...; fi</code> still handles a failed grep. This is deliberate: those forms test failure. In a function, the rules are subtle; test functions directly."
+    },
+    {
+     "type": "p",
+     "text": "The figure shows backup.sh with three cp commands. The first cp returns 0. The second cp, on missing.txt, returns 1. With <code>set -e</code> the shell exits with status 1; the third cp and <code>echo done</code> do not run. Without <code>set -e</code> the shell continues, copies c.txt, prints done, and exits 0. That final 0 hides the failed copy, which is why fail-fast matters."
+    },
+    {
+     "type": "p",
+     "text": "For debugging, run <code>bash -x script.sh</code> without editing the file. Turn tracing off with <code>set +x</code>. Trace output goes to stderr, so it does not corrupt data on stdout."
+    }
+   ]
+  },
+  {
+   "h3": "trap: cleanup and error messages",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>trap</code> runs a command when the shell receives a condition. <code>trap 'rm -f \"$tmp\"' EXIT</code> runs cleanup when the script exits, by normal end or by <code>set -e</code>. <code>trap 'echo \"failed at line $LINENO\" >&2' ERR</code> runs when a command fails (the same exceptions as <code>set -e</code> apply: <code>if</code>/<code>while</code> tests, all but the last command of <code>&&</code> / <code>||</code>, commands after <code>!</code>). It works with or without <code>set -e</code>. Use single quotes so <code>$tmp</code> and <code>$LINENO</code> expand when the trap runs."
+    },
+    {
+     "type": "p",
+     "text": "A logging function keeps messages consistent. <code>log(){ echo \"$(date) $*\" >> \"$log\"; }</code>; <code>die(){ echo \"error: $*\" >&2; exit 1; }</code>. Call <code>die \"missing file $1\"</code> on a bad argument. <code>die</code> writes to stderr and exits the script with status 1. Never follow an error with <code>exit 0</code>; that reports success."
+    },
+    {
+     "type": "p",
+     "text": "Save status before cleanup. <code>cp \"$1\" /backup || { s=$?; log \"copy failed: $s\"; exit \"$s\"; }</code>. The <code>||</code> list keeps <code>set -e</code> from exiting before the log line; a bare <code>cmd; s=$?</code> only works when <code>set -e</code> is off. The EXIT trap keeps the same status unless you call <code>exit</code> inside it. Log both the message and the status, so a reader can reproduce the failure."
+    },
+    {
+     "type": "p",
+     "text": "Use <code>set -e</code> for scripts that must stop, and explicit <code>if</code> tests for steps you can recover from. Check the first failing command in the trace, not the last line."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The second copy fails with status 1. With set -e the script stops at exit 1; without set -e the later commands run and the final status is 0.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Fail fast with set -e",
+   "nodes": [
+    {
+     "id": "run",
+     "label": "Run backup.sh",
+     "note": "3 file arguments",
+     "style": "normal"
+    },
+    {
+     "id": "c1",
+     "label": "cp a.txt",
+     "note": "ok, status 0",
+     "style": "normal"
+    },
+    {
+     "id": "c2",
+     "label": "cp missing.txt",
+     "note": "fails, status 1",
+     "style": "live"
+    },
+    {
+     "id": "stop",
+     "label": "exit 1",
+     "note": "set -e stops",
+     "style": "next"
+    },
+    {
+     "id": "cont",
+     "label": "cp c.txt; echo done",
+     "note": "no set -e",
+     "style": "muted"
+    },
+    {
+     "id": "end",
+     "label": "exit 0",
+     "note": "misleading success",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "run",
+     "to": "c1"
+    },
+    {
+     "from": "c1",
+     "to": "c2"
+    },
+    {
+     "from": "c2",
+     "to": "stop",
+     "label": "set -e"
+    },
+    {
+     "from": "c2",
+     "to": "cont",
+     "label": "no set -e"
+    },
+    {
+     "from": "cont",
+     "to": "end"
+    }
+   ],
+   "aria": "After the first copy succeeds, the second copy fails; with set -e the script exits with status 1, while without set -e it continues, prints done and returns status 0."
+  }
+ },
+ "examples": [
+  {
+   "question": "backup.sh contains: #!/bin/bash, set -e, cp \"$1\" /backup, cp \"$2\" /backup, cp \"$3\" /backup, echo done. Run ./backup.sh a.txt missing.txt c.txt, where a.txt and c.txt exist, missing.txt does not, and /backup is a writable directory. Give the output and exit status with set -e, and without set -e.",
+   "steps": [
+    "With set -e, command 1 <code>cp \"$1\" /backup</code> copies a.txt and returns status 0.",
+    "Command 2 <code>cp \"$2\" /backup</code> cannot find missing.txt. cp prints <code>cp: cannot stat 'missing.txt': No such file or directory</code> to stderr and returns status 1.",
+    "set -e sees status 1 and exits the script immediately with status 1. Command 3 and echo done do not run. Successful copies: 1.",
+    "Without set -e, command 1 returns 0, command 2 returns 1 but the script continues.",
+    "Command 3 copies c.txt and returns 0. <code>echo done</code> prints done and returns 0. Successful copies: 2.",
+    "The script's final status is 0, from echo. The failed copy is hidden unless you check each status."
+   ],
+   "answer": "With set -e: one successful copy, no done, exit status 1. Without set -e: two successful copies, done printed, exit status 0.",
+   "check": "cmds = [(\"cp a.txt\", 0), (\"cp missing.txt\", 1), (\"cp c.txt\", 0), (\"echo done\", 0)]\nsuccess_with = 0\nexit_with = 0\nfor name, status in cmds:\n    if status != 0:\n        exit_with = status\n        break\n    if name.startswith(\"cp \"):\n        success_with += 1\nsuccess_without = 0\nfor name, status in cmds:\n    if name.startswith(\"cp \") and status == 0:\n        success_without += 1\nexit_without = cmds[-1][1]\nprint(exit_with)\nprint(exit_without)\nprint(success_with)\nprint(success_without)",
+   "values": [
+    1,
+    0,
+    1,
+    2
+   ],
+   "code": {
+    "lang": "text",
+    "code": "#!/bin/bash\nset -e\ncp \"$1\" /backup\ncp \"$2\" /backup\ncp \"$3\" /backup\necho done",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Command",
+     "Status",
+     "set -e",
+     "no set -e"
+    ],
+    "rows": [
+     [
+      "cp a.txt /backup",
+      "0",
+      "runs, continues",
+      "runs, continues"
+     ],
+     [
+      "cp missing.txt /backup",
+      "1",
+      "exit 1",
+      "continues"
+     ],
+     [
+      "cp c.txt /backup",
+      "0",
+      "not run",
+      "runs, status 0"
+     ],
+     [
+      "echo done",
+      "0",
+      "not run",
+      "runs, status 0"
+     ]
+    ]
+   },
+   "output": "With set -e:\ncp: cannot stat 'missing.txt': No such file or directory\nexit status 1\n\nWithout set -e:\ncp: cannot stat 'missing.txt': No such file or directory\ndone\nexit status 0"
+  }
+ ],
+ "traps": [
+  "Do not test $? after another command; it has been overwritten. Save it as s=$? immediately.",
+  "set -e does not fire inside if, while, until, && or || tests; those contexts are meant to handle failure.",
+  "126 is found but not executable; 127 is not found. A typo gives 127, a missing execute bit gives 126.",
+  "128+n is killed by signal n, not a normal error code. Signal 9 gives 137, signal 15 gives 143.",
+  "set -x writes to stderr; redirecting stdout to a file does not capture the trace."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does $? hold?",
+   "marks": 2,
+   "a": "The exit status of the last command, an integer from 0 to 255."
+  },
+  {
+   "level": "remember",
+   "q": "Which exit status means command not found?",
+   "marks": 2,
+   "a": "127."
+  },
+  {
+   "level": "understand",
+   "q": "Why send error messages to stderr instead of stdout?",
+   "marks": 3,
+   "a": "stdout may be redirected to a data file; stderr keeps errors visible or separate, and avoids mixing error text into data."
+  },
+  {
+   "level": "understand",
+   "q": "Why save $? before running echo?",
+   "marks": 3,
+   "a": "The echo command replaces $? with its own status, so the original failure status is lost."
+  },
+  {
+   "level": "apply",
+   "q": "What does this print? <code>false; echo $?</code>",
+   "marks": 3,
+   "a": "false returns status 1; <code>$?</code> is expanded to 1 before <code>echo</code> runs, so <code>echo</code> prints 1."
+  },
+  {
+   "level": "apply",
+   "q": "In a script with <code>set -e</code>, what is the output and exit status of <code>echo start; false; echo end</code>?",
+   "marks": 4,
+   "a": "It prints start, then exits after false with status 1. end is not printed."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does <code>set -e; if grep -q x file; then echo yes; fi; echo after</code> still print after when grep fails?",
+   "marks": 4,
+   "a": "set -e is ignored for the command used as the if condition. The if condition is false, the then branch is skipped, and echo after runs."
+  },
+  {
+   "level": "analyze",
+   "q": "A script uses <code>trap 'rm -f \"$tmp\"' EXIT</code>, then <code>cp \"$1\" \"$tmp\"</code> fails under set -e. What runs, and what status should the script report?",
+   "marks": 5,
+   "a": "The EXIT trap runs rm -f on the temporary file. The script should report the non-zero status of the failed cp, not 0."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, shell scripts are the glue in CI/CD, backup jobs and container entrypoints. Teams lint them with ShellCheck, run them under bash -x, and start with set -euo pipefail. The same ideas appear in Python automation through subprocess return codes and logging, and in systemd services through exit status and restart policies. Search for ShellCheck, Bash pipefail, and trap ERR for deeper study."
+}
