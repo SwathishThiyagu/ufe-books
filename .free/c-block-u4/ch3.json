@@ -1,0 +1,229 @@
+{
+ "lead": "Every Bitcoin output carries a tiny program called a locking script. To spend that coin, the spender must supply data that makes the program finish with a single true value on the stack. The language is called Bitcoin script. It is deliberately small: no loops, no backward jumps, so every script stops after a fixed number of steps. This is how Bitcoin says \"only the holder of this key may spend\" without asking anyone's permission. Wallets hide the details; every full node runs the script on every transaction.",
+ "prereq": "You need: <a href=\"#bitcoin-protocol-transactions-and-blocks\">Chapter 4.2</a> for inputs, outputs and outpoints, and Unit 2 for hash functions and ECDSA signature checks.",
+ "sections": [
+  {
+   "h3": "A stack machine with no loops",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each output of a transaction stores a locking script, called scriptPubKey: the condition for spending those coins. The input that spends the output carries an unlocking script, called scriptSig: the data that satisfies the condition. A node takes scriptSig, appends scriptPubKey after it, and runs the joined list once, left to right."
+    },
+    {
+     "type": "p",
+     "text": "The machine has one data structure, a stack: last in, first out. An instruction is called an opcode and takes one byte. Push opcodes place a constant on top of the stack; other opcodes pop items, compute, and push the result. Common ones: OP_DUP copies the top item, OP_HASH160 applies SHA-256 then RIPEMD-160, OP_EQUALVERIFY compares two items and aborts if they differ, OP_CHECKSIG verifies an ECDSA signature against a public key."
+    },
+    {
+     "type": "p",
+     "text": "There are no loops, no backward jumps, no recursion. The number of steps is fixed when the script is written. So script is not Turing complete, and that is on purpose: every full node runs every script many times, so a script that could run forever would be a free denial-of-service tool. The cost of a script is known before it runs."
+    },
+    {
+     "type": "p",
+     "text": "Success rule after the run: the stack must not be empty and the top item must be true (any non-zero value). Standard nodes also require exactly one item left on the stack. An abort, an empty stack, or a false top item makes the transaction invalid and the coins unspendable."
+    }
+   ]
+  },
+  {
+   "h3": "P2PKH: pay to a public key hash",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The commonest pattern is Pay to Public Key Hash, P2PKH. Its locking script has five pieces, and the spender pushes two items in front of them."
+    },
+    {
+     "type": "formula",
+     "text": "OP_DUP OP_HASH160 <pubkey hash> OP_EQUALVERIFY OP_CHECKSIG",
+     "where": "pubkey hash is 20 bytes, equal to RIPEMD-160(SHA-256(public key)); angle brackets mean \"push this constant\"."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "scriptSig pushes sig, then pub. Stack from bottom: sig, pub.",
+      "OP_DUP copies the top item. Stack: sig, pub, pub.",
+      "OP_HASH160 replaces that copy with its 20-byte hash Hpk. Stack: sig, pub, Hpk.",
+      "The constant in the locking script is pushed. Stack: sig, pub, Hpk, h.",
+      "OP_EQUALVERIFY pops h and Hpk and aborts if they differ. Stack: sig, pub.",
+      "OP_CHECKSIG pops pub and sig, verifies the signature over this transaction, and pushes TRUE. Stack: TRUE."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The address you give a friend is this 20-byte hash with a version byte and a checksum, encoded in Base58Check — see <a href=\"#bitcoin-wallets\">Chapter 4.6</a>. Hashing keeps the address short and keeps the full public key hidden until the coin is spent."
+    }
+   ]
+  },
+  {
+   "h3": "P2SH, multisig and timelocks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Pay to Script Hash, P2SH, locks coins to a hash instead of a key. The locking script is OP_HASH160 <script hash> OP_EQUAL, where script hash is 20 bytes, equal to HASH160 of the redeem script. The spender's scriptSig pushes the full redeem script plus the data that script needs; the hash of the redeem script must equal the hash in the output, and then the redeem script itself runs. The sender never needs to know the spending condition, only its hash, and the condition stays off the chain until the coin is spent."
+    },
+    {
+     "type": "p",
+     "text": "Multisig uses OP_M <pub1> <pub2> ... <pubN> OP_N OP_CHECKMULTISIG: m of the n keys must sign. A historical bug makes OP_CHECKMULTISIG pop one element too many, so the unlocking data starts with OP_0 as a dummy. Businesses use 2-of-3 for joint accounts, escrow and payment channels."
+    },
+    {
+     "type": "p",
+     "text": "Timelocks put time into the condition. OP_CHECKLOCKTIMEVERIFY (CLTV) reads the transaction's nLockTime field and fails if it is below the pushed value, or if the input is marked final. It does not spend anything by itself; a CHECKSIG is still needed. OP_CHECKSEQUENCEVERIFY (CSV) does the same with time measured from when the output was confirmed. Together they express \"A may spend after block 800000, B may spend now\", which is the seed of a payment channel."
+    }
+   ]
+  },
+  {
+   "h3": "Witness scripts and standard scripts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SegWit moved the unlocking data out of scriptSig into a separate witness field. For P2WPKH the locking script is OP_0 <20-byte hash of the public key>, that is, a push of 0 followed by a 20-byte push. The scriptSig is empty, and the witness supplies sig and pub. The signature is no longer part of the data that the transaction id commits to, which removes transaction malleability; block weight rules are covered in <a href=\"#bitcoin-protocol-transactions-and-blocks\">Chapter 4.2</a>."
+    },
+    {
+     "type": "p",
+     "text": "A script is standard if the default relay policy accepts it: P2PKH, P2SH, P2WPKH, P2WSH, P2TR, bare multisig up to three keys, and OP_RETURN with at most 80 bytes of data. Scripts outside this list are still valid under consensus rules if a miner includes them; nodes simply do not forward them by default. Keep that gap in mind: a policy bug is not a chain split, a script-interpretation bug is."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The stack after each step of a P2PKH run, the first item pushed on the left. Notice the depth rise to four and then collapse to the single value TRUE.",
+  "spec": {
+   "type": "array",
+   "title": "P2PKH stack at each step",
+   "show_index": false,
+   "aria": "Stack contents after each step of a P2PKH script, starting with sig and pub and ending with a single TRUE.",
+   "rows": [
+    {
+     "label": "scriptSig",
+     "cells": [
+      "sig",
+      "pub"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "OP_DUP",
+     "cells": [
+      "sig",
+      "pub",
+      "pub"
+     ]
+    },
+    {
+     "label": "OP_HASH160",
+     "cells": [
+      "sig",
+      "pub",
+      "Hpk"
+     ]
+    },
+    {
+     "label": "push hash",
+     "cells": [
+      "sig",
+      "pub",
+      "Hpk",
+      "h"
+     ]
+    },
+    {
+     "label": "EQUALVERIFY",
+     "cells": [
+      "sig",
+      "pub"
+     ]
+    },
+    {
+     "label": "CHECKSIG",
+     "cells": [
+      "TRUE"
+     ],
+     "marks": {
+      "0": "live"
+     }
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A P2PKH output holds 0.25 BTC locked to the 20-byte hash h. The spender supplies sig and pub, and HASH160(pub) equals h. This output is the only input of the spending transaction, and the fee is 0.00012 BTC. Trace the stack after every opcode, state the peak stack depth, and compute the value the spender can pay to a new output.",
+   "steps": [
+    "scriptSig pushes sig, then pub. Stack (bottom to top): sig, pub. Depth 2 items.",
+    "OP_DUP copies pub. Stack: sig, pub, pub. Depth 3.",
+    "OP_HASH160 replaces the top pub with Hpk = HASH160(pub). Stack: sig, pub, Hpk. Depth 3.",
+    "The locking script pushes h. Stack: sig, pub, Hpk, h. Depth 4, the peak.",
+    "OP_EQUALVERIFY pops h and Hpk. They are equal (this is the condition of the spend), so no abort. Stack: sig, pub. Depth 2.",
+    "OP_CHECKSIG pops pub and sig, verifies sig over this transaction, and pushes TRUE. Stack: TRUE. Depth 1.",
+    "Value check: input 0.25 BTC minus fee 0.00012 BTC gives 0.24988 BTC for the new output."
+   ],
+   "answer": "The run ends with the single item TRUE, the peak stack depth is 4 items, and the spender can move 0.24988 BTC.",
+   "check": "value = 0.25\nfee = 0.00012\nchange = value - fee\ndepths = [2]\ndepths.append(3)          # OP_DUP\ndepths.append(3)          # OP_HASH160\ndepths.append(4)          # push h\ndepths.append(2)          # OP_EQUALVERIFY drops two\nfinal_items = 1           # OP_CHECKSIG leaves TRUE\ndepths.append(final_items)\nprint(round(change, 8))\nprint(max(depths))\nprint(depths[-1])",
+   "values": [
+    0.24988,
+    4,
+    1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "scriptSig and scriptPubKey are not two separate programs. They are joined, scriptSig first, and run once; a valid run leaves a true top item, and an abort makes the coins unspendable.",
+  "OP_EQUALVERIFY is OP_EQUAL plus OP_VERIFY: it deletes both operands. If the hash does not match, the script aborts and OP_CHECKSIG never runs.",
+  "The hash in a P2PKH script is HASH160 of the public key, not the address text. The address adds a version byte and a 4-byte checksum before Base58Check encoding.",
+  "Script has no loops and is not Turing complete, so answers that talk about infinite loops or running out of gas inside a Bitcoin script are wrong.",
+  "Non-standard does not mean invalid. Consensus rules decide validity; relay policy decides whether a node forwards the transaction."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does scriptPubKey contain, and what does scriptSig supply?",
+   "marks": 2,
+   "a": "scriptPubKey is the locking condition stored in an output; scriptSig is the unlocking data supplied by the input that spends it."
+  },
+  {
+   "level": "remember",
+   "q": "Which opcode copies the top stack item, and which opcode verifies an ECDSA signature?",
+   "marks": 2,
+   "a": "OP_DUP copies the top item; OP_CHECKSIG verifies the signature."
+  },
+  {
+   "level": "understand",
+   "q": "Why is Bitcoin script deliberately not Turing complete?",
+   "marks": 3,
+   "a": "Every full node validates every transaction, so a script that could loop forever would let an attacker stall the network at no cost. Fixed step counts make validation cheap and predictable."
+  },
+  {
+   "level": "understand",
+   "q": "Why does P2SH keep the spending condition off the chain until the output is spent?",
+   "marks": 3,
+   "a": "The output stores only the hash of the redeem script, so the sender needs only the hash and the full condition is revealed only in the spending input."
+  },
+  {
+   "level": "apply",
+   "q": "The stack holds [sig, pub] and the script OP_DUP OP_HASH160 <pubkey hash h> OP_EQUALVERIFY OP_CHECKSIG runs. Give the stack after each opcode and the peak depth.",
+   "marks": 4,
+   "a": "After OP_DUP: [sig, pub, pub], depth 3. After OP_HASH160: [sig, pub, Hpk], depth 3. After pushing h: [sig, pub, Hpk, h], depth 4, the peak. After OP_EQUALVERIFY: [sig, pub], depth 2. After OP_CHECKSIG: [TRUE], depth 1."
+  },
+  {
+   "level": "apply",
+   "q": "A 2-of-3 bare multisig outputs 0.5 BTC and the fee is 0.0004 BTC. How many items does the scriptSig push for a 2-of-3 bare multisig, and what value reaches the new output?",
+   "marks": 4,
+   "a": "Two signatures plus the OP_0 dummy required by the CHECKMULTISIG off-by-one, so three pushes. Value out = 0.5 minus 0.0004 = 0.4996 BTC."
+  },
+  {
+   "level": "analyze",
+   "q": "How can a non-standard script still be a valid spend, and why does that matter for a node that tightens its policy?",
+   "marks": 5,
+   "a": "Consensus rules define validity, and they accept it if a miner includes it; standardness is only the default relay policy. A node that refuses to relay it still must accept a block containing it, so a policy change never splits the chain but a script-rule change can."
+  },
+  {
+   "level": "analyze",
+   "q": "A script ends with stack [TRUE, TRUE]. Is the spend valid by consensus, and by default policy?",
+   "marks": 5,
+   "a": "By consensus it is valid: the stack is non-empty and the top item is true. By default policy it is not standard, because the cleanstack rule requires exactly one item at the end."
+  }
+ ],
+ "beyond": "Not for the exam. Miniscript and output descriptors let wallets describe a spending policy in a readable form and compile it into correct script, instead of hand-writing opcodes. Taproot moved the common single-key case to Schnorr signatures and hid the script path entirely unless it is used. Search for \"Miniscript\", \"Taproot script path\" and \"OP_CHECKSIGADD\" to go further. Wallets now store descriptors rather than raw scripts."
+}

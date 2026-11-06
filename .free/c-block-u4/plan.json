@@ -1,0 +1,587 @@
+{
+ "lead": "This unit explains how Bitcoin works as money: keys, transactions, scripts, mining, the network, wallets and the limits. After it you can trace a payment from wallet to confirmation, read a Bitcoin script, and judge claims about privacy, altcoins and scalability.",
+ "about": "The unit starts with what a cryptocurrency is and where it came from (4.1). It then follows one payment: how a transaction is built from unspent outputs and packed into a block (4.2), how scripts lock and unlock value (4.3), and how miners are paid (4.4). Chapter 4.5 shows how the payment travels over the peer-to-peer network and why confirmations stop double spending. Chapter 4.6 turns to wallets and key management. The last three chapters compare Namecoin and Zcash (4.7), examine pseudonymity and chain analysis (4.8), and close with Bitcoin's technical, economic and legal limits (4.9). Each chapter uses the same payment thread so the pieces fit together.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Cryptocurrency is digital money whose ownership is recorded on a shared ledger and proved by cryptographic keys, so no bank needs to approve each payment.",
+   "depth": "Define cryptocurrency, coin, token and distributed ledger. Explain the double-spending problem and why earlier digital cash needed a trusted issuer. History in safe steps: 1980s blind-signature e-cash ideas, 1990s hashcash and b-money proposals, the 2008 Bitcoin whitepaper, the January 2009 genesis block, the 2010 pizza purchase, and later scaling upgrades. Some syllabi call this 'Introduction to Cryptocurrency' and include distributed ledger here; keep the ledger idea brief because Unit 1 teaches it in detail.",
+   "figure": {
+    "type": "gantt",
+    "unit": "year",
+    "aria": "A timeline from 1980 to 2022 with bars for pre-Bitcoin digital cash ideas, the Bitcoin launch, adoption growth, and later scaling upgrades.",
+    "lanes": [
+     {
+      "label": "Ideas",
+      "bars": [
+       {
+        "label": "1980s",
+        "start": 1980,
+        "end": 2008,
+        "style": "muted"
+       }
+      ]
+     },
+     {
+      "label": "Bitcoin",
+      "bars": [
+       {
+        "label": "launch",
+        "start": 2008,
+        "end": 2012,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "Growth",
+      "bars": [
+       {
+        "label": "growth",
+        "start": 2012,
+        "end": 2017,
+        "style": "normal"
+       }
+      ]
+     },
+     {
+      "label": "Scaling",
+      "bars": [
+       {
+        "label": "scaling",
+        "start": 2017,
+        "end": 2022,
+        "style": "next"
+       }
+      ]
+     }
+    ]
+   },
+   "example": "A wallet shows 0.05 BTC. One bitcoin trades at ₹40,00,000. What is the wallet worth in rupees, and what does the wallet actually store? Value = 0.05 × 40,00,000 = ₹2,00,000. The wallet stores keys and addresses, not coins; the coins are entries on the blockchain.",
+   "trap": "Saying 'the wallet holds bitcoins' or treating Bitcoin as the same thing as blockchain. A wallet holds keys; the ledger holds unspent outputs.",
+   "prereq": "Unit 1 for ledger and decentralization; Unit 2 for hash and key intuition.",
+   "leave": "Detailed hash functions and ECDSA to Unit 2; consensus proofs to Chapter 4.4 and Unit 3."
+  },
+  {
+   "k": 2,
+   "idea": "A Bitcoin transaction moves value by spending earlier outputs and creating new ones, and a block batches such transactions under one hash-linked header.",
+   "depth": "Cover the UTXO model: inputs, outputs, change, transaction ID and fees. Show the block header fields: version, previous block hash, Merkle root, timestamp, bits (difficulty target) and nonce. Explain the coinbase transaction, the mempool, and why a block is a batch. Introduce pre-SegWit transaction layout (scriptSig inside the input) and SegWit layout (witness data moved outside the base transaction), plus transaction malleability at a high level. Some syllabi call this 'Bitcoin protocol' or 'construction and working of Bitcoin'.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "A block and its chain link",
+    "aria": "A block diagram where the previous block's hash enters the 80-byte header, the header commits to a Merkle root, the Merkle root hashes the transaction list, and the next block stores this block's hash.",
+    "nodes": [
+     {
+      "id": "prev",
+      "label": "Previous block",
+      "note": "hash stored",
+      "style": "muted"
+     },
+     {
+      "id": "header",
+      "label": "Block header",
+      "note": "80 bytes",
+      "style": "accent"
+     },
+     {
+      "id": "merkle",
+      "label": "Merkle root",
+      "note": "commits to all tx",
+      "style": "normal"
+     },
+     {
+      "id": "txs",
+      "label": "Transactions",
+      "note": "coinbase first",
+      "style": "live"
+     },
+     {
+      "id": "next",
+      "label": "Next block",
+      "note": "links to this",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "prev",
+      "to": "header",
+      "label": "prev hash",
+      "style": "solid"
+     },
+     {
+      "from": "header",
+      "to": "merkle",
+      "label": "field",
+      "style": "solid"
+     },
+     {
+      "from": "merkle",
+      "to": "txs",
+      "label": "hashes",
+      "style": "solid"
+     },
+     {
+      "from": "header",
+      "to": "next",
+      "label": "hash pointer",
+      "style": "dashed"
+     }
+    ]
+   },
+   "example": "Alice owns one UTXO of 1.0 BTC. She pays Bob 0.3 BTC and sets a fee of 0.0001 BTC. Write the inputs and outputs. Input: 1.0 BTC. Output to Bob: 0.3 BTC. Change output to Alice: 1.0 − 0.3 − 0.0001 = 0.6999 BTC. The transaction has one input and two outputs; the fee is the difference, not a field.",
+   "trap": "Treating the fee as a separate output. The fee is input value minus output value. Forget the change output and the whole leftover becomes a fee.",
+   "prereq": "Unit 1 for block structure; Unit 2 for hash pointers and Merkle trees.",
+   "leave": "Script opcodes to Chapter 4.3; mining economics to Chapter 4.4; network propagation to Chapter 4.5."
+  },
+  {
+   "k": 3,
+   "idea": "Every Bitcoin output is locked by a small stack-based script, and a valid spend is a script run that leaves exactly TRUE.",
+   "depth": "Explain that Bitcoin script is stack-based, has no loops and is not Turing complete. Define opcodes and show the P2PKH pattern: OP_DUP OP_HASH160 <pubkey hash> OP_EQUALVERIFY OP_CHECKSIG. Cover P2SH, multisig, timelocks such as OP_CHECKLOCKTIMEVERIFY, and the witness script used in SegWit spends. Distinguish scriptSig (unlocking data) from scriptPubKey (locking condition); they run as one script. Mention standard versus non-standard scripts.",
+   "figure": {
+    "type": "array",
+    "title": "P2PKH stack at each step",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "scriptSig",
+      "cells": [
+       "sig",
+       "pub"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "OP_DUP",
+      "cells": [
+       "sig",
+       "pub",
+       "pub"
+      ]
+     },
+     {
+      "label": "OP_HASH160",
+      "cells": [
+       "sig",
+       "pub",
+       "Hpk"
+      ]
+     },
+     {
+      "label": "push hash",
+      "cells": [
+       "sig",
+       "pub",
+       "Hpk",
+       "h"
+      ]
+     },
+     {
+      "label": "EQUALVERIFY",
+      "cells": [
+       "sig",
+       "pub"
+      ]
+     },
+     {
+      "label": "CHECKSIG",
+      "cells": [
+       "TRUE"
+      ],
+      "marks": {
+       "0": "live"
+      }
+     }
+    ]
+   },
+   "example": "A P2PKH output locks 0.25 BTC to hash h. The spender supplies sig and pub whose HASH160 equals h. Trace the stack through OP_DUP, OP_HASH160, push h, OP_EQUALVERIFY and OP_CHECKSIG. What can the spender move? After EQUALVERIFY the stack holds sig and pub; CHECKSIG leaves TRUE. The spender can move 0.25 BTC minus the fee.",
+   "trap": "Thinking scriptSig runs first and scriptPubKey runs second as separate stages. They are one script. A non-zero value other than TRUE is not a valid spend.",
+   "prereq": "Chapter 4.2 for inputs and outputs; Unit 2 for hash and signature checks.",
+   "leave": "SegWit block-weight rules to Chapter 4.2; smart-contract scripting to Unit 5."
+  },
+  {
+   "k": 4,
+   "idea": "Miners earn a block subsidy plus fees, and their strategy is to choose transactions and hash power to maximise expected revenue after costs.",
+   "depth": "Only a few universities teach this. Cover the block subsidy schedule: 50 BTC at genesis, halving every 210,000 blocks, and the 21,000,000 BTC cap. Add transaction fees, coinbase maturity (100 blocks), orphan and stale block risk, and transaction selection by fee per byte. Explain mining pools and share accounting: pay-per-share and proportional. Introduce selfish mining as a strategy that withholds blocks. Keep the arithmetic to expected revenue = (subsidy + fees) × probability of finding the block, minus electricity and hardware cost.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "block height",
+     "min": 0,
+     "max": 840000
+    },
+    "y": {
+     "label": "subsidy (BTC)",
+     "min": 0,
+     "max": 55
+    },
+    "series": [
+     {
+      "name": "subsidy",
+      "expr": "50 / 2**floor(x/210000)",
+      "style": "accent"
+     }
+    ],
+    "aria": "A step plot of the Bitcoin block subsidy against block height, falling from 50 BTC to 3.125 BTC at height 840,000 after four halvings."
+   },
+   "example": "A miner finds a block at height 840,000. The subsidy is 50 ÷ 2⁴ = 3.125 BTC. Fees in the block total 0.4 BTC. What is the block reward in BTC and in rupees if 1 BTC = ₹60,00,000? Reward = 3.125 + 0.4 = 3.525 BTC. Rupee value = 3.525 × 60,00,000 = ₹2,11,50,000.",
+   "trap": "Halving at a date rather than every 210,000 blocks. The coinbase reward also cannot be spent for 100 blocks; it is not spendable as soon as the block is found.",
+   "prereq": "Chapter 4.2 for blocks and coinbase; Unit 3 for Proof of Work basics.",
+   "leave": "Consensus theory to Unit 3; pool politics and regulation to Chapter 4.9."
+  },
+  {
+   "k": 5,
+   "idea": "A Bitcoin payment spreads through a peer-to-peer network, and waiting for confirmations makes double spending impractical.",
+   "depth": "Cover full nodes, miners and SPV clients; transaction gossip, mempool and block propagation. Explain confirmation depth, the 10-minute target block interval, and orphans. Treat double-spending attacks: race attack, Finney attack and the 51% attacker. Show why zero-confirmation payments are risky and why merchants set a confirmation count by value. Some syllabi call this 'Bitcoin networks and payments'.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Customer",
+     "Wallet",
+     "Network",
+     "Miner",
+     "Merchant"
+    ],
+    "messages": [
+     {
+      "from": "Customer",
+      "to": "Wallet",
+      "label": "pay 0.5 BTC",
+      "dashed": false
+     },
+     {
+      "from": "Wallet",
+      "to": "Network",
+      "label": "send signed tx",
+      "dashed": false
+     },
+     {
+      "from": "Network",
+      "to": "Miner",
+      "label": "tx in mempool",
+      "dashed": false
+     },
+     {
+      "from": "Miner",
+      "to": "Network",
+      "label": "block found",
+      "dashed": false
+     },
+     {
+      "from": "Network",
+      "to": "Merchant",
+      "label": "1 conf (10 min)",
+      "dashed": false
+     },
+     {
+      "from": "Network",
+      "to": "Merchant",
+      "label": "6 conf (60 min)",
+      "dashed": false
+     },
+     {
+      "from": "Merchant",
+      "to": "Customer",
+      "label": "goods released",
+      "dashed": true
+     }
+    ],
+    "aria": "A sequence diagram from customer wallet to network miner and merchant, showing a signed transaction, one confirmation after about ten minutes, six confirmations after about sixty minutes, and goods released."
+   },
+   "example": "A merchant sells a phone for 0.01 BTC. At ₹50,00,000 per BTC, the rupee price is 0.01 × 50,00,000 = ₹50,000. The customer pays 0.0102 BTC with a 0.0002 BTC fee. The merchant ships after 1 confirmation (about 10 minutes). Explain the double-spend risk and why 6 confirmations (about 60 minutes) reduce it. One confirmation can be reversed by a lucky attacker; six blocks make a reorg much harder.",
+   "trap": "Believing a 51% attacker can steal coins from a wallet. It can reverse or censor transactions and double spend its own coins, but it cannot forge the owner's signature.",
+   "prereq": "Chapter 4.2 for transactions and blocks; Chapter 4.4 for miner incentives.",
+   "leave": "Peer-to-peer discovery to Unit 3; Lightning payment channels to Chapter 4.9."
+  },
+  {
+   "k": 6,
+   "idea": "A wallet stores keys, builds transactions and signs them; the coins stay on the blockchain as unspent outputs.",
+   "depth": "Cover hot and cold wallets, custodial and non-custodial wallets, and hardware wallets. Explain deterministic and hierarchical deterministic wallets: seed phrase, master key, derivation paths, account chains, external and change chains. Cover address types (P2PKH, P2SH, bech32), UTXO selection and coin control, backups and seed-phrase risk. Define a change address and why wallets create fresh addresses.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Seed phrase",
+     "note": "BIP39 words",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Master key",
+       "note": "BIP32 root",
+       "children": [
+        {
+         "label": "Account 0",
+         "children": [
+          {
+           "label": "External chain",
+           "children": [
+            {
+             "label": "Address 0"
+            },
+            {
+             "label": "Address 1"
+            }
+           ]
+          },
+          {
+           "label": "Change chain",
+           "children": [
+            {
+             "label": "Change 0"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A hierarchy from a seed phrase to a master key, then account 0, then external and change chains, then individual addresses."
+   },
+   "example": "A wallet holds UTXOs of 0.4, 0.3 and 0.2 BTC. It must pay 0.6 BTC with a fee of 0.0005 BTC. Which UTXOs should it pick and what is the change? Pick 0.4 + 0.3 = 0.7 BTC. Change = 0.7 − 0.6 − 0.0005 = 0.0995 BTC. The pair 0.4 + 0.2 = 0.6 leaves 0.6 − 0.6 − 0.0005, which is negative, so it fails.",
+   "trap": "Thinking the wallet file contains coins. Losing a phone is not losing money if the seed phrase is backed up; leaking the seed phrase loses everything.",
+   "prereq": "Unit 2 for keys and addresses; Chapter 4.2 for UTXOs and change outputs.",
+   "leave": "Signature mathematics to Unit 2; exchange custody regulation to Chapter 4.9."
+  },
+  {
+   "k": 7,
+   "idea": "Altcoins keep Bitcoin's core design but change one feature: Namecoin adds a naming registry and Zcash adds shielded payments.",
+   "depth": "Cover Namecoin: a merged-mined chain with Bitcoin, a .bit namespace and decentralised DNS. Cover Zcash: transparent and shielded addresses, zk-SNARKs, and the privacy trade-off. Mention Primecoin in one line: it uses prime-number chains for Proof of Work, and only some syllabi list it. Some syllabi call this 'Alternative Coins' and place Namecoin, Primecoin and Zcash together.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Bitcoin base",
+     "note": "UTXO chain",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Namecoin",
+       "note": ".bit names",
+       "children": [
+        {
+         "label": "Merged mining"
+        }
+       ]
+      },
+      {
+       "label": "Zcash",
+       "note": "shielded pool",
+       "children": [
+        {
+         "label": "zk-SNARK"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A tree with Bitcoin as the base, branching to Namecoin for naming and merged mining, and Zcash for shielded transactions using zk-SNARKs."
+   },
+   "example": "A transparent Zcash transaction moves 1.5 ZEC and the public ledger shows sender, receiver and amount. A shielded transaction of 1.5 ZEC hides those. At ₹4,000 per ZEC, what rupee value moves in each, and what does the public see? Both move 1.5 × 4,000 = ₹6,000. The transparent transaction reveals the parties and amount; the shielded one reveals only that the shielded pool changed.",
+   "trap": "Calling Zcash fully anonymous by default. Transparent addresses behave like Bitcoin; privacy requires shielded addresses. Namecoin is not just a copy of Bitcoin with names; it uses merged mining.",
+   "prereq": "Chapter 4.1 for altcoin history; Unit 2 for hash and commitment intuition.",
+   "leave": "zk-SNARK mathematics to advanced cryptography courses; smart-contract coins to Unit 5."
+  },
+  {
+   "k": 8,
+   "idea": "Bitcoin is pseudonymous, not anonymous: public transaction links plus off-chain data can reveal who owns which address.",
+   "depth": "Define pseudonymity, address reuse and the common-input-ownership heuristic. Cover chain analysis, clustering and taint. Explain mixers, CoinJoin, confidential transactions and privacy coins such as Monero ring signatures and Zcash shielded pools. Include KYC exchanges as the link between a name and an address, and mention black-market and legal aspects without sensational detail.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "aria": "A transaction graph where a KYC exchange funds address A1, A1 and A2 co-spend into D, and D pays out to E; the co-spend links A1 and A2 to one owner.",
+    "nodes": [
+     {
+      "id": "Exch",
+      "label": "Exchange",
+      "x": 0,
+      "y": 2,
+      "note": "KYC name",
+      "style": "accent"
+     },
+     {
+      "id": "A1",
+      "label": "A1",
+      "x": 1,
+      "y": 2,
+      "note": "0.8 in",
+      "style": "normal"
+     },
+     {
+      "id": "A2",
+      "label": "A2",
+      "x": 1,
+      "y": 1,
+      "note": "0.3 in",
+      "style": "normal"
+     },
+     {
+      "id": "D",
+      "label": "D",
+      "x": 2,
+      "y": 2,
+      "note": "co-spend",
+      "style": "live"
+     },
+     {
+      "id": "E",
+      "label": "E",
+      "x": 3,
+      "y": 2,
+      "note": "cash out",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "Exch",
+      "to": "A1",
+      "label": "0.8",
+      "style": "solid"
+     },
+     {
+      "from": "A1",
+      "to": "D",
+      "label": "0.8",
+      "style": "solid"
+     },
+     {
+      "from": "A2",
+      "to": "D",
+      "label": "0.3",
+      "style": "solid"
+     },
+     {
+      "from": "D",
+      "to": "E",
+      "label": "1.09",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "Address A1 receives 0.8 BTC from a KYC exchange. A2 holds 0.3 BTC. A transaction spends both to D and pays 1.09 BTC, with a 0.01 BTC fee. What does the common-input heuristic infer, and what does the exchange know? Inputs total 0.8 + 0.3 = 1.1 BTC; outputs total 1.09 + 0.01 = 1.1 BTC. The heuristic says A1 and A2 share one owner. The exchange knows the name behind A1, so it can link that name to A2.",
+   "trap": "Saying Bitcoin is anonymous. Every payment is public and permanent. A mixer does not make coins clean; it adds a hop that chain analysis may still cross.",
+   "prereq": "Chapter 4.2 for UTXOs; Chapter 4.5 for transaction propagation.",
+   "leave": "Exchange regulation and tax law to Chapter 4.9; zero-knowledge proofs to advanced courses."
+  },
+  {
+   "k": 9,
+   "idea": "Bitcoin trades throughput and flexibility for security and decentralisation, so its limits are technical, economic and legal at the same time.",
+   "depth": "Cover the scalability trilemma: throughput, security and decentralisation cannot all be maximised at once. Add the 10-minute block interval, the base block size of 1 MB before SegWit and block weight after SegWit, fee spikes, energy use and mining-pool centralisation. Include volatility, limited scripting, quantum risk as a future concern, regulation, forks and the Lightning network as a partial scaling answer. Some syllabi call this 'Theoretical Limitations' and 'Bitcoin limitations'.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "The throughput trade-off",
+    "aria": "A block diagram showing that raising transactions per second needs bigger blocks, which costs more disk and bandwidth, raises the cost of running a full node, and can push control toward fewer operators.",
+    "nodes": [
+     {
+      "id": "tps",
+      "label": "More TPS",
+      "note": "goal",
+      "style": "accent"
+     },
+     {
+      "id": "size",
+      "label": "Bigger blocks",
+      "note": "or more weight",
+      "style": "normal"
+     },
+     {
+      "id": "cost",
+      "label": "More resources",
+      "note": "disk, bandwidth",
+      "style": "normal"
+     },
+     {
+      "id": "nodes",
+      "label": "Fewer nodes",
+      "note": "higher cost",
+      "style": "live"
+     },
+     {
+      "id": "central",
+      "label": "More central",
+      "note": "risk",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "tps",
+      "to": "size",
+      "label": "needs",
+      "style": "solid"
+     },
+     {
+      "from": "size",
+      "to": "cost",
+      "label": "costs",
+      "style": "solid"
+     },
+     {
+      "from": "cost",
+      "to": "nodes",
+      "label": "raises",
+      "style": "solid"
+     },
+     {
+      "from": "nodes",
+      "to": "central",
+      "label": "leads",
+      "style": "solid"
+     }
+    ]
+   },
+   "example": "A Bitcoin block is 1 MB and each simple transaction is about 250 bytes. Blocks arrive every 10 minutes. How many transactions fit in a block, what is the throughput in transactions per second, and how long for 100,000 transactions? Transactions per block = 1,000,000 ÷ 250 = 4,000. Throughput = 4,000 ÷ 600 s ≈ 6.7 tps. Time for 100,000 = 100,000 ÷ 4,000 = 25 blocks, and 25 × 10 min = 250 min ≈ 4 h 10 min.",
+   "trap": "Saying Bitcoin cannot scale at all. Lightning and SegWit exist. Also do not mix block size in bytes with block weight in weight units; SegWit changed the counting rule.",
+   "prereq": "Chapters 4.2, 4.4 and 4.5 for blocks, mining and confirmations.",
+   "leave": "Ethereum and smart-contract scaling to Unit 5; enterprise alternatives to Unit 6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "keys and ledger lead to transactions"
+  ],
+  [
+   2,
+   3,
+   "outputs are locked by scripts"
+  ],
+  [
+   3,
+   4,
+   "miners run scripts and collect fees"
+  ],
+  [
+   4,
+   5,
+   "mining secures confirmations"
+  ],
+  [
+   5,
+   6,
+   "wallets sign what the network carries"
+  ],
+  [
+   6,
+   7,
+   "wallet key models differ in altcoins"
+  ],
+  [
+   7,
+   8,
+   "privacy coins sharpen the anonymity debate"
+  ],
+  [
+   8,
+   9,
+   "privacy limits sit inside Bitcoin limits"
+  ]
+ ]
+}
