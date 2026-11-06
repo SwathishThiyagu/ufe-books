@@ -1,0 +1,411 @@
+{
+ "lead": "This unit explains the cryptography that makes a blockchain tamper-evident and gives users control of their assets. After it, you can trace a private key through a public key to an address, verify a hash pointer and a Merkle proof, and follow an ECDSA signature from signing to verification.",
+ "about": "This unit builds the cryptographic layer under a blockchain. Chapter 2.1 sets out the primitives and the security goals. Chapter 2.2 explains SHA-256, the hash used almost everywhere in Bitcoin. Chapter 2.3 links blocks with hash pointers, and Chapter 2.4 packs many transactions into one Merkle root. Chapter 2.5 moves to public-key and elliptic curve cryptography, Chapter 2.6 turns keys into ECDSA signatures, and Chapter 2.7 derives addresses and identities from keys. The order follows one chain: primitives → hashes → linked blocks → Merkle trees → keys → signatures → addresses. Mining, transactions, wallets and smart contracts are left to later units.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Cryptography gives four separate tools — hashing, symmetric encryption, message authentication and public-key operations — and each answers a different security question.",
+   "depth": "Define plaintext, ciphertext, key, adversary and the four goals: confidentiality, integrity, authentication and non-repudiation. Cover symmetric encryption (one shared key), cryptographic hash (no key, fixed-size digest), message authentication code (keyed integrity check) and public-key encryption or digital signature (private and public key). Some syllabi call these crypto building blocks or cryptographic primitives. Explain key length and brute-force cost; mention randomness and encodings such as hex, Base64 and Base58. Do not prove security; keep the treatment at the level of what each tool does and what it cannot do.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Four primitives, four jobs",
+    "nodes": [
+     {
+      "id": "m",
+      "label": "Message",
+      "style": "normal"
+     },
+     {
+      "id": "h",
+      "label": "Hash",
+      "note": "fixed-size digest",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Cipher",
+      "note": "key + plaintext",
+      "style": "normal"
+     },
+     {
+      "id": "s",
+      "label": "Signature",
+      "note": "private key",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "m",
+      "to": "h",
+      "label": "integrity"
+     },
+     {
+      "from": "m",
+      "to": "c",
+      "label": "confidentiality"
+     },
+     {
+      "from": "m",
+      "to": "s",
+      "label": "authenticity"
+     }
+    ],
+    "aria": "A message branches to three primitives: hash for integrity, cipher for confidentiality, signature for authenticity.",
+    "caption": "Each primitive answers a different security question about the same message."
+   },
+   "example": "A system uses a 128-bit key. An attacker tries 10¹² keys per second. The expected brute-force search is half the keyspace. How long is that in years? Answer: half of 2¹²⁸ is 2¹²⁷ ≈ 1.70 × 10³⁸ keys. Divide by 10¹² keys/s gives 1.70 × 10²⁶ s. Divide by 3.15 × 10⁷ s/year gives about 5.4 × 10¹⁸ years.",
+   "trap": "Saying a hash encrypts data, or that a hash can be reversed with a key. A hash is unkeyed and one-way.",
+   "prereq": "Unit 1: block structure and distributed ledger.",
+   "leave": "Symmetric cipher modes and key-exchange detail; proof of work to Unit 3; Bitcoin scripts to Unit 4."
+  },
+  {
+   "k": 2,
+   "idea": "A cryptographic hash compresses any input into a fixed 256-bit fingerprint that is one-way and collision-resistant.",
+   "depth": "Cover preimage resistance, second-preimage resistance and collision resistance; avalanche effect; the birthday bound near 2¹²⁸ for a 256-bit hash. Explain SHA-256 padding: append one 1 bit, then zeros, then a 64-bit length, so the total is a multiple of 512 bits. Describe the 512-bit block, 32-bit words, 64 rounds and the compression function; only a few universities teach the full round schedule. State the output: 256 bits, written as 64 hexadecimal characters. Mention Merkle–Damgård construction and SHA-3/Keccak only by name. Some syllabi call this hashing in blockchain.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "SHA-256 in one pass",
+    "nodes": [
+     {
+      "id": "msg",
+      "label": "Message",
+      "note": "any length"
+     },
+     {
+      "id": "pad",
+      "label": "Pad",
+      "note": "1, zeros, 64-bit length",
+      "style": "accent"
+     },
+     {
+      "id": "blk",
+      "label": "512-bit block"
+     },
+     {
+      "id": "cmp",
+      "label": "Compression",
+      "note": "64 rounds",
+      "style": "live"
+     },
+     {
+      "id": "out",
+      "label": "256-bit digest",
+      "note": "64 hex characters"
+     }
+    ],
+    "edges": [
+     {
+      "from": "msg",
+      "to": "pad"
+     },
+     {
+      "from": "pad",
+      "to": "blk"
+     },
+     {
+      "from": "blk",
+      "to": "cmp"
+     },
+     {
+      "from": "cmp",
+      "to": "out"
+     }
+    ],
+    "aria": "A message is padded, split into 512-bit blocks, compressed through 64 rounds, and output as a 256-bit digest.",
+    "caption": "Padding makes the input a whole number of 512-bit blocks; the chaining value carries forward."
+   },
+   "example": "A message is 448 bits long. SHA-256 appends one 1 bit, then k zero bits, then a 64-bit length. Find k and the total padded length. Answer: after the 1 bit the length is 449 bits. We need 449 + k ≡ 448 (mod 512), so k = 511 zero bits. Total length = 448 + 1 + 511 + 64 = 1024 bits, which is two 512-bit blocks.",
+   "trap": "Forgetting the single 1 bit, or padding to 448 bits total instead of 448 bits modulo 512 before adding the length field.",
+   "prereq": "Chapter 2.1.",
+   "leave": "Merkle trees to 2.4; proof of work and difficulty to Unit 3; SHA-3 internals."
+  },
+  {
+   "k": 3,
+   "idea": "A hash pointer stores both the address of the previous block and the hash of its contents, so any edit breaks the chain from that point onward.",
+   "depth": "Define a hash pointer as pointer + hash of the pointed data. Cover the block header fields: version, previous block hash, Merkle root, timestamp, difficulty bits and nonce. Explain the genesis block and why it has no previous hash. Show that changing block i changes its hash, so block i+1's prev field fails, and every later block fails too unless the attacker redoes all later hashes. Some syllabi call this a linking box or linking box using SHA; others call it a digital structure. Keep the chain-of-headers view; leave full mining and consensus to Unit 3.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Hash pointers make a chain",
+    "nodes": [
+     {
+      "id": "g",
+      "label": "Genesis",
+      "note": "prev = 0",
+      "style": "muted"
+     },
+     {
+      "id": "b1",
+      "label": "Block 1",
+      "note": "prev = H(Genesis)",
+      "style": "accent"
+     },
+     {
+      "id": "b2",
+      "label": "Block 2",
+      "note": "prev = H(Block 1)",
+      "style": "normal"
+     },
+     {
+      "id": "b3",
+      "label": "Block 3",
+      "note": "prev = H(Block 2)",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "g",
+      "to": "b1",
+      "label": "hash"
+     },
+     {
+      "from": "b1",
+      "to": "b2",
+      "label": "hash"
+     },
+     {
+      "from": "b2",
+      "to": "b3",
+      "label": "hash"
+     }
+    ],
+    "aria": "Four blocks in a row, each storing the hash of the previous block as its prev field.",
+    "caption": "A change in any block changes its hash, so every later prev field stops matching."
+   },
+   "example": "Three blocks have hashes 0001, 0002 and 0003. Block 1 stores prev = 0000; block 2 stores prev = 0001; block 3 stores prev = 0002. An attacker changes block 2 so its hash becomes 0009, and recomputes nothing else. Which stored prev values now fail? Answer: block 3's prev = 0002 no longer equals H(block 2) = 0009. Block 2's prev = 0001 still matches block 1. If the attacker also updates block 3's prev to 0009, block 3's hash changes and any block after it breaks.",
+   "trap": "Thinking only the next link breaks. In practice the attacker must recompute every later block hash to restore the chain.",
+   "prereq": "Chapters 2.1–2.2; Unit 1 block header.",
+   "leave": "Merkle root construction to 2.4; mining and consensus to Unit 3."
+  },
+  {
+   "k": 4,
+   "idea": "A Merkle tree hashes transactions pairwise up to one root, so a block header can commit to thousands of transactions with 32 bytes.",
+   "depth": "Define leaf, internal node and Merkle root. Build a tree from transaction hashes h1 … hn by concatenating pairs and hashing: H(h1 || h2), then H of the two child hashes, up to the root. For an odd node at any level, duplicate the last hash, as Bitcoin does. Explain a Merkle path or proof of inclusion: about log₂ n hashes prove one transaction is in the block. Mention that Ethereum uses a Merkle Patricia trie, but only by name. Some syllabi list this as digital structures in blockchain. Keep the root's role in the block header short; that was 2.3.",
+   "figure": {
+    "type": "tree",
+    "shape": "circle",
+    "root": {
+     "label": "R",
+     "style": "accent",
+     "note": "Merkle root",
+     "children": [
+      {
+       "label": "h12",
+       "note": "H(h1||h2)",
+       "children": [
+        {
+         "label": "h1",
+         "note": "H(T1)"
+        },
+        {
+         "label": "h2",
+         "note": "H(T2)"
+        }
+       ]
+      },
+      {
+       "label": "h34",
+       "note": "H(h3||h4)",
+       "children": [
+        {
+         "label": "h3",
+         "note": "H(T3)"
+        },
+        {
+         "label": "h4",
+         "note": "H(T4)"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A binary tree with four transaction hashes at the leaves, paired into two hashes, then one root.",
+    "caption": "Four transactions need only log₂ 4 = 2 hash steps to reach the root."
+   },
+   "example": "Four transactions T1, T2, T3 and T4 have hashes h1, h2, h3 and h4. The tree pairs h1 with h2 and h3 with h4, then hashes the two results. Write the root. If T3 changes to T3′, which stored hashes must be recomputed? Answer: root = H( H(h1 || h2) || H(h3 || h4) ). Recompute h3′ = H(T3′), then h34′ = H(h3′ || h4), then root′ = H(h12 || h34′). The hash h12 does not change.",
+   "trap": "Reversing the concatenation order, or forgetting that the last node is duplicated at an odd level.",
+   "prereq": "Chapter 2.2.",
+   "leave": "SPV and Bitcoin payment verification to Unit 4; Ethereum Patricia trie to Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "Public-key cryptography uses a key pair where the public key is derived from the private key but the reverse is infeasible; elliptic curves make this practical with short keys.",
+   "depth": "Explain the key pair and the one-way relation. Compare RSA (large integer factorisation) with ECC (discrete logarithm on an elliptic curve). For ECC, define the curve y² = x³ + ax + b over a prime field Fp, point addition, point doubling and scalar multiplication k·G. State that secp256k1 uses a = 0, b = 7, a 256-bit prime p and a base point G. Give the standard size comparison: a 256-bit ECC key is roughly as strong as a 3072-bit RSA key. Only a few universities teach the full point-addition algebra; the exam usually asks the trapdoor idea and the curve equation. Mention ECDH key agreement by name only.",
+   "figure": {
+    "type": "plot",
+    "title": "y² = x³ + 2x + 2 over the reals",
+    "x": {
+     "label": "x",
+     "min": 0,
+     "max": 10
+    },
+    "y": {
+     "label": "y",
+     "min": -35,
+     "max": 35
+    },
+    "series": [
+     {
+      "name": "upper branch",
+      "expr": "sqrt(x**3 + 2*x + 2)",
+      "style": "accent"
+     },
+     {
+      "name": "lower branch",
+      "expr": "-sqrt(x**3 + 2*x + 2)",
+      "style": "live"
+     }
+    ],
+    "aria": "A plot of the elliptic curve y squared equals x cubed plus 2x plus 2, showing symmetric upper and lower branches.",
+    "caption": "Real curves are smooth; the crypto curve uses the same equation modulo a prime, so points are scattered integers."
+   },
+   "example": "On the curve y² = x³ + 2x + 2 over F₁₇, take P = (5, 1). Compute 2P using m = (3x² + a) / (2y), x₃ = m² − 2x and y₃ = m(x − x₃) − y. Answer: a = 2. m = (3·25 + 2) / (2·1) = 77/2 mod 17. 77 ≡ 9 and 2⁻¹ ≡ 9, so m ≡ 9 × 9 = 81 ≡ 13. x₃ = 13² − 10 = 169 − 10 = 159 ≡ 6. y₃ = 13(5 − 6) − 1 = −14 ≡ 3. So 2P = (6, 3). Check: 3² = 9 and 6³ + 2·6 + 2 = 230 ≡ 9 mod 17.",
+   "trap": "Treating division as ordinary integer division instead of multiplication by a modular inverse; or drawing the real curve and forgetting the modulo-p field.",
+   "prereq": "Chapter 2.1.",
+   "leave": "ECDSA to 2.6; address encoding to 2.7; key storage and wallets to Unit 4."
+  },
+  {
+   "k": 6,
+   "idea": "A digital signature proves that the holder of a private key approved a message, and ECDSA is the specific signature scheme Bitcoin uses.",
+   "depth": "Define signing and verification. For ECDSA over a curve of order n with base point G: choose a fresh random nonce k, compute R = kG, r = R.x mod n, and s = k⁻¹(z + r·d) mod n, where d is the private key and z is the leftmost n bits of the message hash. Verification uses the public key Q = dG and checks that x(u₁G + u₂Q) ≡ r, with u₁ = z·s⁻¹ and u₂ = r·s⁻¹. Cover signature malleability: (r, s) and (r, n − s) both verify, so Bitcoin uses low-s. Mention DER encoding by name. Explain that reusing k reveals d. Mention Schnorr signatures only as a newer alternative.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Signer",
+     "Verifier"
+    ],
+    "messages": [
+     {
+      "from": "Signer",
+      "to": "Signer",
+      "label": "choose k, R = kG"
+     },
+     {
+      "from": "Signer",
+      "to": "Signer",
+      "label": "r = R.x mod n"
+     },
+     {
+      "from": "Signer",
+      "to": "Verifier",
+      "label": "m, (r, s)"
+     },
+     {
+      "from": "Verifier",
+      "to": "Verifier",
+      "label": "check u₁G + u₂Q"
+     }
+    ],
+    "aria": "A signer computes a nonce point and the pair r, s, sends them with the message, and the verifier checks a curve equation.",
+    "caption": "The nonce k must stay secret and fresh; reuse leaks the private key d."
+   },
+   "example": "In ECDSA over a curve of order n = 11, a signer uses private key d = 3, nonce k = 7, and message hash z = 5. The x-coordinate of R = kG gives r = 4. Compute s = k⁻¹(z + r·d) mod n. Answer: 7⁻¹ ≡ 8 mod 11 because 7 × 8 = 56 ≡ 1. z + r·d = 5 + 4×3 = 17 ≡ 6 mod 11. s ≡ 8 × 6 = 48 ≡ 4 mod 11. The signature is (r, s) = (4, 4).",
+   "trap": "Reusing a nonce k across two signatures; that lets anyone solve for the private key. Also do not confuse r with the message hash z.",
+   "prereq": "Chapters 2.2 and 2.5.",
+   "leave": "Transaction signature formats and SegWit to Unit 4; Schnorr and Taproot detail to Unit 4."
+  },
+  {
+   "k": 7,
+   "idea": "A blockchain identity is a key pair; the address is a short, encoded hash of the public key, not the key itself.",
+   "depth": "Trace the path: private key (256 bits) → public key by scalar multiplication → hash → address. Cover uncompressed public keys (65 bytes, 04 || x || y) and compressed keys (33 bytes, 02 or 03 || x). For Bitcoin: HASH160 = RIPEMD160(SHA256(public key)); add a version byte; add a checksum equal to the first 4 bytes of SHA256(SHA256(version || hash160)); encode in Base58Check. A P2PKH address starts with 1. Mention bech32 SegWit addresses starting bc1, WIF private-key encoding, and BIP32/BIP39 for HD wallets by name only. For Ethereum: address = last 20 bytes of Keccak-256 of the public key, written as 0x followed by 40 hex characters. State that control of the private key is the identity. Mention wallets vs exchanges in one line: a wallet holds keys, an exchange holds keys for you.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "From key to address",
+    "nodes": [
+     {
+      "id": "sk",
+      "label": "Private key",
+      "note": "256 bits",
+      "style": "accent"
+     },
+     {
+      "id": "pk",
+      "label": "Public key",
+      "note": "33 or 65 bytes"
+     },
+     {
+      "id": "h",
+      "label": "HASH160",
+      "note": "RIPEMD160(SHA256(pk))",
+      "style": "live"
+     },
+     {
+      "id": "addr",
+      "label": "Address",
+      "note": "Base58Check, 25 bytes"
+     }
+    ],
+    "edges": [
+     {
+      "from": "sk",
+      "to": "pk",
+      "label": "k × G"
+     },
+     {
+      "from": "pk",
+      "to": "h",
+      "label": "hash"
+     },
+     {
+      "from": "h",
+      "to": "addr",
+      "label": "version + checksum"
+     }
+    ],
+    "aria": "A private key produces a public key by scalar multiplication, which is hashed and encoded into a Bitcoin address.",
+    "caption": "Each arrow is one-way in practice; the address hides the public key until it is spent."
+   },
+   "example": "A compressed public key is 33 bytes. HASH160 gives 20 bytes. The version byte is 0x00. The checksum is the first 4 bytes of SHA256(SHA256(version || hash160)). How many bytes are Base58Check-encoded before conversion to Base58 text? Answer: 1 version byte + 20 hash bytes + 4 checksum bytes = 25 bytes.",
+   "trap": "Saying the address is the public key, or omitting the checksum. Also do not mix uncompressed 65-byte keys with compressed 33-byte keys when deriving the same address.",
+   "prereq": "Chapters 2.2, 2.5 and 2.6.",
+   "leave": "Wallet software and transactions to Unit 4; Ethereum accounts and the EVM to Unit 5."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "hash is the first primitive"
+  ],
+  [
+   2,
+   3,
+   "hash pointers link blocks"
+  ],
+  [
+   2,
+   4,
+   "hashes build Merkle leaves"
+  ],
+  [
+   3,
+   4,
+   "Merkle root sits in the header"
+  ],
+  [
+   5,
+   6,
+   "key pair enables signatures"
+  ],
+  [
+   6,
+   7,
+   "signature uses the key pair"
+  ],
+  [
+   5,
+   7,
+   "public key derives address"
+  ],
+  [
+   4,
+   3,
+   "Merkle root commits transactions"
+  ]
+ ]
+}

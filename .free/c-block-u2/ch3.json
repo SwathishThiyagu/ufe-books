@@ -1,0 +1,255 @@
+{
+ "lead": "A hash pointer is an ordinary pointer with one addition: it also stores the cryptographic hash of the data it points to. In a blockchain each block's header holds a hash pointer to the block before it. That one field turns a loose list of blocks into a chain that cannot be edited quietly, because an edit changes a hash and the next block's pointer no longer matches. Bitcoin, Ethereum and every other chain rely on it, and the same trick appears in version-control history, audit logs and certificate transparency.",
+ "prereq": "You need: <a href=\"#cryptographic-primitives\">2.1</a> and <a href=\"#cryptographic-hash-functions-and-sha-256\">2.2</a> for hashing, and the block header from Unit 1, Blockchain architecture and structure of a block.",
+ "sections": [
+  {
+   "h3": "A pointer that carries a fingerprint",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An ordinary pointer stores one thing: the address of the data it points to. Read through it and you get whatever is there now. The pointer itself never tells you whether the data changed since the pointer was made."
+    },
+    {
+     "type": "p",
+     "text": "A hash pointer stores the cryptographic hash of the data it points to. In a block header the field is just the 32-byte hash of the parent block's header; the parent's address is implicit. To use it, fetch the parent block—found by its hash—hash its header yourself, and compare the two values. Equal means the parent is exactly what the pointer was built for. Different means someone edited it."
+    },
+    {
+     "type": "formula",
+     "text": "HP(i − 1) = H(header of block i − 1)",
+     "where": "HP(i − 1) is the hash pointer kept inside block i, stored as the 32-byte prev field; H is the chain's header-hash function (Bitcoin uses SHA-256d, two SHA-256 applications, returning 32 bytes); header of block i − 1 means the full 80-byte header of the parent block. The parent is identified by this hash; any address is implicit and looked up, not stored."
+    },
+    {
+     "type": "p",
+     "text": "The hash costs 32 bytes whether the pointed data is a ten-byte note or a four-megabyte block, because a 256-bit hash always outputs 32 bytes (see <a href=\"#cryptographic-hash-functions-and-sha-256\">2.2</a>). That fixed size is what lets a long chain stay small."
+    },
+    {
+     "type": "p",
+     "text": "The hash covers the pointed header completely. One flipped bit in the header changes H(header). A body edit changes the Merkle root, and updating the header then changes H(header). So the moment block i commits to that hash, block i − 1's header is frozen: any edit is detectable by anyone holding block i's header."
+    },
+    {
+     "type": "p",
+     "text": "The standard name is hash pointer. In a block header the stored field is called the previous block hash, or prev. Use those terms; they are what exam answers expect."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Start from the newest header you trust.",
+      "Read its prev field. That value should equal the hash of the block before it.",
+      "Fetch that earlier block, hash its header with the chain's header-hash function (SHA-256d for Bitcoin), and compare the two.",
+      "If they match, step back one block and repeat.",
+      "Stop at the genesis block. Reaching it with every link matching means the chain is intact."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Inside the block header",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A block is a header plus a body. The body carries transactions; the header carries the links and the metadata. Bitcoin's header is exactly 80 bytes and has six fields."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Field",
+      "Size",
+      "What it holds"
+     ],
+     "rows": [
+      [
+       "version",
+       "4 bytes",
+       "protocol rules the block was built under"
+      ],
+      [
+       "previous block hash",
+       "32 bytes",
+       "the hash pointer to the parent block"
+      ],
+      [
+       "Merkle root",
+       "32 bytes",
+       "one hash committing to every transaction in the body"
+      ],
+      [
+       "timestamp",
+       "4 bytes",
+       "build time in seconds since 1970"
+      ],
+      [
+       "difficulty bits",
+       "4 bytes",
+       "compact encoding of the target the block hash must beat"
+      ],
+      [
+       "nonce",
+       "4 bytes",
+       "counter miners vary to reach that target"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Only the header is hashed, using the chain's header-hash function (SHA-256d for Bitcoin). Two blocks with identical headers hash identically, so changing any one of the six fields changes the block's own hash, and therefore every prev field that points at it."
+    },
+    {
+     "type": "p",
+     "text": "The genesis block is the first block of a chain. It has no parent, so there is no hash to store. Its prev field is set to 32 zero bytes, a value a real block hash will not produce in practice. Nodes read prev = 0 as 'root', which gives every node the same agreed starting point. Bitcoin's genesis header is hardcoded into every client."
+    },
+    {
+     "type": "p",
+     "text": "The Merkle root is the second hash in the header. It is a single 32-byte value that commits to every transaction in the body, built as a Merkle tree (<a href=\"#merkle-trees\">2.4</a>). Difficulty bits and nonce belong to mining, covered in Unit 3, Proof of Work and mining."
+    }
+   ]
+  },
+  {
+   "h3": "Why the tamper travels forward",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Suppose an attacker rewrites a transaction inside block i. The body changes, so the Merkle root inside block i's header changes, so H(header of block i) changes. Block i + 1 still stores the old value as its prev field. The check at that single link fails."
+    },
+    {
+     "type": "p",
+     "text": "Repairing the link means writing the new hash into block i + 1's prev field. But prev is part of block i + 1's header, so H(header of block i + 1) changes too. Block i + 2 now fails. The damage walks forward one link at a time, up to the newest block."
+    },
+    {
+     "type": "p",
+     "text": "Hiding one edit therefore costs a rehash of every later block. That part is cheap: a laptop computes millions of header hashes per second. The expensive part is that each rewritten header must also beat the difficulty target, while honest miners keep extending the chain. Hash pointers give tamper-evidence; mining gives tamper-resistance. Keep the two apart."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "An edit breaks the chain from that block onward, not just the next link.",
+      "Block order is fixed: block i's hash depends on block i − 1, so blocks cannot be swapped.",
+      "Checking one Bitcoin link costs two SHA-256 calls (SHA-256d), so verification stays cheap as the chain grows."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Headers alone are enough to check the skeleton. A million 80-byte headers is about 80 MB, which fits on a phone. A wallet can download only headers and still confirm that a transaction it cares about sits under a header chain it trusts (see Unit 4, Bitcoin protocol)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Each block stores the hash of the block before it, starting from the genesis block whose prev field is all zeros. Edit any block and every later prev field stops matching.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Hash pointers make a chain",
+   "aria": "Four blocks in a row, each storing the hash of the previous block as its prev field.",
+   "nodes": [
+    {
+     "id": "g",
+     "label": "Genesis",
+     "note": "prev = 0",
+     "style": "muted"
+    },
+    {
+     "id": "b1",
+     "label": "Block 1",
+     "note": "prev = H(Genesis)",
+     "style": "accent"
+    },
+    {
+     "id": "b2",
+     "label": "Block 2",
+     "note": "prev = H(Block 1)",
+     "style": "normal"
+    },
+    {
+     "id": "b3",
+     "label": "Block 3",
+     "note": "prev = H(Block 2)",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "g",
+     "to": "b1",
+     "label": "hash"
+    },
+    {
+     "from": "b1",
+     "to": "b2",
+     "label": "hash"
+    },
+    {
+     "from": "b2",
+     "to": "b3",
+     "label": "hash"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Blocks 1, 2 and 3 have hashes 0001, 0002 and 0003. Block 1 stores prev = 0000 (the genesis hash), block 2 stores prev = 0001, and block 3 stores prev = 0002. An attacker rewrites a transaction in block 2, so H(block 2) becomes 0009, and recomputes nothing else. (a) How many stored prev fields now fail to match? (b) Which block's prev field is it, and what value must it hold after the fix?",
+   "steps": [
+    "List the stored prev fields: block 1 → 0000, block 2 → 0001, block 3 → 0002.",
+    "Hash of each parent after the attack: genesis = 0000, block 1 = 0001, block 2 = 0009, block 3 = 0003.",
+    "Block 1: stored prev 0000 against H(genesis) = 0000. Match.",
+    "Block 2: stored prev 0001 against H(block 1) = 0001. Match, because block 1 was not touched.",
+    "Block 3: stored prev 0002 against H(block 2) = 0009. Mismatch. So exactly one prev field fails.",
+    "Fix: set block 3's prev to 0009. That changes block 3's header, so H(block 3) moves away from 0003, and any block 4 holding prev = 0003 breaks next."
+   ],
+   "answer": "One stored prev field fails, block 3's; it must change from 0002 to 0009, and that change breaks the link to block 4.",
+   "check": "h = {'genesis': '0000', 1: '0001', 2: '0009', 3: '0003'}\nprev = {1: '0000', 2: '0001', 3: '0002'}\nfails = []\nfor b in (1, 2, 3):\n    parent = 'genesis' if b == 1 else b - 1\n    if prev[b] != h[parent]:\n        fails.append(b)\nprint(len(fails))\nprint(int(h[2]))",
+   "values": [
+    1,
+    9
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Answering only that the next block breaks. The examiner wants the cascade: every block after the edit must be rehashed.",
+  "Confusing a block's own hash with its prev field. The header stores the parent's hash; the block's own hash is what the child stores.",
+  "Treating genesis prev = 0 as the hash of something. It is a fixed marker that every node reads as 'root'.",
+  "Swapping the Merkle root and the previous block hash in a header diagram. Both are 32 bytes; only one links blocks.",
+  "Saying the hash pointer stores a copy of the block. It stores a 32-byte fingerprint; the address is implicit and looked up, not stored."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a hash pointer and name its two parts.",
+   "marks": 2,
+   "a": "A pointer that stores the address of some data together with the cryptographic hash of that data. In a block header the address is implicit (the parent block) and the hash is the 32-byte prev field."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the genesis block store prev = 0?",
+   "marks": 3,
+   "a": "It has no parent, so there is no hash to store. Thirty-two zero bytes is a fixed marker every node reads as 'root', giving the chain one agreed starting point."
+  },
+  {
+   "level": "apply",
+   "q": "Blocks A, B, C, D have hashes 1100, 2200, 3300, 4400. B stores prev 1100, C stores prev 2200, D stores prev 3300. A change to B gives it hash 9900 and nothing else is recomputed. Which prev fields fail?",
+   "marks": 4,
+   "a": "Only C's: its prev 2200 must equal H(B) = 9900. D's prev 3300 still equals H(C) = 3300. Repairing C changes H(C), which then breaks D."
+  },
+  {
+   "level": "analyze",
+   "q": "An attacker rewrites block 5 of a 100-block chain and correctly recomputes the hashes of blocks 6 to 100. Is the chain valid now?",
+   "marks": 5,
+   "a": "No. Each recomputed header has a new hash and almost certainly misses the difficulty target, and the network keeps extending block 101 on the honest tip. Rehashing restores the links but not the proof of work."
+  },
+  {
+   "level": "understand",
+   "q": "Name the six fields of a Bitcoin block header with their sizes.",
+   "marks": 3,
+   "a": "version 4 bytes, previous block hash 32 bytes, Merkle root 32 bytes, timestamp 4 bytes, difficulty bits 4 bytes, nonce 4 bytes. Total 80 bytes."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a phone wallet download only headers and still trust what it sees?",
+   "marks": 4,
+   "a": "Headers carry the prev links and the Merkle root. Checking 80-byte headers link by link proves the header chain is intact, and a Merkle branch under a trusted root proves a transaction is inside a block. Transaction bodies never need to be stored."
+  }
+ ],
+ "beyond": "Not for the exam. Git is a hash-pointer chain: every commit stores the hash of its parent commit, so rewriting old history changes every later commit id. Certificate Transparency logs hash their entries and browsers audit them the same way they would audit a chain. Supply-chain ledgers reuse the trick so a participant can prove a record was not altered after it was signed. Research goes further with skip lists and Merkle proofs, which let a client jump back over a long header chain in a few hash steps. Search terms: git commit parent hash, certificate transparency Merkle tree, skip list blockchain."
+}

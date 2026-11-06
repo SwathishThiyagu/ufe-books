@@ -1,0 +1,203 @@
+{
+ "lead": "A digital signature is a short value that proves the holder of a private key approved a particular message. Anyone with the matching public key can check it, but nobody can produce it without the private key. Blockchains need this because no bank or login server vouches for a payment: a Bitcoin transaction carries a signature, and every node checks it against the sender's public key. ECDSA, the Elliptic Curve Digital Signature Algorithm, is the scheme Bitcoin has used from its first block. This chapter shows how signing and verification work, and the one careless mistake that destroys the private key.",
+ "prereq": "You need: <a href=\"#cryptographic-hash-functions-and-sha-256\">Chapter 2.2</a> for the hash z, and <a href=\"#public-key-and-elliptic-curve-cryptography\">Chapter 2.5</a> for curve order, base point and the step Q = dG.",
+ "sections": [
+  {
+   "h3": "Signing and verification",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A digital signature is a value attached to a message that proves who approved the message and that it was not altered afterwards. A signing algorithm produces it from the message and a private key d. A verification algorithm checks it using the message and the matching public key Q."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Authenticity: only the holder of d can create a valid signature.",
+      "Integrity: change one bit of the message and verification fails.",
+      "Non-repudiation: the signer cannot later deny signing, because nobody else holds d."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Why not a MAC? A message authentication code also uses a secret, but signer and verifier share the same one, so the verifier could have forged the tag himself. In a blockchain thousands of strangers must verify, and none of them may hold the signer's secret. Public-key signatures give exactly that split."
+    },
+    {
+     "type": "p",
+     "text": "In Bitcoin every transaction input carries a signature, and nodes check it before the transaction enters a block. The transaction format itself is in Unit 4."
+    }
+   ]
+  },
+  {
+   "h3": "ECDSA step by step",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ECDSA turns the curve arithmetic of <a href=\"#public-key-and-elliptic-curve-cryptography\">Chapter 2.5</a> into a signature scheme. Fix a curve, a base point G on it, and the order n of G: n is how many distinct multiples G, 2G, 3G, … exist before the pattern returns to the point at infinity. Bitcoin uses the curve secp256k1, whose n is a 256-bit prime."
+    },
+    {
+     "type": "formula",
+     "text": "Q = d·G",
+     "where": "d is the private key, an integer in [1, n−1]; Q is the public key, a point on the curve; G is the base point; · means repeated point addition."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Hash the message with SHA-256 and take the leftmost n bits of the digest as an integer z.",
+      "Pick a fresh random nonce k in [1, n−1]. It is secret and used once.",
+      "Compute the point R = k·G and set r = R.x mod n, where R.x is its x-coordinate. If r = 0, restart.",
+      "Compute s = k⁻¹(z + r·d) mod n. If s = 0, restart.",
+      "The signature is the pair (r, s), two 256-bit numbers."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "s = k⁻¹(z + r·d) mod n",
+     "where": "k⁻¹ is the modular inverse of the nonce, so k·k⁻¹ ≡ 1; z is the truncated hash; r is the x-coordinate of R = kG reduced mod n; d is the private key; n is the order of G."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Reject unless 1 ≤ r ≤ n−1 and 1 ≤ s ≤ n−1.",
+      "Compute u₁ = z·s⁻¹ mod n and u₂ = r·s⁻¹ mod n.",
+      "Compute the point P = u₁·G + u₂·Q.",
+      "Accept if P.x mod n = r; otherwise reject."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Why it works. Put Q = dG: then P = (z + r·d)·s⁻¹·G. Because s = k⁻¹(z + rd), we get s⁻¹(z + rd) = k, so P = kG = R and the x-coordinates agree. The verifier never learns k or d."
+    },
+    {
+     "type": "formula",
+     "text": "P = u₁G + u₂Q = (z + r·d)s⁻¹G = kG",
+     "where": "P is the point the verifier computes; u₁ = z·s⁻¹ mod n; u₂ = r·s⁻¹ mod n; the last equality holds because of how s was formed."
+    }
+   ]
+  },
+  {
+   "h3": "Nonce reuse, malleability and encoding",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Reusing k destroys the key. Let the same k sign two messages with hashes z₁ and z₂, giving s₁ = k⁻¹(z₁ + rd) and s₂ = k⁻¹(z₂ + rd). Subtracting gives s₁ − s₂ = k⁻¹(z₁ − z₂), hence k = (z₁ − z₂)(s₁ − s₂)⁻¹ mod n, and then d = (s₁k − z₁)r⁻¹ mod n. Both signatures are public, so anyone can finish the calculation. A famous console firmware failure came from exactly this. A wallet either draws k from a strong random source or derives it deterministically from the message and d, as RFC 6979 does."
+    },
+    {
+     "type": "p",
+     "text": "Malleability. Replacing s by n − s gives a second signature that also verifies: the verifier then computes −P instead of P, and a curve point and its negation share an x-coordinate. So the signature is not unique. Bitcoin's standard rule keeps only the low-s form, s ≤ n/2, and rejects the twin, which would otherwise let someone change a transaction id without changing the payment."
+    },
+    {
+     "type": "p",
+     "text": "Encoding. The pair (r, s) is serialised with DER, an ASN.1 format that writes each number as a variable-length signed integer. Different encoders can emit different bytes for the same (r, s), so Bitcoin demands strict DER in addition to low-s."
+    },
+    {
+     "type": "p",
+     "text": "Schnorr signatures are a newer alternative over the same curve. They are linear, so several keys and signatures can be added into one, and they rest on a cleaner security assumption. Bitcoin adopted them later; see Unit 4. One limit of any signature: it proves authorship, not secrecy. The message itself stays readable."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The signer's two private numbers, d = 3 and k = 7, never travel; the verifier rebuilds the point R = 7G from (r, s) and the public key and compares x-coordinates.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Signer",
+    "Verifier"
+   ],
+   "messages": [
+    {
+     "from": "Signer",
+     "to": "Signer",
+     "label": "pick k = 7"
+    },
+    {
+     "from": "Signer",
+     "to": "Signer",
+     "label": "R = 7G, r = 4"
+    },
+    {
+     "from": "Signer",
+     "to": "Verifier",
+     "label": "m, (r, s) = (4, 4)"
+    },
+    {
+     "from": "Verifier",
+     "to": "Verifier",
+     "label": "check u₁G + u₂Q"
+    }
+   ],
+   "aria": "A signer picks nonce 7 and gets r = 4, computes s = 4, sends the message with the signature, and the verifier checks a curve combination that returns the same point R."
+  }
+ },
+ "examples": [
+  {
+   "question": "A toy ECDSA setup uses a curve of order n = 11 and a base point G of order 11. A signer has private key d = 3, chooses the nonce k = 7, and signs a message whose truncated hash is z = 5. The x-coordinate of R = kG reduces to r = 4. Find the signature (r, s), then verify it with Q = dG and state which multiple of G the verifier computes.",
+   "steps": [
+    "Find k⁻¹ mod 11: 7 × 8 = 56 = 5×11 + 1, so k⁻¹ = 8.",
+    "Compute z + r·d = 5 + 4×3 = 17 ≡ 6 (mod 11).",
+    "Compute s = 8 × 6 = 48 ≡ 4 (mod 11). The signature is (r, s) = (4, 4).",
+    "Verify: s⁻¹ mod 11 = 4⁻¹ = 3, since 4 × 3 = 12 ≡ 1.",
+    "Compute u₁ = z·s⁻¹ = 5 × 3 = 15 ≡ 4 (mod 11) and u₂ = r·s⁻¹ = 4 × 3 = 12 ≡ 1 (mod 11).",
+    "The public key is Q = dG = 3G, so the verifier's point is u₁G + u₂Q = 4G + 1×3G = 7G.",
+    "That point is R itself, because u₁ + u₂d = 4 + 3 = 7 = k. Its x-coordinate is 4, which equals r, so the signature is accepted."
+   ],
+   "answer": "The signature is (r, s) = (4, 4); the verifier computes 4G + 3G = 7G = R, whose x-coordinate 4 matches r, so verification succeeds.",
+   "check": "n, d, k, z, r = 11, 3, 7, 5, 4\ns = (pow(k, -1, n) * (z + r * d)) % n\nprint(r)\nprint(s)\nu1 = (z * pow(s, -1, n)) % n\nu2 = (r * pow(s, -1, n)) % n\nprint(u1)\nprint(u2)\nprint((u1 + u2 * d) % n)\n",
+   "values": [
+    4,
+    4,
+    4,
+    1,
+    7
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Reusing k. Two signatures with the same k give k = (z₁ − z₂)(s₁ − s₂)⁻¹ mod n and then d = (s₁k − z₁)r⁻¹ mod n, so the private key leaks.",
+  "Confusing r with the hash z. r is R.x mod n for R = kG; z is the truncated message hash. An answer that mixes them still looks like a formula, which is how examiners catch it.",
+  "Forgetting malleability. Both (r, s) and (r, n − s) verify, so quote Bitcoin's low-s rule s ≤ n/2 as the fix.",
+  "Calling a signature encryption. The message is not hidden; only authenticity and integrity are proved.",
+  "Signing the raw message instead of the hash, or forgetting that z is cut to the leftmost n bits of the digest."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What two integers form an ECDSA signature, and what does the verifier need besides them?",
+   "marks": 2,
+   "a": "r and s. The verifier needs the message, its hash z, the signer's public key Q, and the curve parameters G and n."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a MAC not replace a digital signature on a public blockchain?",
+   "marks": 3,
+   "a": "A MAC uses one secret shared by signer and verifier, so any verifier could forge it and nobody can prove who signed. A signature uses a private key held by one party and a public key that everyone may see."
+  },
+  {
+   "level": "apply",
+   "q": "In a toy curve with n = 11, d = 4, k = 3, z = 6 and r = 5, compute s.",
+   "marks": 4,
+   "a": "3⁻¹ mod 11 = 4 because 3 × 4 = 12 ≡ 1. z + r·d = 6 + 5×4 = 26 ≡ 4 (mod 11). s = 4 × 4 = 16 ≡ 5 (mod 11). Signature (r, s) = (5, 5)."
+  },
+  {
+   "level": "apply",
+   "q": "Two signatures reuse the same nonce, with z₁ − z₂ = 3 and s₁ − s₂ = 5 modulo n = 11. Recover k.",
+   "marks": 4,
+   "a": "5⁻¹ mod 11 = 9 since 5 × 9 = 45 ≡ 1. k = 3 × 9 = 27 ≡ 5 (mod 11)."
+  },
+  {
+   "level": "analyze",
+   "q": "Show that if (r, s) verifies then (r, n − s) also verifies.",
+   "marks": 5,
+   "a": "Let s' = n − s ≡ −s. Then s'⁻¹ = −s⁻¹, so u₁' = −u₁ and u₂' = −u₂, giving P' = −P. A curve point and its negation have the same x-coordinate, so P'.x mod n = P.x mod n = r and verification passes. This is malleability, closed by requiring s ≤ n/2."
+  },
+  {
+   "level": "analyze",
+   "q": "A wallet draws its nonce from a weak random generator. Explain the danger using the signing equation.",
+   "marks": 4,
+   "a": "From s = k⁻¹(z + rd) we get d = (sk − z)r⁻¹ mod n. Everything except k is public, so anyone who learns or repeats k recovers d from a single signature and can then sign any transaction as the victim."
+  }
+ ],
+ "beyond": "Not for the exam. Bitcoin's Taproot upgrade moved to Schnorr signatures, and the interesting work is aggregation: MuSig and related schemes merge many public keys and signatures into one, which saves space and hides the number of signers. Threshold ECDSA splits d among several machines so no single device ever holds the full key, which is how custodial wallets reduce risk. Ed25519 is a popular alternative curve and scheme outside Bitcoin. Deterministic nonces, standardised in RFC 6979, are now the default defence against nonce reuse. Search for secp256k1, MuSig2 and threshold signature wallets to go further."
+}
