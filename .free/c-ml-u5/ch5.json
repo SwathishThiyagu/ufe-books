@@ -1,0 +1,249 @@
+{
+ "lead": "A network learns by nudging every weight a little in the direction that lowers the loss. With thousands of weights you cannot do this one weight at a time, so you need the gradient of the loss for all of them at once. Backpropagation produces that gradient in one backward sweep by applying the chain rule layer by layer, from the loss towards the input. Every network you meet in use — a UPI fraud filter, a speech recogniser — was trained this way.",
+ "prereq": "You need: <a href=\"#multilayer-feedforward-networks-and-hidden-layers\">5.3</a> and <a href=\"#activation-functions-and-loss-functions\">5.4</a>, plus partial derivatives and the chain rule.",
+ "sections": [
+  {
+   "h3": "What δ means and why the sweep runs backwards",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A forward pass turns input x into output a and gives a loss L, one number measuring the error. Training must know how L changes when each weight w changes, that is the partial derivative ∂L/∂w. There are far too many weights to test one at a time, so the whole gradient is computed in a single sweep running from the loss back to the input. That sweep is backpropagation."
+    },
+    {
+     "type": "p",
+     "text": "The trick is to carry one intermediate number per unit. Define δ for a unit as ∂L/∂z: the derivative of the loss with respect to that unit's pre-activation z, the weighted sum computed just before the activation function. Read δ as the unit's share of the blame for the error."
+    },
+    {
+     "type": "p",
+     "text": "Two notations come up. The Hadamard product of two vectors, written u ⊙ v, multiplies them element by element: (u ⊙ v)ᵢ = uᵢ vᵢ. The Jacobian of a vector function is the matrix holding all its first partial derivatives; for a single unit it is just the number σ′(z), the slope of the activation."
+    },
+    {
+     "type": "p",
+     "text": "Backpropagation is cheap because it reuses work. The forward pass already computed and stored z and a for every unit. The backward pass reads those stored values and builds each δ from the δ of the layer above, so no derivative is ever computed twice."
+    }
+   ]
+  },
+  {
+   "h3": "The chain rule, layer by layer",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Number the layers 1 to L, with L the output layer, and write a⁽⁰⁾ = x. Layer l holds weight matrix W⁽ˡ⁾, bias vector b⁽ˡ⁾ and activation σ. The forward pass is two lines per layer."
+    },
+    {
+     "type": "formula",
+     "text": "z⁽ˡ⁾ = W⁽ˡ⁾ a⁽ˡ⁻¹⁾ + b⁽ˡ⁾,   a⁽ˡ⁾ = σ(z⁽ˡ⁾)",
+     "where": "W⁽ˡ⁾ is the weight matrix of layer l, b⁽ˡ⁾ its bias vector, a⁽ˡ⁻¹⁾ the activations coming in from the layer below, z⁽ˡ⁾ the pre-activation and a⁽ˡ⁾ what the layer passes on."
+    },
+    {
+     "type": "p",
+     "text": "Backward starts at the loss. At the output layer the blame is the loss slope multiplied by the activation slope."
+    },
+    {
+     "type": "formula",
+     "text": "δ⁽ᴸ⁾ = ∂L/∂a⁽ᴸ⁾ ⊙ σ′(z⁽ᴸ⁾)",
+     "where": "∂L/∂a⁽ᴸ⁾ is how fast the loss changes with the output; σ′(z⁽ᴸ⁾) is the activation slope at the pre-activation z⁽ᴸ⁾, not at a⁽ᴸ⁾."
+    },
+    {
+     "type": "p",
+     "text": "For a hidden layer the same rule applies, with the signal arriving from above. The transpose W⁽ˡ⁺¹⁾ᵀ sends the blame back through the same weights the forward pass used."
+    },
+    {
+     "type": "formula",
+     "text": "δ⁽ˡ⁾ = (W⁽ˡ⁺¹⁾ᵀ δ⁽ˡ⁺¹⁾) ⊙ σ′(z⁽ˡ⁾)",
+     "where": "W⁽ˡ⁺¹⁾ᵀ is the transpose of the next layer's weights, δ⁽ˡ⁺¹⁾ the blame one layer above, and σ′(z⁽ˡ⁾) the local slope at layer l."
+    },
+    {
+     "type": "p",
+     "text": "Once the δ values are known the weight gradients follow. A weight that multiplies input aᵢ and feeds unit j gets gradient δⱼ × aᵢ, so the whole matrix is an outer product."
+    },
+    {
+     "type": "formula",
+     "text": "∂L/∂W⁽ˡ⁾ = δ⁽ˡ⁾ (a⁽ˡ⁻¹⁾)ᵀ,   ∂L/∂b⁽ˡ⁾ = δ⁽ˡ⁾",
+     "where": "δ⁽ˡ⁾ is the blame vector of layer l and (a⁽ˡ⁻¹⁾)ᵀ is the previous activation written as a row, so the product has the shape of W⁽ˡ⁾. The bias gradient is δ itself because ∂z/∂b = 1."
+    }
+   ]
+  },
+  {
+   "h3": "The update, the cost, and computation graphs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Gradient descent then sets w ← w − η ∂L/∂w for every weight, where η is the learning rate, a small positive number such as 0.1 or 0.5. The minus sign matters: the weight moves against the gradient, so a negative gradient raises the weight."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Forward: for l = 1 to L, compute z⁽ˡ⁾ and a⁽ˡ⁾ and store both.",
+      "Loss: compute L from the final a⁽ᴸ⁾ and the target.",
+      "Output blame: δ⁽ᴸ⁾ = ∂L/∂a⁽ᴸ⁾ ⊙ σ′(z⁽ᴸ⁾).",
+      "Hidden blame: for l = L−1 down to 1, δ⁽ˡ⁾ = (W⁽ˡ⁺¹⁾ᵀ δ⁽ˡ⁺¹⁾) ⊙ σ′(z⁽ˡ⁾).",
+      "Gradients: ∂L/∂W⁽ˡ⁾ = δ⁽ˡ⁾ (a⁽ˡ⁻¹⁾)ᵀ and ∂L/∂b⁽ˡ⁾ = δ⁽ˡ⁾.",
+      "Update: w ← w − η ∂L/∂w for every weight and bias."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Cost. The forward pass does one multiply-add per weight, about Σ nₗ nₗ₋₁ of them for layer sizes nₗ. The backward pass does roughly twice that, one pass for Wᵀδ and one for δ aᵀ. So a training step costs about three forward passes, and the memory cost is the stored activations."
+    },
+    {
+     "type": "p",
+     "text": "Each forward operation can be drawn as a node in a computation graph, with arrows from inputs to output. Walking the graph in reverse order applies the chain rule once per node. That is why one short loop over layers trains a network of any depth, with no new formula per layer. Older syllabi say error back propagation for the same idea."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Solid arrows are the forward pass from x to the loss. The dashed arrows climb back carrying ∂L/∂a, then δ, then the weight gradients.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Forward pass and backward gradient flow",
+   "nodes": [
+    {
+     "id": "x",
+     "label": "x",
+     "style": "normal"
+    },
+    {
+     "id": "z",
+     "label": "z = Wx + b",
+     "style": "accent"
+    },
+    {
+     "id": "a",
+     "label": "a = σ(z)",
+     "style": "accent"
+    },
+    {
+     "id": "L",
+     "label": "Loss L",
+     "style": "live"
+    },
+    {
+     "id": "g",
+     "label": "∂L/∂W, ∂L/∂b",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "x",
+     "to": "z",
+     "style": "solid"
+    },
+    {
+     "from": "z",
+     "to": "a",
+     "style": "solid"
+    },
+    {
+     "from": "a",
+     "to": "L",
+     "style": "solid"
+    },
+    {
+     "from": "L",
+     "to": "a",
+     "label": "∂L/∂a",
+     "style": "dashed"
+    },
+    {
+     "from": "a",
+     "to": "z",
+     "label": "δ",
+     "style": "dashed"
+    },
+    {
+     "from": "z",
+     "to": "g",
+     "label": "chain rule",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Values flow down from input to loss, and dashed arrows climb back carrying the derivatives used to compute the weight gradients."
+  }
+ },
+ "examples": [
+  {
+   "question": "A single sigmoid unit has weight w = 1, bias b = 0, input x = 1 and target t = 1. The loss is L = ½(a − t)². Compute z, a, L, ∂L/∂a, σ′(z), δ = ∂L/∂z and ∂L/∂w, then take one gradient step with learning rate η = 0.5 and give the new w and b.",
+   "steps": [
+    "Forward pre-activation: z = w x + b = 1 × 1 + 0 = 1.000000.",
+    "Activation: a = 1/(1 + e^(−1)) = 0.731059.",
+    "Loss: L = ½(0.731059 − 1)² = ½(−0.268941)² = 0.036165.",
+    "Loss slope at the output: ∂L/∂a = a − t = −0.268941.",
+    "Activation slope at z = 1: σ′(z) = a(1 − a) = 0.731059 × 0.268941 = 0.196612.",
+    "Blame: δ = ∂L/∂a × σ′(z) = −0.268941 × 0.196612 = −0.052877.",
+    "Weight gradient: ∂L/∂w = δ × x = −0.052877 × 1 = −0.052877. Bias gradient: ∂L/∂b = δ = −0.052877.",
+    "Update: w ← 1 − 0.5 × (−0.052877) = 1.026439; b ← 0 − 0.5 × (−0.052877) = 0.026439."
+   ],
+   "answer": "After one step the weight is w = 1.026439 and the bias is b = 0.026439; both rose because the gradient was negative.",
+   "check": "import math\nx, w, b, t, eta = 1.0, 1.0, 0.0, 1.0, 0.5\nz = w * x + b\na = 1 / (1 + math.exp(-z))\nL = 0.5 * (a - t) ** 2\ndL_da = a - t\ndsig = a * (1 - a)\ndelta = dL_da * dsig\ndL_dw = delta * x\nw_new = w - eta * dL_dw\nb_new = b - eta * delta\nfor v in [z, a, L, dL_da, dsig, delta, dL_dw, w_new, b_new]:\n    print(round(v, 6))",
+   "values": [
+    1.0,
+    0.731059,
+    0.036165,
+    -0.268941,
+    0.196612,
+    -0.052877,
+    -0.052877,
+    1.026439,
+    0.026439
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Evaluate σ′ at the pre-activation z, never at a or at the loss. For a sigmoid, σ′(z) = a(1 − a) is computed from the stored a, which is why activations are kept.",
+  "Forgetting a_prev: ∂L/∂W = δ a_prevᵀ, not δ alone. The bias gradient is δ alone, because the bias adds no input factor.",
+  "Sign slip: gradient descent subtracts the gradient, so a negative gradient increases the weight. If your loss rises after the update, check the sign first.",
+  "δ is not ∂L/∂a. They differ by the factor σ′(z); the output layer δ is the product of the two.",
+  "Gradients accumulate if not reset. In loop-based code, clear the gradient buffers before each new backward pass."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define δ for one unit in a single line.",
+   "marks": 2,
+   "a": "δ = ∂L/∂z, the derivative of the loss with respect to that unit's pre-activation z."
+  },
+  {
+   "level": "remember",
+   "q": "What does the Hadamard product u ⊙ v do?",
+   "marks": 2,
+   "a": "It multiplies the two vectors element by element: (u ⊙ v)ᵢ = uᵢ vᵢ. The result has the same length as the inputs."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the backward pass use Wᵀ and not W?",
+   "marks": 3,
+   "a": "The blame must be spread back to the units that fed the layer. Forward, W maps a⁽ˡ⁻¹⁾ to z⁽ˡ⁾; the linear map that carries a vector of size nₗ to size nₗ₋₁ is the transpose, so δ⁽ˡ⁾ = (W⁽ˡ⁺¹⁾ᵀ δ⁽ˡ⁺¹⁾) ⊙ σ′(z⁽ˡ⁾)."
+  },
+  {
+   "level": "apply",
+   "q": "A sigmoid unit has z = 0, input x = 2, target t = 1, loss ½(a − t)². Find δ and ∂L/∂w.",
+   "marks": 4,
+   "a": "a = 0.5, so ∂L/∂a = −0.5 and σ′(0) = 0.5 × 0.5 = 0.25. Then δ = −0.5 × 0.25 = −0.125 and ∂L/∂w = δ x = −0.25."
+  },
+  {
+   "level": "apply",
+   "q": "The output blame is δ⁽²⁾ = [0.2], the output weights are W⁽²⁾ = [0.5, −1.0], and the hidden pre-activations have σ′ = [0.25, 0.1]. Find δ⁽¹⁾.",
+   "marks": 5,
+   "a": "W⁽²⁾ᵀ δ⁽²⁾ = [0.5 × 0.2, −1.0 × 0.2] = [0.1, −0.2]. Multiply element by element by σ′: δ⁽¹⁾ = [0.1 × 0.25, −0.2 × 0.1] = [0.025, −0.02]."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain why backpropagation must store the activations of every layer, and what you would have to do without them.",
+   "marks": 5,
+   "a": "Each weight gradient is δ a_prevᵀ, so the previous layer's activation is needed at the moment of the update. Without stored activations, the forward pass would have to be recomputed for every layer during the backward sweep, roughly squaring the work."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the same backprop code train networks of any depth, and how does depth change the cost?",
+   "marks": 6,
+   "a": "The backward loop is uniform: one δ formula and one outer-product formula repeated for l = L down to 1, so no new code per layer. Depth changes only the number of iterations, and the cost stays linear in the total number of weights, about three forward passes per training step, while memory grows with the stored activations."
+  }
+ ],
+ "beyond": "Not for the exam. In practice nobody writes this loop by hand: frameworks build a computation graph and differentiate it automatically, which is called reverse-mode automatic differentiation. The same rule that gives weight gradients also gives gradients with respect to the input, which is how adversarial examples and saliency maps are made. Very deep models trade memory for speed by recomputing activations instead of storing them, a technique called gradient checkpointing. Search for reverse-mode automatic differentiation, autograd, and gradient checkpointing to go further."
+}

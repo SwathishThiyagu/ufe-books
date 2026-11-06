@@ -1,0 +1,248 @@
+{
+ "lead": "A feedforward network sees one input and forgets it. A recurrent neural network (RNN) adds a hidden state h<sub>t</sub> that acts as memory: it is updated at every step from input x<sub>t</sub> and previous state h<sub>t−1</sub>. The same weights are reused at all steps, so any sequence length uses one small parameter set. This is how phone keyboards guess the next word, how speech is transcribed, and how sensor or UPI transaction streams are modelled. The update rule, unrolling, gradient decay and LSTM fix follow.",
+ "prereq": "You need: <a href=\"#backpropagation-training\">5.5</a> (chain rule), <a href=\"#from-shallow-to-deep-networks-deep-learning-vs-anns\">5.7</a> (vanishing gradients), and <a href=\"#activation-functions-and-loss-functions\">5.4</a> (tanh, sigmoid).",
+ "sections": [
+  {
+   "h3": "The recurrent unit and unrolling",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A feedforward layer maps one input to one output. A sequence x<sub>1</sub>,...,x<sub>T</sub> needs an output at every step and memory of earlier steps. An RNN keeps a hidden vector h<sub>t</sub> of fixed size d. The state is overwritten each step, not stored as a list. At run time the state is one vector of size d, so memory is O(d); during BPTT training the unrolled graph keeps the h<sub>t</sub> for all T steps, so memory grows as O(T·d). The parameter count alone is independent of T."
+    },
+    {
+     "type": "formula",
+     "text": "h<sub>t</sub> = tanh(W x<sub>t</sub> + U h<sub>t−1</sub> + b),   y<sub>t</sub> = V h<sub>t</sub>",
+     "where": "x<sub>t</sub> is the input vector of size m; h<sub>t</sub> is the hidden state of size d; W is d×m, U is d×d, V is k×d; b is a bias vector of size d; y<sub>t</sub> is the output vector of size k; tanh acts element by element."
+    },
+    {
+     "type": "p",
+     "text": "The same W, U, V and b are used at every time step. To train, unroll the network: draw a copy of the cell for t=1,...,T, with h<sub>t−1</sub> feeding h<sub>t</sub>. This is only a drawing aid; there is one set of weights. The parameter count is d×m + d×d + k×d + d, independent of T. A 1000-step sequence and a 10-step sequence have the same number of trainable weights."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Start with h<sub>0</sub> = 0, or a learned initial state.",
+      "For t = 1 to T, compute pre-activation a<sub>t</sub> = W x<sub>t</sub> + U h<sub>t−1</sub> + b, then h<sub>t</sub> = tanh(a<sub>t</sub>).",
+      "Compute y<sub>t</sub> = V h<sub>t</sub>, then a loss such as cross-entropy for the next symbol.",
+      "Sum the losses over t; backpropagate through the unrolled graph to get gradients for W, U, V, b."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Backpropagation through time and gradient size",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Training a recurrent net uses backpropagation through time (BPTT). It is ordinary backpropagation on the unrolled graph. Because W and U appear at every step, their gradients are sums of contributions from all T steps. A long sequence gives a long chain of Jacobian products."
+    },
+    {
+     "type": "p",
+     "text": "For one step the Jacobian is ∂h<sub>t</sub>/∂h<sub>t−1</sub> = diag(1 − h<sub>t</sub>²) U. In the backward pass the gradient is carried by the transpose: ∂L/∂h<sub>t−1</sub> = Uᵀ diag(1 − h<sub>t</sub>²) ∂L/∂h<sub>t</sub>. The tanh derivative 1 − h<sub>t</sub>² lies between 0 and 1. Over k steps the forward Jacobian multiplies k such matrices. If the largest singular value of U is below 1, the product shrinks exponentially: this is the vanishing gradient problem. If it is above 1, the product grows and gradients explode. Saturation of tanh, where h<sub>t</sub> is near ±1, makes the slope near zero and speeds the shrink."
+    },
+    {
+     "type": "formula",
+     "text": "∂h<sub>T</sub>/∂h<sub>t</sub> = ∏<sub>i=t+1</sub><sup>T</sup> diag(1 − h<sub>i</sub>²) U",
+     "where": "U is d×d; diag(1 − h<sub>i</sub>²) is the diagonal matrix of tanh slopes at step i; the product is a matrix product with the i = T factor leftmost and i = t+1 rightmost; the factors do not commute."
+    },
+    {
+     "type": "p",
+     "text": "Gradient clipping handles exploding gradients. Compute the gradient vector g for all parameters; if its norm ||g|| is larger than a threshold c, replace g by c g / ||g||. This keeps the step bounded but does not create memory. For vanishing gradients, use gated units (LSTM, GRU), a ReLU-style nonlinearity where suitable, or shorter truncated sequences."
+    }
+   ]
+  },
+  {
+   "h3": "LSTM and GRU: gated memory",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A plain RNN overwrites h<sub>t</sub> at every step. An LSTM (long short-term memory) adds a cell state c<sub>t</sub> that runs along time with only elementwise changes, and gates that decide what to keep, write and read. A gate is a sigmoid layer: σ(z)=1/(1+e<sup>−z</sup>), so each gate value is between 0 and 1."
+    },
+    {
+     "type": "formula",
+     "text": "f<sub>t</sub> = σ(W<sub>f</sub>[h<sub>t−1</sub>, x<sub>t</sub>] + b<sub>f</sub>),   i<sub>t</sub> = σ(W<sub>i</sub>[h<sub>t−1</sub>, x<sub>t</sub>] + b<sub>i</sub>),   c̃<sub>t</sub> = tanh(W<sub>c</sub>[h<sub>t−1</sub>, x<sub>t</sub>] + b<sub>c</sub>),   c<sub>t</sub> = f<sub>t</sub> ⊙ c<sub>t−1</sub> + i<sub>t</sub> ⊙ c̃<sub>t</sub>,   o<sub>t</sub> = σ(W<sub>o</sub>[h<sub>t−1</sub>, x<sub>t</sub>] + b<sub>o</sub>),   h<sub>t</sub> = o<sub>t</sub> ⊙ tanh(c<sub>t</sub>)",
+     "where": "f<sub>t</sub>, i<sub>t</sub>, o<sub>t</sub> are the forget, input and output gates; c<sub>t</sub> is the cell state; c̃<sub>t</sub> is the candidate cell value; h<sub>t</sub> is the hidden output; [h<sub>t−1</sub>, x<sub>t</sub>] is concatenation; ⊙ is elementwise multiplication; W<sub>f</sub>, W<sub>i</sub>, W<sub>c</sub>, W<sub>o</sub> and b<sub>f</sub>, b<sub>i</sub>, b<sub>c</sub>, b<sub>o</sub> are gate weights and biases; σ is the sigmoid."
+    },
+    {
+     "type": "p",
+     "text": "The key line is c<sub>t</sub> = f<sub>t</sub> ⊙ c<sub>t−1</sub> + i<sub>t</sub> ⊙ c̃<sub>t</sub>. Its derivative with respect to c<sub>t−1</sub> is just f<sub>t</sub>, an elementwise factor. When f<sub>t</sub> is near 1, the gradient passes many steps without being multiplied by a weight matrix and a tanh slope at every step. The forget gate near 0 deletes old memory; the input gate near 1 writes new information; the output gate controls how much of tanh(c<sub>t</sub>) becomes h<sub>t</sub>."
+    },
+    {
+     "type": "p",
+     "text": "A GRU (gated recurrent unit) uses two gates, update and reset, and one state vector instead of separate h and c, so it has fewer parameters. Uses include next-word prediction on a phone keyboard, speech recognition, time-series forecasting such as electricity load, and sequence labelling in text. For very long sequences, attention-based models are now common, but the recurrent idea is still the base."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One cell reused across time: h(t−1) and x(t) pass through the weighted sum and tanh to make h(t), which gives y(t) and feeds the next step. Notice the U and W arrows are the same at every step.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One recurrent step",
+   "nodes": [
+    {
+     "id": "hp",
+     "label": "h(t−1)",
+     "note": "previous state",
+     "style": "muted"
+    },
+    {
+     "id": "xt",
+     "label": "x(t)",
+     "style": "normal"
+    },
+    {
+     "id": "cell",
+     "label": "W x(t) + U h(t−1)",
+     "note": "then tanh",
+     "style": "accent"
+    },
+    {
+     "id": "ht",
+     "label": "h(t)",
+     "style": "live"
+    },
+    {
+     "id": "yt",
+     "label": "y(t) = V h(t)",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "hp",
+     "to": "cell",
+     "label": "U",
+     "style": "solid"
+    },
+    {
+     "from": "xt",
+     "to": "cell",
+     "label": "W",
+     "style": "solid"
+    },
+    {
+     "from": "cell",
+     "to": "ht",
+     "style": "solid"
+    },
+    {
+     "from": "ht",
+     "to": "yt",
+     "label": "V",
+     "style": "solid"
+    },
+    {
+     "from": "ht",
+     "to": "cell",
+     "label": "next step",
+     "style": "dashed"
+    }
+   ],
+   "aria": "The previous hidden state and the current input combine in a weighted sum with tanh to give the new hidden state, which produces the output and feeds the next step."
+  }
+ },
+ "examples": [
+  {
+   "question": "An RNN has W = 0.5, U = 0.5, b = 0, h<sub>0</sub> = 0, and inputs x<sub>1</sub> = x<sub>2</sub> = 1. Use h<sub>t</sub> = tanh(W x<sub>t</sub> + U h<sub>t−1</sub> + b). (a) Find h<sub>1</sub> and h<sub>2</sub>. (b) Find ∂h<sub>1</sub>/∂h<sub>0</sub> and ∂h<sub>2</sub>/∂h<sub>1</sub>. (c) Multiply them. What does the product say about a ten-step sequence?",
+   "steps": [
+    "Step 1: net<sub>1</sub> = 0.5×1 + 0.5×0 + 0 = 0.5. h<sub>1</sub> = tanh(0.5) = 0.4621.",
+    "Step 2: net<sub>2</sub> = 0.5×1 + 0.5×0.4621 + 0 = 0.7311. h<sub>2</sub> = tanh(0.7311) = 0.6237.",
+    "Gradient factor at step 2: ∂h<sub>2</sub>/∂h<sub>1</sub> = U(1 − h<sub>2</sub>²) = 0.5×(1 − 0.3890) = 0.3055.",
+    "Gradient factor at step 1: ∂h<sub>1</sub>/∂h<sub>0</sub> = U(1 − h<sub>1</sub>²) = 0.5×(1 − 0.2136) = 0.3932.",
+    "Product over two steps: 0.3055 × 0.3932 = 0.1201.",
+    "Five copies of a two-step block give 0.1201⁵ ≈ 0.000025 for ten steps, far below 0.0001. Early inputs have almost no influence on the late gradient."
+   ],
+   "answer": "h<sub>1</sub> = 0.4621, h<sub>2</sub> = 0.6237, ∂h<sub>2</sub>/∂h<sub>1</sub> = 0.3055, ∂h<sub>1</sub>/∂h<sub>0</sub> = 0.3932, product = 0.1201; over ten similar steps the product is about 0.000025, so the gradient vanishes.",
+   "check": "import math\nW=0.5\nU=0.5\nb=0.0\nh=0.0\nhs=[]\nfor x in [1.0,1.0]:\n    net=W*x+U*h+b\n    h=math.tanh(net)\n    hs.append(h)\nh1,h2=hs\nd1=U*(1-h1*h1)\nd2=U*(1-h2*h2)\np=d1*d2\np10=p**5\nprint(round(h1,4))\nprint(round(h2,4))\nprint(round(d1,4))\nprint(round(d2,4))\nprint(round(p,4))\nprint(round(p10,6))",
+   "values": [
+    0.4621,
+    0.6237,
+    0.3932,
+    0.3055,
+    0.1201,
+    2.5e-05
+   ],
+   "dry_run": {
+    "head": [
+     "step",
+     "net",
+     "h_t"
+    ],
+    "rows": [
+     [
+      "1",
+      "0.5",
+      "0.4621"
+     ],
+     [
+      "2",
+      "0.7311",
+      "0.6237"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not multiply the parameter count by T. The unrolled steps share W, U, V, b; there is one weight set, only the graph is longer.",
+  "BPTT is not a separate learning rule. It is backpropagation on the unrolled graph, with gradients summed over time because weights are shared.",
+  "A vanishing gradient is not the same as a small loss. It means early-step derivatives become tiny, so early words or inputs get almost no update.",
+  "In an LSTM, f<sub>t</sub> near 1 keeps the old cell state and f<sub>t</sub> near 0 erases it. The cell state c<sub>t</sub> is not the hidden output h<sub>t</sub>.",
+  "Clipping prevents exploding gradients, not vanishing ones. It rescales a large gradient; it cannot restore a signal that has already decayed."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the RNN update and output equations. Which matrix carries the previous state?",
+   "marks": 2,
+   "a": "h<sub>t</sub> = tanh(W x<sub>t</sub> + U h<sub>t−1</sub> + b), y<sub>t</sub> = V h<sub>t</sub>; U multiplies h<sub>t−1</sub>."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an RNN's parameter count not grow with sequence length?",
+   "marks": 3,
+   "a": "The same W, U, V, b are reused at every step; unrolled copies share weights."
+  },
+  {
+   "level": "apply",
+   "q": "With W = 0.5, U = 0.5, b = 0, h<sub>0</sub> = 0, x<sub>1</sub> = 1, find net<sub>1</sub> and h<sub>1</sub>.",
+   "marks": 3,
+   "a": "net<sub>1</sub> = 0.5×1 + 0.5×0 + 0 = 0.5; h<sub>1</sub> = tanh(0.5) = 0.4621."
+  },
+  {
+   "level": "analyze",
+   "q": "Each step's Jacobian has largest singular value 0.5. What happens to a gradient over about 50 steps? Name one fix.",
+   "marks": 5,
+   "a": "The product scales like 0.5⁵⁰, so it is extremely tiny. Use LSTM/GRU gates or shorter sequences."
+  },
+  {
+   "level": "apply",
+   "q": "An LSTM has f<sub>t</sub> = 0.9, c<sub>t−1</sub> = 2.0, i<sub>t</sub> = 0.1, c̃<sub>t</sub> = 1.0. Find c<sub>t</sub>.",
+   "marks": 2,
+   "a": "c<sub>t</sub> = 0.9×2.0 + 0.1×1.0 = 1.9."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the additive cell state help gradient flow?",
+   "marks": 4,
+   "a": "∂c<sub>t</sub>/∂c<sub>t−1</sub> = f<sub>t</sub>, an elementwise factor; near 1 it passes gradient without a full matrix and tanh product at every step."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three gates of an LSTM.",
+   "marks": 2,
+   "a": "Forget gate, input gate, output gate."
+  },
+  {
+   "level": "analyze",
+   "q": "Does gradient clipping fix vanishing gradients? Explain.",
+   "marks": 4,
+   "a": "No. Clipping only rescales large gradients, so it controls exploding gradients; vanishing needs gated memory or architecture changes."
+  }
+ ],
+ "beyond": "Not for the exam. Modern sequence models replace the recurrence with attention and transformers, which train in parallel over positions and handle very long context. Recurrent layers still appear in streaming or low-latency systems, and GRUs remain a compact baseline. In code, inspect a deep-learning framework's RNN, LSTM and GRU layers, then check the shape of the hidden state across a batch. For research, search sequence-to-sequence learning, teacher forcing, and truncated BPTT."
+}
