@@ -1,22 +1,20 @@
 # c-iot-u4: free-model run
 
 - Book: `books/cse/c-iot/c-iot-u4.html`
-- Status: problems
-- Model calls so far: 33 (127,821 tokens in, 230,824 out), 7.6 minutes
+- Status: ok
+- Model calls so far: 33 (127,821 tokens in, 230,824 out), 7.7 minutes
 
 ## Checker
 
 ```
-c-iot-u4.html: 7 chapters, 14114 words, 8 figures, 143 KB
-PROBLEMS:
- - text contains "I cannot"
+c-iot-u4.html: 7 chapters, 14116 words, 8 figures, 143 KB
+OK
 ```
 
 ## For the reviewer
 
 - chapter 6: the figure cannot be drawn: note "Linux, Uno pins" runs off the right edge; shorten it
 - chapter 6: the figure could not be drawn; a plain box diagram stands in for it
-- checker: text contains "I cannot"
 
 ## Reviewer notes (after any revision)
 
