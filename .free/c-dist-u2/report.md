@@ -1,8 +1,15 @@
 # c-dist-u2: free-model run
 
 - Book: `books/cse/c-dist/c-dist-u2.html`
-- Status: error
-- Model calls so far: 23 (85,207 tokens in, 237,856 out), 5.7 minutes
+- Status: ok
+- Model calls so far: 29 (109,181 tokens in, 315,998 out), 11.8 minutes
+
+## Checker
+
+```
+c-dist-u2.html: 7 chapters, 11729 words, 8 figures, 140 KB
+OK
+```
 
 ## For the reviewer
 
@@ -27,6 +34,13 @@
 - ch 3 [low] Quiz Q6: The answer writes 'T_p = O(1000 + 10) = O(1010)'. O(1010) is O(1) as notation, so the line is meaningless and a student may copy it as a result.
 - ch 3 [low] Section 3, total work claim: 'The total work is O(n)' counts only the block scans and the offset additions. The block totals are prefix summed by doubling, which costs about p⌈log₂ p⌉ additions, so strictly W = O(n + p log₂ p). The O(n) claim needs a condition on p.
 - ch 3 [low] Section 2, first line: 'also called scan or all-sums' — 'all-sums' is not standard; the usual name is 'all-prefix-sums'.
+- ch 4 [high] Section 1, formula line T_p = Θ(log n), W = p · T_p = Θ(n): The equality W = p · T_p is false here. The line itself sets p = n, so p · T_p = n · Θ(log n) = Θ(n log n), not Θ(n). The two claims contradict each other, and a student who copies W = p·T_p into an answer loses marks.
+- ch 4 [high] Worked example 1, step 1: The binary-search steps are wrong. After a[7] = 34 < 42 the low end must move, not the high end, and one comparison is skipped: the text jumps from mid = 7 to mid = 9, which is impossible when lo = 8 and hi = 14 (that midpoint is 11). Only two comparisons are described while the answer claims three.
+- ch 4 [high] Section 1, list of steps after the prefix sum: Only the branch k > r is given (and its condition is garbled as 'If k  r'). The branch k < r is missing, so the stated algorithm never says what to do when the answer lies below the pivot, even though the worked example needs exactly that branch.
+- ch 4 [low] Section 1, paragraph 'The pivot is never extreme': The counting is loose for even block sizes. With the median taken at position ⌈m/2⌉ (the lower median) and m even, only m/2 − 1 keys lie strictly below the block median, and only ⌈p/2⌉ − 1 block medians lie strictly below the pivot. The conclusion n/4 survives only if you count 'at or below'.
+- ch 4 [low] Section 1, ranking step: The prefix sum of the p counts gives the number of keys strictly below the pivot, which is r − 1, not r. The text says it 'gives the pivot's true rank r'.
+- ch 4 [low] Figure, root edge labels: The edge labels do not match their notes and do not describe the ranges correctly: an edge labelled '≤ 34' carries the note '17 to 34', and an edge labelled '≤ 17' carries 'below 17' although 17 itself is inside it. A student reading the tree gets contradictory ranges.
+- ch 4 [low] Exam traps, fourth bullet: The bullet points the wrong way. Reading the p per-block answers in one step is cheap on a PRAM, so the block-split time really is Θ(log(n/p)); the full answer including the combine step is Θ(log(n/p) + log p) = Θ(log n), not something smaller. As written, the trap suggests that adding the combine step makes the time longer than O(log n), which is the opposite of what happens.
 - ch 5 [high] Quiz Q7: The answer says bitonic sort 'is shallower but uses more comparators' than odd-even transposition. This is false. For 8 keys bitonic uses 24 comparators while odd-even transposition uses 28, and in general bitonic size O(n log² n) is far smaller than the n(n−1)/2 comparators of the odd-even network. The answer also contradicts the worked example, where both networks have 6 comparators for n = 4.
 - ch 5 [high] Section 3 (hyperquicksort) and Quiz Q6: The text says the median of the processors' local medians 'becomes the pivot, so the two halves are equal'. That is wrong. Only the true global median splits the data into two exactly equal halves. The median of the local medians gives each processor an approximately even split, so each subcube receives about half the keys, not exactly half. Q6 repeats the same claim.
 - ch 5 [low] Section 2, odd-even merge sentence: 'Odd-even merge sort has the same depth and size with a simpler merge' is too loose. Batcher's odd-even mergesort has the same depth, but it uses fewer comparators than bitonic sort (same O(n log² n) order, smaller constant). The odd-even merge network is usually considered more intricate than the bitonic merge network, not simpler.
