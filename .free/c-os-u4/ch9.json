@@ -1,0 +1,246 @@
+{
+ "lead": "Frames are fixed-size slots of physical memory. A process cannot run on one frame; it needs a small set at once. If the OS gives a process too few frames, every instruction touch becomes a page fault, and the disk runs while the CPU waits. The questions are: how many frames should each process get, who may take a frame from whom, and why a machine slows down when the OS admits more processes. These choices decide whether a phone with 6 GB RAM stays smooth or starts swapping.",
+ "prereq": "You need: page faults and demand paging from <a href=\"#virtual-memory-demand-paging-page-faults-copy-on-write\">4.7</a>, and victim selection from <a href=\"#page-replacement-algorithms-fifo-lru-optimal\">4.8</a>.",
+ "sections": [
+  {
+   "h3": "Minimum, equal and proportional allocation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process does not need all its pages in memory, but it needs a minimum number of frames. The instruction set sets this minimum. One instruction may touch the page holding the instruction, the page holding operand A, and the page holding operand B. With only two frames, the instruction faults, brings a page, restarts, faults again, and never finishes. Indirect addressing, which follows a pointer to a pointer, can touch more pages, so its minimum is larger. This minimum is a hard floor."
+    },
+    {
+     "type": "p",
+     "text": "When m frames are free and n processes are ready, equal allocation gives each process floor(m ÷ n) frames. Leftover frames stay free or go to a shared pool. This is simple, but a 10-page process and a 600-page process get the same share. The small process hoards frames; the large one keeps faulting."
+    },
+    {
+     "type": "formula",
+     "text": "frames_i = floor(m × s_i ÷ S)",
+     "where": "m is the number of usable frames; s_i is the number of pages in process i; S is the sum of s_i over all processes; floor rounds down to a whole frame."
+    },
+    {
+     "type": "p",
+     "text": "Proportional allocation uses size. Let s_i be the pages of process i in memory, and S = Σ s_i. A larger process gets a larger share. Rounding leaves a few frames; the OS gives them to the largest fractional parts or keeps them free. The example below splits 100 frames."
+    }
+   ]
+  },
+  {
+   "h3": "Global and local replacement",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A process's resident set is the frames it currently holds. When a page fault occurs and no frame is free, the OS picks a victim. In global replacement, the victim can come from any process. A process may take a frame from another, so its resident set grows and shrinks with load. In local replacement, the victim must come from the faulting process, so each process works inside its frame budget. This is about ownership, not the replacement policy. FIFO, LRU or optimal from <a href=\"#page-replacement-algorithms-fifo-lru-optimal\">4.8</a> still decides which page inside the allowed set leaves."
+    },
+    {
+     "type": "p",
+     "text": "Global replacement gives better throughput when process sizes change, and most general-purpose kernels use it. Its weakness is control: a greedy process can pull frames from quiet ones. Local replacement protects quiet processes, but a process with too few frames can thrash alone."
+    }
+   ]
+  },
+  {
+   "h3": "Thrashing and the working-set model",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Thrashing is the state where a process, or the whole system, spends more time moving pages in and out than executing instructions. It starts with a shortage of frames. A loop needs a set of pages. Give the process fewer frames, and each pass faults on a page evicted on the last pass."
+    },
+    {
+     "type": "p",
+     "text": "The feedback loop makes it worse. Page faults queue for disk, so CPU utilisation drops. The OS sees an idle CPU, concludes memory is underused, and admits another process. That process needs frames, so the OS takes frames from running processes. Their fault rates rise and CPU utilisation falls further. The machine is busy paging, not working. The figure plots this: utilisation rises, peaks, then collapses."
+    },
+    {
+     "type": "formula",
+     "text": "WSS_i = |{pages referenced in the last Δ references}|",
+     "where": "WSS_i is the working-set size of process i in pages; Δ is the window size in memory references; | | means the number of distinct pages, not references."
+    },
+    {
+     "type": "p",
+     "text": "The working-set model stops the loop. Choose a window Δ, measured in memory references. WSS_i is the number of distinct pages that process i referenced in the last Δ references. It estimates current locality. The OS admits a new process only if Σ WSS_i ≤ m, where m is total usable frames. If the sum is above m, suspend or swap out a process. Count distinct pages, not references. Page-fault frequency (PFF) is the practical control: measure faults per second per process, set an upper bound, give frames when the rate crosses it, and take frames back when the rate is low."
+    },
+    {
+     "type": "p",
+     "text": "Memory compression is a middle path: compress cold pages in RAM instead of writing them to disk. It saves space but spends CPU. Only a few universities teach it."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "CPU utilisation against number of processes. It peaks near six processes and then falls as thrashing sets in; adding more processes past the peak makes the machine slower.",
+  "spec": {
+   "type": "plot",
+   "x": {
+    "label": "Processes in memory",
+    "min": 0,
+    "max": 10
+   },
+   "y": {
+    "label": "CPU utilisation (%)",
+    "min": 0,
+    "max": 100
+   },
+   "series": [
+    {
+     "name": "utilisation",
+     "points": [
+      [
+       1,
+       20
+      ],
+      [
+       2,
+       35
+      ],
+      [
+       3,
+       55
+      ],
+      [
+       4,
+       75
+      ],
+      [
+       5,
+       90
+      ],
+      [
+       6,
+       92
+      ],
+      [
+       7,
+       80
+      ],
+      [
+       8,
+       50
+      ],
+      [
+       9,
+       25
+      ]
+     ],
+     "style": "accent",
+     "_pts": [
+      [
+       1.0,
+       20.0
+      ],
+      [
+       2.0,
+       35.0
+      ],
+      [
+       3.0,
+       55.0
+      ],
+      [
+       4.0,
+       75.0
+      ],
+      [
+       5.0,
+       90.0
+      ],
+      [
+       6.0,
+       92.0
+      ],
+      [
+       7.0,
+       80.0
+      ],
+      [
+       8.0,
+       50.0
+      ],
+      [
+       9.0,
+       25.0
+      ]
+     ]
+    }
+   ],
+   "aria": "CPU utilisation rises as more processes are admitted, peaks near six processes, then falls sharply once thrashing begins."
+  }
+ },
+ "examples": [
+  {
+   "question": "A system has m = 100 usable frames. Three processes need P1 = 10 pages, P2 = 30 pages, P3 = 60 pages. (a) Give an equal allocation, the leftover frames, the surplus for P1 and the shortfall for P3. (b) Give a proportional allocation. (c) For the reference string 2, 6, 1, 5, 7, 7, 7, 7, 5, 1 and window Δ = 4, find the working-set size at the last reference.",
+   "steps": [
+    "Equal allocation: floor(100 ÷ 3) = 33 frames each.",
+    "Used frames = 33 × 3 = 99, so leftover = 100 − 99 = 1 frame.",
+    "P1 surplus = 33 − 10 = 23 frames. P3 shortfall = 60 − 33 = 27 frames.",
+    "Total pages S = 10 + 30 + 60 = 100 pages.",
+    "Proportional allocation: P1 = floor(100 × 10 ÷ 100) = 10 frames; P2 = floor(100 × 30 ÷ 100) = 30 frames; P3 = floor(100 × 60 ÷ 100) = 60 frames.",
+    "The last Δ = 4 references are 7, 7, 5, 1. Distinct pages are {1, 5, 7}, so WSS = 3 pages.",
+    "The sum of all working-set sizes must stay ≤ 100 frames to keep admitting processes; this window alone uses 3 pages."
+   ],
+   "answer": "Equal allocation gives 33 frames each with 1 frame left over, P1 has a surplus of 23 frames and P3 is short by 27 frames; proportional allocation gives 10, 30 and 60 frames; the last working-set window has WSS = 3 pages.",
+   "check": "m = 100\ns = [10, 30, 60]\nn = len(s)\nequal = m // n\nleft = m - equal * n\np1_surplus = equal - s[0]\np3_short = s[2] - equal\nS = sum(s)\nprop = [m * x // S for x in s]\nrefs = [2, 6, 1, 5, 7, 7, 7, 7, 5, 1]\nwss = len(set(refs[-4:]))\nfor v in [equal, left, p1_surplus, p3_short, prop[0], prop[1], prop[2], wss]:\n    print(v)",
+   "values": [
+    33,
+    1,
+    23,
+    27,
+    10,
+    30,
+    60,
+    3
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "More processes always raise CPU use. Past the thrashing peak, each extra process lowers throughput.",
+  "The working-set size counts distinct pages in the window, not references. Repeating page 7 four times adds one page, not four.",
+  "Equal allocation is not the same as fair allocation. A 10-page process and a 60-page process do not need the same frames.",
+  "Global replacement lets a process take any frame; local replacement restricts victims to the faulting process. FIFO or LRU is a separate choice.",
+  "A slow machine is not always short of CPU. A high page-fault rate shows the shortage is frames."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define thrashing.",
+   "marks": 2,
+   "a": "Thrashing is when a process or system spends more time paging pages in and out than executing instructions."
+  },
+  {
+   "level": "understand",
+   "q": "Why does equal allocation waste frames for a small process?",
+   "marks": 3,
+   "a": "Equal allocation gives every process the same number of frames. A small process may need only 10 pages but get 33 frames, so 23 frames stay unused while a large process remains short."
+  },
+  {
+   "level": "apply",
+   "q": "A system has 80 usable frames and two processes with 20 pages and 60 pages. Give the proportional allocation.",
+   "marks": 3,
+   "a": "S = 20 + 60 = 80. P1 gets floor(80 × 20 ÷ 80) = 20 frames. P2 gets floor(80 × 60 ÷ 80) = 60 frames."
+  },
+  {
+   "level": "analyze",
+   "q": "CPU utilisation is 30% and the page-fault rate is very high. Should the OS admit another process? Explain.",
+   "marks": 4,
+   "a": "No. Low CPU use with a high fault rate is the thrashing signature. Admitting another process takes frames from running processes, raises faults further, and lowers CPU use more."
+  },
+  {
+   "level": "apply",
+   "q": "References are 1, 2, 3, 1, 2, 4 with window Δ = 4. Find WSS at the last reference.",
+   "marks": 3,
+   "a": "The last four references are 3, 1, 2, 4. Distinct pages are {1, 2, 3, 4}, so WSS = 4 pages."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between global and local replacement.",
+   "marks": 2,
+   "a": "In global replacement a victim frame may belong to any process; in local replacement the victim must belong to the process that faulted."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can adding a small process increase total page faults?",
+   "marks": 4,
+   "a": "The new process takes frames from running processes. Their frame counts fall below their working sets, so they fault more. The extra faults can outweigh the small process's own work."
+  }
+ ],
+ "beyond": "Not for the exam. Production kernels use memory pressure signals and per-cgroup limits rather than a single global frame count. Linux reclaims pages using active and inactive lists, and zram or zswap compresses pages instead of swapping. Cloud hosts overcommit memory and rely on ballooning and hotplug to correct mistakes. Search terms: working-set reclaim, page-fault frequency, memory cgroup, zram, PSI."
+}

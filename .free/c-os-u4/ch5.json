@@ -1,0 +1,220 @@
+{
+ "lead": "A page table maps every virtual page of a process to a physical frame. For a 32-bit address space with 4 KB pages, a flat table needs about one million entries, roughly 4 MB for every process. Most entries are unused. Operating systems therefore split, hash or invert the table and keep only the parts the process actually uses. This keeps context switches and memory use under control while translation stays fast with the TLB from <a href=\"#paging-and-the-translation-look-aside-buffer\">4.4</a>.",
+ "prereq": "You need <a href=\"#paging-and-the-translation-look-aside-buffer\">4.4</a> for the page number p, offset d, page-table entry (PTE) and page-table base register (PTBR).",
+ "sections": [
+  {
+   "h3": "The flat table is too large",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In <a href=\"#paging-and-the-translation-look-aside-buffer\">4.4</a>, each process has a page table with one entry per virtual page. The page number has m − n bits when the logical address has m bits and the offset has n bits. One PTE is often 4 bytes. The table size is the number of entries times the PTE size."
+    },
+    {
+     "type": "formula",
+     "text": "PTEs = 2<sup>m − n</sup>; table bytes = PTEs × PTE size",
+     "where": "m is the number of bits in the logical address; n is the number of offset bits, so page size = 2<sup>n</sup> bytes; one PTE is 4 bytes in the running example."
+    },
+    {
+     "type": "p",
+     "text": "For a 32-bit address and 4 KB pages: n = 12, so m − n = 20; 2²⁰ = 1,048,576 entries; at 4 bytes each, 4,194,304 bytes = 4 MB per process. Fifty processes would need 200 MB just for page tables, and most entries point nowhere because a process uses a small part of its address space."
+    }
+   ]
+  },
+  {
+   "h3": "Two-level and multi-level paging",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two-level paging splits the page number p into p1 and p2. The first-level (outer) table is indexed by p1. Its entry points to a second-level (inner) table, which is indexed by p2. That entry gives the frame number. The offset d then picks the byte inside the 4 KB frame. The address is p1 | p2 | d."
+    },
+    {
+     "type": "formula",
+     "text": "m = p1 bits + p2 bits + d bits",
+     "where": "m is the logical-address width; p1 indexes the outer table; p2 indexes an inner table; d is the offset inside a page."
+    },
+    {
+     "type": "p",
+     "text": "In the running example, 20 page-number bits split as 10 + 10, so d = 12 bits. The outer table has 2¹⁰ = 1024 entries and is 4 KB. Each inner table also has 1024 entries and is 4 KB. An inner table exists only when some page in its 4 MB range is used. A process with three separate 4 MB regions needs one outer table and three inner tables: 4 KB + 3 × 4 KB = 16 KB, not 4 MB."
+    },
+    {
+     "type": "p",
+     "text": "A three-level table splits p again. A flat 64-bit table is impossible, so common designs use four or five levels, hashed tables or inverted tables."
+    }
+   ]
+  },
+  {
+   "h3": "Hashed and inverted tables, and ASIDs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A hashed page table stores entries in buckets. The hardware hashes the virtual page number, then walks the chain in that bucket comparing stored virtual page numbers until it finds a match. The matching entry gives the frame number. A chain handles collisions. This is common for address spaces larger than 32 bits."
+    },
+    {
+     "type": "p",
+     "text": "An inverted page table has one entry per physical frame, not per virtual page. Each entry stores the process id and virtual page number that occupy that frame, plus protection data. To translate, the OS or hardware searches the table; a hash on pid and page number makes the search short. One table serves all processes, so it is small, but a miss costs a search and sharing pages is awkward."
+    },
+    {
+     "type": "p",
+     "text": "A translation look-aside buffer (TLB) caches recent translations. On a context switch, old entries belong to the old process. An address-space identifier (ASID) is stored with each TLB entry; the hardware compares the ASID as well as the page number. Then the OS need not flush the whole TLB at every switch."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The outer index selects an inner table; only used inner tables exist. The inner index p2 selects the entry inside that table, and the 12-bit offset d picks the byte in the final 4 KB frame.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Two-level paging for a 32-bit address, 4 KB pages",
+   "nodes": [
+    {
+     "id": "addr",
+     "label": "32-bit address",
+     "note": "splits into p1, p2, d",
+     "style": "normal"
+    },
+    {
+     "id": "p1",
+     "label": "p1: 10 bits",
+     "note": "outer index",
+     "style": "accent"
+    },
+    {
+     "id": "p2",
+     "label": "p2: 10 bits",
+     "note": "inner index (input)",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "d: 12 bits",
+     "note": "offset in frame",
+     "style": "muted"
+    },
+    {
+     "id": "outer",
+     "label": "Outer table",
+     "note": "1024 entries, 4 KB",
+     "style": "accent"
+    },
+    {
+     "id": "inner",
+     "label": "Inner table",
+     "note": "4 KB, only if used",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "addr",
+     "to": "p1",
+     "style": "solid"
+    },
+    {
+     "from": "addr",
+     "to": "p2",
+     "style": "solid"
+    },
+    {
+     "from": "addr",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "p1",
+     "to": "outer",
+     "style": "solid"
+    },
+    {
+     "from": "outer",
+     "to": "inner",
+     "style": "solid"
+    },
+    {
+     "from": "p2",
+     "to": "inner",
+     "style": "solid"
+    }
+   ],
+   "aria": "The 32-bit address splits into a 10-bit outer index p1, a 10-bit inner index p2 and a 12-bit offset d. p1 selects the outer-table entry that points to an inner table; p2 indexes that inner table; d selects the byte in the final frame."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 32-bit logical address uses 4 KB pages and 4-byte page-table entries. (a) Find the number of entries and the size of a flat page table. (b) The page number is split 10 + 10 for two-level paging. Find the size of the outer table and one inner table. (c) The process uses three separate 4 MB regions. Find total page-table memory and compare with (a).",
+   "steps": [
+    "Page offset: page size = 4 KB = 4096 B = 2¹² B, so d = 12 bits.",
+    "Page-number bits: 32 − 12 = 20 bits. Flat entries = 2²⁰ = 1,048,576 entries.",
+    "Flat table size = 1,048,576 × 4 B = 4,194,304 B = 4 MB.",
+    "Two-level split: p1 = 10 bits, p2 = 10 bits, d = 12 bits. Outer entries = 2¹⁰ = 1024; outer size = 1024 × 4 B = 4096 B = 4 KB.",
+    "Inner entries = 2¹⁰ = 1024; one inner table = 1024 × 4 B = 4096 B = 4 KB.",
+    "The three regions lie in three different 4 MB ranges, so each needs its own inner table. Total = 4096 B + 3 × 4096 B = 16,384 B = 16 KB.",
+    "Comparison: 4,194,304 B ÷ 16,384 B = 256. The flat table is 256 times the two-level total."
+   ],
+   "answer": "Flat table: 1,048,576 entries and 4,194,304 B (4 MB); outer table: 4096 B; one inner table: 4096 B; three-region total: 16,384 B (16 KB), which is 256 times smaller than the flat table.",
+   "check": "page_size = 4096\npte_size = 4\nm = 32\nd_bits = 12\npno_bits = m - d_bits\nflat_entries = 2 ** pno_bits\nflat_bytes = flat_entries * pte_size\nouter_bytes = (2 ** 10) * pte_size\ninner_bytes = (2 ** 10) * pte_size\ntotal_bytes = outer_bytes + 3 * inner_bytes\nratio = flat_bytes // total_bytes\nprint(flat_entries)\nprint(flat_bytes)\nprint(outer_bytes)\nprint(inner_bytes)\nprint(total_bytes)\nprint(ratio)",
+   "values": [
+    1048576,
+    4194304,
+    4096,
+    4096,
+    16384,
+    256
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not multiply the outer table's entry count by the PTE size and stop; the 4 MB flat size comes from all 2²⁰ entries, while 4 KB is only one level's size.",
+  "Do not assume every inner table exists. The saving in two-level paging comes exactly from skipping inner tables for unused 4 MB ranges.",
+  "A hashed table hashes the virtual page number, not the frame number; a chain resolves collisions.",
+  "An inverted table has one entry per physical frame, not per virtual page, and must store the pid with the page number.",
+  "An ASID lets TLB entries of different processes coexist; it does not remove the page-table walk on a TLB miss."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In two-level paging, what does the outer index p1 select?",
+   "marks": 2,
+   "a": "It selects an entry in the outer page table; that entry points to the inner page table for one 4 MB region."
+  },
+  {
+   "level": "understand",
+   "q": "Why does two-level paging use less memory than a flat table for a sparse address space?",
+   "marks": 3,
+   "a": "Only inner tables for used 4 MB regions are allocated; unused regions have no inner table. The outer table always exists."
+  },
+  {
+   "level": "apply",
+   "q": "Same 32-bit address, 4 KB pages, 4-byte PTEs, 10 + 10 + 12 split. A process uses five separate 4 MB regions. Find total page-table bytes.",
+   "marks": 4,
+   "a": "Outer = 1024 × 4 = 4096 B. Five inners = 5 × 4096 = 20,480 B. Total = 24,576 B = 24 KB."
+  },
+  {
+   "level": "analyze",
+   "q": "A process touches one page near the top of its 32-bit address space. How much page-table memory does the two-level scheme need? Explain.",
+   "marks": 4,
+   "a": "One outer table plus one inner table = 4096 B + 4096 B = 8192 B = 8 KB. Only the one inner table for that 4 MB region exists; a flat table would be 4 MB."
+  },
+  {
+   "level": "understand",
+   "q": "Compare hashed and inverted page tables in one sentence each.",
+   "marks": 3,
+   "a": "Hashed: hash the virtual page number to a bucket, then search the chain for a matching page number. Inverted: keep one entry per physical frame and search by pid and page number."
+  },
+  {
+   "level": "analyze",
+   "q": "What does an ASID in a TLB entry avoid after a context switch?",
+   "marks": 3,
+   "a": "It lets entries of different processes coexist, so the OS need not flush the entire TLB; hardware ignores entries whose ASID differs from the current process."
+  },
+  {
+   "level": "apply",
+   "q": "A 32-bit address uses 8 KB pages and 4-byte PTEs. Find the flat page-table size.",
+   "marks": 4,
+   "a": "8 KB = 2¹³ B, so offset bits = 13. Page-number bits = 32 − 13 = 19. Entries = 2¹⁹ = 524,288. Size = 524,288 × 4 B = 2,097,152 B = 2 MB."
+  }
+ ],
+ "beyond": "Not for the exam. Real processors use multi-level radix page tables, huge pages and tagged TLBs; the same ideas appear in hardware page-table walkers. Virtual machines add nested paging, where two translations happen per access. Search for multi-level page tables, huge pages, ASID and inverted page tables."
+}

@@ -1,0 +1,246 @@
+{
+ "lead": "When memory is full and another process needs space, the operating system can copy one whole process out to disk and later copy it back. The disk area that holds these copies is the backing store, also called swap space. This is swapping: roll out, then roll in. It lets more processes take turns in a small memory than could fit at once. The catch is time. Moving a whole process costs far more than the CPU work it saves, so classic whole-process swapping has largely given way to moving individual pages.",
+ "prereq": "You need: <a href=\"#memory-management-strategies-and-address-spaces\">4.1</a> for what lives in memory, and Unit 2 for context switching and scheduling queues.",
+ "sections": [
+  {
+   "h3": "Roll out and roll in",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The memory manager wants the CPU busy. The CPU is busy only if some ready process sits in memory. When memory is full and a new or higher-priority process needs frames, one option is to move a process out of the way entirely."
+    },
+    {
+     "type": "p",
+     "text": "Swapping does exactly that. The OS picks a victim, usually a process that is blocked or has low priority, and copies every byte of it from memory to a disk area. That is swap out, also called roll out. Later, when the process should run again, the OS copies it back: swap in, or roll in. The disk area is the backing store, also called swap space or the swap device."
+    },
+    {
+     "type": "p",
+     "text": "The backing store must hold copies of every process that might be out at the same time, and it must allow direct access, so any process can be read back without scanning past the others."
+    },
+    {
+     "type": "p",
+     "text": "The classic rule: a process is either entirely in memory or entirely on disk. Half-swapped processes do not exist in this scheme. So the moment a victim is chosen, all its frames become free at once, and the waiting process can be loaded into that space."
+    },
+    {
+     "type": "p",
+     "text": "Two decisions belong to the OS: which process to swap out, and when. Swapping out a process that will be needed again soon wastes disk bandwidth and delays it."
+    }
+   ]
+  },
+  {
+   "h3": "The cost is transfer time",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A swap is pure copying, so its cost is set by the disk, not the CPU. Each direction takes the process size divided by the transfer rate, plus one disk latency for the seek and rotation."
+    },
+    {
+     "type": "formula",
+     "text": "T_swap = 2 × (S ÷ R + L)",
+     "where": "T_swap is the total swap time in seconds; S is the process size in megabytes; R is the disk transfer rate in MB/s; L is the disk latency in seconds; the factor 2 counts the copy out and the copy in."
+    },
+    {
+     "type": "p",
+     "text": "Latency is a few milliseconds on a hard disk, so the transfer dominates for any decent-sized process. Notice what the formula says: swap time grows in a straight line with process size."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Process size",
+      "Copy out (s)",
+      "Complete swap (s)"
+     ],
+     "rows": [
+      [
+       "10 MB",
+       "0.21",
+       "0.42"
+      ],
+      [
+       "50 MB",
+       "1.01",
+       "2.02"
+      ],
+      [
+       "100 MB",
+       "2.01",
+       "4.02"
+      ],
+      [
+       "200 MB",
+       "4.01",
+       "8.02"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Values in the table use R = 50 MB/s and L = 10 ms. If the next process to run is not in memory, the context switch cannot finish until the copy in completes. So context-switch time is not a fixed few microseconds; it becomes proportional to process size (see Unit 2)."
+    }
+   ]
+  },
+  {
+   "h3": "Why whole processes rarely swap now",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Compare the two numbers. A 100 MB process costs 4.02 s to swap. On the same machine a time slice might be 10 ms. That swap is worth 402 time slices. No scheduler can win that trade, even if the swapped process would use every slice fully. Meanwhile the CPU sits idle, or at best runs the other processes, while the disk copies."
+    },
+    {
+     "type": "p",
+     "text": "So modern systems still swap, but in much smaller units. A page is typically 4 KB. Copying a page at 50 MB/s takes about 0.08 ms, slow but survivable, especially since most needed pages are already in memory. Page-level work is covered in <a href=\"#virtual-memory-demand-paging-page-faults-copy-on-write\">4.7</a> and <a href=\"#page-replacement-algorithms-fifo-lru-optimal\">4.8</a>."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Unix-style systems keep a swap area and send pages to it only when free memory falls below a threshold; otherwise they free memory by dropping clean file pages and writing back dirty ones.",
+      "Windows uses page files, written page by page, sized by the system or the user.",
+      "Linux also has a swap partition or swap file, but it moves pages, not whole processes.",
+      "Android and iOS normally do not swap to disk. Android may swap into a compressed area of RAM (zram); iOS keeps no swap device. With no disk swap, both end idle background apps when memory runs short."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "How swap space is laid out on disk is a file-system topic; see Unit 5."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A full memory forces the OS to pick a victim, copy it out, free its frames, then copy the next process in. The two copy steps carry the times from the worked example.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Swapping one process out and another in",
+   "nodes": [
+    {
+     "id": "full",
+     "label": "Memory full",
+     "note": "no free hole",
+     "style": "normal"
+    },
+    {
+     "id": "pick",
+     "label": "Pick a victim",
+     "note": "lowest priority process",
+     "style": "normal"
+    },
+    {
+     "id": "out",
+     "label": "Copy out",
+     "note": "2.01 s to swap space",
+     "style": "accent"
+    },
+    {
+     "id": "free",
+     "label": "Frames free",
+     "note": "victim leaves memory",
+     "style": "normal"
+    },
+    {
+     "id": "in",
+     "label": "Copy in",
+     "note": "2.01 s for a next process of 100 MB",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "full",
+     "to": "pick",
+     "style": "solid"
+    },
+    {
+     "from": "pick",
+     "to": "out",
+     "style": "solid"
+    },
+    {
+     "from": "out",
+     "to": "free",
+     "style": "solid"
+    },
+    {
+     "from": "free",
+     "to": "in",
+     "style": "solid"
+    }
+   ],
+   "aria": "A full memory forces the OS to pick a victim, copy it out to swap space, free its frames, and then copy the next process in."
+  }
+ },
+ "examples": [
+  {
+   "question": "A process of 100 MB must be swapped out of memory. The backing store transfers at 50 MB/s and has a disk latency of 10 ms per transfer. The CPU time slice is 10 ms. Find (a) the copy-out time, (b) the time for one complete swap, and (c) how many time slices that swap is worth.",
+   "steps": [
+    "Copy-out transfer time = S ÷ R = 100 MB ÷ 50 MB/s = 2 s.",
+    "Add one disk latency: 2 s + 0.010 s = 2.01 s to write the process to swap space.",
+    "Copy in is the same size at the same rate: 2 s + 0.010 s = 2.01 s to read it back.",
+    "One complete swap = 2.01 s + 2.01 s = 4.02 s.",
+    "Time slices lost = 4.02 s ÷ 0.010 s per slice = 402 slices."
+   ],
+   "answer": "Copy out takes 2.01 s, one complete swap takes 4.02 s, and that is worth 402 time slices of 10 ms.",
+   "check": "S = 100.0\nR = 50.0\nL = 0.010\nslice_s = 0.010\nt_out = S / R\nt_out_lat = t_out + L\nswap = 2 * t_out_lat\nslices = swap / slice_s\nprint(t_out)\nprint(round(t_out_lat, 2))\nprint(round(swap, 2))\nprint(round(slices, 2))",
+   "values": [
+    2.0,
+    2.01,
+    4.02,
+    402.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Counting the transfer only once. The process goes out and comes back, so the transfer cost doubles; 100 MB at 50 MB/s is 4 s of transfer, not 2 s.",
+  "Mixing MB (megabytes) with Mb (megabits). 100 MB at 50 Mb/s is 16 s, not 2 s. Divide by 8 when the sizes are in different units.",
+  "Thinking swap time is a small constant. It is linear in process size, which is exactly why whole-process swapping lost to paging.",
+  "Forgetting the disk latency, or adding it once instead of twice. Each of the two transfers pays its own latency.",
+  "Treating swapping and paging as the same thing. Classic swapping moves a whole process and leaves it entirely in memory or entirely on disk; paging moves individual pages and keeps the rest in memory."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define backing store and give its two other common names.",
+   "marks": 2,
+   "a": "The backing store is the disk area that holds copies of processes that have been swapped out of memory. It is also called swap space or the swap device."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the swap-time formula multiply by 2?",
+   "marks": 3,
+   "a": "A swap has two transfers: the victim is written to the backing store and later read back. Both move the same number of bytes at the same rate and each pays its own latency, so the single-transfer cost is doubled."
+  },
+  {
+   "level": "apply",
+   "q": "A 200 MB process is swapped at 40 MB/s with a latency of 5 ms. Find the copy-out time and the time for one complete swap.",
+   "marks": 4,
+   "a": "Transfer = 200 ÷ 40 = 5 s. Copy out = 5 + 0.005 = 5.005 s. Complete swap = 2 × 5.005 = 10.01 s."
+  },
+  {
+   "level": "apply",
+   "q": "With the swap of 10.01 s above and a time slice of 10 ms, how many time slices does the swap cost?",
+   "marks": 3,
+   "a": "10.01 s ÷ 0.010 s = 1001 time slices."
+  },
+  {
+   "level": "analyze",
+   "q": "A system swaps a whole process out on every context switch, and another back in. Its time slices are 10 ms and its processes average 50 MB at 50 MB/s with 10 ms latency. Explain what happens to CPU utilisation.",
+   "marks": 5,
+   "a": "One complete swap = 2 × (1 s + 0.01 s) = 2.02 s, about 202 slices. The machine spends 2.02 s of disk copying to deliver 10 ms of CPU work, so utilisation collapses and the system behaves like thrashing. Whole-process swapping on every switch is unusable; that is why pages are swapped instead."
+  },
+  {
+   "level": "analyze",
+   "q": "Give two reasons why phones such as Android and iOS generally do not use disk swap.",
+   "marks": 4,
+   "a": "Flash storage is slower per operation than RAM and wears out with repeated writes, so constant paging would hurt both speed and device life. Phone memory pressure is handled instead by ending idle background apps, and by compressing some pages in RAM."
+  },
+  {
+   "level": "understand",
+   "q": "State the classic rule about where a swapped process lives, and say what it means for free frames.",
+   "marks": 3,
+   "a": "A process is entirely in memory or entirely on disk. So when a victim is swapped out, all of its frames are released together, giving one large free region for the incoming process."
+  }
+ ],
+ "beyond": "Not for the exam. Linux now ships compressed RAM swap (zram) and a swap cache layer (zswap) that trade CPU cycles for avoiding disk writes entirely, which changes the arithmetic in this chapter. Container platforms lean on memory overcommit and the out-of-memory killer rather than classical swapping, and cloud providers bill partly on memory pressure. Android's low-memory killer and iOS memory limits are worth reading as real designs of \"what to do when memory is full\". Search for zram, zswap, memory overcommit, and the Linux OOM killer."
+}

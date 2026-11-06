@@ -1,0 +1,205 @@
+{
+ "lead": "Physical memory is cut into fixed-size frames; each process is cut into pages of the same size. A page table maps each page to any free frame, so memory need not be contiguous. Because page size is a power of two, the hardware splits an address into page number and offset by bits. A small cache called the translation look-aside buffer (TLB) keeps recent translations, avoiding a second memory read on most accesses. Every phone app, database and cloud virtual machine uses this pair: paging gives flexible placement, and the TLB makes it fast.",
+ "prereq": "You need <a href=\"#memory-management-strategies-and-address-spaces\">4.1</a> for logical versus physical addresses and <a href=\"#contiguous-memory-allocation-and-fragmentation\">4.3</a> for why contiguous allocation fails.",
+ "sections": [
+  {
+   "h3": "Pages, frames and the address split",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Physical memory is cut into fixed-size blocks called frames. A process is cut into blocks of the same size called pages. Page and frame sizes are equal and always a power of two, so the hardware can split a logical address by bits instead of dividing."
+    },
+    {
+     "type": "formula",
+     "text": "p = logical address ÷ page size (integer part); d = logical address mod page size; physical address = frame × page size + d",
+     "where": "p is the page number, d is the offset inside the page, and frame is the frame number that the page table gives for page p."
+    },
+    {
+     "type": "p",
+     "text": "With page size 4 KB = 4096 bytes and a 32-bit logical address, the offset needs d = log₂ 4096 = 12 bits. The page number gets the remaining p = 32 − 12 = 20 bits."
+    },
+    {
+     "type": "p",
+     "text": "Logical address 8196 = 2 × 4096 + 4, so page number p = 2 and offset d = 4. Each process has a page table with one entry per page. Entry 2 says frame 5. Physical address = 5 × 4096 + 4 = 20484."
+    },
+    {
+     "type": "p",
+     "text": "The page-table base register (PTBR) holds the physical address of the page table; some syllabi call it the page-table pointer. Pages need not be contiguous, so any page can go in any free frame. Only the last page of a process may waste space inside its frame; this waste is internal fragmentation."
+    }
+   ]
+  },
+  {
+   "h3": "Why a TLB, and effective access time",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Without a TLB every memory access costs two reads: one for the page-table entry and one for the data. The translation look-aside buffer (TLB) is a small, fast, associative memory inside the CPU. It caches recent page-table entries."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "On a hit, the frame number is available at once and the access needs one memory read.",
+      "On a miss, the CPU reads the page table, then the data, and copies the entry into the TLB.",
+      "An address-space identifier (ASID) in each TLB entry tells which process the entry belongs to, so a context switch need not flush everything.",
+      "Some entries are wired: they cannot be evicted, and the kernel uses them for code that must never fault."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "EAT = h(t + m) + (1 − h)(t + 2m)",
+     "where": "h is the hit ratio (0 to 1), t is the TLB search time in ns, m is one memory access time in ns, and EAT is the effective access time in ns."
+    },
+    {
+     "type": "p",
+     "text": "Take h = 0.8, t = 10 ns and m = 100 ns. EAT = 0.8 × (10 + 100) + 0.2 × (10 + 100 + 100) = 88 + 42 = 130 ns. The miss case has two memory reads, not one."
+    }
+   ]
+  },
+  {
+   "h3": "What page size changes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A larger page means fewer page-table entries and fewer TLB misses, but more waste in the last page of each process. A smaller page wastes less, but the table grows and the TLB holds fewer useful translations. The operating system picks a size that balances table size, TLB reach and fragmentation."
+    },
+    {
+     "type": "p",
+     "text": "The page table itself lives in memory, so the PTBR changes on every context switch. On a TLB miss the hardware reads the entry at PTBR + p × entry size. A page-table entry usually also stores valid, protection and dirty bits; those bits are checked during translation."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Logical address 8196 splits into page 2 and offset 4; entry 2 of the page table points to frame 5, so the physical address is 20484.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Page 2 of the process sits in frame 5",
+   "nodes": [
+    {
+     "id": "cpu",
+     "label": "CPU",
+     "note": "logical address 8196",
+     "style": "normal"
+    },
+    {
+     "id": "split",
+     "label": "Split",
+     "note": "p = 2, d = 4",
+     "style": "accent"
+    },
+    {
+     "id": "pt",
+     "label": "Page table",
+     "note": "entry 2 gives frame 5",
+     "style": "accent"
+    },
+    {
+     "id": "phys",
+     "label": "Physical memory",
+     "note": "5 × 4096 + 4 = 20484",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cpu",
+     "to": "split",
+     "label": "8196",
+     "style": "solid"
+    },
+    {
+     "from": "split",
+     "to": "pt",
+     "label": "p = 2",
+     "style": "solid"
+    },
+    {
+     "from": "pt",
+     "to": "phys",
+     "label": "frame 5",
+     "style": "solid"
+    }
+   ],
+   "aria": "Logical address 8196 splits into page 2 and offset 4, the page table maps page 2 to frame 5, and the physical address becomes 20484."
+  }
+ },
+ "examples": [
+  {
+   "question": "A system has 32-bit logical addresses and a page size of 4 KB. (a) How many bits are used for the page number and the offset? (b) Translate logical address 8196 when the page table says page 2 is in frame 5. (c) Find the effective access time if the TLB hit ratio is 0.8, TLB search takes 10 ns and a memory access takes 100 ns.",
+   "steps": [
+    "Page size = 4 KB = 4096 = 2¹² bytes, so offset bits d = log₂ 4096 = 12 bits.",
+    "Page-number bits p = 32 − 12 = 20 bits.",
+    "8196 ÷ 4096 = 2 with remainder 4, so page number p = 2 and offset d = 4.",
+    "Page-table entry 2 gives frame 5.",
+    "Physical address = 5 × 4096 + 4 = 20480 + 4 = 20484.",
+    "EAT = 0.8 × (10 ns + 100 ns) + 0.2 × (10 ns + 100 ns + 100 ns).",
+    "EAT = 0.8 × 110 + 0.2 × 210 = 88 + 42 = 130 ns."
+   ],
+   "answer": "Offset bits = 12, page-number bits = 20, physical address = 20484, and EAT = 130 ns.",
+   "check": "page_size = 4096\nlogical = 8196\nd_bits = 12\np_bits = 20\np = logical // page_size\nd = logical % page_size\nframe = 5\nphysical = frame * page_size + d\nh = 0.8\nt = 10\nm = 100\neat = h * (t + m) + (1 - h) * (t + 2 * m)\nprint(d_bits)\nprint(p_bits)\nprint(p)\nprint(d)\nprint(physical)\nprint(eat)",
+   "values": [
+    12,
+    20,
+    2,
+    4,
+    20484,
+    130.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not compute offset bits as log₂(number of pages). It is log₂(page size in bytes).",
+  "EAT on a TLB miss includes the TLB search plus two memory reads: one for the page-table entry and one for the data.",
+  "A page is a logical unit and a frame is a physical unit; do not say a process is divided into frames.",
+  "Internal fragmentation occurs only in the last page of a process, not in every page.",
+  "The PTBR stores the physical address of the page table, not the page number of the current page."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a TLB?",
+   "marks": 2,
+   "a": "A small, fast, associative cache inside the CPU that holds recent page-table entries."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a memory access need two reads when there is no TLB?",
+   "marks": 3,
+   "a": "One read fetches the page-table entry to find the frame, and the second read fetches the actual data from that frame."
+  },
+  {
+   "level": "apply",
+   "q": "Page size is 2 KB. Logical address 5000 maps to frame 7. Find the page number, offset and physical address.",
+   "marks": 4,
+   "a": "p = 5000 ÷ 2048 = 2, d = 5000 − 4096 = 904, physical = 7 × 2048 + 904 = 14336 + 904 = 15240."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a TLB entry need an ASID?",
+   "marks": 3,
+   "a": "Two processes can use the same page numbers for different frames. The ASID tells which process an entry belongs to, so a context switch need not flush the TLB."
+  },
+  {
+   "level": "remember",
+   "q": "How many offset bits does an 8 KB page need?",
+   "marks": 2,
+   "a": "8 KB = 8192 = 2¹³, so 13 offset bits."
+  },
+  {
+   "level": "understand",
+   "q": "Why must page size be a power of two?",
+   "marks": 3,
+   "a": "Then the address splits into page number and offset by bit positions, with no division in the hardware."
+  },
+  {
+   "level": "apply",
+   "q": "TLB hit ratio 0.9, TLB search 5 ns, memory access 80 ns. Find EAT.",
+   "marks": 4,
+   "a": "EAT = 0.9 × (5 + 80) + 0.1 × (5 + 80 + 80) = 76.5 + 16.5 = 93 ns."
+  }
+ ],
+ "beyond": "Not for the exam. Real CPUs use a two-level TLB and a page-walk cache, and huge pages reduce TLB pressure in databases and virtual machines. Search next for TLB shootdown, ASID, huge pages, and page-walk cache."
+}

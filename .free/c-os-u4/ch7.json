@@ -1,0 +1,227 @@
+{
+ "lead": "Virtual memory separates the logical address space a process uses from the physical memory installed. With paging, the OS keeps only the pages a process touches in RAM and leaves the rest on disk. Demand paging loads a page on its first reference, so a large program starts quickly and can be larger than RAM. A laptop with many tabs and a phone opening apps both rely on this. The cost is the page fault, a trap that must be handled fast.",
+ "prereq": "You need: <a href=\"#paging-and-the-translation-look-aside-buffer\">4.4</a> for pages and frames, <a href=\"#structure-of-the-page-table\">4.5</a> for page-table entries, and <a href=\"#swapping-of-processes\">4.2</a> for disk transfer.",
+ "sections": [
+  {
+   "h3": "Virtual memory and demand paging",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Virtual memory is the separation of the logical address space from physical memory. A process gets a logical address space, independent of how much RAM is installed. With <a href=\"#paging-and-the-translation-look-aside-buffer\">paging</a>, this space is cut into pages and RAM into frames. The page table maps each page to a frame. Virtual memory lets the OS keep only the pages in use in frames and hold the rest in a swap area on disk. A program can then be larger than physical memory, and it can start before all its pages are loaded."
+    },
+    {
+     "type": "p",
+     "text": "Demand paging loads a page only when it is referenced. The OS acts as a pager, also called a lazy swapper: it does not swap whole processes, it brings in pages. In the page-table entry (PTE), a valid bit records whether the page is in memory. Valid 1 means the frame number is usable. Valid 0 means the page is not in memory; touching it causes a trap. In a <i>pure</i> demand paging system, a process starts with no pages in memory. The first instruction immediately faults, then the working pages arrive one by one."
+    }
+   ]
+  },
+  {
+   "h3": "The page fault and its cost",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A page fault is a trap caused by a reference to a page whose valid bit is 0. It is normal, not a program error. The hardware raises the trap; the OS handles it in this order:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Check the reference. If the address is outside the process's logical space, terminate with a segmentation fault. If legal but absent, continue.",
+      "Find a free frame, usually from a free-frame list. If none is free, choose a victim page (see <a href=\"#page-replacement-algorithms-fifo-lru-optimal\">4.8</a>).",
+      "If the victim page is dirty, write it back to its backing store: swap space for an anonymous page, or the mapped file for a file-backed page.",
+      "Set the victim's PTE valid bit to 0 and record where the victim page now lives: its swap slot or file location. The frame is now free for reuse.",
+      "Read the needed page from its backing store into the frame: swap space for an anonymous page, or the mapped file for a file-backed page.",
+      "Update the needed page's PTE: set valid 1 and write the frame number.",
+      "Restart the instruction that trapped. It now runs normally."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Let p be the page-fault rate, the fraction of memory references that fault. Let t<sub>a</sub> be memory access time and t<sub>s</sub> the page-fault service time. The effective access time is the average time per reference."
+    },
+    {
+     "type": "formula",
+     "text": "EAT = (1 − p) × t<sub>a</sub> + p × t<sub>s</sub>",
+     "where": "EAT is the effective access time per memory reference; p is the page-fault rate (0 ≤ p ≤ 1); t<sub>a</sub> is memory access time; t<sub>s</sub> is page-fault service time. Use the same unit for t<sub>a</sub> and t<sub>s</sub>."
+    },
+    {
+     "type": "p",
+     "text": "The term (1 − p) × t<sub>a</sub> is the no-fault case. The term p × t<sub>s</sub> is the fault case. Because t<sub>s</sub> is measured in milliseconds and t<sub>a</sub> in nanoseconds, p must be tiny for EAT to stay close to t<sub>a</sub>."
+    }
+   ]
+  },
+  {
+   "h3": "Copy-on-write and vfork",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "After fork, parent and child usually have identical pages. Copying them all is wasteful. Copy-on-write (COW) makes both page tables point to the same frames, and marks each shared writable private page read-only as a copy-on-write page. When either process writes to such a page, the write-protection fault traps. The OS allocates a new frame, copies the page into it, marks the writer's PTE writable and points it to the new frame. The other process keeps the old page. A page that was already read-only, such as a code page, is not copied on a write: writing it remains a protection fault. Pages never written stay shared. When fork is followed by exec, COW saves most of the copy."
+    },
+    {
+     "type": "p",
+     "text": "vfork is a special case: the child uses the parent's address space, and the parent is suspended until the child calls exec or exit. Do not let the child change memory under vfork."
+    },
+    {
+     "type": "p",
+     "text": "Memory-mapped files use the same machinery: a file is mapped into the address space and its pages are faulted in on demand. File systems and mmap are in Unit 5."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A page reference with valid bit 0 traps to the OS, which gets a free frame, reads the page from its backing store (swap space for an anonymous page or the mapped file for a file-backed page), updates the page table and restarts the instruction. If a victim frame is reused, the OS writes a dirty victim to its backing store if needed, clears the victim's valid bit, and records where the victim now lives. Notice that the fault is repaired, not reported as a program error.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "What happens on a page fault",
+   "nodes": [
+    {
+     "id": "ref",
+     "label": "Reference a page",
+     "style": "normal"
+    },
+    {
+     "id": "bit",
+     "label": "Valid bit 0",
+     "note": "page not in memory",
+     "style": "accent"
+    },
+    {
+     "id": "trap",
+     "label": "Trap to OS",
+     "style": "accent"
+    },
+    {
+     "id": "frame",
+     "label": "Get free frame",
+     "note": "from free list",
+     "style": "normal"
+    },
+    {
+     "id": "read",
+     "label": "Read page",
+     "note": "from backing store",
+     "style": "live"
+    },
+    {
+     "id": "table",
+     "label": "Update page table",
+     "note": "set valid, frame no.",
+     "style": "normal"
+    },
+    {
+     "id": "again",
+     "label": "Restart instruction",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ref",
+     "to": "bit",
+     "style": "solid"
+    },
+    {
+     "from": "bit",
+     "to": "trap",
+     "label": "fault",
+     "style": "solid"
+    },
+    {
+     "from": "trap",
+     "to": "frame",
+     "style": "solid"
+    },
+    {
+     "from": "frame",
+     "to": "read",
+     "style": "solid"
+    },
+    {
+     "from": "read",
+     "to": "table",
+     "style": "solid"
+    },
+    {
+     "from": "table",
+     "to": "again",
+     "style": "solid"
+    }
+   ],
+   "aria": "A reference to a page whose valid bit is zero traps to the OS, which takes a free frame, reads the page from its backing store, updates the page table and restarts the instruction."
+  }
+ },
+ "examples": [
+  {
+   "question": "A system has memory access time 200 ns and page-fault service time 8 ms. A slowdown of at most 10 percent is allowed. Find the largest page-fault rate p that keeps the effective access time within this limit, and the average number of references per page fault at that rate.",
+   "steps": [
+    "Data: t<sub>a</sub> = 200 ns. t<sub>s</sub> = 8 ms = 8,000,000 ns because 1 ms = 1,000,000 ns.",
+    "EAT = (1 − p) × 200 + p × 8,000,000 = 200 + p × (8,000,000 − 200) = 200 + 7,999,800p ns.",
+    "A 10 percent slowdown means EAT ≤ 1.10 × 200 = 220 ns.",
+    "Set 220 = 200 + 7,999,800p. Then 20 = 7,999,800p.",
+    "p ≤ 20 ÷ 7,999,800 = 2.500062502 × 10⁻⁶.",
+    "References per fault = 1 ÷ p ≥ 1 ÷ (2.500062502 × 10⁻⁶) = 399,990."
+   ],
+   "answer": "The fault rate must satisfy p ≤ 2.500062502 × 10⁻⁶, about one fault in 399,990 references, and the allowed effective access time is 220 ns.",
+   "check": "ma_ns = 200.0\nfault_ns = 8_000_000.0\nlimit_ns = 1.10 * ma_ns\np_max = (limit_ns - ma_ns) / (fault_ns - ma_ns)\nrefs = 1.0 / p_max\nprint(f\"{p_max:.10g}\")\nprint(int(round(refs)))\nprint(round(limit_ns, 1))",
+   "values": [
+    2.500062502e-06,
+    399990,
+    220.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Dropping the (1 − p) factor and using EAT = p × t<sub>s</sub> only. The no-fault case still costs one memory access.",
+  "Mixing milliseconds and nanoseconds. Convert 8 ms to 8,000,000 ns before putting it into the formula.",
+  "Treating a page fault as an error. A legal page that is merely absent from memory causes a normal trap and is loaded on demand.",
+  "Using p as a percentage. p = 0.1 means 10 percent of references fault, not 0.1 percent.",
+  "Thinking COW copies every page at fork. COW copies a page only when one process first writes to it."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a page fault.",
+   "marks": 2,
+   "a": "A page fault is a trap raised when a process references a page whose valid bit is 0, meaning the page is not currently in memory."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a process be larger than physical memory under demand paging?",
+   "marks": 3,
+   "a": "Only the pages currently referenced must be in frames. The remaining pages stay in swap space and are loaded when touched, so the logical address space can exceed RAM."
+  },
+  {
+   "level": "apply",
+   "q": "A system has t<sub>a</sub> = 100 ns, t<sub>s</sub> = 5 ms and p = 0.0001. Compute EAT in nanoseconds.",
+   "marks": 4,
+   "a": "5 ms = 5,000,000 ns. EAT = 0.9999 × 100 + 0.0001 × 5,000,000 = 99.99 + 500 = 599.99 ns."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must p be tiny? Use the ratio t<sub>s</sub> ÷ t<sub>a</sub>.",
+   "marks": 4,
+   "a": "The fault term is p × t<sub>s</sub>. If t<sub>s</sub> is 8,000,000 ns and t<sub>a</sub> is 200 ns, one fault adds the equivalent of 40,000 memory accesses. Even a small p then dominates EAT."
+  },
+  {
+   "level": "understand",
+   "q": "What does valid bit 0 mean? Is every such reference a program error?",
+   "marks": 3,
+   "a": "It means the page is not in memory. It is not necessarily an error: if the address is legal, the OS loads the page and restarts the instruction. An address outside the logical space is the error case."
+  },
+  {
+   "level": "analyze",
+   "q": "In copy-on-write after fork, when is a page actually copied?",
+   "marks": 3,
+   "a": "Only when the parent or child writes to a shared page. The write-protection fault makes the OS copy that page into a new frame for the writer; unwritten pages remain shared."
+  },
+  {
+   "level": "remember",
+   "q": "What does vfork guarantee about the parent?",
+   "marks": 2,
+   "a": "The parent is suspended until the child calls exec or exit, and the child uses the parent's address space."
+  }
+ ],
+ "beyond": "Not for the exam. Linux reports minor faults, where the page is in memory but not mapped, and major faults, which need disk I/O. Huge pages reduce fault and TLB cost for large working sets. Containers use memory cgroups to limit resident pages, which changes fault behaviour under pressure. Search for demand paging, copy-on-write fork and minor vs major page fault."
+}

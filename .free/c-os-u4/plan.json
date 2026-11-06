@@ -1,0 +1,674 @@
+{
+ "lead": "Memory management is how one physical memory is shared among many processes without any process reading another's data. After this unit you can translate a logical address into a physical one, run FIFO, LRU and optimal page replacement by hand with numbers, and explain why a machine thrashes and how to stop it.",
+ "about": "Main memory holds several processes at once while the CPU runs one of them. This unit shows the mechanisms that make that safe and affordable. Chapter 4.1 sets up logical and physical addresses and the base–limit check. 4.2 swaps whole processes to disk, and 4.3 places processes into contiguous holes and names the fragmentation that follows. 4.4 breaks memory into pages with a translation look-aside buffer, and 4.5 makes large page tables affordable. 4.6 covers segmentation, the programmer's view of memory. 4.7 adds virtual memory: pages loaded only on demand, page faults, copy-on-write. 4.8 compares FIFO, LRU and optimal replacement, and 4.9 decides how many frames each process gets and how to stop thrashing.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Each process works with its own logical addresses, and a hardware unit adds a base to turn them into physical addresses after a limit check.",
+   "depth": "Address binding at three moments: compile time (absolute code), load time (relocatable code) and execution time (needs hardware support). Logical address (also called virtual address) versus physical address. The memory-management unit (MMU) with two registers: base (some syllabi call it the relocation register) and limit. The rule: if offset ≥ limit, trap; else physical = base + offset. Why the check matters for protection in a multiprocessor machine. One line each on dynamic loading, dynamic linking and shared libraries. Name the two families of strategies: contiguous allocation and non-contiguous allocation (paging, segmentation), and say the rest of the unit fills these in. Keep it conceptual; no arithmetic beyond base plus offset.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "One logical address, one physical address",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "CPU",
+      "note": "logical address 346",
+      "style": "normal"
+     },
+     {
+      "id": "mmu",
+      "label": "MMU",
+      "note": "346 < 1000, add 14000",
+      "style": "accent"
+     },
+     {
+      "id": "mem",
+      "label": "Physical memory",
+      "note": "word 14346",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cpu",
+      "to": "mmu",
+      "label": "346",
+      "style": "solid"
+     },
+     {
+      "from": "mmu",
+      "to": "mem",
+      "label": "14346",
+      "style": "solid"
+     }
+    ],
+    "aria": "The CPU sends logical address 346 to the memory-management unit, which passes the limit check, adds the base 14000 and reaches physical word 14346."
+   },
+   "example": "Base register = 14000, limit register = 1000. (a) Logical address 346: 346 < 1000, so physical = 14000 + 346 = 14346. (b) Logical address 999: 999 < 1000, so physical = 14000 + 999 = 14999. (c) Logical address 1200: 1200 ≥ 1000, so the MMU raises a trap (address error) and the process is stopped.",
+   "trap": "Adding the base before checking the limit, so a bad offset can read another process. Also quoting a logical address as if it were physical, and treating the limit register as the last valid address instead of the size.",
+   "prereq": "Unit 1 for dual-mode operation and interrupts; Unit 2 for the process and its address space in the PCB.",
+   "leave": "Swapping and the time it costs go to 4.2, hole selection to 4.3, paging hardware to 4.4 and 4.5."
+  },
+  {
+   "k": 2,
+   "idea": "When memory is full, the OS copies a whole process out to a disk area and later copies it back, so more processes can take turns in memory.",
+   "depth": "Standard swapping: roll out and roll in, backing store (also called swap space or the swap device). Swap time = copy out + copy in, each roughly size ÷ transfer rate, plus disk latency; context-switch time therefore grows with process size. Why swapping whole processes is rare now: the transfer cost dwarfs any CPU time saved. Modern forms: Unix swaps only when free memory falls below a threshold, and moves pages rather than processes; Windows uses page files; mobile systems such as Android and iOS usually do not swap at all, they end idle background apps. One line: a process must be entirely in memory or entirely on disk for classic swapping. Keep the arithmetic to transfer time.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Swapping one process out and another in",
+    "nodes": [
+     {
+      "id": "full",
+      "label": "Memory full",
+      "note": "no free hole",
+      "style": "normal"
+     },
+     {
+      "id": "pick",
+      "label": "Pick a victim",
+      "note": "lowest priority process",
+      "style": "normal"
+     },
+     {
+      "id": "out",
+      "label": "Copy out",
+      "note": "2.01 s to swap space",
+      "style": "accent"
+     },
+     {
+      "id": "free",
+      "label": "Frames free",
+      "note": "victim leaves memory",
+      "style": "normal"
+     },
+     {
+      "id": "in",
+      "label": "Copy in",
+      "note": "2.01 s for next process",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "full",
+      "to": "pick",
+      "style": "solid"
+     },
+     {
+      "from": "pick",
+      "to": "out",
+      "style": "solid"
+     },
+     {
+      "from": "out",
+      "to": "free",
+      "style": "solid"
+     },
+     {
+      "from": "free",
+      "to": "in",
+      "style": "solid"
+     }
+    ],
+    "aria": "A full memory forces the OS to pick a victim, copy it out to swap space, free its frames, and then copy the next process in."
+   },
+   "example": "A process of 100 MB is swapped out at a transfer rate of 50 MB/s with a disk latency of 10 ms. Copy out = 100 ÷ 50 = 2 s, plus 0.01 s latency = 2.01 s. Copy in is the same, 2.01 s. One complete swap = 4.02 s. If the CPU time slice is 10 ms, this swap costs the equivalent of about 400 time slices, so swapping whole processes on every switch is not practical.",
+   "trap": "Counting the transfer only once (it goes out and comes back), and mixing MB (megabytes) with Mb (megabits): 100 MB at 50 Mb/s is 16 s, not 2 s.",
+   "prereq": "4.1 for what lives in memory, and Unit 2 for context switching and scheduling queues.",
+   "leave": "Replacing individual pages instead of whole processes goes to 4.7 and 4.8; swap-space layout on disk goes to Unit 5."
+  },
+  {
+   "k": 3,
+   "idea": "If every process must sit in one continuous block, free memory breaks into holes, and the OS must choose a hole and live with the waste.",
+   "depth": "Fixed partitioning (partitions made at boot, waste inside a partition = internal fragmentation) and variable partitioning (holes created and merged at run time, waste between holes = external fragmentation). The four placement rules with their exact meaning: first fit, best fit (smallest hole that fits), worst fit (largest hole), and next fit in one line. Compaction, and why it needs execution-time relocation. The 50-percent rule as a one-line result (with first fit, about half the memory ends up as holes on average). Keep the arithmetic to hole selection and leftover sizes.",
+   "figure": {
+    "type": "array",
+    "show_index": false,
+    "title": "Hole chosen (KB) for each request, holes 100, 500, 200, 300, 600",
+    "rows": [
+     {
+      "label": "Request",
+      "cells": [
+       "212",
+       "417",
+       "112",
+       "426"
+      ]
+     },
+     {
+      "label": "First fit",
+      "cells": [
+       "500",
+       "600",
+       "288",
+       "fail"
+      ],
+      "marks": {
+       "3": "live"
+      }
+     },
+     {
+      "label": "Best fit",
+      "cells": [
+       "300",
+       "500",
+       "200",
+       "600"
+      ],
+      "marks": {
+       "3": "next"
+      }
+     },
+     {
+      "label": "Worst fit",
+      "cells": [
+       "600",
+       "500",
+       "388",
+       "fail"
+      ],
+      "marks": {
+       "3": "live"
+      }
+     }
+    ],
+    "aria": "Each row shows which hole size in kilobytes a strategy picks for the four requests; the last request fails under first fit and worst fit but fits under best fit."
+   },
+   "example": "Free holes in order: 100 KB, 500 KB, 200 KB, 300 KB, 600 KB. Requests arrive: 212 KB, 417 KB, 112 KB, 426 KB. First fit: 212 takes the 500 hole (288 left), 417 takes the 600 hole (183 left), 112 takes the 288 hole (176 left), 426 has no hole (largest left is 300) so it waits. Best fit: 212 takes 300 (88 left), 417 takes 500 (83 left), 112 takes 200 (88 left), 426 takes 600 (174 left); all four fit. Worst fit: 212 takes 600 (388 left), 417 takes 500 (83 left), 112 takes 388 (276 left), 426 has no hole so it waits.",
+   "trap": "Calling best fit the winner always: it leaves many tiny unusable holes. And confusing external fragmentation (holes between allocations, variable partitions) with internal fragmentation (waste inside a fixed block, paging's last page).",
+   "prereq": "4.1 for base and limit, 4.2 for what happens when no hole is big enough.",
+   "leave": "Fixed-size blocks that remove external fragmentation go to 4.4; variable-length logical blocks go to 4.6."
+  },
+  {
+   "k": 4,
+   "idea": "Cut memory into fixed frames and each process into same-size pages, so any page can sit in any free frame and a per-process page table does the translation.",
+   "depth": "Page (logical unit) and frame (physical unit), page size always a power of two so the address splits by bits: logical address = page number p and offset d, with d = log₂(page size) bits. Page table, page-table entry (PTE), page-table base register (PTBR, some syllabi say page-table pointer). Two memory reads per access and why that hurts. The translation look-aside buffer (TLB): small fast associative memory, hit ratio, application-specific identifiers (ASID), wired entries, and the effective access time (EAT) formula. Internal fragmentation only in the last page. Keep hierarchical tables for 4.5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Page 2 of the process sits in frame 5",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "CPU",
+      "note": "logical address 8196",
+      "style": "normal"
+     },
+     {
+      "id": "split",
+      "label": "Split",
+      "note": "p = 2, d = 4",
+      "style": "accent"
+     },
+     {
+      "id": "pt",
+      "label": "Page table",
+      "note": "entry 2 gives frame 5",
+      "style": "accent"
+     },
+     {
+      "id": "phys",
+      "label": "Physical memory",
+      "note": "5 × 4096 + 4 = 20484",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cpu",
+      "to": "split",
+      "label": "8196",
+      "style": "solid"
+     },
+     {
+      "from": "split",
+      "to": "pt",
+      "label": "p = 2",
+      "style": "solid"
+     },
+     {
+      "from": "pt",
+      "to": "phys",
+      "label": "frame 5",
+      "style": "solid"
+     }
+    ],
+    "aria": "Logical address 8196 splits into page 2 and offset 4, the page table maps page 2 to frame 5, and the physical address becomes 20484."
+   },
+   "example": "Page size 4 KB = 4096 bytes, logical address 32 bits. Offset bits d = log₂ 4096 = 12, page number bits p = 32 − 12 = 20. Logical address 8196 = 2 × 4096 + 4, so p = 2 and d = 4; the page table says page 2 is in frame 5, so physical = 5 × 4096 + 4 = 20484. With a TLB, hit ratio 0.8, TLB search 10 ns and memory access 100 ns: EAT = 0.8 × (10 + 100) + 0.2 × (10 + 100 + 100) = 88 + 42 = 130 ns.",
+   "trap": "Shifting by the wrong number of bits (offset bits = log₂ page size, not the number of pages), and writing EAT as a plain average without the extra memory read on a TLB miss.",
+   "prereq": "4.1 for logical versus physical addresses; 4.3 for why contiguous allocation fails.",
+   "leave": "Two-level, hashed and inverted tables to 4.5; sharing pages between processes to Unit 5 and Unit 6."
+  },
+  {
+   "k": 5,
+   "idea": "A flat page table for a 32-bit or 64-bit address space is far too big, so the OS uses multi-level, hashed or inverted tables and keeps only what is used.",
+   "depth": "The size problem: number of entries × PTE size, per process. Hierarchical (two-level, three-level) paging: split p again, and allocate inner tables only where the address space is used. Hashed page tables (hash on the page number, chain for collisions) and inverted page tables (one entry per physical frame, search by pid and page number) in moderate detail, since only a few universities teach these in depth. Address-space identifiers so a context switch need not flush the TLB. One line on 64-bit address spaces. Keep memory-mapped files out; they belong with files.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Two-level paging for a 32-bit address, 4 KB pages",
+    "nodes": [
+     {
+      "id": "addr",
+      "label": "32-bit address",
+      "note": "p1, p2, d",
+      "style": "normal"
+     },
+     {
+      "id": "p1",
+      "label": "p1: 10 bits",
+      "note": "outer index",
+      "style": "accent"
+     },
+     {
+      "id": "outer",
+      "label": "Outer table",
+      "note": "1024 entries, 4 KB",
+      "style": "accent"
+     },
+     {
+      "id": "p2",
+      "label": "p2: 10 bits",
+      "note": "inner index",
+      "style": "normal"
+     },
+     {
+      "id": "inner",
+      "label": "Inner table",
+      "note": "4 KB, only if used",
+      "style": "next"
+     },
+     {
+      "id": "d",
+      "label": "d: 12 bits",
+      "note": "offset in frame",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "addr",
+      "to": "p1",
+      "style": "solid"
+     },
+     {
+      "from": "p1",
+      "to": "outer",
+      "style": "solid"
+     },
+     {
+      "from": "outer",
+      "to": "p2",
+      "style": "solid"
+     },
+     {
+      "from": "p2",
+      "to": "inner",
+      "style": "solid"
+     },
+     {
+      "from": "inner",
+      "to": "d",
+      "style": "solid"
+     }
+    ],
+    "aria": "The 32-bit address splits into a 10-bit outer index, a 10-bit inner index and a 12-bit offset; the outer table points to inner tables that exist only for regions the process uses."
+   },
+   "example": "32-bit logical address, page size 4 KB, PTE 4 bytes. Offset d = 12 bits, page number = 20 bits, so a flat table needs 2²⁰ = 1,048,576 entries × 4 B = 4,194,304 B = 4 MB per process. Two-level split 10 + 10 + 12: outer table has 2¹⁰ = 1024 entries × 4 B = 4 KB; each inner table is also 1024 × 4 B = 4 KB. A process using three separate regions needs one outer table plus three inner tables = 4 KB + 3 × 4 KB = 16 KB, instead of 4 MB.",
+   "trap": "Multiplying the wrong level's entry count by the PTE size, and assuming every inner table exists; the saving comes exactly from skipping unused inner tables.",
+   "prereq": "4.4 for p, d, PTE and PTBR.",
+   "leave": "The reverse mapping kept by the OS for its own structures goes to Unit 5; protection bits inside a PTE go to Unit 6."
+  },
+  {
+   "k": 6,
+   "idea": "Programmers think in variable-length pieces such as code, stack and heap, so segmentation gives each piece its own base and limit and checks every access against its length.",
+   "depth": "Segment number s and offset d; segment table with base and limit per segment; physical = base[s] + d only if d < limit[s], else trap. Why it matches the programmer's view (code, global data, stack, heap, shared libraries) and supports sharing and per-segment protection (read, write, execute). Pure segmentation suffers external fragmentation; the fix is segmentation with paging (paged segmentation), where each segment is itself paged — some syllabi call this 'segmentation with paging'. One line on the x86 flat-plus-segments model. Compare paging (fixed, invisible to the programmer) with segmentation (variable, visible).",
+   "figure": {
+    "type": "array",
+    "show_index": false,
+    "title": "Segment table for four segments",
+    "rows": [
+     {
+      "label": "Segment",
+      "cells": [
+       "0",
+       "1",
+       "2",
+       "3"
+      ]
+     },
+     {
+      "label": "Base",
+      "cells": [
+       "219",
+       "2300",
+       "90",
+       "1327"
+      ],
+      "marks": {
+       "2": "accent"
+      }
+     },
+     {
+      "label": "Limit",
+      "cells": [
+       "600",
+       "14",
+       "100",
+       "580"
+      ],
+      "marks": {
+       "2": "accent"
+      }
+     }
+    ],
+    "aria": "The segment table lists base and limit for segments 0 to 3; segment 2 has base 90 and limit 100, which is the row used in the worked example."
+   },
+   "example": "Segment table: segment 0 base 219 limit 600; segment 1 base 2300 limit 14; segment 2 base 90 limit 100; segment 3 base 1327 limit 580. (a) Segment 2, offset 53: 53 < 100, so physical = 90 + 53 = 143. (b) Segment 1, offset 500: 500 ≥ 14, so trap. (c) Segment 0, offset 1222: 1222 ≥ 600, so trap. (d) Segment 3, offset 580: 580 ≥ 580, so trap — an offset equal to the limit is already outside.",
+   "trap": "Adding the base before the limit check, and allowing offset = limit as valid. Also calling a segment a page: a segment has variable length and a visible number.",
+   "prereq": "4.1 for logical addresses and the limit check; 4.3 for external fragmentation.",
+   "leave": "Segments implemented over pages (the hardware detail) to 4.4 and 4.5; file and memory sharing to Unit 5."
+  },
+  {
+   "k": 7,
+   "idea": "Virtual memory loads pages only when they are touched, so a process can be larger than physical memory and start almost instantly.",
+   "depth": "Virtual memory as the separation of the logical address space from physical memory, built on paging. Demand paging, the pager (lazy swapper), valid–invalid bit in the PTE, pure demand paging (start with nothing in memory). The page-fault trap and the full handling sequence: check the reference, find a free frame, read the page from disk, update the table, restart the instruction. Effective access time with a fault rate p and why p must stay tiny. Copy-on-write after fork: parent and child share pages marked read-only until one writes; then a copy is made. vfork and its guarantee in one line. One line on memory-mapped files with a pointer to Unit 5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "What happens on a page fault",
+    "nodes": [
+     {
+      "id": "ref",
+      "label": "Reference a page",
+      "style": "normal"
+     },
+     {
+      "id": "bit",
+      "label": "Valid bit 0",
+      "note": "page not in memory",
+      "style": "accent"
+     },
+     {
+      "id": "trap",
+      "label": "Trap to OS",
+      "style": "accent"
+     },
+     {
+      "id": "frame",
+      "label": "Get free frame",
+      "note": "from free list",
+      "style": "normal"
+     },
+     {
+      "id": "read",
+      "label": "Read page",
+      "note": "from swap space",
+      "style": "live"
+     },
+     {
+      "id": "table",
+      "label": "Update page table",
+      "note": "set valid, frame no.",
+      "style": "normal"
+     },
+     {
+      "id": "again",
+      "label": "Restart instruction",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ref",
+      "to": "bit",
+      "style": "solid"
+     },
+     {
+      "from": "bit",
+      "to": "trap",
+      "label": "fault",
+      "style": "solid"
+     },
+     {
+      "from": "trap",
+      "to": "frame",
+      "style": "solid"
+     },
+     {
+      "from": "frame",
+      "to": "read",
+      "style": "solid"
+     },
+     {
+      "from": "read",
+      "to": "table",
+      "style": "solid"
+     },
+     {
+      "from": "table",
+      "to": "again",
+      "style": "solid"
+     }
+    ],
+    "aria": "A reference to a page whose valid bit is zero traps to the OS, which takes a free frame, reads the page from swap space, updates the page table and restarts the instruction."
+   },
+   "example": "Memory access time = 200 ns, page-fault service time = 8 ms = 8,000,000 ns, page-fault rate = p. EAT = (1 − p) × 200 + p × 8,000,000 ns. For a slowdown of at most 10 percent, EAT must be ≤ 220 ns: 220 = 200 + p × (8,000,000 − 200), so p ≤ 20 ÷ 7,999,800 ≈ 2.5 × 10⁻⁶. That is about one fault in 400,000 references, which is why a slightly high fault rate destroys performance.",
+   "trap": "Dropping the (1 − p) factor, and forgetting to convert milliseconds to nanoseconds. Also treating a page fault as an error: it is a normal, expected event.",
+   "prereq": "4.4 and 4.5 for paging and page tables, 4.2 for moving data to and from disk.",
+   "leave": "Choosing which page to throw out goes to 4.8; how many frames each process gets goes to 4.9."
+  },
+  {
+   "k": 8,
+   "idea": "When no frame is free, a replacement algorithm picks the victim page, and the order of choices decides the fault count.",
+   "depth": "Reference string and fault counting. FIFO with a queue on arrival, and Belady's anomaly (more frames, more faults). LRU with a stack or with counters/aging, and why exact LRU needs hardware help. Optimal (OPT/MIN) as an unachievable benchmark used to judge others. Second-chance and clock as cheap LRU approximations in one paragraph. Counting algorithms LFU/MFU only in a line, noting that only a few universities teach them. Compare fault counts on the same string; keep implementation details short.",
+   "figure": {
+    "type": "array",
+    "show_index": false,
+    "title": "Three frames, reference string 1 2 3 4 1 2 5 1 2 3 4 5",
+    "rows": [
+     {
+      "label": "Reference",
+      "cells": [
+       "1",
+       "2",
+       "3",
+       "4",
+       "1",
+       "2",
+       "5",
+       "1",
+       "2",
+       "3",
+       "4",
+       "5"
+      ]
+     },
+     {
+      "label": "FIFO",
+      "cells": [
+       "F",
+       "F",
+       "F",
+       "F",
+       "H",
+       "H",
+       "F",
+       "F",
+       "F",
+       "F",
+       "F",
+       "H"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "LRU",
+      "cells": [
+       "F",
+       "F",
+       "F",
+       "F",
+       "F",
+       "F",
+       "F",
+       "H",
+       "H",
+       "F",
+       "F",
+       "F"
+      ],
+      "marks": {
+       "1": "live"
+      }
+     },
+     {
+      "label": "OPT",
+      "cells": [
+       "F",
+       "F",
+       "F",
+       "F",
+       "H",
+       "H",
+       "F",
+       "H",
+       "H",
+       "F",
+       "F",
+       "H"
+      ],
+      "marks": {
+       "2": "next"
+      }
+     }
+    ],
+    "aria": "Each row marks fault or hit for every reference under one algorithm; FIFO ends with nine faults, LRU with ten and OPT with seven."
+   },
+   "example": "Reference string 1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5 with 3 frames. FIFO: after loading 1, 2, 3 and 4 (4 faults, 1 evicted) the hits at references 5 and 6 help, then 5 arrives and evicts 2, and every later new page evicts the oldest; final count = 9 faults. LRU: after 4 faults the pages are 2, 3, 4; reference 1 evicts 2, reference 2 evicts 3, reference 5 evicts 4, then references 1 and 2 hit, reference 3 evicts 5, reference 4 evicts 1 and reference 5 evicts 2; final count = 10 faults. OPT looks ahead: at reference 4 it throws out 3 (needed last), at reference 5 it throws out 4, at 3 it throws out 1 (never used again) and at 4 it throws out 2; final count = 7 faults. Belady's anomaly: the same string under FIFO with 4 frames gives 10 faults, more than with 3.",
+   "trap": "Running LRU but evicting the page loaded first, which is FIFO. Also counting a hit as a fault, and forgetting that FIFO can be worse with more frames.",
+   "prereq": "4.7 for page faults, 4.4 for frames and PTEs.",
+   "leave": "The frame count used in these examples is fixed by hand; 4.9 decides it and explains thrashing."
+  },
+  {
+   "k": 9,
+   "idea": "Each process needs a minimum number of frames, and giving processes too few frames causes thrashing, where the machine swaps pages instead of doing work.",
+   "depth": "Minimum frames per process (set by the instruction set), equal allocation, proportional allocation, and a worked proportional split. Global replacement (a process may take any frame) versus local replacement (it may take only its own). Thrashing: high fault rate lowers CPU use, the OS adds more processes, faults rise further. Working-set model with window Δ: WSSᵢ = distinct pages used in the last Δ references; admit a process only if Σ WSSᵢ ≤ total frames. Page-fault frequency as the practical control. Memory compression in one line, since only a few universities teach it. Do not re-teach replacement algorithms.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "processes in memory",
+     "min": 0,
+     "max": 10
+    },
+    "y": {
+     "label": "CPU utilisation (%)",
+     "min": 0,
+     "max": 100
+    },
+    "series": [
+     {
+      "name": "utilisation",
+      "points": [
+       [
+        1,
+        20
+       ],
+       [
+        2,
+        35
+       ],
+       [
+        3,
+        55
+       ],
+       [
+        4,
+        75
+       ],
+       [
+        5,
+        90
+       ],
+       [
+        6,
+        92
+       ],
+       [
+        7,
+        80
+       ],
+       [
+        8,
+        50
+       ],
+       [
+        9,
+        25
+       ]
+      ],
+      "style": "accent"
+     }
+    ],
+    "aria": "CPU utilisation rises as more processes are admitted, peaks near six processes, then falls sharply once thrashing begins."
+   },
+   "example": "Total usable frames = 100. Process P1 has 10 pages, P2 has 30 pages, P3 has 60 pages, total 100 pages. Equal allocation gives 100 ÷ 3 ≈ 33 frames each, which wastes 23 frames on P1 and starves P3. Proportional allocation gives P1 = 100 × 10/100 = 10, P2 = 30, P3 = 60 frames. Check with the working-set model, window Δ = 4, references 2, 6, 1, 5, 7, 7, 7, 7, 5, 1: at the last reference the window holds 7, 5, 1, so WSS = {1, 5, 7} and the working-set size is 3 pages; the sum of all WSS values must stay within 100 frames.",
+   "trap": "Assuming more processes always means more CPU use. Also counting references instead of distinct pages in the working-set window, and blaming a slow machine on the CPU when the real cause is too few frames.",
+   "prereq": "4.7 for fault rates, 4.8 for replacement policy.",
+   "leave": "Page-fault handling cost itself stays in 4.7; the OS memory allocators (buddy system, slab) belong with kernel internals, not here."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "base–limit gives no room when memory is full"
+  ],
+  [
+   1,
+   3,
+   "the same check runs under contiguous allocation"
+  ],
+  [
+   3,
+   4,
+   "fragmentation forces fixed-size pages"
+  ],
+  [
+   4,
+   5,
+   "big page tables need more levels"
+  ],
+  [
+   4,
+   6,
+   "fixed pages against variable segments"
+  ],
+  [
+   2,
+   7,
+   "swapping whole processes becomes demand paging"
+  ],
+  [
+   7,
+   8,
+   "a fault needs a victim page"
+  ],
+  [
+   8,
+   9,
+   "replacement quality decides how many frames to give"
+  ],
+  [
+   7,
+   9,
+   "too few frames per process means thrashing"
+  ]
+ ]
+}

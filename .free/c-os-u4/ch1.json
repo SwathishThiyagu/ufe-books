@@ -1,0 +1,196 @@
+{
+ "lead": "A process never touches physical memory directly. It uses its own logical addresses, numbered from zero, and a small hardware unit translates each one to a physical address after a safety check. This separation lets the OS place a program anywhere in RAM, move it later, and stop one process from reading another's data. Every phone app, UPI payment and IRCTC booking runs behind this translation. This chapter sets up the model: binding time, logical versus physical addresses, and the base-limit memory-management unit.",
+ "prereq": "You need: dual-mode operation and interrupts from Unit 1, Foundations; the process and its PCB address space from Unit 2, Processes, Threads and CPU Scheduling.",
+ "sections": [
+  {
+   "h3": "Address binding and two kinds of address",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Before the CPU can run an instruction, the instruction and its data must sit at some physical address in RAM. The act of fixing those addresses is called address binding. It can happen at three moments."
+    },
+    {
+     "type": "p",
+     "text": "Compile time: the compiler knows the exact address and emits absolute code. The program must load at that address, so moving it means recompiling. Small embedded firmware often works this way."
+    },
+    {
+     "type": "p",
+     "text": "Load time: the compiler emits relocatable code. The loader chooses a start address when the program is first loaded and adjusts addresses once. The process cannot move after that."
+    },
+    {
+     "type": "p",
+     "text": "Execution time: the process may move while running. The CPU must translate every address at the moment of use, so this needs hardware support. General-purpose operating systems use this."
+    },
+    {
+     "type": "p",
+     "text": "The address the CPU generates is a logical address; many syllabi call it a virtual address. The address the memory unit sees is a physical address. The set of logical addresses a process uses is its logical address space. A process's logical space starts at 0, independent of where it sits in RAM. The OS keeps the mapping private to each process, which is the base of protection."
+    }
+   ]
+  },
+  {
+   "h3": "The memory-management unit: base plus limit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Translation is done by the memory-management unit (MMU), a hardware block between CPU and memory. The simplest MMU has two registers per process."
+    },
+    {
+     "type": "p",
+     "text": "The base register holds the smallest physical address of the process. Some syllabi call it the relocation register. The limit register holds the size of the process in bytes or words. It is a size, not the last valid address."
+    },
+    {
+     "type": "p",
+     "text": "For every memory reference the CPU sends an offset. The MMU applies one rule."
+    },
+    {
+     "type": "formula",
+     "text": "if offset ≥ limit → trap; else physical = base + offset",
+     "where": "base is the process start in physical memory; offset is the logical address; limit is the process length; physical is the translated physical address; trap means an address error sent to the OS."
+    },
+    {
+     "type": "p",
+     "text": "The order matters. Check the limit first, then add the base. If you add first, a large offset can land inside another process and read or overwrite it."
+    },
+    {
+     "type": "p",
+     "text": "The check is protection. In a multiprocessor or time-sharing machine, each process has its own base and limit. The OS loads the pair on a context switch (see Unit 2, Process scheduling queues and context switching). A trap goes to the OS, which usually terminates the offending process."
+    }
+   ]
+  },
+  {
+   "h3": "Allocation strategies and library loading",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Translation answers where an address goes. Allocation answers where the OS puts each process."
+    },
+    {
+     "type": "p",
+     "text": "Contiguous allocation gives each process one continuous block. It is simple, but free memory breaks into holes; choosing a hole is covered in <a href=\"#contiguous-memory-allocation-and-fragmentation\">4.3</a>, and moving a process out is <a href=\"#swapping-of-processes\">4.2</a>."
+    },
+    {
+     "type": "p",
+     "text": "Non-contiguous allocation splits a process. Paging cuts memory into fixed frames and the process into same-size pages, so pages can sit anywhere (<a href=\"#paging-and-the-translation-look-aside-buffer\">4.4</a>, <a href=\"#structure-of-the-page-table\">4.5</a>). Segmentation uses variable pieces such as code, stack and heap, each with its own base and limit (<a href=\"#segmentation-of-memory\">4.6</a>). Virtual memory adds demand paging later (<a href=\"#virtual-memory-demand-paging-page-faults-copy-on-write\">4.7</a>)."
+    },
+    {
+     "type": "p",
+     "text": "Three loading ideas save memory. Dynamic loading loads a routine only when it is first called. Dynamic linking postpones linking until run time: a small stub finds the library routine. A shared library is one copy on disk and in memory, mapped by many processes; the code is shared, while each process keeps its own data."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The CPU sends logical address 346. The MMU checks it against limit 1000, adds base 14000 and produces physical word 14346.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "One logical address, one physical address",
+   "nodes": [
+    {
+     "id": "cpu",
+     "label": "CPU",
+     "note": "logical address 346",
+     "style": "normal"
+    },
+    {
+     "id": "mmu",
+     "label": "MMU",
+     "note": "346 < 1000, add 14000",
+     "style": "accent"
+    },
+    {
+     "id": "mem",
+     "label": "Physical memory",
+     "note": "word 14346",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cpu",
+     "to": "mmu",
+     "label": "346",
+     "style": "solid"
+    },
+    {
+     "from": "mmu",
+     "to": "mem",
+     "label": "14346",
+     "style": "solid"
+    }
+   ],
+   "aria": "The CPU sends logical address 346 to the memory-management unit, which passes the limit check, adds the base 14000 and reaches physical word 14346."
+  }
+ },
+ "examples": [
+  {
+   "question": "A system uses execution-time binding with a base register of 14000 and a limit register of 1000, in word addresses. For each logical address, give the physical address or state the trap: (a) 346 (b) 999 (c) 1200.",
+   "steps": [
+    "Read the rule: if offset ≥ limit, trap; else physical = base + offset. Here base = 14000 and limit = 1000.",
+    "(a) offset = 346. 346 < 1000, so the access is valid. physical = 14000 + 346 = 14346.",
+    "(b) offset = 999. 999 < 1000, so the access is valid. physical = 14000 + 999 = 14999.",
+    "(c) offset = 1200. 1200 ≥ 1000, so the access is invalid. The MMU raises a trap and no physical address is produced."
+   ],
+   "answer": "The valid physical addresses are 14346 and 14999; logical address 1200 traps with an address error.",
+   "check": "base = 14000\nlimit = 1000\nfor offset in (346, 999):\n    assert offset < limit\n    print(base + offset)\n",
+   "values": [
+    14346,
+    14999
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Adding the base before checking the limit. A bad offset can then read another process; the check must come first.",
+  "Quoting a logical address as if it were physical. Only base + offset after a valid check gives a physical address.",
+  "Treating the limit register as the last valid address. It is the size, so offset equal to limit traps.",
+  "Assuming compile-time binding is normal. Absolute code cannot be moved; execution-time binding needs MMU hardware.",
+  "Swapping the base and limit. Base is the start address; limit is the length."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What are the three moments at which address binding can occur?",
+   "marks": 2,
+   "a": "Compile time, load time and execution time."
+  },
+  {
+   "level": "remember",
+   "q": "Define logical address and physical address.",
+   "marks": 2,
+   "a": "A logical address is generated by the CPU and used by the process; many syllabi call it a virtual address. A physical address is the address seen by the memory unit."
+  },
+  {
+   "level": "understand",
+   "q": "Why must the MMU check the limit before adding the base?",
+   "marks": 3,
+   "a": "The limit check rejects offsets outside the process. If the base were added first, an oversized offset could point into another process and break protection."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between the base register and the limit register.",
+   "marks": 3,
+   "a": "The base register holds the start of the process in physical memory. The limit register holds the process size, not the last valid address."
+  },
+  {
+   "level": "apply",
+   "q": "A process has base = 8000 and limit = 600. Find the physical address for logical address 250, and state what happens for logical address 600.",
+   "marks": 4,
+   "a": "250 < 600, so physical = 8000 + 250 = 8250. For 600, 600 ≥ 600, so the MMU traps."
+  },
+  {
+   "level": "analyze",
+   "q": "A program is bound at compile time. The OS loads it at a different start address. Predict the result and explain.",
+   "marks": 4,
+   "a": "The absolute addresses inside the code no longer match the load address. The program will access wrong locations and usually crash; compile-time absolute code must load at its fixed address."
+  },
+  {
+   "level": "analyze",
+   "q": "Two processes share a CPU. P1 has base 5000, limit 1000; P2 has base 7000, limit 1000. Both use logical address 900. Explain why their physical addresses differ and what protection the limit gives.",
+   "marks": 5,
+   "a": "For P1: 900 < 1000, physical = 5000 + 900 = 5900. For P2: 900 < 1000, physical = 7000 + 900 = 7900. The same logical address maps to different physical addresses because each process has a private base. The limit stops either process from using an offset of 1000 or more, so it cannot reach outside its own block."
+  }
+ ],
+ "beyond": "Not for the exam. Real CPUs add a translation look-aside buffer (TLB) to cache recent translations, and modern OSes randomize load addresses (ASLR) for security. Kernel allocators such as the buddy system and slab allocator manage free memory inside the OS using related free-list ideas. Virtual machines add a second layer of address translation. Search next: TLB, ASLR, buddy allocator, slab allocator."
+}

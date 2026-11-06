@@ -1,0 +1,214 @@
+{
+ "type": "json_object",
+ "lead": "Segmentation cuts a process into variable-length pieces the programmer wrote: machine code, global data, stack, heap and shared libraries. Each piece is a segment with number, base and length. A CPU address becomes (segment number, offset); hardware checks offset against length before adding base. Programs are unequal pieces, not fixed blocks, so this gives per-segment protection and sharing. It survives in x86, linker sections and thread-local storage.",
+ "prereq": "You need logical addresses and limit checks from <a href=\"#memory-management-strategies-and-address-spaces\">4.1</a> and holes and external fragmentation from <a href=\"#contiguous-memory-allocation-and-fragmentation\">4.3</a>.",
+ "sections": [
+  {
+   "h3": "Pieces the programmer wrote",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A compiled program is not one lump. Code is read-only. Global data is read-write. Stack and heap grow at run time. A shared library is separate. The compiler and linker already know these blocks and their lengths."
+    },
+    {
+     "type": "p",
+     "text": "A segment is a variable-length block of a process's logical address space, with a number, base and limit. Limit is length in bytes. A logical address is s : d, where s is segment number and d is offset from segment start. Valid offsets are 0 to limit − 1."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Protection fits the block: code read and execute, data read and write.",
+      "Sharing fits the block: two processes can name one library copy.",
+      "A bad access traps instead of silently corrupting another block.",
+      "Programmer and linker see the structure hardware enforces."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Paging uses fixed-size units chosen by hardware and hidden from the programmer. Segmentation uses variable-length units chosen by compiler or programmer; segment numbers appear in the address."
+    }
+   ]
+  },
+  {
+   "h3": "The segment table and the limit check",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each process owns a segment table, one entry per segment. An entry holds base (physical start), limit (length in bytes) and protection bits. The segment-table base register points to the table; the segment-table length register holds entry count, so a bad segment number is caught."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Split the logical address into segment number s and offset d.",
+      "If s is not less than the table length, trap.",
+      "Read base[s] and limit[s].",
+      "If d ≥ limit[s], trap.",
+      "Otherwise physical = base[s] + d."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "physical = base[s] + d, valid only when 0 ≤ d < limit[s]",
+     "where": "s is segment number, d is offset in bytes from segment start, base[s] is physical start and limit[s] is length in bytes. If the test fails, no physical address exists and the CPU traps."
+    },
+    {
+     "type": "p",
+     "text": "Compare before add. Adding first can produce a number pointing elsewhere and hide the fault. Hardware caches recent segment entries, like the TLB in <a href=\"#paging-and-the-translation-look-aside-buffer\">4.4</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Sharing, protection and fragmentation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Protection bits are per segment: code can be read and execute, stack no-execute. Two processes can share a library by having entries with the same base and limit; both reach one physical copy."
+    },
+    {
+     "type": "p",
+     "text": "Pure segmentation fragments externally. Variable-length segments leave holes of many sizes as processes come and go, as in <a href=\"#contiguous-memory-allocation-and-fragmentation\">4.3</a>. Compaction removes holes but copies segments and changes bases, so it is slow."
+    },
+    {
+     "type": "p",
+     "text": "The standard fix is segmentation with paging, which some syllabi call paged segmentation. Each segment is divided into fixed-size pages. The segment-table entry holds the base address of that segment's page table plus the segment's limit (still the segment's length in bytes, used for the bounds check) and protection bits, instead of the segment's physical start address. The offset d is split into page number and page offset. The page table's size follows from limit ÷ page size, rounded up. There are no variable-length holes; waste is internal fragmentation in the last page of each segment."
+    },
+    {
+     "type": "p",
+     "text": "Modern 64-bit x86 keeps segment registers but uses a flat model: base 0 and limit covering all addresses, so paging does translation. FS and GS still point at per-thread data."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "A process's segment table, one base and limit row per segment. Segment 2, base 90 and limit 100, is used in the worked example; segment 1 has limit 14, so almost any access to it traps.",
+  "spec": {
+   "type": "array",
+   "title": "Segment table for four segments",
+   "show_index": false,
+   "rows": [
+    {
+     "label": "Segment",
+     "cells": [
+      "0",
+      "1",
+      "2",
+      "3"
+     ]
+    },
+    {
+     "label": "Base",
+     "cells": [
+      "219",
+      "2300",
+      "90",
+      "1327"
+     ],
+     "marks": {
+      "2": "accent"
+     }
+    },
+    {
+     "label": "Limit",
+     "cells": [
+      "600",
+      "14",
+      "100",
+      "580"
+     ],
+     "marks": {
+      "2": "accent"
+     }
+    }
+   ],
+   "aria": "The segment table lists base and limit for segments 0 to 3; segment 2 has base 90 and limit 100, which is the row used in the worked example."
+  }
+ },
+ "examples": [
+  {
+   "question": "A process has the segment table below. Find the physical address for each logical address, or state that it traps. (a) segment 2, offset 53. (b) segment 1, offset 500. (c) segment 0, offset 1222. (d) segment 3, offset 580. Segment 0: base 219, limit 600; segment 1: base 2300, limit 14; segment 2: base 90, limit 100; segment 3: base 1327, limit 580.",
+   "steps": [
+    "(a) s = 2, d = 53. 53 < 100 is true; physical = 90 + 53 = 143.",
+    "(b) s = 1, d = 500. 500 < 14 is false; traps.",
+    "(c) s = 0, d = 1222. 1222 < 600 is false; traps.",
+    "(d) s = 3, d = 580. 580 < 580 is false; offset equal to the limit is one byte past the end, so traps."
+   ],
+   "answer": "Only (a) is valid, giving physical address 143; (b), (c) and (d) all trap because the offset is not less than the limit.",
+   "check": "table = {0: (219, 600), 1: (2300, 14), 2: (90, 100), 3: (1327, 580)}\n\ndef translate(s, d):\n    base, limit = table[s]\n    if d < limit:\n        return base + d\n    return None\n\nprint(translate(2, 53))\nfor s, d in [(1, 500), (0, 1222), (3, 580)]:\n    print(1 if translate(s, d) is None else 0)\n",
+   "values": [
+    143,
+    1,
+    1,
+    1
+   ],
+   "output": ""
+  },
+  {
+   "question": "A segment table entry has base = 1400 and limit = 1000. Give the physical address, or trap, for offset 999 and offset 1000.",
+   "steps": [
+    "Offset 999: 999 < 1000 is true; physical = 1400 + 999 = 2399.",
+    "Offset 1000: 1000 < 1000 is false; traps.",
+    "The largest valid offset is 999, one less than the limit."
+   ],
+   "answer": "Offset 999 maps to physical address 2399 and offset 1000 traps.",
+   "check": "base, limit = 1400, 1000\nprint(base + 999 if 999 < limit else -1)\nprint(base + 1000 if 1000 < limit else -1)\n",
+   "values": [
+    2399,
+    -1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Adding base before checking limit. Compare first; if d ≥ limit, trap.",
+  "Accepting offset = limit as valid. Valid offsets are 0 to limit − 1.",
+  "Calling a segment a page. A page is fixed and hidden; a segment is variable, visible, with base and limit.",
+  "Assuming one segment table for the whole machine. Each process has its own.",
+  "Forgetting the fragmentation answer. Pure segmentation fragments externally; the fix is paging inside segments."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a segment. What fields does a segment-table entry hold?",
+   "marks": 2,
+   "a": "A variable-length block of logical address space with a segment number. Entry: base (physical start), limit (length in bytes) and protection bits."
+  },
+  {
+   "level": "remember",
+   "q": "What happens when the offset is equal to or greater than the limit?",
+   "marks": 2,
+   "a": "Hardware raises a trap; no physical address is formed."
+  },
+  {
+   "level": "understand",
+   "q": "Why does segmentation match the programmer's view better than paging?",
+   "marks": 3,
+   "a": "Code, data, stack, heap and libraries have natural unequal sizes. Segmentation makes each one unit with its own length, protection and sharing. Paging uses fixed-size units chosen by hardware and hidden from the programmer."
+  },
+  {
+   "level": "apply",
+   "q": "Segment 0 has base 1400 and limit 1000; segment 1 has base 3200 and limit 500; segment 2 has base 800 and limit 300. Translate (1, 350), (2, 300) and (0, 999), or state that the access traps.",
+   "marks": 4,
+   "a": "(1, 350): 350 < 500, physical = 3200 + 350 = 3550. (2, 300): 300 < 300 is false, traps. (0, 999): 999 < 1000, physical = 1400 + 999 = 2399."
+  },
+  {
+   "level": "understand",
+   "q": "How does segmentation let two processes share a library and stop writes to it?",
+   "marks": 3,
+   "a": "Both entries point to the same base and limit, so both reach one physical copy. Protection bits control access; an entry without write permission faults on a store."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does pure segmentation cause external fragmentation, and how does paging each segment remove it?",
+   "marks": 5,
+   "a": "Variable-length segments leave holes of many sizes. A new segment may need a larger contiguous run than any hole. With paged segmentation, the entry points to a page table, so pages sit in any free frames. Allocation is in fixed frames; only the last page of each segment wastes space internally."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare paging and segmentation on unit size, visibility, table contents and fragmentation.",
+   "marks": 6,
+   "a": "Paging: fixed-size unit chosen by hardware; invisible; page table maps page to frame; internal fragmentation in the last page. Segmentation: variable-length unit chosen by compiler or programmer; segment number visible; table has base, limit and protection; external fragmentation. Paged segmentation keeps visible logical structure and simple fixed-frame allocation."
+  }
+ ],
+ "beyond": "Not for the exam. CPUs still have segment hardware, but 64-bit operating systems use a flat model and paging, so this is mostly a teaching model. What survives is visible: executable sections, the segmentation fault message in C, and FS and GS registers for thread-local storage. Search for x86-64 flat memory model, thread-local storage FS segment and paged segmentation to go further."
+}
