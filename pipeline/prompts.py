@@ -247,3 +247,24 @@ The chapter:
 <<<
 {chapter_text[:9000]}
 >>>"""
+
+
+def figure_redo(P, k, chapter_text, fig):
+    U = P['unit']; st = U['subtopics'][k - 1]
+    return f"""Design the single best figure for chapter {U['n']}.{k} ("{st['t']}") of a {P['subject']['name']} unit book.
+The figure must show the chapter's central mechanism so a student understands it at a glance, and it must use exactly the
+same values, names and order as the chapter text and its worked example (recompute them; a figure that disagrees with the
+example is wrong). Pick the figure type that fits the idea best, not the easiest one. Use the styles to pick out the one or two
+things the caption points to.
+
+The current figure (replace it if a different type or content would teach better):
+{json.dumps(fig, ensure_ascii=False)}
+
+The chapter:
+<<<
+{chapter_text[:12000]}
+>>>
+
+Reply with JSON {{"after_section": 1, "caption": "what it shows and what to notice, 1-2 sentences", "spec": {{...}}}}.
+
+{FIGURES}"""
