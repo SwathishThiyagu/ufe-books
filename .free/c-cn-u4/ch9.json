@@ -1,0 +1,246 @@
+{
+ "lead": "Path vector routing is the interdomain routing method used between autonomous systems. Each announcement carries the full list of autonomous systems it has crossed, called the AS path. A router rejects any path that already contains its own AS number, so loops are found without counting to infinity. The list also lets each network apply policy: a longer path may be preferred for business reasons. BGP, the Border Gateway Protocol, runs this method on the Internet. ISPs, cloud providers and multihomed enterprises use it to choose and advertise routes.",
+ "prereq": "You need: <a href=\"#routing-basics-static-vs-dynamic-hierarchical-routing\">Chapter 4.6</a> for routing tables, and <a href=\"#link-state-routing-and-ospf\">Chapter 4.8</a> for autonomous systems and OSPF inside one AS.",
+ "sections": [
+  {
+   "h3": "Path vector: carry the whole path",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An autonomous system (AS) is a group of networks under one routing policy, usually one ISP or one large organisation. Inside an AS, a protocol such as OSPF finds routes; between ASes, BGP exchanges reachability. A BGP speaker is a router that runs BGP, normally at the AS border."
+    },
+    {
+     "type": "p",
+     "text": "BGP is a path vector protocol. Its UPDATE message carries a prefix, such as 203.0.113.0/24, and an AS_PATH. The AS_PATH is the list of AS numbers the route has passed through, written from the AS closest to the receiver (the most recently added) to the origin AS, which comes last. When AS 20 sends a route learned from AS 30 to AS 10, the path is [20, 30]. AS 10 stores that whole list."
+    },
+    {
+     "type": "p",
+     "text": "Loop detection is direct. If a router sees its own AS number inside AS_PATH, it discards the route. No hop limit and no count-to-infinity are needed."
+    },
+    {
+     "type": "p",
+     "text": "There are two BGP modes. External BGP (eBGP) runs between routers in different ASes and adds the sender's AS number to AS_PATH. Internal BGP (iBGP) runs between BGP routers inside one AS; it carries external routes without adding a new AS number. iBGP keeps every border router aware of the same external choices."
+    }
+   ]
+  },
+  {
+   "h3": "BGP attributes and selection order",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BGP chooses routes by attributes, not by one metric. An attribute is a value attached to a route. NEXT_HOP is the IP address of the next router on the way to the prefix. AS_PATH is the AS list just described. ORIGIN records how the route entered BGP: IGP, EGP or incomplete. LOCAL_PREF is a local preference value; higher is better and it stays inside one AS. MED (multi-exit discriminator) is a hint sent to a neighbouring AS about which of several links into that AS to use; lower is better. By default a router compares MED only among routes received from the same neighbouring AS, and MED is not passed on to other ASes. Weight is a Cisco-specific local value; higher is better."
+    },
+    {
+     "type": "p",
+     "text": "The usual selection order is a decision ladder. Compare weight first (if supported), then LOCAL_PREF, then prefer a locally originated route, then shortest AS_PATH, then lowest ORIGIN, then lowest MED, then eBGP over iBGP, then lowest IGP metric to NEXT_HOP, then lowest router ID. The exact list varies slightly by vendor, but LOCAL_PREF comes before AS_PATH. That order matters in the worked example. NEXT_HOP must be reachable through the IGP; otherwise the route is unusable."
+    },
+    {
+     "type": "p",
+     "text": "The MED step is narrower than it looks. MED is compared only among routes received from the same neighbouring AS. Routes from two different neighbours are not compared on MED; that step is skipped and the later attributes decide. So MED is not a general tie-breaker across providers."
+    }
+   ]
+  },
+  {
+   "h3": "Policy, peering and transit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "BGP is policy-based because each AS is a business. Peering is an agreement between two ASes to exchange traffic, often without payment; each side usually advertises only its own routes and its customers' routes. Transit is a paid service: a provider carries a customer's traffic to the rest of the Internet. A customer does not want to become free transit for a peer, so export filters block transit routes from being re-advertised to other peers. This is why the chosen route is not always the shortest AS path."
+    },
+    {
+     "type": "p",
+     "text": "A multihomed enterprise may connect to two ISPs. It can set LOCAL_PREF to favour one ISP for outbound traffic. For inbound traffic, MED can spread load across several links to the same neighbouring AS. Across two different ISPs, MED is normally ignored by the receivers, so the enterprise uses AS_PATH prepending or another policy to steer inbound traffic instead. The other ISP still sees a valid path, so failover works. Inside the enterprise, iBGP distributes the chosen external routes to border routers; OSPF or another IGP carries internal routes. Some syllabi call this interdomain routing."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "AS10 learns the prefix through AS20 with AS path [20, 30] and through AS40 with [40, 50, 60]; the shorter path wins by default, but a higher LOCAL_PREF on the AS40 path would override that. AS30 and AS60 announce the same prefix, so the route is multi-origin and the two paths end at different origin ASes.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "AS10",
+     "label": "AS10",
+     "x": 0,
+     "y": 1,
+     "note": "local AS",
+     "style": "accent"
+    },
+    {
+     "id": "AS20",
+     "label": "AS20",
+     "x": 1,
+     "y": 2,
+     "note": "path 1",
+     "style": "normal"
+    },
+    {
+     "id": "AS30",
+     "label": "AS30",
+     "x": 2,
+     "y": 2,
+     "note": "origin",
+     "style": "normal"
+    },
+    {
+     "id": "AS40",
+     "label": "AS40",
+     "x": 1,
+     "y": 0,
+     "note": "path 2",
+     "style": "normal"
+    },
+    {
+     "id": "AS50",
+     "label": "AS50",
+     "x": 2,
+     "y": 0,
+     "note": "",
+     "style": "muted"
+    },
+    {
+     "id": "AS60",
+     "label": "AS60",
+     "x": 3,
+     "y": 0,
+     "note": "origin",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "AS10",
+     "to": "AS20",
+     "label": "eBGP",
+     "style": "solid"
+    },
+    {
+     "from": "AS20",
+     "to": "AS30",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "AS10",
+     "to": "AS40",
+     "label": "eBGP",
+     "style": "solid"
+    },
+    {
+     "from": "AS40",
+     "to": "AS50",
+     "label": "",
+     "style": "solid"
+    },
+    {
+     "from": "AS50",
+     "to": "AS60",
+     "label": "",
+     "style": "solid"
+    }
+   ],
+   "aria": "AS10 sees the prefix through AS20 with path [20,30] and through AS40 with path [40,50,60]; the first is shorter by AS count."
+  }
+ },
+ "examples": [
+  {
+   "question": "AS 10 learns 203.0.113.0/24 from AS 20 with AS_PATH [20, 30] and from AS 40 with AS_PATH [40, 50, 60]. Which path wins by default? If LOCAL_PREF 200 is set for the AS 40 path, which wins?",
+   "steps": [
+    "Count the AS_PATH length for the AS 20 route: the list [20, 30] has 2 AS numbers.",
+    "Count the AS_PATH length for the AS 40 route: the list [40, 50, 60] has 3 AS numbers.",
+    "By default, LOCAL_PREF is equal for both routes, so BGP compares AS_PATH length. 2 is less than 3, so the AS 20 route wins.",
+    "Set LOCAL_PREF 200 on the AS 40 route. LOCAL_PREF is compared before AS_PATH length. A higher LOCAL_PREF is better, so the AS 40 route wins even though its AS_PATH length is 3."
+   ],
+   "answer": "By default the AS 20 path [20, 30] wins with AS path length 2 against 3. With LOCAL_PREF 200 on the AS 40 path, the AS 40 path [40, 50, 60] wins because LOCAL_PREF is compared before AS path length.",
+   "check": "path_a = [20, 30]\npath_b = [40, 50, 60]\nlocal_pref_b = 200\nprint(len(path_a))\nprint(len(path_b))\nprint(local_pref_b)\n",
+   "values": [
+    2,
+    3,
+    200
+   ],
+   "dry_run": {
+    "head": [
+     "Step",
+     "Value"
+    ],
+    "rows": [
+     [
+      "AS_PATH length for [20, 30]",
+      "2"
+     ],
+     [
+      "AS_PATH length for [40, 50, 60]",
+      "3"
+     ],
+     [
+      "LOCAL_PREF on AS 40 path",
+      "200"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Shortest AS_PATH always wins. False: weight and LOCAL_PREF are compared first; AS_PATH length comes later.",
+  "Confusing eBGP with iBGP. eBGP is between ASes and adds the sender AS to AS_PATH; iBGP is inside one AS and does not.",
+  "Reversing LOCAL_PREF and MED. Higher LOCAL_PREF is better; lower MED is better. LOCAL_PREF stays inside the AS; MED is sent to a neighbour.",
+  "Treating MED as a general tie-breaker. By default MED is compared only among routes from the same neighbouring AS, and it is not passed on to other ASes.",
+  "Treating AS_PATH as a router list. It is an AS list, so one AS counts once even if it contains many routers.",
+  "Forgetting that a route with the local AS number in AS_PATH is rejected as a loop."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is stored in the AS_PATH attribute?",
+   "marks": 2,
+   "a": "The list of AS numbers a route has crossed, written most recently added AS first and origin AS last."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a path vector protocol not need a hop-count limit for loop detection?",
+   "marks": 3,
+   "a": "A router checks whether its own AS number is already in AS_PATH; if yes, it rejects the route."
+  },
+  {
+   "level": "apply",
+   "q": "AS 10 receives route X with AS_PATH [20, 30, 40] and route Y with [50, 60]. LOCAL_PREF is equal. Which route wins by default?",
+   "marks": 3,
+   "a": "Route Y wins, because its AS path length is 2 against 3 for route X."
+  },
+  {
+   "level": "analyze",
+   "q": "AS 10 sets LOCAL_PREF 200 on route X but leaves route Y at the default. X has path [20, 30, 40], Y has [50, 60]. Which wins and why?",
+   "marks": 4,
+   "a": "X wins; LOCAL_PREF is compared before AS_PATH length, and 200 is higher than the default local preference."
+  },
+  {
+   "level": "remember",
+   "q": "State one difference between eBGP and iBGP.",
+   "marks": 2,
+   "a": "eBGP runs between different ASes and prepends the sender AS; iBGP runs inside one AS and does not prepend a new AS number."
+  },
+  {
+   "level": "understand",
+   "q": "What does NEXT_HOP mean in a BGP route?",
+   "marks": 2,
+   "a": "The IP address of the next router used to reach the announced prefix."
+  },
+  {
+   "level": "apply",
+   "q": "A router learns two routes to the same prefix from the same neighbouring ISP, one with MED 50 and one with MED 80; all earlier attributes are equal. Which is preferred?",
+   "marks": 4,
+   "a": "The route with MED 50, because lower MED is better. The comparison is valid only because both routes came from the same neighbouring AS; MED from different neighbours is not compared by default."
+  },
+  {
+   "level": "analyze",
+   "q": "Why may an ISP choose a longer AS path for some traffic?",
+   "marks": 5,
+   "a": "Policy can prefer a customer or peer route, for example by LOCAL_PREF, to save money or honour business agreements; AS_PATH length is only one later tie-breaker."
+  }
+ ],
+ "beyond": "Not for the exam. BGP now appears in data centres, where BGP EVPN carries virtual machine reachability, and in DDoS scrubbing and anycast. RPKI adds cryptographic checks on which AS may originate a prefix; BGP hijacks remain a live security problem. Search for BGP EVPN, RPKI ROA, BGP hijack, and route reflector."
+}

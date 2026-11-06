@@ -1,0 +1,182 @@
+{
+ "lead": "An IPv4 datagram is the network-layer packet: a header plus data. The header carries addressing, length, checksum and fragmentation control. A link has an MTU, the largest frame payload it can carry. If a datagram is larger, a router splits it into fragments; the destination reassembles them using identification, flags and fragment offset. Here the header is opened field by field, then fragmentation and path MTU discovery are shown. Every photo upload, UPI request and IRCTC page rides in such datagrams, so these rules decide whether big packets cross a Wi-Fi, fibre or tunnel link.",
+ "prereq": "You need: <a href=\"#ipv4-addressing-classful-and-classless\">IPv4 addressing</a>, <a href=\"#subnetting-subnet-masks-and-cidr\">subnetting and CIDR</a>, and Unit 3 framing.",
+ "sections": [
+  {
+   "h3": "Header fields in order",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An IPv4 header is normally 20 bytes. The first byte holds two 4-bit fields. Version is 4. IHL (Internet Header Length) gives header length in 32-bit words; value 5 means 5 × 4 = 20 bytes. A larger IHL means options are present. The next byte splits into DSCP and ECN. DSCP (Differentiated Services Code Point) labels traffic class for priority. ECN (Explicit Congestion Notification) lets routers mark congestion instead of dropping. Total length is 16 bits and counts header plus data in bytes, so maximum datagram is 65,535 bytes. Identification is a 16-bit tag chosen by the sender; all fragments of one datagram share it. Flags are 3 bits: reserved, DF (Don't Fragment), MF (More Fragments). DF forbids fragmentation; MF is 1 on every fragment except the last. Fragment offset is 13 bits and gives where this fragment's data starts in the original data, measured in 8-byte units. TTL (Time To Live) is a hop counter; each router subtracts 1 and drops at 0. Protocol names the payload: 1 ICMP, 6 TCP, 17 UDP. Header checksum covers the header only; routers recompute it after changing TTL. Source and destination are 32-bit IPv4 addresses. Options, rare today, can add timestamp, route or padding. Data follows the header. Some syllabi call the datagram a packet."
+    }
+   ]
+  },
+  {
+   "h3": "MTU, fragmentation and reassembly",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "MTU (Maximum Transmission Unit) is the largest payload a link can carry in one frame. Ethernet commonly uses 1500 bytes. If an IP datagram is larger than the next link's MTU, a router fragments it unless DF is set. Each fragment is a complete IPv4 datagram: its own header (normally 20 bytes), same identification, same source and destination, and a copy of the original protocol. The fragment's data is a contiguous slice of the original data. Total length changes per fragment. MF is 1 if more fragments follow, 0 on the last. Fragment offset gives the slice's start in 8-byte units. The first fragment has offset 0. Every fragment except the last must carry a data length that is a multiple of 8, so the next offset is a whole number. The last fragment may carry any remaining length."
+    },
+    {
+     "type": "formula",
+     "text": "max_data = ((MTU − H) ÷ 8) × 8",
+     "where": "max_data is the largest data slice for every fragment except the last, in bytes; MTU is the link maximum transmission unit in bytes; H is the IPv4 header length in bytes; ÷8 then ×8 rounds down to a whole 8-byte block."
+    },
+    {
+     "type": "p",
+     "text": "To fragment, slice the data, set total length = header + slice length, set offset = bytes already sent ÷ 8, set MF, and copy identification. Reassembly happens only at the final destination, not at each router. The destination holds fragments under the same identification and source until it has offset 0 through the last byte. It uses MF and total length to find the end. If a timer expires, it discards the set. Routers do not reassemble, so fragments can travel different paths."
+    }
+   ]
+  },
+  {
+   "h3": "Path MTU discovery and common trouble",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Path MTU (PMTU) is the smallest MTU on the path from source to destination. Sending maximum-size datagrams and letting routers fragment wastes bandwidth and can hurt loss-sensitive traffic. Path MTU discovery avoids it. The source sets DF = 1 and sends a datagram at its local MTU. If a router cannot forward it because the next link is smaller, the router sends ICMP 'fragmentation needed' back to the source, including the next-hop MTU. The source lowers its size and retries. This repeats until packets pass. The source keeps a cache per destination. A PMTU black hole happens when ICMP is blocked: the source never learns and keeps sending packets that are silently dropped. Tunnels and VPNs often lower the usable MTU because they add outer headers. Setting DF also matters for testing: a ping with DF and a large size reveals the path limit. Reassembly at the destination uses memory; too many half-complete fragment sets can exhaust it, so routers and hosts may rate-limit ICMP and fragment queues."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A 3980-byte payload is split into data blocks of 1480, 1480 and 1020 bytes. The offsets jump by 185 and 370 because they count 8-byte units, and the last fragment clears MF.",
+  "spec": {
+   "type": "array",
+   "title": "Fragments for MTU 1500",
+   "show_index": true,
+   "index_from": 1,
+   "rows": [
+    {
+     "label": "Field",
+     "cells": [
+      "Data",
+      "Off",
+      "MF"
+     ]
+    },
+    {
+     "label": "Frag 1",
+     "cells": [
+      "1480",
+      "0",
+      "1"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "Frag 2",
+     "cells": [
+      "1480",
+      "185",
+      "1"
+     ]
+    },
+    {
+     "label": "Frag 3",
+     "cells": [
+      "1020",
+      "370",
+      "0"
+     ],
+     "marks": {
+      "2": "next"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 1,
+     "cell": 0,
+     "label": "data"
+    }
+   ],
+   "aria": "A 3980-byte payload is cut into data sizes 1480, 1480 and 1020 bytes; offsets are 0, 185 and 370 in 8-byte units, with MF flags 1, 1, 0."
+  }
+ },
+ "examples": [
+  {
+   "question": "An IPv4 datagram is 4000 bytes including a 20-byte header, so its data is 3980 bytes. It must cross a link with MTU 1500 bytes. All fragments use the same 20-byte header. Give each fragment's data size, total length, fragment offset and MF flag.",
+   "steps": [
+    "Available data per full fragment = MTU − header = 1500 − 20 = 1480 bytes. 1480 is a multiple of 8 (1480 ÷ 8 = 185), so no rounding is needed.",
+    "Fragment 1 takes first 1480 bytes. Total length = 20 + 1480 = 1500 bytes. Offset = 0 ÷ 8 = 0. More data remains, so MF = 1.",
+    "Remaining data = 3980 − 1480 = 2500 bytes.",
+    "Fragment 2 takes next 1480 bytes. Total length = 20 + 1480 = 1500 bytes. Offset = 1480 ÷ 8 = 185. Remaining = 2500 − 1480 = 1020 bytes, so MF = 1.",
+    "Fragment 3 takes last 1020 bytes. Total length = 20 + 1020 = 1040 bytes. Offset = 2960 ÷ 8 = 370. No data remains, so MF = 0.",
+    "Check: final byte position = 2960 + 1020 = 3980 bytes, matching original data."
+   ],
+   "answer": "Data sizes 1480, 1480 and 1020 bytes; total lengths 1500, 1500 and 1040 bytes; offsets 0, 185 and 370; MF flags 1, 1 and 0.",
+   "check": "mtu = 1500\nheader = 20\ntotal = 4000\ndata = total - header\nmax_data = mtu - header\nfrags = []\nremaining = data\noffset = 0\nwhile remaining > max_data:\n    frags.append((max_data, header + max_data, offset, 1))\n    offset += max_data // 8\n    remaining -= max_data\nfrags.append((remaining, header + remaining, offset, 0))\nfor d, t, o, mf in frags:\n    print(d)\n    print(t)\n    print(o)\n    print(mf)",
+   "values": [
+    1480,
+    1500,
+    0,
+    1,
+    1480,
+    1500,
+    185,
+    1,
+    1020,
+    1040,
+    370,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Fragment offset is in 8-byte units, not bytes. 1480 bytes gives offset 185, not 1480.",
+  "Total length includes the IP header; data size is total length minus header length.",
+  "The last fragment's data length need not be a multiple of 8; only non-last fragments need that.",
+  "Identification is the same on all fragments; MF and fragment offset differ. Do not confuse identification with fragment offset.",
+  "DF = 1 means no fragmentation; a router drops the datagram and may return ICMP instead of fragmenting."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which IPv4 header field is 13 bits and counts 8-byte units?",
+   "marks": 2,
+   "a": "Fragment offset."
+  },
+  {
+   "level": "remember",
+   "q": "What does MF = 0 mean on an IPv4 fragment?",
+   "marks": 2,
+   "a": "This is the last fragment; no more fragments follow."
+  },
+  {
+   "level": "understand",
+   "q": "Why must every non-last fragment carry a data length that is a multiple of 8?",
+   "marks": 3,
+   "a": "The next fragment's offset is bytes sent ÷ 8. A non-multiple would make the offset fractional; 8-byte blocks keep the 13-bit field integral."
+  },
+  {
+   "level": "apply",
+   "q": "A 4000-byte datagram has a 20-byte header and crosses MTU 1500. What is the second fragment's offset?",
+   "marks": 3,
+   "a": "First fragment data = 1500 − 20 = 1480 bytes; offset = 1480 ÷ 8 = 185."
+  },
+  {
+   "level": "apply",
+   "q": "Data is 3000 bytes, header is 20 bytes, MTU is 1000 bytes. Give the first two fragment data sizes, total lengths and offsets, using largest multiple-of-8 slices.",
+   "marks": 5,
+   "a": "Max raw data = 1000 − 20 = 980; rounded slice = 976 bytes. Fragment 1: data 976, total length 996, offset 0, MF 1. Fragment 2: data 976, total length 996, offset 122, MF 1."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is reassembly done at the final destination and not at every router?",
+   "marks": 4,
+   "a": "It avoids repeated fragment-and-reassemble work, lets fragments use different paths, and only the destination has the complete set under one identification; routers stay simple."
+  },
+  {
+   "level": "analyze",
+   "q": "Large packets with DF = 1 vanish, but small pings work. Give the likely cause and the mechanism.",
+   "marks": 4,
+   "a": "A PMTU black hole. A smaller link needs fragmentation, DF forbids it, and the ICMP 'fragmentation needed' message is blocked, so the source never learns the lower MTU."
+  }
+ ],
+ "beyond": "Not for the exam. In production, path MTU discovery, ICMP filtering and tunneling interact; a VPN adds an outer header and shrinks the usable MTU. Linux exposes PMTU cache entries and supports TCP MSS clamping at gateways to keep TCP segments small enough. IPv6 moves fragmentation to the source and uses a Fragment extension header; see <a href=\"#ipv6-addressing-header-and-transition-from-ipv4\">IPv6 header</a>. Search terms: PMTUD black hole, MSS clamping, IP fragmentation attack."
+}
