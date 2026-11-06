@@ -1,0 +1,556 @@
+{
+ "lead": "This unit is about processes that share data and resources: how to stop two processes from changing the same value at the same time, how to make them wait and signal in order, and how to deal with deadlocks. After it you can state the critical-section conditions, trace Peterson's algorithm, semaphores and monitors, and apply prevention, Banker's algorithm, detection and recovery to a deadlock question.",
+ "about": "Chapter 3.1 starts with race conditions and the three conditions a critical section must satisfy. Chapter 3.2 gives Peterson's two-process solution and atomic hardware instructions. Chapter 3.3 moves to mutex locks and semaphores, including the classic producer-consumer problem. Chapter 3.4 wraps shared data and condition variables inside a monitor. Chapter 3.5 changes from coordination to deadlock: the resource-allocation graph and the four necessary conditions. Chapter 3.6 compares the handling methods and shows prevention by breaking a condition. Chapter 3.7 explains safe states and works the Banker's algorithm matrices. Chapter 3.8 detects deadlock with wait-for graphs or the multiple-instance algorithm and recovers by termination or preemption.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Two processes can interleave machine steps on shared data and lose an update; a critical section is the code that must run with mutual exclusion.",
+   "depth": "Cover race condition, shared counter example, critical-section structure (entry, critical section, exit, remainder), and the three requirements: mutual exclusion, progress, bounded waiting. Distinguish preemptive and non-preemptive kernels. Define shared variable x, process P_i, and the load/add/store steps. Keep proofs informal.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "P1",
+     "P2",
+     "Memory"
+    ],
+    "messages": [
+     {
+      "from": "P1",
+      "to": "Memory",
+      "label": "read x=5",
+      "dashed": false
+     },
+     {
+      "from": "P2",
+      "to": "Memory",
+      "label": "read x=5",
+      "dashed": false
+     },
+     {
+      "from": "P1",
+      "to": "Memory",
+      "label": "write 6",
+      "dashed": false
+     },
+     {
+      "from": "P2",
+      "to": "Memory",
+      "label": "write 6",
+      "dashed": false
+     }
+    ],
+    "aria": "Both processes read x=5 before either writes, so the final x is 6 instead of 7."
+   },
+   "example": "Shared integer x = 5. Processes P1 and P2 each run x = x + 1, compiled as load x, add 1, store x. P1 loads 5, P2 loads 5, P1 stores 6, P2 stores 6. What is the final x, and why is one update lost?",
+   "trap": "A single high-level statement x = x + 1 is not atomic; it is three machine steps. Mutual exclusion alone does not satisfy progress and bounded waiting.",
+   "prereq": "Unit 2: process concept, states and context switching.",
+   "leave": "Hardware instructions to 3.2; semaphores and monitors to 3.3 and 3.4."
+  },
+  {
+   "k": 2,
+   "idea": "Peterson's two-process software lock and atomic hardware instructions give a correct entry protocol for a critical section.",
+   "depth": "Peterson's algorithm: shared boolean flag[2], shared int turn; flag[i]=true, turn=j, wait while flag[j] and turn==j, then enter. Show mutual exclusion, progress, bounded waiting. Note busy waiting, two-process limit, and sequential-consistency assumption. Hardware: test-and-set, compare-and-swap, atomic swap; semantics return old value and set new value atomically; spinlock use. Some syllabi call this synchronization hardware.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Peterson entry for process i",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "flag[i]=true",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "turn=j",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "while flag[j] and turn=j",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Critical section",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "flag[i]=false",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "ready",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     }
+    ],
+    "aria": "Process i sets its flag, gives turn to j, waits while flag[j] and turn equal j, then enters and later clears its flag."
+   },
+   "example": "P0 and P1 use Peterson's algorithm with flag[0]=flag[1]=false and turn=0. P0 sets flag[0]=true and turn=1. P1 sets flag[1]=true and turn=0. P0 checks flag[1]=true and turn==1: false, so P0 enters. P1 checks flag[0]=true and turn==0: true, so P1 waits. P0 sets flag[0]=false. Who enters next?",
+   "trap": "Peterson's condition uses turn==j for process i; swapping the test or initializing turn wrongly lets both enter. It assumes atomic loads and stores with sequential consistency, so it is not a portable lock on all modern CPUs.",
+   "prereq": "3.1 critical sections and race conditions.",
+   "leave": "General locks and semaphores to 3.3."
+  },
+  {
+   "k": 3,
+   "idea": "A mutex gives one owner at a time; a semaphore is an integer with atomic wait and signal used for mutual exclusion or ordering.",
+   "depth": "Mutex lock: acquire/release, busy waiting, spinlock, owner concept. Semaphore S: wait(S) (P) decrements and blocks if S<0; signal(S) (V) increments and wakes if S≤0; atomicity. Binary semaphore vs counting semaphore. Use for mutual exclusion and for ordering (signal before wait). Classic problems: bounded-buffer producer-consumer with empty/full/mutex; readers-writers; dining philosophers and deadlock. Some syllabi call wait P and signal V.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Semaphore wait and signal",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "wait(S)",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "S = S − 1",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "S < 0?",
+      "note": "no: continue",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Block process",
+      "note": "add to queue",
+      "style": "live"
+     },
+     {
+      "id": "e",
+      "label": "signal(S)",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "S = S + 1",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "S ≤ 0?",
+      "note": "no: no wake",
+      "style": "accent"
+     },
+     {
+      "id": "h",
+      "label": "Wake one waiter",
+      "note": "remove from queue",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "yes",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "style": "solid"
+     },
+     {
+      "from": "g",
+      "to": "h",
+      "label": "yes",
+      "style": "solid"
+     }
+    ],
+    "aria": "wait lowers S and blocks the process when S is negative; signal raises S and wakes one waiter when S is zero or negative."
+   },
+   "example": "Counting semaphore S=1. P1, P2 and P3 call wait(S) in that order with no signal between. Give S and the blocked set after each call. Then P1 calls signal(S). Who can enter? Trace: S = 0, −1, −2; P2 and P3 block; P1 signal makes S = −1 and wakes P2.",
+   "trap": "S negative means the number of waiting processes in the common convention; signal must be atomic with the queue check. A semaphore used for ordering must start at 0, while a mutex semaphore starts at 1.",
+   "prereq": "3.1 and 3.2.",
+   "leave": "Monitor condition variables to 3.4; deadlock handling to 3.5–3.8."
+  },
+  {
+   "k": 4,
+   "idea": "A monitor packs shared data and its procedures into one module with implicit mutual exclusion, and condition variables let a process wait inside without busy spinning.",
+   "depth": "Monitor structure: shared variables, procedures, initialization; only one process active inside. Condition variable x: x.wait releases the monitor and blocks; x.signal resumes one waiter if any. Signal has no memory. Hoare (signal-and-wait) vs Mesa (signal-and-continue) semantics; use while loops. Solve bounded-buffer producer-consumer with notFull/notEmpty; mention monitor solution to dining philosophers. Some syllabi call condition variables CVs.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Monitor",
+     "style": "accent",
+     "children": [
+      {
+       "label": "buffer, count",
+       "style": "normal",
+       "edge": "data"
+      },
+      {
+       "label": "insert()",
+       "style": "normal",
+       "edge": "procedure"
+      },
+      {
+       "label": "remove()",
+       "style": "normal",
+       "edge": "procedure"
+      },
+      {
+       "label": "notFull",
+       "style": "live",
+       "edge": "condition"
+      },
+      {
+       "label": "notEmpty",
+       "style": "live",
+       "edge": "condition"
+      }
+     ]
+    },
+    "aria": "A monitor holds shared buffer and count, procedures insert and remove, and condition variables notFull and notEmpty."
+   },
+   "example": "Bounded buffer of capacity 2 inside a monitor. count=0. Producer inserts A: count=1. Producer inserts B: count=2. Producer tries C and waits on notFull. Consumer removes A: count=1 and signals notFull. Producer inserts C: count=2. Show count and the waiting set after each step.",
+   "trap": "Condition-variable signal is lost if no process is waiting; use while (not if) around wait because another process may run first. Monitor mutual exclusion does not choose which waiter enters.",
+   "prereq": "3.1 and 3.3.",
+   "leave": "Semaphore implementation to 3.3; deadlock to 3.5."
+  },
+  {
+   "k": 5,
+   "idea": "Deadlock is a cycle of processes waiting for resources held by each other; it needs mutual exclusion, hold and wait, no preemption and circular wait all at once.",
+   "depth": "System model: resource types R1...Rm with instances; request, allocate, use, release. Resource-allocation graph: process circles, resource boxes with dots, request edge P→R, assignment edge R→P. Deadlock vs starvation. Four necessary conditions (Coffman): mutual exclusion, hold and wait, no preemption, circular wait. Cycle in RAG: necessary; sufficient only when every resource has one instance. Multithreaded deadlock example. Some syllabi call these deadlock characterization conditions.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "P1",
+      "label": "P1",
+      "x": 0,
+      "y": 1,
+      "note": "holds R1",
+      "style": "normal"
+     },
+     {
+      "id": "P2",
+      "label": "P2",
+      "x": 2,
+      "y": 1,
+      "note": "holds R2",
+      "style": "normal"
+     },
+     {
+      "id": "R1",
+      "label": "R1",
+      "x": 1,
+      "y": 0,
+      "note": "1 instance",
+      "style": "accent"
+     },
+     {
+      "id": "R2",
+      "label": "R2",
+      "x": 1,
+      "y": 2,
+      "note": "1 instance",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "P1",
+      "to": "R2",
+      "label": "request",
+      "style": "dashed"
+     },
+     {
+      "from": "R2",
+      "to": "P2",
+      "label": "assigned",
+      "style": "solid"
+     },
+     {
+      "from": "P2",
+      "to": "R1",
+      "label": "request",
+      "style": "dashed"
+     },
+     {
+      "from": "R1",
+      "to": "P1",
+      "label": "assigned",
+      "style": "solid"
+     }
+    ],
+    "aria": "P1 holds R1 and requests R2; P2 holds R2 and requests R1; the edges form a cycle."
+   },
+   "example": "Two resources R1 and R2, one instance each. P1 holds R1 and requests R2. P2 holds R2 and requests R1. Draw the resource-allocation graph and decide if the system is deadlocked.",
+   "trap": "A cycle in a resource-allocation graph is not always a deadlock when resources have multiple instances. Holding one resource while waiting for another is hold and wait, not circular wait by itself.",
+   "prereq": "Unit 2: process states and scheduling; 3.1 for shared-resource conflict.",
+   "leave": "Prevention, avoidance, detection and recovery to 3.6–3.8."
+  },
+  {
+   "k": 6,
+   "idea": "There are four ways to handle deadlocks; prevention breaks one necessary condition before deadlock can form.",
+   "depth": "Handling methods: prevention, avoidance, detection with recovery, and ignore (ostrich). Prevention: break mutual exclusion (spooling, read-only), break hold and wait (request all before start, release all before request), break no preemption (preempt resource, rollback), break circular wait (global numbering, request in increasing order). Costs: low utilization, starvation, rollback. Contrast prevention with avoidance. Some syllabi call the ignore approach the ostrich algorithm.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Deadlock handling",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Prevention",
+       "style": "live",
+       "children": [
+        {
+         "label": "Break mutual exclusion",
+         "style": "normal"
+        },
+        {
+         "label": "Break hold and wait",
+         "style": "normal"
+        },
+        {
+         "label": "Break no preemption",
+         "style": "normal"
+        },
+        {
+         "label": "Break circular wait",
+         "style": "normal"
+        }
+       ]
+      },
+      {
+       "label": "Avoidance",
+       "style": "normal"
+      },
+      {
+       "label": "Detection",
+       "style": "normal"
+      },
+      {
+       "label": "Ignore",
+       "style": "normal"
+      }
+     ]
+    },
+    "aria": "Prevention is one of four handling methods and breaks one of the four necessary conditions."
+   },
+   "example": "Resources R1, R2, R3 are numbered R1 < R2 < R3. A process may request only in increasing order. P1 holds R1 and requests R2: allowed. P2 holds R2 and requests R1: not allowed; P2 must release R2 first. Show how this rule prevents a cycle among P1 and P2.",
+   "trap": "Prevention is not avoidance: prevention removes a necessary condition for every request, while avoidance checks each request against future claims. Breaking hold and wait can starve a process that needs many resources.",
+   "prereq": "3.5 deadlock model and four conditions.",
+   "leave": "Safe-state check to 3.7; detection algorithm to 3.8."
+  },
+  {
+   "k": 7,
+   "idea": "Avoidance grants a request only if the system can still find a safe sequence in which every process can finish.",
+   "depth": "Safe state, safe sequence, unsafe state. Single-instance resource-allocation graph with claim edges. Banker's algorithm for n processes and m resource types: vectors Available, Max, Allocation, Need = Max − Allocation; safety algorithm with Work and Finish; resource-request algorithm. Worked 5-process, 3-resource example. Note known maximum claims and fixed process set.",
+   "figure": {
+    "type": "array",
+    "title": "Need = Max − Allocation; Available = (3,3,2)",
+    "show_index": false,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "P0",
+      "cells": [
+       "7",
+       "4",
+       "3"
+      ]
+     },
+     {
+      "label": "P1",
+      "cells": [
+       "1",
+       "2",
+       "2"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent",
+       "2": "accent"
+      }
+     },
+     {
+      "label": "P2",
+      "cells": [
+       "6",
+       "0",
+       "0"
+      ]
+     },
+     {
+      "label": "P3",
+      "cells": [
+       "0",
+       "1",
+       "1"
+      ]
+     },
+     {
+      "label": "P4",
+      "cells": [
+       "4",
+       "3",
+       "1"
+      ]
+     },
+     {
+      "label": "Avail",
+      "cells": [
+       "3",
+       "3",
+       "2"
+      ],
+      "marks": {
+       "0": "live",
+       "1": "live",
+       "2": "live"
+      }
+     }
+    ],
+    "aria": "Need matrix for five processes and three resource types; Available is 3,3,2; P1 can finish first."
+   },
+   "example": "Five processes P0–P4 and resource types A, B, C. Available = (3,3,2). Allocation: P0 (0,1,0), P1 (2,0,0), P2 (3,0,2), P3 (2,1,1), P4 (0,0,2). Max: P0 (7,5,3), P1 (3,2,2), P2 (9,0,2), P3 (2,2,2), P4 (4,3,3). Find Need and a safe sequence. Safe sequence: P1, P3, P4, P0, P2.",
+   "trap": "An unsafe state is not necessarily deadlocked; it may still finish. Banker's algorithm needs the maximum claim of every process in advance and does not handle new processes arriving.",
+   "prereq": "3.5 and 3.6.",
+   "leave": "Detection and recovery to 3.8."
+  },
+  {
+   "k": 8,
+   "idea": "Detection finds a cycle or a set of processes that cannot finish; recovery breaks the deadlock by ending processes or preempting resources.",
+   "depth": "Detection: wait-for graph for single instance (nodes are processes, edge P_i→P_j if P_i waits for a resource held by P_j); cycle means deadlock. Multiple instances: detection algorithm with Available, Allocation, Request; Work and Finish; mark processes that can finish; unmarked are deadlocked. Detection frequency trade-off. Recovery: abort all deadlocked processes or abort one at a time; choose victim by priority, CPU time, resources held; resource preemption with victim selection, rollback, starvation. Some syllabi call this recovery from deadlock.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "nodes": [
+     {
+      "id": "P1",
+      "label": "P1",
+      "x": 0,
+      "y": 0,
+      "note": "holds R1",
+      "style": "normal"
+     },
+     {
+      "id": "P2",
+      "label": "P2",
+      "x": 2,
+      "y": 0,
+      "note": "holds R2",
+      "style": "normal"
+     },
+     {
+      "id": "P3",
+      "label": "P3",
+      "x": 1,
+      "y": 2,
+      "note": "holds R3",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "P1",
+      "to": "P2",
+      "label": "waits",
+      "style": "solid"
+     },
+     {
+      "from": "P2",
+      "to": "P3",
+      "label": "waits",
+      "style": "solid"
+     },
+     {
+      "from": "P3",
+      "to": "P1",
+      "label": "waits",
+      "style": "solid"
+     }
+    ],
+    "aria": "Each process waits for the next, so the wait-for graph has a cycle and the system is deadlocked."
+   },
+   "example": "Single-instance resources R1, R2, R3. P1 holds R1 and requests R2. P2 holds R2 and requests R3. P3 holds R3 and requests R1. Draw the wait-for graph. Is there a deadlock? Which process should recovery abort first if P3 has the lowest priority?",
+   "trap": "The multiple-instance detection algorithm uses Request, not Need; using Need turns it into Banker's safety check. Aborting a process can leave inconsistent files, so rollback is needed.",
+   "prereq": "3.5; 3.7 for the matrix style.",
+   "leave": "File consistency and I/O details to Unit 5."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "race condition needs atomic entry"
+  ],
+  [
+   2,
+   3,
+   "hardware lock becomes mutex"
+  ],
+  [
+   3,
+   4,
+   "semaphore waiting becomes monitor condition"
+  ],
+  [
+   4,
+   5,
+   "waiting inside monitor can deadlock"
+  ],
+  [
+   5,
+   6,
+   "four conditions guide prevention"
+  ],
+  [
+   6,
+   7,
+   "avoidance checks safe state"
+  ],
+  [
+   7,
+   8,
+   "detection finds unsafe cycle"
+  ]
+ ]
+}

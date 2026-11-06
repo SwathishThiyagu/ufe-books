@@ -1,0 +1,186 @@
+{
+ "lead": "A monitor is a language-level module that holds shared data and the procedures that use it. Only one process may be active inside the monitor at a time, so the compiler or runtime supplies mutual exclusion; the programmer does not write lock and unlock calls. Condition variables let a process wait inside the monitor and release it without busy spinning. Monitors appear as Java's synchronized methods with wait and notify. Pthreads give you the same idea built by hand: a mutex plus condition variables.",
+ "prereq": "You need: <a href=\"#critical-section-problem-and-race-conditions\">3.1 Critical-section problem and race conditions</a> and <a href=\"#mutex-locks-and-semaphores\">3.3 Mutex locks and semaphores</a>.",
+ "sections": [
+  {
+   "h3": "Monitor structure",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A monitor has three parts: shared variables, procedures, and an initialization block. The shared variables hold the state that several processes need, such as a buffer and a count. The procedures are the only legal way to read or change those variables. The initialization block runs once and sets the starting values. A process calls a monitor procedure like any other procedure. The runtime checks the door: if no process is inside, the caller enters; if another process is active, the caller waits in an entry queue. This is implicit mutual exclusion. It removes the semaphore bugs of forgetting to lock or unlock the mutex, and of unlocking the wrong mutex. Condition variables still have to be waited on and signalled explicitly, so a missing or wrong condition-variable signal remains a programmer bug. See <a href=\"#mutex-locks-and-semaphores\">3.3</a> for the explicit lock version. The monitor is a higher-level construct, not a hardware instruction. Its guarantee comes from the compiler or runtime plus a mutex and condition variables underneath. Monitor mutual exclusion does not decide which waiting process enters next; that is a scheduling choice."
+    }
+   ]
+  },
+  {
+   "h3": "Condition variables",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Inside a monitor, a condition variable x is a queue of waiting processes. It has two operations. x.wait makes the calling process release the monitor and block on x. When another process later resumes it, it must reacquire the monitor before returning from wait. x.signal resumes one process waiting on x, if any. If no process waits, signal does nothing; the signal has no memory. A later wait will not see an earlier signal. Some syllabi call condition variables CVs."
+    },
+    {
+     "type": "p",
+     "text": "The two common semantics differ in who runs after signal. Under Hoare semantics, signal-and-wait, the signalling process gives up the monitor and the signalled process runs immediately. Under Mesa semantics, signal-and-continue, the signaller keeps the monitor and the signalled process is made ready; it runs later. Java's wait and notify follow a Mesa-like style."
+    },
+    {
+     "type": "p",
+     "text": "Because the condition can change again before the woken process runs, every wait must sit inside a while loop, not an if. Recheck the condition after wake-up. A condition variable is not a semaphore: it has no counter and no stored signal. It only answers who is waiting here now."
+    }
+   ]
+  },
+  {
+   "h3": "Bounded buffer inside a monitor",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take a buffer of capacity 2. The variable count is the number of items currently stored. The condition notFull holds producers waiting for space; notEmpty holds consumers waiting for an item. A producer calls insert: while count == 2, notFull.wait(); put the item; count = count + 1; notEmpty.signal(). A consumer calls remove: while count == 0, notEmpty.wait(); take an item; count = count - 1; notFull.signal(). The while guards are essential. If two producers wake, one may fill the last slot before the other runs; the second must test count again."
+    },
+    {
+     "type": "p",
+     "text": "The same pattern solves the dining philosophers problem. Each philosopher has a state: thinking, hungry or eating. A philosopher who cannot get both forks waits on a condition for that philosopher. When a neighbour puts down a fork, it signals the neighbours that may now be able to eat. No busy waiting is used. If the state checks are wrong, deadlock can still appear; see <a href=\"#deadlock-system-model-and-necessary-conditions\">3.5</a>. The monitor still does not choose which waiter enters; it only enforces one active process."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The monitor groups state, procedures and two condition variables. Only insert and remove touch buffer and count.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "Monitor",
+    "style": "accent",
+    "children": [
+     {
+      "label": "buffer, count",
+      "style": "normal",
+      "edge": "data",
+      "_d": 1,
+      "children": [],
+      "_x": 88.0,
+      "_y": 116
+     },
+     {
+      "label": "insert()",
+      "style": "normal",
+      "edge": "procedure",
+      "_d": 1,
+      "children": [],
+      "_x": 224.0,
+      "_y": 116
+     },
+     {
+      "label": "remove()",
+      "style": "normal",
+      "edge": "procedure",
+      "_d": 1,
+      "children": [],
+      "_x": 360.0,
+      "_y": 116
+     },
+     {
+      "label": "notFull",
+      "style": "live",
+      "edge": "condition",
+      "_d": 1,
+      "children": [],
+      "_x": 496.0,
+      "_y": 116
+     },
+     {
+      "label": "notEmpty",
+      "style": "live",
+      "edge": "condition",
+      "_d": 1,
+      "children": [],
+      "_x": 632.0,
+      "_y": 116
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "A monitor holds shared buffer and count, procedures insert and remove, and condition variables notFull and notEmpty."
+  }
+ },
+ "examples": [
+  {
+   "question": "A bounded buffer of capacity 2 sits inside a monitor. count = 0. Producer P inserts A, then B. P then tries to insert C while the buffer is full and waits on notFull. Consumer K removes A and signals notFull. P resumes and inserts C. For each of the five events, give count and the waiting sets for notFull and notEmpty. Use Mesa semantics.",
+   "steps": [
+    "Initial state: count = 0, notFull = {}, notEmpty = {}.",
+    "P inserts A: count = 1, notFull = {}, notEmpty = {}.",
+    "P inserts B: count = 2, notFull = {}, notEmpty = {}.",
+    "P tries C: buffer is full, so P waits on notFull. count stays 2, notFull = {P}, notEmpty = {}.",
+    "K removes A: count = 1. K signals notFull, so P leaves the notFull waiting set and becomes ready. Under Mesa semantics K continues first. Waiting sets: notFull = {}, notEmpty = {}.",
+    "P resumes and inserts C: count = 2. Waiting sets: notFull = {}, notEmpty = {}."
+   ],
+   "answer": "Counts after the five events are 1, 2, 2, 1, 2. notFull had 1 waiter at step 4 (when P tried to insert C); at the end count = 2, notFull waiters = 0 and notEmpty waiters = 0.",
+   "check": "capacity = 2\ncount = 0\nnotFull_wait = 0\nnotEmpty_wait = 0\ncounts = []\nstep4_notFull = None\n\n# 1 P inserts A\ncount += 1\ncounts.append(count)\n\n# 2 P inserts B\ncount += 1\ncounts.append(count)\n\n# 3 P tries C, buffer full\nif count == capacity:\n    notFull_wait = 1\nstep4_notFull = notFull_wait\ncounts.append(count)\n\n# 4 K removes A and signals notFull\ncount -= 1\nif notFull_wait > 0:\n    notFull_wait = 0\ncounts.append(count)\n\n# 5 P resumes and inserts C\ncount += 1\ncounts.append(count)\n\nfor c in counts:\n    print(c)\nprint(step4_notFull)\nprint(notFull_wait)\nprint(notEmpty_wait)\n",
+   "values": [
+    1,
+    2,
+    2,
+    1,
+    2,
+    1,
+    0,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "signal on a condition variable with no waiter is lost; it is not saved for a later wait.",
+  "Use while, not if, around wait; under Mesa the condition can change before the woken process runs.",
+  "Monitor mutual exclusion does not mean first-come-first-served among waiters; the runtime or scheduler chooses.",
+  "A condition variable has no value; a semaphore has an integer count. Do not use signal as if it increments something.",
+  "Hoare signal-and-wait is not Mesa signal-and-continue; state which semantics your answer uses."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a monitor and list its three parts.",
+   "marks": 2,
+   "a": "A monitor is a module holding shared data and the procedures that operate on it. Its three parts are shared variables, procedures, and an initialization block."
+  },
+  {
+   "level": "understand",
+   "q": "Why does x.wait release the monitor before blocking?",
+   "marks": 3,
+   "a": "If the caller kept the monitor while blocked, no other process could enter to change the condition. Releasing the monitor lets another process run and later signal x."
+  },
+  {
+   "level": "apply",
+   "q": "A monitor buffer has capacity 3 and count = 2. Producer P inserts X. Producer Q tries Y and waits. Consumer K removes Z and signals notFull. Q resumes and inserts Y. Give the final count and the final notFull waiter count.",
+   "marks": 4,
+   "a": "After P inserts X, count = 3. Q waits, so count stays 3 and notFull has 1 waiter. K removes Z, so count = 2, and the signal clears Q from notFull. Q inserts Y, so count = 3. Final: count = 3, notFull waiters = 0."
+  },
+  {
+   "level": "analyze",
+   "q": "A signal with no waiter does nothing. Why is that harmless in a correct monitor program?",
+   "marks": 4,
+   "a": "Because each wait sits in a while loop inside the monitor. A process blocks only while the predicate is false, and only a process holding the monitor can make the predicate true, and that process signals before leaving. The wait and the test cannot be interleaved, so no signal is ever needed by a process that is not already waiting. Lost signals cause trouble only when the test and the wait are not atomic."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between Hoare and Mesa monitor semantics after x.signal.",
+   "marks": 3,
+   "a": "In Hoare signal-and-wait, the signaller gives up the monitor and the signalled process runs immediately. In Mesa signal-and-continue, the signaller keeps the monitor and the signalled process becomes ready to run later."
+  },
+  {
+   "level": "analyze",
+   "q": "A monitor has condition x with no waiter. Process P calls x.signal. Process Q then calls x.wait. Does Q return immediately? Explain.",
+   "marks": 3,
+   "a": "No. The signal by P is lost because no process was waiting. Q blocks on x until some later process calls x.signal while Q is waiting."
+  },
+  {
+   "level": "understand",
+   "q": "Can two processes be active inside monitor procedures at the same time? Can one be active while another waits on a condition?",
+   "marks": 2,
+   "a": "No, only one process can be active inside the monitor at a time. Yes, one process can be active while other processes wait on condition variables or in the entry queue."
+  }
+ ],
+ "beyond": "Not for the exam. Java's synchronized methods with wait and notify are a monitor implementation; C++ std::condition_variable and pthread_cond_wait are condition variables used with a mutex, not a full language monitor. Modern languages add async/await and structured concurrency, but the same lost-signal and while-loop rules return. Researchers verify monitor implementations with model checkers. Search for Mesa versus Hoare monitor semantics, Java monitor wait notify, and pthread condition variable while loop."
+}

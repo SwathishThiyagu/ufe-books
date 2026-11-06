@@ -1,0 +1,204 @@
+{
+ "lead": "Two processes on one CPU can still touch the same memory. The CPU switches between them in the middle of a statement. A line like x = x + 1 is not one step: the CPU loads x into a register, adds 1, and stores it back. If the switch happens between the load and the store, one update disappears. A critical section is the piece of code that reads or writes such shared data, and it must run for one process at a time. Bank balance updates, IRCTC seat counters and kernel data all depend on getting this right.",
+ "prereq": "You need Unit 2's <a href=\"#unit-2-processes-threads-and-cpu-scheduling\">processes, threads and CPU scheduling</a>: what a process is, its states, and how a context switch saves and restores registers.",
+ "sections": [
+  {
+   "h3": "One statement hides three machine steps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Take a shared integer <code>x</code> in memory, starting at 5. Processes <code>P<sub>1</sub></code> and <code>P<sub>2</sub></code> each run the line <code>x = x + 1</code>. A process is a running program with its own registers and program counter. A CPU cannot add 1 to memory directly, so that line becomes three machine steps: load <code>x</code> into a register, add 1 to the register, store the register back into <code>x</code>."
+    },
+    {
+     "type": "p",
+     "text": "The OS may switch processes between any two machine instructions. A <b>race condition</b> is when the result depends on that order. Both processes can load 5, both compute 6, both store 6. Two increments ran, yet x rose by one, because the second store threw away the first. That is a <b>lost update</b>."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "A bank balance updated from two ATMs at once.",
+      "The last train seat: two users each see 1 seat left and both pay.",
+      "A kernel counter of free memory pages touched by two system calls."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "The four parts of a process's code",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <b>critical section</b> is the part of a process that reads or writes data shared with another process. Only one process may be inside its critical section at a time. That condition is <b>mutual exclusion</b>. Every process using the shared data has the same four-part shape."
+    },
+    {
+     "type": "code",
+     "lang": "pseudo",
+     "code": "while (1) {\n    /* entry section: ask for permission */\n    /* critical section: touch shared data */\n    /* exit section: give permission back */\n    /* remainder section: local work */\n}",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "The entry and exit code is called the entry protocol. A correct protocol needs more than setting a flag. <a href=\"#peterson-s-solution-and-hardware-synchronization-support\">Peterson's solution and hardware instructions</a> build one from atomic reads and swaps, and <a href=\"#mutex-locks-and-semaphores\">mutex locks and semaphores</a> wrap the same idea into a ready-made object."
+    }
+   ]
+  },
+  {
+   "h3": "Three requirements for a correct solution",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Any solution to the critical-section problem must satisfy three requirements."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Mutual exclusion.</b> No two processes are inside their critical sections at the same time.",
+      "<b>Progress.</b> If no process is inside and some want to enter, the choice of who enters next cannot be postponed forever. A process sitting in its remainder section must not block the others.",
+      "<b>Bounded waiting.</b> After a process asks to enter, there is a finite limit on how many times other processes may enter before it. So no process waits forever."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Mutual exclusion is a safety property: nothing bad happens. Progress and bounded waiting are liveness properties: something good eventually happens. A protocol with a slow release can keep mutual exclusion and still fail progress. Keep the three separate when you write an answer."
+    }
+   ]
+  },
+  {
+   "h3": "Preemptive and non-preemptive kernels",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The same race lives inside the kernel, where the shared data is the ready queue, a page table or the open-file table. A kernel is <b>preemptive</b> if it can switch away from a process while that process is executing kernel code, for example inside a system call. A <b>non-preemptive</b> kernel runs kernel code until it finishes or the process blocks."
+    },
+    {
+     "type": "p",
+     "text": "A non-preemptive kernel avoids most races on a single CPU, because kernel code is never cut in the middle. The price is response time: one long system call delays every other process, which hurts interactive and real-time work."
+    },
+    {
+     "type": "p",
+     "text": "A preemptive kernel is more responsive, so each shared kernel structure needs its own lock. On a multicore machine, staying free of preemption is not enough at all: two CPUs run kernel code at the same instant, so locks are needed even in a non-preemptive kernel."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Both processes read x = 5 before either writes, so the final x is 6 instead of 7. Each process still does its own add; only the read is stale.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "P1",
+    "P2",
+    "Memory"
+   ],
+   "messages": [
+    {
+     "from": "P1",
+     "to": "Memory",
+     "label": "read x=5",
+     "dashed": false
+    },
+    {
+     "from": "P2",
+     "to": "Memory",
+     "label": "read x=5",
+     "dashed": false
+    },
+    {
+     "from": "P1",
+     "to": "Memory",
+     "label": "write 6",
+     "dashed": false
+    },
+    {
+     "from": "P2",
+     "to": "Memory",
+     "label": "write 6",
+     "dashed": false
+    }
+   ],
+   "aria": "Both processes read x=5 before either writes, so the final x is 6 instead of 7."
+  }
+ },
+ "examples": [
+  {
+   "question": "A shared integer x holds 5. Processes P1 and P2 each execute x = x + 1, compiled into load x into a register, add 1, store the register into x. The steps interleave as: P1 loads x, P2 loads x, P1 stores, P2 stores. (a) What is the final value of x? (b) What should it be if the two increments did not interfere? (c) How many updates are lost?",
+   "steps": [
+    "Memory holds x = 5 before either process runs.",
+    "P1 loads x into its register R1, so R1 = 5.",
+    "P2 loads x into its register R2, so R2 = 5. Both read the old value.",
+    "P1 computes R1 = 5 + 1 = 6 and stores it, so x = 6.",
+    "P2 computes R2 = 5 + 1 = 6 and stores it, so x = 6 again. P2's read was stale.",
+    "Without interference: 5 + 1 = 6, then 6 + 1 = 7.",
+    "Lost updates = correct value − actual value = 7 − 6 = 1."
+   ],
+   "answer": "Final x = 6 instead of 7, so one update is lost.",
+   "check": "x = 5\nr1 = x          # P1 loads\nr2 = x          # P2 loads\nx = r1 + 1      # P1 stores\nx = r2 + 1      # P2 stores\nprint(x)                 # final value\nprint(5 + 2)             # correct value\nprint((5 + 2) - x)       # lost updates\n",
+   "values": [
+    6,
+    7,
+    1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Treating x = x + 1 as one step. It is load, add, store, and a context switch can land between any two of them.",
+  "Thinking mutual exclusion is the whole answer. Progress and bounded waiting are separate requirements and are examined separately.",
+  "Confusing a race condition with a deadlock. A race needs no waiting at all; a deadlock is a cycle of processes waiting for held resources, covered in <a href=\"#deadlock-system-model-and-necessary-conditions\">3.5</a>.",
+  "Swapping progress and bounded waiting. Progress says some waiting process enters; bounded waiting says a particular one enters within a finite number of turns.",
+  "Claiming the whole process needs exclusion. Only the critical section does; the remainder section runs freely and can be preempted."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a race condition.",
+   "marks": 2,
+   "a": "Two or more processes access shared data concurrently and the final value depends on the order of their machine steps."
+  },
+  {
+   "level": "remember",
+   "q": "Name the four parts of a process's code around a critical section.",
+   "marks": 2,
+   "a": "Entry section, critical section, exit section, remainder section."
+  },
+  {
+   "level": "understand",
+   "q": "Two increments of a shared counter starting at 5 leave it at 6. Explain why.",
+   "marks": 3,
+   "a": "Both processes load 5 before either stores. Each computes 6 from its register. The second store overwrites the first, so one increment disappears."
+  },
+  {
+   "level": "understand",
+   "q": "Distinguish progress from bounded waiting.",
+   "marks": 3,
+   "a": "Progress: if the critical section is free and some process wants it, one of them gets in, and a process in its remainder section cannot block them. Bounded waiting: a process that has asked to enter gets in after a finite number of other entries, so it cannot starve."
+  },
+  {
+   "level": "apply",
+   "q": "x = 10. P1 loads, P2 loads, P1 stores, P2 stores, each running x = x + 1. Find the final x and the number of lost updates.",
+   "marks": 4,
+   "a": "R1 = 10, R2 = 10. P1 stores 11, P2 stores 11. Final x = 11. Correct value is 12, so 1 update is lost."
+  },
+  {
+   "level": "apply",
+   "q": "x = 0. Three processes each run x = x + 1, and all three load before any stores. Find the final x.",
+   "marks": 5,
+   "a": "Each register holds 0, each adds 1 to get 1, each stores 1. Final x = 1. Correct value is 3, so 2 updates are lost."
+  },
+  {
+   "level": "analyze",
+   "q": "A protocol lets only one process into the critical section, but a fast process re-enters any number of times while another waits. Which requirement fails, and which still hold?",
+   "marks": 5,
+   "a": "Bounded waiting fails. Mutual exclusion holds, since only one process is inside. Progress can still hold, since some waiting process does eventually enter."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a non-preemptive kernel still need locks on a multicore CPU?",
+   "marks": 4,
+   "a": "Two CPUs execute kernel code at the same instant, so kernel code is interleaved even when no single CPU is preempted inside it."
+  }
+ ],
+ "beyond": "Not for the exam. Languages now expose atomic types such as std::atomic in C++ and AtomicInteger in Java, which make the read-add-write of a counter one indivisible step. Tools such as ThreadSanitizer and the Java race detector find data races by watching the order of memory accesses in a running program. Modern CPUs reorder memory operations, so a correct lock must also respect the machine's memory consistency model. Lock-free structures avoid the critical section by retrying a compare-and-swap until it succeeds. Search for memory consistency models, transactional memory and the C++ memory model to go further."
+}

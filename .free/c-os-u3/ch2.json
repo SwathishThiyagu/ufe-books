@@ -1,0 +1,203 @@
+{
+ "lead": "Two processes that share data can corrupt it unless entry to the critical section is controlled. Peterson's solution does this with only two shared variables: a flag for each process and a turn variable. It is small enough to prove correct on the board, and it shows the three requirements a lock must meet. Hardware instructions such as test-and-set, compare-and-swap and swap do the same job in one atomic step and are used inside real spinlocks. This chapter explains both, their costs, and the assumptions that decide when each one works.",
+ "prereq": "You need: <a href=\"#critical-section-problem-and-race-conditions\">3.1 Critical-section problem and race conditions</a> for the definition of a critical section and the three correctness requirements.",
+ "sections": [
+  {
+   "h3": "Peterson's two-process protocol",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Peterson's solution is a software lock for exactly two processes, P0 and P1. It uses two shared variables. <code>flag[2]</code> is an array of booleans; <code>flag[i]=true</code> means Pi wants to enter its critical section. <code>turn</code> is an integer holding 0 or 1; it names the process that should go first when both want to enter. For process i, let j = 1 - i."
+    },
+    {
+     "type": "p",
+     "text": "Entry protocol: set <code>flag[i]=true</code>, set <code>turn=j</code>, then spin while <code>flag[j]</code> is true and <code>turn</code> equals j. When the loop ends, enter the critical section. On exit, set <code>flag[i]=false</code>. The flag announces intent; turn is a polite concession to the other process. A process waits only when the other also wants entry and the turn is not its own."
+    }
+   ]
+  },
+  {
+   "h3": "Why the protocol is correct",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Three requirements define a correct critical-section solution. Mutual exclusion: at most one process is inside. Progress: if no process is inside and one wants in, it must get in. Bounded waiting: a process cannot be overtaken forever."
+    },
+    {
+     "type": "p",
+     "text": "Mutual exclusion holds because both processes cannot find the spin condition false together. Suppose both flags are true. P0 can pass only when <code>turn=0</code>; P1 can pass only when <code>turn=1</code>. Since turn has one value, at most one passes. If one process tested before the other had set its flag, the late process sees the earlier flag true and must wait."
+    },
+    {
+     "type": "p",
+     "text": "Progress holds when only one process wants entry: the other flag is false, so the spin condition is false. When both want entry, turn is 0 or 1, so exactly one spin condition is false and that process enters."
+    },
+    {
+     "type": "p",
+     "text": "Bounded waiting holds because after Pi exits it clears <code>flag[i]</code>. If Pj is waiting, Pi must set <code>turn=j</code> before trying again, which releases Pj. So Pj waits for at most one entry by Pi."
+    },
+    {
+     "type": "p",
+     "text": "Costs: the spin loop burns CPU time (busy waiting). The algorithm covers only two processes. It also assumes atomic loads and stores and sequential consistency: all processes see memory operations in one global order. Modern CPUs may reorder independent loads and stores, so Peterson's solution is not a portable lock on all hardware."
+    }
+   ]
+  },
+  {
+   "h3": "Hardware synchronization instructions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Atomic hardware instructions are the practical alternative. Atomic means no other process can observe the step half done. Three common instructions follow."
+    },
+    {
+     "type": "p",
+     "text": "Test-and-set: <code>test_and_set(lock)</code> returns the old value of lock and sets lock to true, as one atomic step. With <code>lock=false</code> meaning free, the entry is: while <code>test_and_set(&lock)</code> spin; critical section; <code>lock=false</code>. The first process gets false and enters. Others get true and spin. This is a spinlock: a lock that waits by spinning."
+    },
+    {
+     "type": "p",
+     "text": "Compare-and-swap: <code>compare_and_swap(&value, expected, new)</code> returns the old value. If old equals expected, it stores new; otherwise it stores nothing. All of this is atomic. A lock can be built by expecting false and writing true."
+    },
+    {
+     "type": "p",
+     "text": "Swap: <code>swap(&a, &b)</code> atomically exchanges two values. A spinlock can use a local variable <code>key=true</code> and repeat <code>swap(&lock, &key)</code> until key becomes false."
+    },
+    {
+     "type": "p",
+     "text": "These instructions give mutual exclusion on multiprocessors. They do not by themselves give bounded waiting: a fast process can release and reacquire a test-and-set lock while another spins. Some syllabi call this synchronization hardware. Use spinlocks only for short critical sections, because spinning wastes a CPU that could run another thread."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The loop is the only place a process waits. Notice that turn is set to the other process before the test.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Peterson entry for process i",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "flag[i]=true",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "turn=j",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "while flag[j] and turn=j",
+     "style": "accent"
+    },
+    {
+     "id": "d",
+     "label": "Critical section",
+     "style": "live"
+    },
+    {
+     "id": "e",
+     "label": "flag[i]=false",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "label": "ready",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    }
+   ],
+   "aria": "Process i sets its flag, gives turn to j, waits while flag[j] and turn equal j, then enters and later clears its flag."
+  }
+ },
+ "examples": [
+  {
+   "question": "P0 and P1 run Peterson's algorithm. Initially flag[0]=false, flag[1]=false, turn=0. The interleaving is: P0 sets flag[0]=true and turn=1. P1 sets flag[1]=true and turn=0. P0 tests while(flag[1] and turn==1). P1 tests while(flag[0] and turn==0). P0 finishes and sets flag[0]=false. Who enters the critical section next? Give flag[0], flag[1] and turn (0 for false, 1 for true) at the moment that process enters.",
+   "steps": [
+    "Initial state: flag[0]=0, flag[1]=0, turn=0.",
+    "P0 sets flag[0]=1 and turn=1. State: flag[0]=1, flag[1]=0, turn=1.",
+    "P1 sets flag[1]=1 and turn=0. State: flag[0]=1, flag[1]=1, turn=0.",
+    "P0 tests: flag[1]=1 is true, but turn==1 is false because turn=0. The while condition is false, so P0 enters.",
+    "P1 tests: flag[0]=1 is true and turn==0 is true. P1 spins.",
+    "P0 exits and sets flag[0]=0. State: flag[0]=0, flag[1]=1, turn=0.",
+    "P1 tests again: flag[0]=0 makes the while condition false. P1 enters."
+   ],
+   "answer": "P1 enters next; at that moment flag[0]=0, flag[1]=1 and turn=0.",
+   "check": "flag = [False, False]\nturn = 0\n\nflag[0] = True\nturn = 1\nflag[1] = True\nturn = 0\n\np0_enters = not (flag[1] and turn == 1)\np1_waits = flag[0] and turn == 0\nassert p0_enters is True\nassert p1_waits is True\n\nflag[0] = False\n\nprint(int(flag[0]))\nprint(int(flag[1]))\nprint(turn)\n",
+   "values": [
+    0,
+    1,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Writing the wait as while(flag[j] and turn==i) is wrong. P0 can set flag[0]=true and turn=1, see flag[1]=false, and enter; P1 can then set flag[1]=true and turn=0, see flag[0]=true but turn==1 false (turn=0), and enter too. Both are inside, so mutual exclusion fails.",
+  "Testing turn against the wrong process breaks the tie; process i must set turn=j and wait while turn==j.",
+  "Forgetting flag[i]=false on exit leaves the other process spinning forever; mutual exclusion still holds but progress fails.",
+  "Peterson assumes atomic loads and stores with sequential consistency; on CPUs that reorder stores it can fail, so it is not a portable production lock.",
+  "test-and-set returns the old value and sets true; it does not return true on success. compare-and-swap writes only when the old value equals expected."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the shared variables in Peterson's solution and give each type.",
+   "marks": 2,
+   "a": "flag[2], an array of two booleans; turn, an integer 0 or 1."
+  },
+  {
+   "level": "understand",
+   "q": "Why does process i wait on turn==j rather than turn==i?",
+   "marks": 3,
+   "a": "turn==j means the other process has priority; if both want entry, i must wait so only j enters. The loop must test turn==j, because with turn==i in the loop both processes can enter when one reads the other's flag as false before it is set."
+  },
+  {
+   "level": "apply",
+   "q": "flag[0]=false, flag[1]=false, turn=0. P0 sets flag[0]=true and turn=1, and P1 is not running. Does P0 enter?",
+   "marks": 2,
+   "a": "Yes. flag[1] is false, so while(flag[1] and turn==1) is false."
+  },
+  {
+   "level": "apply",
+   "q": "A compare-and-swap has value=5, expected=5, new=9. What does it return and what is value after?",
+   "marks": 2,
+   "a": "It returns 5; value becomes 9."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a simple test-and-set spinlock lack bounded waiting?",
+   "marks": 4,
+   "a": "After release, the same process can call test-and-set again and get false before a waiting process runs. The waiter can be overtaken repeatedly."
+  },
+  {
+   "level": "analyze",
+   "q": "A programmer writes while(flag[j] and turn==i) in Peterson. What can go wrong?",
+   "marks": 4,
+   "a": "The bug shows when the other flag is read before it is set. P0 sets flag[0]=true and turn=1, sees flag[1]=false, and enters; P1 then sets flag[1]=true and turn=0, sees flag[0]=true but turn==1 false (turn=0), and enters too. Both are in the critical section, so mutual exclusion fails."
+  },
+  {
+   "level": "understand",
+   "q": "Why is Peterson's solution not used as a general lock in modern kernels?",
+   "marks": 3,
+   "a": "It is limited to two processes and depends on sequential consistency; CPUs may reorder memory operations. Kernels use atomic instructions and spinlocks instead."
+  }
+ ],
+ "beyond": "Not for the exam. Peterson's solution is mainly a teaching model now. Real kernels use atomic instructions in spinlocks, and C11/C++11 expose std::atomic and memory_order to control reordering. Search terms: sequential consistency, memory_order_acquire, spinlock fairness, compare-and-swap ABA problem."
+}

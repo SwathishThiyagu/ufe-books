@@ -1,0 +1,190 @@
+{
+ "lead": "Detection is for systems that do not prevent or avoid deadlock. The system runs normally, and a detector checks whether a set of processes is stuck waiting for each other. If each resource type has one instance, a wait-for graph with a cycle proves deadlock. If a resource type has several instances, an algorithm with Work and Finish marks the processes that can finish; the rest are deadlocked. Recovery then breaks the deadlock by ending processes or taking resources back. Kernels and database engines use these ideas when they choose not to forbid deadlock.",
+ "prereq": "You need: <a href=\"#deadlock-system-model-and-necessary-conditions\">3.5</a> for the resource model and <a href=\"#deadlock-avoidance-and-banker-s-algorithm\">3.7</a> for the matrix style.",
+ "sections": [
+  {
+   "h3": "Wait-for graph for single-instance resources",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Draw one node per process. Add a directed edge P<sub>i</sub> → P<sub>j</sub> when P<sub>i</sub> is waiting for a resource instance that P<sub>j</sub> holds. A cycle means every process on it waits for the next, and none can release, so the system is deadlocked. No cycle means no deadlock. This test works only when every resource type has one instance."
+    },
+    {
+     "type": "p",
+     "text": "The figure uses R1, R2, R3. P1 holds R1 and requests R2; P2 holds R2 and requests R3; P3 holds R3 and requests R1. The edges form P1 → P2 → P3 → P1, a cycle, so all three are deadlocked. Detect by keeping the graph current: add an edge when a request blocks, remove it when the request is granted or the process releases. Cycle search costs O(V + E) for V processes and E wait edges."
+    }
+   ]
+  },
+  {
+   "h3": "Detection with several instances per resource",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Use four arrays. Available[j] is the number of free instances of resource type j. Allocation[i][j] is what process i holds. Request[i][j] is what process i is waiting for now. Work is a copy of Available; Finish[i] is false until process i is proved able to finish."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set Work = Available. Set Finish[i] = false, but set Finish[i] = true at once if Allocation[i] has no nonzero entry.",
+      "Find an unfinished process i with Request<sub>i</sub> ≤ Work for every resource type j. If none exists, stop.",
+      "Add what i holds: Work = Work + Allocation<sub>i</sub>. Mark Finish[i] = true. Go back to step 2.",
+      "Every process still unfinished is deadlocked."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "Request<sub>i</sub> ≤ Work means Request[i][j] ≤ Work[j] for all j",
+     "where": "Request[i][j] is the outstanding number of instances of type j that process i is waiting for; Work[j] is the number currently free in the detector's simulation."
+    },
+    {
+     "type": "p",
+     "text": "Use Request, not Need. Need is the maximum that may still be requested; using it turns the test into the Banker's safety check from <a href=\"#deadlock-avoidance-and-banker-s-algorithm\">3.7</a>. The detector runs in O(n²m) time for n processes and m resource types. Run it on every request for early warning, or periodically to save CPU; frequent runs cost time, rare runs let many processes pile up before recovery."
+    }
+   ]
+  },
+  {
+   "h3": "Recovery: abort processes or preempt resources",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "After detection, recovery must break the wait. Some syllabi call this recovery from deadlock. The first choice is to abort all deadlocked processes: simple and fast, but all their work is lost. The second is to abort one process at a time and rerun detection until the cycle breaks: less work lost, more overhead."
+    },
+    {
+     "type": "p",
+     "text": "Pick the victim by cost: priority, CPU time already used, resources held, resources still needed, how many processes must be killed, and whether the process is interactive or batch. A low-priority process holding one resource is often cheaper to kill than a high-priority process holding many."
+    },
+    {
+     "type": "p",
+     "text": "Resource preemption takes a resource from one process and gives it to another. It needs three pieces: victim selection, rollback to a state before the victim acquired the resource, and a limit on how often the same process is chosen, or it starves. Killing or preempting can leave files and shared memory half-updated, so a checkpoint or restart is needed. File consistency after a kill is handled in Unit 5, File Systems, Storage and I/O."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The wait-for graph has the cycle P1 → P2 → P3 → P1, so the three processes are deadlocked. P3 is marked as the cheapest victim to abort first if it has the lowest priority.",
+  "spec": {
+   "type": "graph",
+   "directed": true,
+   "nodes": [
+    {
+     "id": "P1",
+     "label": "P1",
+     "x": 0,
+     "y": 0,
+     "note": "holds R1",
+     "style": "normal"
+    },
+    {
+     "id": "P2",
+     "label": "P2",
+     "x": 2,
+     "y": 0,
+     "note": "holds R2",
+     "style": "normal"
+    },
+    {
+     "id": "P3",
+     "label": "P3",
+     "x": 1,
+     "y": 2,
+     "note": "holds R3",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "P1",
+     "to": "P2",
+     "label": "waits",
+     "style": "solid"
+    },
+    {
+     "from": "P2",
+     "to": "P3",
+     "label": "waits",
+     "style": "solid"
+    },
+    {
+     "from": "P3",
+     "to": "P1",
+     "label": "waits",
+     "style": "solid"
+    }
+   ],
+   "aria": "Each process waits for the next, so the wait-for graph has a cycle and the system is deadlocked."
+  }
+ },
+ "examples": [
+  {
+   "question": "A system has resource types A (2 instances), B (1 instance) and C (1 instance). Allocation and Request matrices are: Allocation P1=[0,1,0], P2=[1,0,0], P3=[0,0,1], P4=[1,0,0]; Request P1=[0,0,1], P2=[0,0,0], P3=[0,1,0], P4=[0,0,0]. Use the multiple-instance detection algorithm to find how many processes are deadlocked and name them.",
+   "steps": [
+    "Total instances = [2,1,1]. Allocated instances = [2,1,1]. Available = Total − Allocated = [0,0,0]. Set Work = [0,0,0].",
+    "Every Allocation row has a nonzero entry, so Finish = [false, false, false, false].",
+    "P1 requests [0,0,1] ≤ [0,0,0]? No. P2 requests [0,0,0] ≤ Work? Yes. Work = [0,0,0] + [1,0,0] = [1,0,0]; Finish[P2] = true.",
+    "P3 requests [0,1,0] ≤ [1,0,0]? No. P4 requests [0,0,0] ≤ Work? Yes. Work = [1,0,0] + [1,0,0] = [2,0,0]; Finish[P4] = true.",
+    "Scan again. P1 requests C, but Work[C] = 0, so no. P3 requests B, but Work[B] = 0, so no. No unfinished process fits.",
+    "Unfinished processes are P1 and P3. Count = 2.",
+    "P1 holds B and waits for C held by P3; P3 holds C and waits for B held by P1. P2 and P4 finished and freed both instances of A, but A does not help this B–C cycle."
+   ],
+   "answer": "2 processes, P1 and P3, are deadlocked; P2 and P4 can finish and free [2,0,0].",
+   "check": "total = [2, 1, 1]\nalloc = [[0,1,0], [1,0,0], [0,0,1], [1,0,0]]\nreq = [[0,0,1], [0,0,0], [0,1,0], [0,0,0]]\nn = len(alloc)\nm = len(total)\nwork = [total[j] - sum(alloc[i][j] for i in range(n)) for j in range(m)]\nfinish = [all(v == 0 for v in alloc[i]) for i in range(n)]\nchanged = True\nwhile changed:\n    changed = False\n    for i in range(n):\n        if not finish[i] and all(req[i][j] <= work[j] for j in range(m)):\n            for j in range(m):\n                work[j] += alloc[i][j]\n            finish[i] = True\n            changed = True\nprint(finish.count(False))",
+   "values": [
+    2
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The multiple-instance detector uses Request, the outstanding demand now; Need is the maximum remaining demand and belongs to Banker's safety check. Swapping them gives wrong deadlock sets.",
+  "An edge P<sub>i</sub> → P<sub>j</sub> in a wait-for graph means P<sub>i</sub> waits for something P<sub>j</sub> holds. Reversing the edge can invent or hide a cycle.",
+  "A wait-for graph cycle is necessary and sufficient only for single-instance resources. With several instances, a cycle can exist while another free instance lets a process finish.",
+  "Aborting a process is not free: files, locks or shared memory can be left inconsistent, so recovery needs rollback or a checkpoint.",
+  "Preemption without a starvation limit can keep choosing the same low-priority process and delay it forever."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In a wait-for graph, what does the edge P<sub>i</sub> → P<sub>j</sub> mean?",
+   "marks": 2,
+   "a": "P<sub>i</sub> is blocked waiting for a resource instance that P<sub>j</sub> holds."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a cycle prove deadlock only when each resource type has one instance?",
+   "marks": 3,
+   "a": "With one instance, the holder cannot release until it gets the next resource in the cycle, so there is no exit. With several instances, another free instance or a process outside the cycle can free a resource, so a cycle can exist without deadlock."
+  },
+  {
+   "level": "apply",
+   "q": "Resource types A, B, C each have one instance. P1 holds A and requests B; P2 holds B and requests C; P3 holds C and requests A. Which processes are deadlocked?",
+   "marks": 4,
+   "a": "All three. Edges P1 → P2, P2 → P3, P3 → P1 form a cycle. No instances are free, so none can finish."
+  },
+  {
+   "level": "apply",
+   "q": "Available = [0,0]; Allocation P1 = [1,0], P2 = [0,1]; Request P1 = [0,1], P2 = [1,0]. Run the multiple-instance detector and give the number of deadlocked processes.",
+   "marks": 4,
+   "a": "Work = [0,0]. P1 requests [0,1] ≤ [0,0]? No. P2 requests [1,0] ≤ [0,0]? No. No process finishes. Count = 2 deadlocked processes."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare running deadlock detection on every request with running it every 10 seconds: give one benefit and one cost of each.",
+   "marks": 5,
+   "a": "Every request catches deadlock early and limits damage, but spends CPU on each request and may catch short waits that would clear. Every 10 seconds costs less CPU, but several processes may pile up, making recovery more expensive."
+  },
+  {
+   "level": "analyze",
+   "q": "In the three-process cycle, P3 has the lowest priority. Why is P3 the first victim, and what risk remains after aborting it?",
+   "marks": 5,
+   "a": "P3 is the cheapest by priority, and removing it breaks the cycle. Risk: P3 may hold a file or lock in a half-updated state, so rollback is needed; always choosing the low-priority process can also starve it."
+  },
+  {
+   "level": "remember",
+   "q": "Which matrix does the multiple-instance detection algorithm use: Request or Need?",
+   "marks": 2,
+   "a": "Request, the outstanding requests at detection time. Need is used by Banker's safety check."
+  }
+ ],
+ "beyond": "Not for the exam. Database engines often detect deadlocks with wait-for graphs and break them by aborting a transaction, then rolling it back. Distributed systems use edge-chasing or timeouts because no single machine sees the whole graph. Many modern kernels avoid full detection by enforcing lock order or using timeouts, which turns a possible deadlock into a failed request. Search for wait-for graph deadlock detection, victim selection, and distributed deadlock detection."
+}
