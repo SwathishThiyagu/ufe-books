@@ -1,0 +1,233 @@
+{
+ "lead": "A frame is a bounded package at the data link layer. The receiver must see where it starts and ends before it can read addresses or check bits. Bit stuffing solves one exact problem: the end flag is a pattern of bits, and user data might contain that same pattern by accident. The sender inserts a zero after every five consecutive 1s so the flag can never appear inside the frame. The receiver removes those zeros. HDLC-style links and many bit-oriented protocols use this.",
+ "prereq": "You need: Unit 1 for the data link layer's place in the layered model, and the idea of a packet from the network layer.",
+ "sections": [
+  {
+   "h3": "A frame is a bounded package",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A frame is the data link layer's unit of transmission. It carries a packet from the network layer. The packet sits inside the frame's payload. The payload is the user data that the frame protects and delivers. A frame needs a visible start and end. Without them the receiver cannot tell where one frame stops and the next begins. Some syllabi call this frame delineation."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Flag: the boundary marker. In bit-oriented framing it is <code>01111110</code>.",
+      "Header: address and control information.",
+      "Payload: the network-layer packet.",
+      "Trailer: frame check bits (FCS) for error detection, covered in <a href=\"#error-detection-parity-checksum-and-crc\">3.2</a>."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Fixed-length frames need no end marker: the receiver counts bytes. A length field in the header also works: it states how many bytes follow. Variable-length frames often use a flag at both ends."
+    }
+   ]
+  },
+  {
+   "h3": "Byte-oriented framing with an escape byte",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In byte-oriented framing the frame is a sequence of bytes. A flag byte marks start and end; a common value is <code>0x7E</code>, binary <code>01111110</code>. If the flag byte appears inside the data, the sender inserts an escape byte, often <code>0x7D</code>, before it. If the escape byte itself appears in the data, the sender sends escape then escape. The receiver sees the escape and removes it, restoring the original bytes."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sender rule: data byte equals flag → send ESC, then flag.",
+      "Sender rule: data byte equals ESC → send ESC, then ESC.",
+      "Receiver rule: ESC flag → flag; ESC ESC → ESC."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Bit-oriented framing and bit stuffing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Bit-oriented framing does not align to bytes. A single flag <code>01111110</code> marks both start and end. The flag contains six consecutive 1s, so six 1s in the data would look like the flag. Bit stuffing prevents that. The sender scans every bit between the flags, including header, payload and FCS. After five consecutive 1s it inserts one 0, whether the next data bit is 0 or 1. That breaks every run of six 1s. The receiver counts 1s; after five 1s it discards the next 0. The flag itself is never stuffed."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Sender: copy bits in order and keep a count of consecutive 1s.",
+      "After the count reaches five, append a 0 and reset the count to zero.",
+      "Receiver: copy bits and after five 1s throw away the next 0.",
+      "Destuff first, then test the FCS, because the check bits were computed before stuffing."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Stuffing costs extra bits but guarantees the flag cannot appear inside the frame. If the receiver tested the FCS on the stuffed stream, the inserted zeros would look like changed data and a good frame would fail."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The frame begins and ends with the flag 01111110. The receiver finds the payload boundaries from the flags, then removes any stuffed bits before testing the check bits.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "A frame on the wire",
+   "nodes": [
+    {
+     "id": "f1",
+     "label": "Flag",
+     "note": "01111110",
+     "style": "accent"
+    },
+    {
+     "id": "h",
+     "label": "Header",
+     "note": "address, control",
+     "style": "normal"
+    },
+    {
+     "id": "p",
+     "label": "Payload",
+     "note": "user data",
+     "style": "normal"
+    },
+    {
+     "id": "t",
+     "label": "FCS",
+     "note": "check bits",
+     "style": "normal"
+    },
+    {
+     "id": "f2",
+     "label": "Flag",
+     "note": "01111110",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "f1",
+     "to": "h",
+     "style": "solid"
+    },
+    {
+     "from": "h",
+     "to": "p",
+     "style": "solid"
+    },
+    {
+     "from": "p",
+     "to": "t",
+     "style": "solid"
+    },
+    {
+     "from": "t",
+     "to": "f2",
+     "style": "solid"
+    }
+   ],
+   "aria": "A frame drawn left to right with a flag at each end, and the same flag pattern marked as the reason for bit stuffing."
+  }
+ },
+ "examples": [
+  {
+   "question": "A bit-oriented frame uses flag <code>01111110</code>. The 15 bits between the flags before stuffing are <code>111111011111100</code>. Find the stuffed stream, the number of inserted zeros, and the total length. Then show the receiver's destuffed output.",
+   "steps": [
+    "Write the input in order: 1 1 1 1 1 1 0 1 1 1 1 1 1 0 0.",
+    "Scan from the left. The first five bits are 11111, so insert 0. The next input bits are 1 and 0, giving 11111010.",
+    "Continue at input bit 8. Input bits 8 to 12 are 11111, so insert a second 0. The remaining input bits are 1, 0, 0, giving 111110100.",
+    "Join the two pieces: 11111010 + 111110100 = 11111010111110100.",
+    "Length: original 15 bits + 2 inserted zeros = 17 bits.",
+    "Receiver scans 11111010111110100. After the first five 1s it removes the next 0. After the next five 1s it removes the next 0. It recovers 111111011111100."
+   ],
+   "answer": "The stuffed stream is 11111010111110100, length 17 bits, with 2 inserted zeros; the receiver recovers the original 15 bits.",
+   "check": "payload = '111111011111100'\ndef stuff(bits):\n    out = []\n    run = 0\n    for b in bits:\n        out.append(b)\n        if b == '1':\n            run += 1\n            if run == 5:\n                out.append('0')\n                run = 0\n        else:\n            run = 0\n    return ''.join(out)\nstuffed = stuff(payload)\nprint(len(payload))\nprint(len(stuffed) - len(payload))\nprint(len(stuffed))\nassert stuffed == '11111010111110100'",
+   "values": [
+    15,
+    2,
+    17
+   ],
+   "dry_run": {
+    "head": [
+     "Scan",
+     "Seen bits",
+     "Action"
+    ],
+    "rows": [
+     [
+      "1",
+      "11111",
+      "insert 0"
+     ],
+     [
+      "2",
+      "11111010",
+      "continue"
+     ],
+     [
+      "3",
+      "1111101011111",
+      "insert 0"
+     ],
+     [
+      "4",
+      "11111010111110100",
+      "send"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Insert the 0 after the fifth 1 even if the sixth bit is 1, and even if the next bit is 0. Do not wait for a sixth 1.",
+  "The flag itself is never stuffed. Stuffing applies only to bits between the opening and closing flags.",
+  "Destuff before the FCS check. The sender computed the FCS on the original bits, not on the stuffed stream.",
+  "Byte stuffing uses a whole escape byte; bit stuffing inserts one zero bit. They are different fixes for the same boundary problem.",
+  "Do not count the flag's own six 1s as data. The receiver knows where the flags are."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the bit-oriented flag pattern?",
+   "marks": 2,
+   "a": "01111110."
+  },
+  {
+   "level": "remember",
+   "q": "Name the four parts around a frame's payload.",
+   "marks": 2,
+   "a": "Flag, header, payload and trailer or FCS."
+  },
+  {
+   "level": "understand",
+   "q": "Why does bit stuffing insert a 0 after five consecutive 1s?",
+   "marks": 3,
+   "a": "The flag has six consecutive 1s. Breaking every run at five prevents six 1s from appearing inside the frame, so the flag cannot appear by accident."
+  },
+  {
+   "level": "apply",
+   "q": "Stuff the payload 11111011111 using the five-1s rule.",
+   "marks": 4,
+   "a": "After the first five 1s insert 0. After the second five 1s insert 0. Output is 1111100111110, length 13 bits."
+  },
+  {
+   "level": "apply",
+   "q": "A stuffed stream is 11111010111110100. Remove the stuffed bits and give the original length.",
+   "marks": 4,
+   "a": "Remove the 0 after each run of five 1s. Original is 111111011111100, length 15 bits."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must the receiver remove stuffed zeros before testing the FCS?",
+   "marks": 4,
+   "a": "The sender computes the FCS on the original bits before stuffing. The inserted zeros are not part of the checked data, so testing the stuffed stream would fail a good frame."
+  },
+  {
+   "level": "analyze",
+   "q": "Can the flag 01111110 appear inside a correctly stuffed frame? Explain.",
+   "marks": 4,
+   "a": "No. Stuffing prevents six consecutive 1s between flags. The flag contains six consecutive 1s, so the receiver cannot mistake data for a flag."
+  }
+ ],
+ "beyond": "Not for the exam. Bit stuffing still appears in CAN bus, USB packets, and HDLC-derived links. Modern Ethernet uses length fields and start-of-frame delimiters, so it does not need bit stuffing, but CAN and some serial links do. Search for CAN bit stuffing and HDLC frame format to see the same rule in hardware."
+}

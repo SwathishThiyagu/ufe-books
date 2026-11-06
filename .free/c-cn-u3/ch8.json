@@ -1,0 +1,287 @@
+{
+ "lead": "Ethernet is the wired LAN standard: IEEE 802.3 fixes one frame format and one 48-bit address scheme, so any two Ethernet cards can talk. A switch forwards frames using those addresses and learns the LAN layout by itself. A VLAN splits one physical switch into several separate LANs, so two departments share hardware without sharing broadcasts.",
+ "prereq": "You need <a href=\"#framing-and-bit-stuffing\">3.1</a> for what a frame is, and <a href=\"#multiple-access-protocols-aloha-csma-cd-csma-ca\">3.7</a> for CSMA/CD on a shared cable.",
+ "sections": [
+  {
+   "h3": "The IEEE 802.3 frame",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "IEEE 802.3 fixes the frame fields and their order, so any two cards can exchange data."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Field",
+      "Size",
+      "Job"
+     ],
+     "rows": [
+      [
+       "Preamble",
+       "7 bytes",
+       "10101010 repeated; lets the receiver clock lock on"
+      ],
+      [
+       "SFD",
+       "1 byte",
+       "10101011; the final 11 says the frame starts next"
+      ],
+      [
+       "Destination MAC",
+       "6 bytes",
+       "who should receive it"
+      ],
+      [
+       "Source MAC",
+       "6 bytes",
+       "who sent it"
+      ],
+      [
+       "Type / Length",
+       "2 bytes",
+       "protocol type, or payload length"
+      ],
+      [
+       "Payload",
+       "46 to 1500 bytes",
+       "the upper-layer packet, usually IP"
+      ],
+      [
+       "FCS",
+       "4 bytes",
+       "CRC-32 check over the frame"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Hardware adds and strips the preamble and SFD, so they are never counted as part of the frame. That is why the size rules start at the destination address."
+    },
+    {
+     "type": "formula",
+     "text": "frame size = 6 + 6 + 2 + payload + 4 bytes, with 46 ≤ payload ≤ 1500",
+     "where": "6 is the destination MAC address, 6 the source MAC, 2 the type/length field, payload the data in bytes, and 4 the FCS (frame check sequence, a CRC-32 — see <a href=\"#error-detection-parity-checksum-and-crc\">3.2</a>). The smallest frame is 64 bytes and the largest is 1518 bytes."
+    },
+    {
+     "type": "p",
+     "text": "Why 64 bytes? On a shared 10 Mbps cable with CSMA/CD a sender must still be transmitting when a collision signal returns. The worst-case round trip was fixed at 512 bit times, so the frame must last at least 512 bits = 64 bytes. A payload shorter than 46 bytes is padded to 46. If the 2-byte field is a length, the receiver uses it to find where real data ends. If it is a type, the MAC cannot tell and the padding goes upward; the upper layer drops it, for example IPv4 uses its own Total Length field."
+    },
+    {
+     "type": "p",
+     "text": "A value of 1536 (0x0600) or more is a type, such as 0x0800 for IPv4. A value up to 1500 is a length. The 1500 limit is the MTU that IP must respect."
+    }
+   ]
+  },
+  {
+   "h3": "MAC addresses and Ethernet names",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A MAC address is 48 bits, written as six hex bytes such as 00:1A:2B:3C:4D:5E. The first three bytes are the OUI (organizationally unique identifier), bought from IEEE; the last three are assigned by that vendor."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "The low bit of the first byte is the I/G bit: 0 is unicast, one specific card; 1 is multicast, a group of cards.",
+      "FF:FF:FF:FF:FF:FF is broadcast: every station on the LAN accepts it.",
+      "Old names read rate, signalling, medium: 10Base5 = 10 Mbps baseband, 500 m on thick coax; 10BaseT = 10 Mbps over twisted pair; 100BaseFX = 100 Mbps over fibre."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Switches and full-duplex Ethernet",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A hub repeats every bit out of every other port, so all ports form one collision domain and CSMA/CD is needed. A switch stores a frame and sends it out of one chosen port, so each port is its own collision domain. With full duplex — separate transmit and receive pairs — there are no collisions, CSMA/CD is switched off, and both ends may send at once."
+    },
+    {
+     "type": "p",
+     "text": "The switch builds its forwarding table from the traffic it sees:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Read the source MAC and store it against the incoming port, with a timestamp.",
+      "Look up the destination MAC.",
+      "Different port: forward out of that port only.",
+      "Same port it came from: drop it.",
+      "Not in the table: flood out of every port except the incoming one.",
+      "Age out quiet entries after a few minutes, so a station that moves is relearned."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Store-and-forward switches wait for the whole frame and check the FCS before forwarding. Cut-through switches start forwarding after the destination address: faster, but they pass on damaged frames."
+    }
+   ]
+  },
+  {
+   "h3": "Virtual LANs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A 24-port switch is one broadcast domain: a broadcast from port 1 goes out of all 23 others. A VLAN splits it. Put ports 1 to 12 in VLAN 10 and 13 to 24 in VLAN 20, and the switch keeps two forwarding tables and two broadcast domains. A broadcast from port 1 now reaches only ports 2 to 12."
+    },
+    {
+     "type": "p",
+     "text": "To carry many VLANs over one inter-switch link, each frame gets an 802.1Q tag: 4 bytes inserted between the source MAC address and the type/length field. The first 2 bytes are the tag protocol identifier 0x8100. The next 2 hold a 3-bit priority, a 1-bit drop-eligible flag and the 12-bit VLAN ID. Twelve bits give 4096 values; 0 and 4095 are reserved, so 1 to 4094 are usable."
+    },
+    {
+     "type": "formula",
+     "text": "tagged frame = 6 + 6 + 4 + 2 + payload + 4 bytes",
+     "where": "the extra 4 is the 802.1Q tag. The maximum frame becomes 1522 bytes and the minimum 68 bytes. The switch counts the tag; a device on an access port never sees it."
+    },
+    {
+     "type": "p",
+     "text": "An access port belongs to exactly one VLAN and sends untagged frames to the attached PC. A trunk port carries many VLANs, each frame tagged. VLANs are separate broadcast domains and normally separate IP subnets, so the switch alone cannot move traffic between them. A router or layer-3 switch with one interface per VLAN must forward; the usual trick is one trunk to a router, called router-on-a-stick."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The frame after the preamble, with byte counts. The payload range sets the smallest and largest frame; the FCS sits outside the payload.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "IEEE 802.3 frame fields",
+   "nodes": [
+    {
+     "id": "da",
+     "label": "Dest",
+     "note": "6 bytes",
+     "style": "normal"
+    },
+    {
+     "id": "sa",
+     "label": "Source",
+     "note": "6 bytes",
+     "style": "normal"
+    },
+    {
+     "id": "ty",
+     "label": "Type",
+     "note": "2 bytes",
+     "style": "accent"
+    },
+    {
+     "id": "pl",
+     "label": "Payload",
+     "note": "46 to 1500 bytes",
+     "style": "accent"
+    },
+    {
+     "id": "fc",
+     "label": "FCS",
+     "note": "4 bytes",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "da",
+     "to": "sa",
+     "style": "solid"
+    },
+    {
+     "from": "sa",
+     "to": "ty",
+     "style": "solid"
+    },
+    {
+     "from": "ty",
+     "to": "pl",
+     "style": "solid"
+    },
+    {
+     "from": "pl",
+     "to": "fc",
+     "style": "solid"
+    }
+   ],
+   "aria": "The Ethernet frame left to right with byte sizes, showing that the payload length decides padding."
+  }
+ },
+ "examples": [
+  {
+   "question": "An IP packet of 1500 bytes is sent in one Ethernet frame. (a) Give the frame size without the preamble. (b) How many bytes does the wire carry including preamble and SFD? (c) A different frame carries a 10-byte payload; what is its final frame size? (d) What is the frame size of the full 1500-byte packet once an 802.1Q VLAN tag is added?",
+   "steps": [
+    "Header and trailer without the preamble: 6 + 6 + 2 + 4 = 18 bytes.",
+    "(a) Frame = 18 + 1500 = 1518 bytes, the maximum, so no padding.",
+    "(b) Wire adds the 7-byte preamble and 1-byte SFD: 1518 + 7 + 1 = 1526 bytes. These 8 bytes are not part of the frame and are outside the 64-byte rule and the FCS.",
+    "(c) Payload 10 is below the 46-byte floor, so 36 padding bytes are added. Frame = 6 + 6 + 2 + 46 + 4 = 64 bytes, exactly the minimum.",
+    "(d) The tag adds 4 bytes: 1518 + 4 = 1522 bytes, the maximum tagged frame. On the wire it is 1522 + 8 = 1530 bytes."
+   ],
+   "answer": "The full frame is 1518 bytes (1526 on the wire), the padded short frame is 64 bytes, and with a VLAN tag the full frame is 1522 bytes.",
+   "check": "header = 6 + 6 + 2\nfcs = 4\nfull = header + 1500 + fcs\nprint(full)\nprint(full + 7 + 1)\nprint(header + 46 + fcs)\nprint(full + 4)\n",
+   "values": [
+    1518,
+    1526,
+    64,
+    1522
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The preamble (7 bytes) and SFD (1 byte) are not part of the frame. The 64-byte minimum and the FCS exclude them, so a 64-byte frame is 72 bytes on the wire.",
+  "A VLAN tag changes both ends of the size range: the maximum becomes 1522 bytes and the minimum 68 bytes.",
+  "The FCS is outside the 46-to-1500 payload range. 1500 is the payload limit, 1518 the frame limit.",
+  "The 2-byte field is type or length, never both: 1536 (0x0600) and above are types, up to 1500 are lengths.",
+  "The I/G bit is the low bit of the first byte, which is sent first, not the high bit. Reading it as the high bit turns a unicast address into a false multicast."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the fields of the IEEE 802.3 frame in order with their sizes, starting from the preamble.",
+   "marks": 3,
+   "a": "Preamble 7 bytes, SFD 1 byte, destination MAC 6 bytes, source MAC 6 bytes, type/length 2 bytes, payload 46 to 1500 bytes, FCS 4 bytes."
+  },
+  {
+   "level": "remember",
+   "q": "How many bits are in a MAC address, and what does the first half identify?",
+   "marks": 2,
+   "a": "48 bits. The first 3 bytes are the OUI, naming the vendor; the vendor assigns the last 3 bytes."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Ethernet impose a 64-byte minimum frame, and what does the sender do when the payload is shorter?",
+   "marks": 4,
+   "a": "On a shared half-duplex cable a sender must still be transmitting when a collision signal returns, so the frame must last the worst-case round trip of 512 bit times, which is 64 bytes at 10 Mbps. A payload under 46 bytes is padded to 46, giving 6 + 6 + 2 + 46 + 4 = 64 bytes."
+  },
+  {
+   "level": "apply",
+   "q": "A frame carries a 100-byte payload and no VLAN tag. Give its frame size, its size on the wire, and say whether padding is used.",
+   "marks": 3,
+   "a": "100 ≥ 46, so no padding. Frame = 6 + 6 + 2 + 100 + 4 = 118 bytes. On the wire add 8 bytes, giving 126 bytes."
+  },
+  {
+   "level": "apply",
+   "q": "An 802.1Q tag carries a 12-bit VLAN ID. How many VLAN IDs exist, how many are usable, and which are not?",
+   "marks": 2,
+   "a": "2¹² = 4096 values. 0 and 4095 are reserved, so 4094 IDs, numbered 1 to 4094, are usable."
+  },
+  {
+   "level": "analyze",
+   "q": "Two PCs sit on one 24-port switch, one in port 3 (VLAN 10) and one in port 20 (VLAN 20). PC A pings PC B. Explain what happens and what extra device is needed.",
+   "marks": 5,
+   "a": "PC B is in another subnet, so PC A sends to its default gateway and ARPs for the gateway; that request is flooded only inside VLAN 10. With a router on a trunk the router forwards into VLAN 20 and the ping works. Without a gateway it fails, because the ARP request for PC B never leaves VLAN 10. Inter-VLAN forwarding always needs a router or layer-3 switch with an interface in each VLAN."
+  },
+  {
+   "level": "analyze",
+   "q": "A switch receives a frame whose destination MAC is not in its forwarding table. What does it do, and why is that correct?",
+   "marks": 4,
+   "a": "It floods the frame out of every port except the incoming one. The destination is reached wherever it sits, and its reply teaches the switch that port. Flooding covers only unknown and broadcast destinations, so normal traffic stops being flooded once the table is warm."
+  },
+  {
+   "level": "understand",
+   "q": "Distinguish an access port from a trunk port on a VLAN-aware switch.",
+   "marks": 3,
+   "a": "An access port belongs to exactly one VLAN and sends untagged frames to the end device, which need not know about VLANs. A trunk port belongs to many VLANs and tags each frame with its 802.1Q header, so one link between switches carries all of them."
+  }
+ ],
+ "beyond": "Not for the exam. Data centres stretch Ethernet over VXLAN, which wraps the frame in UDP with a 24-bit identifier (RFC 7348). Shortest path bridging (IEEE 802.1aq) replaces spanning tree on large campus networks. Time-sensitive networking adds scheduled slots on Ethernet for factory control (IEEE 802.1Qbv). Cut-through switching and 25/100 Gbps ports dominate server racks today."
+}

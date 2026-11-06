@@ -1,0 +1,251 @@
+{
+ "lead": "A frame format alone does not make a working link. You also need to know who may send, how frames are numbered, how the link is opened, and how it is closed. A data link protocol is the package that supplies all of this on top of framing and the FCS. HDLC is the bit-oriented template that fixes stations, transfer modes and three frame types. PPP is the leaner point-to-point protocol that carries IP over serial, DSL and fibre links, keeping the frame simple and pushing setup into small helper protocols. Both open and close every frame with the same flag, 01111110.",
+ "prereq": "You need: <a href=\"#framing-and-bit-stuffing\">3.1</a> for framing and bit stuffing, <a href=\"#error-detection-parity-checksum-and-crc\">3.2</a> for the FCS, and <a href=\"#flow-control-stop-and-wait-and-sliding-window\">3.4</a> and <a href=\"#arq-error-control-go-back-n-and-selective-repeat\">3.5</a> for the control field.",
+ "sections": [
+  {
+   "h3": "HDLC: stations, configurations and transfer modes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "HDLC (High-level Data Link Control) is a bit-oriented protocol: it reads the frame as a stream of bits, not as characters, so it runs over any line. It bundles four jobs into one standard — frame format, frame numbering, error control by retransmission, and link management, meaning starting and stopping the link."
+    },
+    {
+     "type": "p",
+     "text": "Three station types share the link:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Primary: sends commands, owns the link, is responsible for error recovery.",
+      "Secondary: sends responses and acts only on commands.",
+      "Combined: can take either role."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two configurations are built from these stations. In an unbalanced configuration there is one primary and one or more secondaries — the classic multi-drop line with a host polling terminals. In a balanced configuration two combined stations face each other as equals, which is exactly what a link between two routers looks like."
+    },
+    {
+     "type": "p",
+     "text": "Three transfer modes decide who may transmit when. NRM (normal response mode) makes a secondary transmit only after the primary polls it. ARM (asynchronous response mode) lets a secondary send without a poll, though the primary still runs the link. ABM (asynchronous balanced mode) gives two combined stations the right to send whenever they have a frame, and it is the mode used in practice."
+    }
+   ]
+  },
+  {
+   "h3": "The HDLC frame and its three frame types",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The frame has six fields, all of fixed size except the payload:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Flag, 8 bits, 01111110, opens and closes the frame.",
+      "Address, 8 bits, names the secondary station for which the frame is meant.",
+      "Control, 8 bits normally, 16 bits when extended sequence numbers are used.",
+      "Information, any length, holds the network-layer packet.",
+      "FCS, 16 or 32 bits, a CRC over everything after the first flag.",
+      "Flag, 8 bits, the same 01111110 again."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Bit stuffing runs on the address, control, information and FCS fields (see <a href=\"#framing-and-bit-stuffing\">3.1</a>): the sender inserts a 0 after every five 1s in a row, and the receiver deletes it. The flags themselves are never stuffed. A frame with no information field is 8 + 8 + 8 + 16 + 8 = 48 bits when the FCS is 16 bits."
+    },
+    {
+     "type": "p",
+     "text": "The control field has three shapes. Bit 0 is 0 for an I-frame, 1 for both S-frames and U-frames; bit 1 is 0 for an S-frame and 1 for a U-frame."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "I-frame (bit 0 = 0): carries data plus N(S), its own send sequence number, and N(R), the number it expects next, which is a piggybacked acknowledgement (see <a href=\"#flow-control-stop-and-wait-and-sliding-window\">3.4</a>).",
+      "S-frame (bit 0 = 1, bit 1 = 0): pure control carrying N(R) — RR (receive ready, window open), RNR (receive not ready, stop sending), REJ (reject, go back), SREJ (selective reject, resend one frame).",
+      "U-frame (bit 0 = 1, bit 1 = 1): sets up and tears down the link — SNRM and SABM to connect, DISC to disconnect, UA and FRMR as replies."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "N(S) and N(R) are 3 bits each in the basic format, counted modulo 8, so at most 7 frames may be outstanding at a time."
+    }
+   ]
+  },
+  {
+   "h3": "PPP: a simple frame with helper protocols",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "PPP (Point-to-Point Protocol) is the leaner relative. It assumes exactly two ends, so it drops numbering and retransmission and keeps only what a serial line needs: framing, error detection, option negotiation, and the ability to carry many network protocols."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Flag 01111110 (0x7E), address 0xFF, control 0x03: a fixed three-byte header.",
+      "Protocol, 2 bytes, saying what is inside — 0x0021 means IPv4.",
+      "Payload, up to the MTU, 1500 bytes by default.",
+      "FCS, 2 or 4 bytes, then the closing flag 0x7E."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "On asynchronous links PPP stuffs bytes, not bits, because such a line carries whole characters. The sender sends 0x7D first, then the byte XOR 0x20. The receiver reverses this whenever it sees 0x7D."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Payload byte",
+      "Sent on the line",
+      "Reason"
+     ],
+     "rows": [
+      [
+       "0x7E",
+       "0x7D 0x5E",
+       "flag value; 0x7E XOR 0x20 = 0x5E"
+      ],
+      [
+       "0x7D",
+       "0x7D 0x5D",
+       "the escape byte itself; 0x7D XOR 0x20 = 0x5D"
+      ],
+      [
+       "0x11, any byte < 0x20",
+       "0x7D 0x31",
+       "control byte; 0x11 XOR 0x20 = 0x31"
+      ],
+      [
+       "0x8A, any byte ≥ 0x20",
+       "0x8A",
+       "nothing special, sent as it is"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Three small protocols do the management. LCP (Link Control Protocol) opens, configures, tests and closes the link, agreeing the MTU, the authentication method and compression. Authentication, if used, comes next: PAP sends a plain password in two messages, while CHAP sends a challenge, reads a hashed reply and confirms, and repeats this during the session. NCP (Network Control Protocol) is a family with one member per network protocol — IPCP for IPv4 — and it configures that protocol's parameters such as the IP address."
+    },
+    {
+     "type": "p",
+     "text": "PPP's FCS only detects errors: a bad frame is discarded. There is no acknowledgement, no sequence number and no flow control. Recovery belongs to a higher layer, usually TCP's timer and checksum (see Unit 5, TCP)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The HDLC frame field by field. PPP keeps the outer shape but fixes the address at 0xFF and the control at 0x03, and adds a 2-byte protocol field; only the two flags sit outside the region where stuffing applies.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "Flag",
+     "note": "01111110",
+     "style": "accent"
+    },
+    {
+     "label": "Address",
+     "note": "1 byte, 0xFF in PPP",
+     "style": "normal"
+    },
+    {
+     "label": "Control",
+     "note": "1 or 2 bytes",
+     "style": "normal"
+    },
+    {
+     "label": "Information",
+     "note": "payload, any length",
+     "style": "normal"
+    },
+    {
+     "label": "FCS",
+     "note": "2 or 4 bytes",
+     "style": "normal"
+    },
+    {
+     "label": "Flag",
+     "note": "01111110",
+     "style": "accent"
+    }
+   ],
+   "aria": "The six fields of an HDLC frame stacked in order from flag to flag, with the control field in the middle."
+  }
+ },
+ "examples": [
+  {
+   "question": "A PPP sender on an asynchronous serial line must carry the 4-byte payload 7E 8A 7D 11 (all values in hex) inside a frame. Apply byte stuffing. Give the exact byte sequence placed on the line, the number of escape bytes added, and the stuffing overhead ratio (line bytes ÷ payload bytes).",
+   "steps": [
+    "List the payload bytes with their decimal values: 0x7E = 126, 0x8A = 138, 0x7D = 125, 0x11 = 17. Payload length = 4 bytes.",
+    "Byte 1 is 0x7E, the flag value. Escape it: send 0x7D, then 0x7E XOR 0x20 = 0x5E. Escape count = 1.",
+    "Byte 2 is 0x8A = 138. It is ≥ 0x20 and is neither 0x7E nor 0x7D, so it is sent unchanged as 8A. Escape count stays 1.",
+    "Byte 3 is 0x7D, the escape byte itself. Escape it: send 0x7D, then 0x7D XOR 0x20 = 0x5D. Escape count = 2.",
+    "Byte 4 is 0x11 = 17, which is below 0x20. Escape it: send 0x7D, then 0x11 XOR 0x20 = 0x31. Escape count = 3.",
+    "Line sequence: 7D 5E 8A 7D 5D 7D 31. Line length = 2 + 1 + 2 + 2 = 7 bytes.",
+    "Overhead ratio = 7 ÷ 4 = 1.75, so 3 extra bytes were added for 4 payload bytes."
+   ],
+   "answer": "The line carries 7 bytes, 7D 5E 8A 7D 5D 7D 31, produced from 4 payload bytes with 3 escape bytes added, an overhead ratio of 1.75.",
+   "check": "payload = [0x7E, 0x8A, 0x7D, 0x11]\nline = []\nfor b in payload:\n    if b == 0x7E or b == 0x7D or b < 0x20:\n        line += [0x7D, b ^ 0x20]\n    else:\n        line.append(b)\nprint(len(payload))\nprint(len(line))\nprint(len(line) - len(payload))\nprint(len(line) / len(payload))\n",
+   "values": [
+    4,
+    7,
+    3,
+    1.75
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "PPP detects errors but never corrects them: no sequence numbers, no acknowledgements, no flow control. Any option saying 'PPP retransmits the bad frame' is wrong.",
+  "REJ asks for Go-Back-N — the rejected frame and everything after it. SREJ asks for exactly one frame. Swapping the two is the most common slip; see <a href=\"#arq-error-control-go-back-n-and-selective-repeat\">3.5</a>.",
+  "Byte stuffing belongs to PPP on asynchronous links; bit stuffing belongs to HDLC and to synchronous PPP. A question that mentions a serial line and the byte 0x7E wants 7D 5E.",
+  "The escape byte escapes itself as 7D 5D, not 7D 5E. 5E is 0x7E XOR 0x20 and 5D is 0x7D XOR 0x20.",
+  "ABM is what examiners mean by normal operation between two equal stations. NRM applies only to an unbalanced link where a primary polls its secondaries."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the flag pattern and its hex value in HDLC and PPP, and what is it for?",
+   "marks": 2,
+   "a": "01111110, which is 0x7E. It opens and closes every frame so the receiver can find frame boundaries on a bit stream."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three HDLC frame types and say what each carries.",
+   "marks": 2,
+   "a": "I-frames carry data with N(S) and N(R); S-frames carry control only, as RR, RNR, REJ or SREJ with N(R); U-frames set up and disconnect the link."
+  },
+  {
+   "level": "understand",
+   "q": "Why is ABM preferred to NRM on a link between two routers?",
+   "marks": 3,
+   "a": "Routers are equal peers. ABM lets both transmit whenever they have a frame; under NRM one side is a secondary that must wait for a poll, adding a round trip of delay per frame."
+  },
+  {
+   "level": "apply",
+   "q": "A PPP payload byte on an asynchronous line is 0x07. Give the two bytes sent on the line.",
+   "marks": 4,
+   "a": "0x07 is below 0x20, so escape it: send 0x7D, then 0x07 XOR 0x20 = 0x27. Line bytes are 7D 27."
+  },
+  {
+   "level": "apply",
+   "q": "An HDLC I-frame has control byte 0x7A. Find N(S), N(R) and the P/F bit.",
+   "marks": 4,
+   "a": "0x7A = 0111 1010. Bit 0 = 0, so it is an I-frame. N(S) = bits 3-1 = 101 = 5. P/F = bit 4 = 1. N(R) = bits 7-5 = 011 = 3."
+  },
+  {
+   "level": "analyze",
+   "q": "A PPP link runs on a noisy line and many frames fail the FCS check, yet no data stays lost for long. Explain.",
+   "marks": 5,
+   "a": "PPP discards each bad frame silently: no acknowledgement, no retransmission, no sequence numbers. The IP packets inside are lost, and TCP's checksum and retransmission timer resend them, so repair happens end to end, not on the link."
+  },
+  {
+   "level": "understand",
+   "q": "What does LCP do that NCP does not?",
+   "marks": 3,
+   "a": "LCP sets up, tests and closes the link itself, agreeing MTU, authentication and compression. NCP is one member per network protocol, such as IPCP for IPv4, and configures that protocol's parameters like the IP address."
+  }
+ ],
+ "beyond": "Not for the exam. PPP still runs in most broadband logins: PPPoE carries a PPP frame inside an Ethernet frame for DSL and fibre connections, so your home router performs LCP and CHAP underneath the Wi-Fi. Some router vendors ship a proprietary HDLC that adds a 2-byte type field, which is why a serial link between two brands may need PPP instead. The same duties have moved elsewhere in modern networks — Ethernet handles LAN framing, and PPP-style authentication now appears in 802.1X and in tunnels such as L2TP over IPsec. Useful search terms: PPP frame format, PPPoE, LCP negotiation, Cisco HDLC versus PPP."
+}

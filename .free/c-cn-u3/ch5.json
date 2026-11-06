@@ -1,0 +1,263 @@
+{
+ "lead": "A frame can be damaged or lost, and error detection only tells the receiver that something is wrong. ARQ (automatic repeat request) closes the loop: the sender keeps a copy, starts a timer, and waits for an acknowledgement before it trusts the frame. Adding this to the sliding window turns a link that drops frames into one that delivers every frame, in order, exactly once. Go-Back-N and Selective Repeat are the two standard ways to do it, and both sit inside TCP (Unit 5) and inside every data link protocol that retransmits.",
+ "prereq": "You need: <a href=\"#flow-control-stop-and-wait-and-sliding-window\">3.4</a> for windows and sequence numbers, and <a href=\"#error-detection-parity-checksum-and-crc\">3.2</a> for how the receiver notices a damaged frame.",
+ "sections": [
+  {
+   "h3": "Stop-and-wait ARQ and the duplicate frame",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>ARQ</b> means automatic repeat request: turn a detected error into a retransmission. It adds two things to a frame — a sequence number and a timer. A damaged frame is dropped silently and sent again; a frame not acknowledged in time is also sent again."
+    },
+    {
+     "type": "p",
+     "text": "The simplest form is <b>stop-and-wait ARQ</b>. The sender transmits one frame, starts a timer, and waits. A correct ACK stops the timer and releases the next frame. A bad frame or an expired timer means: send it again."
+    },
+    {
+     "type": "p",
+     "text": "One bit of sequence number, 0 and 1 alternating, is enough, because only one frame is ever in flight. That bit kills duplicates. Frame 0 arrives safely and the receiver replies ACK 1, but the ACK is lost. The sender's timer fires and it sends frame 0 again. The receiver sees sequence number 0, knows it already delivered that frame, discards it as a duplicate, and repeats ACK 1. Without the number, the same data would be handed up twice."
+    },
+    {
+     "type": "p",
+     "text": "Stop-and-wait wastes the link. After every frame the sender sits idle for one round trip, 2T<sub>p</sub>."
+    }
+   ]
+  },
+  {
+   "h3": "Go-Back-N: one timer, cumulative ACKs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Pipelining lets the sender keep W frames in flight, the sliding window of <a href=\"#flow-control-stop-and-wait-and-sliding-window\">3.4</a>, with ARQ layered on top. The simpler pipelined ARQ is <b>Go-Back-N</b>."
+    },
+    {
+     "type": "p",
+     "text": "The receiver window is exactly 1. It accepts only the frame it is expecting, in order. A frame that arrives early — because an earlier one was lost — is discarded, not buffered, and the receiver repeats the ACK of the last frame it accepted in order."
+    },
+    {
+     "type": "p",
+     "text": "Acknowledgements are <b>cumulative</b>. ACK n means: every frame up to n − 1 is safe, and I am now expecting frame n. One ACK can therefore cover several frames."
+    },
+    {
+     "type": "p",
+     "text": "The sender keeps a single timer, for the oldest unacknowledged frame. When it expires, the sender resends that frame and every frame after it. That is the N it goes back to, and it is the price of a one-frame receiver: one loss costs a whole window of retransmissions."
+    },
+    {
+     "type": "p",
+     "text": "With a k-bit sequence number the sender window must be at most 2<sup>k</sup> − 1. One number is deliberately held back so a new frame can never carry the same number as an old frame still in flight."
+    },
+    {
+     "type": "formula",
+     "text": "E = W ÷ (1 + 2a) while W ≤ 1 + 2a, and E = 1 beyond that",
+     "where": "E is the fraction of the link's capacity actually used; W is the sender window in frames; a = T<sub>p</sub> / T<sub>t</sub>, with T<sub>p</sub> the one-way propagation delay and T<sub>t</sub> the transmission time of one frame."
+    }
+   ]
+  },
+  {
+   "h3": "Selective Repeat: buffer and resend one frame",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>Selective Repeat</b> removes the waste. The receiver has a window as large as the sender's and <b>buffers</b> frames that arrive out of order. It sends a <b>NAK</b> (negative acknowledgement) naming the missing frame, and delivers data as soon as the gap fills. The sender keeps a separate timer per unacknowledged frame and resends only the one whose timer fires."
+    },
+    {
+     "type": "p",
+     "text": "The window must be halved: with a k-bit sequence number, W ≤ 2<sup>k−1</sup>. The sequence space holds 2<sup>k</sup> distinct numbers, and at some instant the receiver may still be waiting for frames of the previous window while the sender has moved into the next. The two windows together need 2W distinct numbers, so 2W ≤ 2<sup>k</sup>, giving W ≤ 2<sup>k−1</sup>. This bound is exact, not conservative."
+    },
+    {
+     "type": "p",
+     "text": "The cost moves to the receiver: a buffer of W frames and reordering before delivery."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing between them",
+   "blocks": [
+    {
+     "type": "table",
+     "head": [
+      "Protocol",
+      "Sender window",
+      "Receiver buffer",
+      "Retransmits",
+      "ACK"
+     ],
+     "rows": [
+      [
+       "Stop-and-wait",
+       "1",
+       "1 frame",
+       "the lost frame",
+       "individual"
+      ],
+      [
+       "Go-Back-N",
+       "≤ 2<sup>k</sup> − 1",
+       "none (window 1)",
+       "the lost frame and all after it",
+       "cumulative"
+      ],
+      [
+       "Selective Repeat",
+       "≤ 2<sup>k−1</sup>",
+       "W frames",
+       "only the missing frame",
+       "individual, plus NAK"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Pipelining is the whole point. On a satellite or intercontinental link the round trip 2T<sub>p</sub> can be far larger than the frame time T<sub>t</sub>, so stop-and-wait leaves the link idle most of the time whatever the bit rate. Go-Back-N recovers that capacity cheaply when frames are rarely lost. Selective Repeat is worth its buffer when losses are frequent or the window is long, because each loss then costs one retransmission instead of up to W."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Frame 1 is lost, so the receiver keeps answering ACK 1 — it still expects frame 1 — and throws away frames 2 and 3 unread. When the sender's timer for frame 1 fires, it goes back and resends from frame 1, and only then does the ACK move to 2.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Sender",
+    "Receiver"
+   ],
+   "messages": [
+    {
+     "from": "Sender",
+     "to": "Receiver",
+     "label": "Frame 0",
+     "dashed": false
+    },
+    {
+     "from": "Receiver",
+     "to": "Sender",
+     "label": "ACK 1",
+     "dashed": false
+    },
+    {
+     "from": "Sender",
+     "to": "Receiver",
+     "label": "Frame 1 lost",
+     "dashed": true
+    },
+    {
+     "from": "Sender",
+     "to": "Receiver",
+     "label": "Frame 2",
+     "dashed": false
+    },
+    {
+     "from": "Receiver",
+     "to": "Sender",
+     "label": "ACK 1 again",
+     "dashed": false
+    },
+    {
+     "from": "Sender",
+     "to": "Receiver",
+     "label": "Frame 3",
+     "dashed": false
+    },
+    {
+     "from": "Receiver",
+     "to": "Sender",
+     "label": "ACK 1 again",
+     "dashed": false
+    },
+    {
+     "from": "Sender",
+     "to": "Receiver",
+     "label": "Resend Frame 1",
+     "dashed": false
+    },
+    {
+     "from": "Receiver",
+     "to": "Sender",
+     "label": "ACK 2",
+     "dashed": false
+    }
+   ],
+   "aria": "A message exchange where frame 1 is lost, so the receiver keeps repeating ACK 1 and the sender goes back and resends from frame 1."
+  }
+ },
+ "examples": [
+  {
+   "question": "A data link uses a 3-bit sequence number. The sender has seven frames, numbered 0 to 6, ready to send, and frame 2 is damaged in transit. Trace the exchange and count total frame transmissions for (a) Go-Back-N and (b) Selective Repeat.",
+   "steps": [
+    "k = 3 gives 2<sup>3</sup> = 8 sequence numbers, 0 to 7.",
+    "Go-Back-N sender window = 2<sup>k</sup> − 1 = 7. All seven frames fit in one window, so the sender transmits 0, 1, 2, 3, 4, 5, 6: 7 transmissions.",
+    "Frame 2 is damaged and discarded. Frames 0 and 1 were accepted in order, so the receiver sends ACK 2, meaning it expects frame 2.",
+    "Frames 3, 4, 5, 6 arrive early. The receiver has no buffer, so each is discarded and draws another ACK 2: 4 more ACKs, all saying ACK 2.",
+    "The sender's single timer, running for frame 2, expires. It resends frames 2, 3, 4, 5, 6 — 5 retransmissions. These arrive in order and draw ACK 3, ACK 4, ACK 5, ACK 6, ACK 7.",
+    "Go-Back-N total = 7 + 5 = 12 frame transmissions to deliver 7 useful frames.",
+    "Selective Repeat window = 2<sup>k−1</sup> = 2<sup>2</sup> = 4. The sender sends 0, 1, 2, 3. ACKs for 0 and 1 slide the window, so it sends 4 and 5; the window base is still frame 2, so frame 6 must wait.",
+    "Frame 2 is damaged and discarded, which to the sender looks the same as a loss. The receiver buffers 3, 4 and 5 — all inside its window 2 to 5 — and sends NAK 2. The NAK 2 (or, if the NAK itself is lost, the timer for frame 2) makes the sender resend frame 2 alone: 1 retransmission.",
+    "The receiver now delivers 2, 3, 4, 5 in order and acknowledges them, the window slides, and frame 6 is sent. New frames = 7, resent = 1.",
+    "Selective Repeat total = 7 + 1 = 8 frame transmissions. Saving = 12 − 8 = 4, at the cost of a 4-frame buffer and reordering at the receiver, and one timer per unacknowledged frame at the sender."
+   ],
+   "answer": "Go-Back-N needs 12 frame transmissions (7 new + 5 resent) while Selective Repeat needs 8 (7 new + 1 resent), a saving of 4 transmissions for the same 7 delivered frames.",
+   "check": "k = 3\nn_frames = 7\nlost = 2\ngbn_window = 2**k - 1\nsr_window = 2**(k-1)\ngbn_resend = n_frames - lost\ngbn_total = n_frames + gbn_resend\nsr_resend = 1\nsr_total = n_frames + sr_resend\nfor v in (gbn_window, sr_window, gbn_resend, gbn_total, sr_total):\n    print(v)",
+   "values": [
+    7,
+    4,
+    5,
+    12,
+    8
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using 2<sup>k</sup> as the Go-Back-N sender window, or 2<sup>k</sup> instead of 2<sup>k−1</sup> for Selective Repeat. Both make the protocol fail: an old frame gets mistaken for a new one.",
+  "Reading ACK n as 'frame n arrived'. It means frames up to n − 1 are safe and frame n is expected. Examiners ask this in almost every paper.",
+  "Forgetting that the Go-Back-N receiver has a window of 1. Out-of-order frames are discarded there, not buffered, so they are never delivered later.",
+  "Counting one retransmission for a Go-Back-N loss. It resends the lost frame and everything after it, so a loss near the start of the window costs W retransmissions.",
+  "Mixing up NAK with ACK. A NAK names a frame the receiver has not got; a cumulative ACK names the next frame it wants."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "In Go-Back-N, what does the receiver's ACK 5 tell the sender?",
+   "marks": 2,
+   "a": "Frames 0 through 4 have arrived safely and frame 5 is the next one expected. It is cumulative, so it covers all of them in one message."
+  },
+  {
+   "level": "remember",
+   "q": "How many bits of sequence number does stop-and-wait ARQ need, and what are they used for?",
+   "marks": 2,
+   "a": "1 bit, giving numbers 0 and 1. It lets the receiver detect a retransmitted frame as a duplicate when an ACK was lost."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the Selective Repeat window 2<sup>k−1</sup> and not 2<sup>k</sup>?",
+   "marks": 3,
+   "a": "The receiver may still be waiting for frames of the previous window while the sender works in the next. The two windows need 2W distinct numbers, and the space has only 2<sup>k</sup>, so W ≤ 2<sup>k−1</sup>."
+  },
+  {
+   "level": "apply",
+   "q": "A link uses a 4-bit sequence number. Give the maximum sender window for Go-Back-N and for Selective Repeat.",
+   "marks": 3,
+   "a": "Sequence numbers 0 to 15, so 2<sup>k</sup> = 16. Go-Back-N: 2<sup>4</sup> − 1 = 15. Selective Repeat: 2<sup>4−1</sup> = 8."
+  },
+  {
+   "level": "apply",
+   "q": "A Go-Back-N sender has window W = 5, T<sub>t</sub> = 1 ms and T<sub>p</sub> = 9 ms. Find a and the link efficiency.",
+   "marks": 4,
+   "a": "a = T<sub>p</sub>/T<sub>t</sub> = 9/1 = 9. 1 + 2a = 19, and W = 5 ≤ 19, so E = 5/19 = 0.263, about 26.3 per cent."
+  },
+  {
+   "level": "analyze",
+   "q": "A receiver in Go-Back-N expecting frame 3 gets frame 5. What does it do, and why can it not just keep frame 5?",
+   "marks": 4,
+   "a": "It discards frame 5 and sends ACK 3. Its window is 1 and it delivers strictly in order, so it has nowhere to store frame 5 and cannot hand it up before frames 3 and 4 exist."
+  },
+  {
+   "level": "analyze",
+   "q": "On a link with a high frame loss rate, why does Selective Repeat beat Go-Back-N, and what does it pay for that?",
+   "marks": 5,
+   "a": "One loss costs Selective Repeat a single retransmission, while Go-Back-N resends up to W frames for it, so Go-Back-N throughput falls sharply as loss rises. Selective Repeat pays with a W-frame receiver buffer, per-frame timers and reordering logic."
+  }
+ ],
+ "beyond": "Not for the exam. Modern links rarely use plain Go-Back-N or Selective Repeat at the data link layer, because fibre has a very low loss rate and the link layer is kept simple. The ideas survive at the transport layer instead. Search for TCP selective acknowledgement (SACK) and for hybrid ARQ in 4G and 5G radio links if you want to see where they went."
+}

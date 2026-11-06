@@ -1,0 +1,642 @@
+{
+ "lead": "The data link layer does two jobs: it packs bits into frames that can be checked for errors, and it decides which station may use a shared medium. By the end of this unit you can design a framing and error-check scheme, size a sliding window, and explain how Ethernet and Wi-Fi share a cable or a radio channel.",
+ "about": "Unit 3 covers the data link layer, the layer that cuts a raw bit stream into frames and shares one medium among many stations. Chapter 3.1 shows how the start and end of a frame are marked. Chapters 3.2 and 3.3 add check bits so a receiver can detect bit errors, and in one case correct them. Chapters 3.4 and 3.5 stop a fast sender from drowning a slow receiver, then add retransmission when a frame is lost. Chapter 3.6 reads two real protocols, HDLC and PPP. Chapters 3.7 to 3.9 turn to shared media: ALOHA, CSMA/CD and CSMA/CA, then Ethernet with VLANs, and finally IEEE 802.11 wireless LANs.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A frame needs a visible start and end, and bit stuffing keeps the flag pattern from ever appearing inside the data.",
+   "depth": "Frame, packet and payload as terms. Fixed-length and length-field framing in one line. Byte-oriented framing with a flag byte and byte stuffing using ESC; bit-oriented framing with the flag 01111110 and bit stuffing after five consecutive 1s. The four frame fields: header, payload, trailer, flag. Destuffing at the receiver and why stuffing is removed before the check bits are tested. Some syllabi call this frame delineation or HDLC-like framing.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "A frame on the wire",
+    "nodes": [
+     {
+      "id": "f1",
+      "label": "Flag",
+      "note": "01111110",
+      "style": "accent"
+     },
+     {
+      "id": "h",
+      "label": "Header",
+      "note": "address, control",
+      "style": "normal"
+     },
+     {
+      "id": "p",
+      "label": "Payload",
+      "note": "user data",
+      "style": "normal"
+     },
+     {
+      "id": "t",
+      "label": "FCS",
+      "note": "check bits",
+      "style": "normal"
+     },
+     {
+      "id": "f2",
+      "label": "Flag",
+      "note": "01111110",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "f1",
+      "to": "h",
+      "style": "solid"
+     },
+     {
+      "from": "h",
+      "to": "p",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "t",
+      "style": "solid"
+     },
+     {
+      "from": "t",
+      "to": "f2",
+      "style": "solid"
+     }
+    ],
+    "aria": "A frame drawn left to right with a flag at each end, and the same flag pattern marked as the reason for bit stuffing."
+   },
+   "example": "Payload bits: 111111011111100 (15 bits). Show the stuffed stream. Scan left to right and insert a 0 every time five 1s in a row have been sent. Bits 1 to 5 are 11111, so a 0 goes in; then bit 6 is 1 and bit 7 is 0, giving 11111010. Bits 8 to 12 are another 11111, so a second 0 goes in; then 1, 0, 0 follow, giving 111110100. Stuffed output is 11111010111110100, 17 bits: two extra bits for two runs of five 1s. The receiver counts five 1s and throws away the next 0, getting the original 15 bits back.",
+   "trap": "Stuffing happens after the fifth 1 whether or not the next bit is also a 1, and the flag itself is never stuffed. A second trap is forgetting to remove the stuffed bits before checking the FCS.",
+   "prereq": "Unit 1 for the data link layer's place in the layered model.",
+   "leave": "Bit-by-bit transmission and line coding to Unit 2; the frame error check to 3.2."
+  },
+  {
+   "k": 2,
+   "idea": "Add redundant bits that are a fixed function of the data, so the receiver can prove that some bits changed on the way.",
+   "depth": "Single parity bit (odd and even) and its blind spot: any even number of flipped bits passes. Two-dimensional parity: a block of rows, one parity bit per row plus one per column, which detects and can even correct a single flip. Internet checksum: 16-bit one's complement sum, carried in IPv4, TCP and UDP headers. CRC: generator polynomial G of degree r, append r zeros, modulo-2 division (XOR, no borrows), remainder is the CRC, send data plus CRC, receiver divides the whole thing and expects zero. Which error bursts each method misses. Standard generators named only, no bit patterns invented.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "CRC at the sender and receiver",
+    "nodes": [
+     {
+      "id": "d",
+      "label": "Data bits",
+      "note": "k bits",
+      "style": "normal"
+     },
+     {
+      "id": "z",
+      "label": "Append r zeros",
+      "note": "r = degree of G",
+      "style": "normal"
+     },
+     {
+      "id": "div",
+      "label": "Divide by G",
+      "note": "XOR, no borrows",
+      "style": "normal"
+     },
+     {
+      "id": "rem",
+      "label": "Remainder = CRC",
+      "note": "r check bits",
+      "style": "accent"
+     },
+     {
+      "id": "snd",
+      "label": "Send data + CRC",
+      "note": "k + r bits",
+      "style": "accent"
+     },
+     {
+      "id": "rcv",
+      "label": "Receiver divides all",
+      "note": "remainder 0 means OK",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "d",
+      "to": "z",
+      "style": "solid"
+     },
+     {
+      "from": "z",
+      "to": "div",
+      "style": "solid"
+     },
+     {
+      "from": "div",
+      "to": "rem",
+      "style": "solid"
+     },
+     {
+      "from": "rem",
+      "to": "snd",
+      "style": "solid"
+     },
+     {
+      "from": "snd",
+      "to": "rcv",
+      "style": "solid"
+     }
+    ],
+    "aria": "A top-to-bottom flow showing data bits padded with r zeros, divided by the generator, and the remainder attached as the CRC before transmission."
+   },
+   "example": "Data 1001, generator G = 1011 (degree 3, so r = 3). Append three zeros: 1001000. Divide modulo 2. 1001 XOR 1011 = 0010; bring down 0 gives 0100, leading 0 so shift only and bring 0 gives 1000; 1000 XOR 1011 = 0011; bring the last 0 gives 0110. Remainder is 110, so the CRC is 110 and the frame sent is 1001110. At the receiver, 1001110 divided by 1011 leaves 000, so the frame is accepted. A single flipped bit leaves a non-zero remainder and the frame is dropped.",
+   "trap": "CRC subtraction is XOR with no borrows, and the number of appended zeros equals the degree r of G, not its length in bits. Parity detects any odd number of errors only; a two-bit flip slips through single parity.",
+   "prereq": "3.1, because the check bits sit in the frame trailer.",
+   "leave": "Correcting the error instead of detecting it goes to 3.3; the checksum's use inside IP and TCP headers goes to Units 4 and 5."
+  },
+  {
+   "k": 3,
+   "idea": "With enough well-placed check bits, the receiver can name the position of a single flipped bit and repair it, not just notice it.",
+   "depth": "Hamming distance d_min: a code detects up to d_min − 1 errors and corrects up to floor((d_min − 1)/2). The count rule 2^r ≥ m + r + 1 for m data bits and r check bits; show the small table m = 4, r = 3; m = 8, r = 4. Hamming(7,4): positions numbered from 1, check bits at positions 1, 2, 4 (powers of 2), data at 3, 5, 6, 7, even parity, syndrome read as a binary position. One overall parity bit for SECDED, in one line. Cyclic codes and convolutional encoding/decoding: only a few universities teach these, so give the idea (polynomial codes; a shift register with memory) and move on.",
+   "figure": {
+    "type": "array",
+    "title": "Hamming(7,4) for data 1011, then bit 5 flips",
+    "show_index": true,
+    "index_from": 1,
+    "rows": [
+     {
+      "label": "Role",
+      "cells": [
+       "p1",
+       "p2",
+       "d1",
+       "p4",
+       "d2",
+       "d3",
+       "d4"
+      ]
+     },
+     {
+      "label": "Sent",
+      "cells": [
+       "0",
+       "1",
+       "1",
+       "0",
+       "0",
+       "1",
+       "1"
+      ]
+     },
+     {
+      "label": "Got",
+      "cells": [
+       "0",
+       "1",
+       "1",
+       "0",
+       "1",
+       "1",
+       "1"
+      ],
+      "marks": {
+       "4": "live"
+      }
+     }
+    ],
+    "aria": "Seven numbered positions with three check bits and four data bits, and a received codeword where the shaded position 5 has flipped."
+   },
+   "example": "Data 1011 in a Hamming(7,4) code. d1 = 1 at position 3, d2 = 0 at 5, d3 = 1 at 6, d4 = 1 at 7. Check bits use even parity: p1 covers positions 1, 3, 5, 7, so p1 = 0; p2 covers 2, 3, 6, 7, so p2 = 1; p4 covers 4, 5, 6, 7, so p4 = 0. Codeword: 0 1 1 0 0 1 1. Now flip position 5: received 0 1 1 0 1 1 1. Syndrome bit s1 = parity of 1, 3, 5, 7 = 0+1+1+1 = odd = 1. s2 = parity of 2, 3, 6, 7 = 1+1+1+1 = even = 0. s4 = parity of 4, 5, 6, 7 = 0+1+1+1 = odd = 1. Syndrome s4 s2 s1 = 101 = 5, so flip position 5 back to 0.",
+   "trap": "Positions start at 1, and check bit p_i covers every position whose index has bit i set. Students also mix odd and even parity between the sender and the receiver, or use 2^r ≥ m + r and leave out the +1.",
+   "prereq": "3.2, especially even parity and the idea of check bits.",
+   "leave": "Detection-only schemes stay in 3.2; ARQ, which resends instead of repairing, is 3.5."
+  },
+  {
+   "k": 4,
+   "idea": "A receiver has a finite buffer, so the sender must be paced, and a sliding window of W frames is the standard way to keep the link busy while pacing it.",
+   "depth": "Stop-and-wait: send one frame, wait for the ACK, send the next. Utilisation U = t_frame / (t_frame + 2 t_prop) = 1 / (1 + 2a), with a = t_prop / t_frame, t_frame = frame length / bit rate, t_prop = one-way propagation delay. Bandwidth-delay product as the number of bits in flight. Sliding window: sender window W_s, receiver window W_r, sequence numbers modulo 2^k, U = W / (1 + 2a) for W < 1 + 2a and U = 1 otherwise. Piggybacking in one line. The example uses 100 kbps, 1000-bit frames and a 20 ms one-way delay.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "Sender",
+      "bars": [
+       {
+        "label": "Frame 0",
+        "start": 0,
+        "end": 10,
+        "style": "accent"
+       },
+       {
+        "label": "Frame 1",
+        "start": 51,
+        "end": 61,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "Receiver",
+      "bars": [
+       {
+        "label": "ACK 0",
+        "start": 30,
+        "end": 31,
+        "style": "live"
+       },
+       {
+        "label": "ACK 1",
+        "start": 81,
+        "end": 82,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "Two timelines: the sender transmits for 10 ms, then sits idle for the 40 ms round trip, while the receiver's short acknowledgement arrives 20 ms later."
+   },
+   "example": "A 100 kbps link, frames of 1000 bits, one-way propagation 20 ms. t_frame = 1000 / 100 000 = 10 ms. a = 20 / 10 = 2. Stop-and-wait: U = 1 / (1 + 2×2) = 1/5 = 0.20, so only 20 percent of the link is used. Round trip is 40 ms and the cycle is 10 + 40 = 50 ms, matching 10/50. For full use the window must be at least 1 + 2a = 5 frames. With W = 3, U = 3 / 5 = 0.60, that is 60 percent. With W = 5 or more, U = 1.",
+   "trap": "a uses one-way propagation, while the 2 in 1 + 2a is the round trip. Students also plug W in bits instead of frames, or forget that U cannot exceed 1.",
+   "prereq": "3.1 for the frame, and 3.2 because flow control alone assumes frames arrive intact.",
+   "leave": "What happens when a frame is damaged or lost is 3.5; TCP's own window and congestion control is Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "Add a timer and acknowledgements to the sliding window and lost frames get resent, either all frames after the loss (Go-Back-N) or only the missing one (Selective Repeat).",
+   "depth": "Stop-and-wait ARQ with 1-bit sequence numbers and the duplicate-frame problem. Go-Back-N: cumulative ACK, ACK n means expecting n, sender window at most 2^k − 1, receiver window 1, out-of-order frames discarded, one timer for the oldest frame. Selective Repeat: per-frame timers, receiver buffers out-of-order frames, NAK, window at most 2^(k−1) so old and new frames cannot be confused. Efficiency of GBN. A comparison table: window size, receiver buffer, retransmission, ACK type. Pipelining as the reason ARQ beats stop-and-wait on a long link.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Sender",
+     "Receiver"
+    ],
+    "messages": [
+     {
+      "from": "Sender",
+      "to": "Receiver",
+      "label": "Frame 0",
+      "dashed": false
+     },
+     {
+      "from": "Receiver",
+      "to": "Sender",
+      "label": "ACK 1",
+      "dashed": false
+     },
+     {
+      "from": "Sender",
+      "to": "Receiver",
+      "label": "Frame 1 lost",
+      "dashed": true
+     },
+     {
+      "from": "Sender",
+      "to": "Receiver",
+      "label": "Frame 2",
+      "dashed": false
+     },
+     {
+      "from": "Receiver",
+      "to": "Sender",
+      "label": "ACK 1 again",
+      "dashed": false
+     },
+     {
+      "from": "Sender",
+      "to": "Receiver",
+      "label": "Frame 3",
+      "dashed": false
+     },
+     {
+      "from": "Receiver",
+      "to": "Sender",
+      "label": "ACK 1 again",
+      "dashed": false
+     },
+     {
+      "from": "Sender",
+      "to": "Receiver",
+      "label": "Resend Frame 1",
+      "dashed": false
+     },
+     {
+      "from": "Receiver",
+      "to": "Sender",
+      "label": "ACK 2",
+      "dashed": false
+     }
+    ],
+    "aria": "A message exchange where frame 1 is lost, so the receiver keeps repeating ACK 1 and the sender goes back and resends from frame 1."
+   },
+   "example": "A 3-bit sequence number, so k = 3. Go-Back-N allows a sender window of 2^3 − 1 = 7. Frames 0 to 6 are sent. Frame 2 is lost. The receiver takes 0 and 1 and sends ACK 1, meaning it expects frame 2. Frames 3, 4, 5 and 6 arrive out of order, are discarded, and each one draws another ACK 1. The sender's timer for frame 2 expires and it resends frames 2, 3, 4, 5, 6: five frames for one loss, twelve transmissions in all for seven useful frames. With Selective Repeat on the same k = 3, the window is 2^(3−1) = 4, the receiver buffers 3 to 6, and only frame 2 is resent: eight transmissions.",
+   "trap": "The sender window is 2^k − 1 for Go-Back-N but 2^(k−1) for Selective Repeat; using 2^k makes the protocol fail. Also ACK n is not an acknowledgement of frame n, it means frames up to n − 1 are safe.",
+   "prereq": "3.4 for windows and sequence numbers, 3.2 for detecting a damaged frame.",
+   "leave": "TCP's real retransmission and congestion behaviour is Unit 5; HDLC's use of these ideas is 3.6."
+  },
+  {
+   "k": 6,
+   "idea": "A real data link protocol is a package of frame format, error control and link management, and HDLC and PPP show the two common shapes.",
+   "depth": "HDLC: primary, secondary and combined stations; link configurations balanced and unbalanced; transfer modes NRM, ABM and ARM, with ABM as the usual one. Frame format: flag 01111110, 8-bit address, 8 or 16-bit control, information, 16 or 32-bit FCS, flag; bit stuffing everywhere except the flags. Three frame types: I-frames carrying data with N(S) and N(R), S-frames RR, RNR, REJ, SREJ, and U-frames for link setup and disconnect. PPP: flag 01111110, address 0xFF, control 0x03, 2-byte protocol field, payload up to the MTU, 2 or 4-byte FCS; byte stuffing with 0x7D, and 0x7D 0x5E for a flag byte; LCP to set up the link, NCP per network protocol, PAP and CHAP for authentication named only. PPP detects errors but has no flow control and no correction.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "Flag",
+      "note": "01111110",
+      "style": "accent"
+     },
+     {
+      "label": "Address",
+      "note": "1 byte, 0xFF in PPP",
+      "style": "normal"
+     },
+     {
+      "label": "Control",
+      "note": "1 or 2 bytes",
+      "style": "normal"
+     },
+     {
+      "label": "Information",
+      "note": "payload, any length",
+      "style": "normal"
+     },
+     {
+      "label": "FCS",
+      "note": "2 or 4 bytes",
+      "style": "normal"
+     },
+     {
+      "label": "Flag",
+      "note": "01111110",
+      "style": "accent"
+     }
+    ],
+    "aria": "The six fields of an HDLC frame stacked in order from flag to flag, with the control field in the middle."
+   },
+   "example": "PPP byte stuffing. Payload bytes: 7E 8A 7D 11. A 0x7E is the flag, so it becomes 7D 5E. 0x8A is an ordinary byte, so it stays 8A. 0x7D is the escape byte itself, so it becomes 7D 5D. 0x11 is below 0x20, so it is escaped as 7D 31, since 0x11 XOR 0x20 = 0x31. Stuffed payload sent on the line: 7D 5E 8A 7D 5D 7D 31, six bytes for four original bytes. The receiver reverses each rule on seeing 0x7D.",
+   "trap": "PPP has error detection but no error correction and no flow control, so saying it retransmits is wrong. Also HDLC's REJ asks for a go-back retransmission while SREJ asks for one frame only.",
+   "prereq": "3.1 framing, 3.2 the FCS, 3.4 and 3.5 for the control field.",
+   "leave": "Ethernet's own frame format is 3.8; the IP packet that PPP carries is Unit 4."
+  },
+  {
+   "k": 7,
+   "idea": "When several stations share one medium, a medium access control rule is needed to decide who talks and when to recover from two stations talking together.",
+   "depth": "Split into random, controlled and channelisation access. Pure ALOHA: a station sends at will; vulnerable time 2 × frame time; throughput S = G e^(−2G), maximum 0.184 at G = 0.5. Slotted ALOHA: send only at slot boundaries, S = G e^(−G), maximum 0.368 at G = 1, where G is offered load in frames per frame time. CSMA: listen before sending, 1-persistent, non-persistent and p-persistent variants, propagation delay as the reason collisions still happen. CSMA/CD: listen while sending, detect a collision, send a jam signal, binary exponential backoff after the i-th collision from a set of 2^i slots, slot time = 2τ, minimum frame = 2τ × bit rate. CSMA/CA: avoid rather than detect, ACK every frame. Controlled access: polling and token passing, one line each. Some syllabi group these as MAC sublayer protocols.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "CSMA/CD on a half-duplex cable",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Frame ready",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Sense channel",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Idle?",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Transmit and monitor",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Collision?",
+      "style": "accent"
+     },
+     {
+      "id": "f",
+      "label": "Send jam, back off",
+      "note": "2^i slots",
+      "style": "live"
+     },
+     {
+      "id": "g",
+      "label": "Frame done",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "yes",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "b",
+      "label": "busy",
+      "style": "dashed"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "g",
+      "label": "no",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "label": "yes",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "b",
+      "label": "retry",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A loop that senses the cable, sends only when idle, and returns to sensing through a jam-and-backoff step whenever a collision is detected."
+   },
+   "example": "ALOHA at an offered load of G = 0.5 frame per frame time: pure ALOHA gives S = 0.5 × e^(−1) = 0.5 × 0.368 = 0.184, that is 18.4 percent of the channel. Slotted ALOHA at its best point G = 1 gives S = 1 × e^(−1) = 0.368, or 36.8 percent. Now the minimum Ethernet frame: at 10 Mbps with a slot time 2τ = 51.2 μs, a station must still be transmitting when a collision signal returns, so it needs 51.2 μs × 10 000 000 bit/s = 512 bits = 64 bytes. Any shorter frame is padded, or the sender can finish early and miss the collision.",
+   "trap": "Pure ALOHA uses e^(−2G) and slotted ALOHA uses e^(−G); swapping them is the commonest slip. CSMA/CA cannot detect collisions on radio, and the backoff in CSMA/CD doubles per collision but never beyond the allowed slot set.",
+   "prereq": "3.1, since the unit of transmission is a frame.",
+   "leave": "The Ethernet frame that CSMA/CD carries is 3.8; the 802.11 version of CSMA/CA is 3.9."
+  },
+  {
+   "k": 8,
+   "idea": "Ethernet is the LAN standard that fixes the frame format and addresses, and a VLAN lets one switch behave like several separate LANs.",
+   "depth": "IEEE 802.3 frame: preamble 7 bytes, SFD 1 byte, destination MAC 6 bytes, source MAC 6 bytes, type or length 2 bytes, payload 46 to 1500 bytes, FCS 4 bytes. 48-bit MAC addresses, unicast, multicast and broadcast (all 1s), and the first 3 bytes from the vendor. Minimum frame 64 bytes, why padding exists, why the preamble is not counted. Naming such as 10Base5 and 10BaseT read as rate, signalling and medium. Switched full-duplex Ethernet: no shared cable, so no CSMA/CD. LAN switch learning: read the source address, forward by the destination, flood when unknown. VLAN: one physical switch split by port, 802.1Q 4-byte tag with a 12-bit VLAN ID (1 to 4094 usable), access ports versus trunk ports, inter-VLAN routing needed because VLANs are separate broadcast domains. IEEE 802.4 token bus named in one line only.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "IEEE 802.3 frame fields",
+    "nodes": [
+     {
+      "id": "da",
+      "label": "Destination",
+      "note": "6 bytes",
+      "style": "normal"
+     },
+     {
+      "id": "sa",
+      "label": "Source",
+      "note": "6 bytes",
+      "style": "normal"
+     },
+     {
+      "id": "ty",
+      "label": "Type",
+      "note": "2 bytes",
+      "style": "accent"
+     },
+     {
+      "id": "pl",
+      "label": "Payload",
+      "note": "46 to 1500 bytes",
+      "style": "accent"
+     },
+     {
+      "id": "fc",
+      "label": "FCS",
+      "note": "4 bytes",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "da",
+      "to": "sa",
+      "style": "solid"
+     },
+     {
+      "from": "sa",
+      "to": "ty",
+      "style": "solid"
+     },
+     {
+      "from": "ty",
+      "to": "pl",
+      "style": "solid"
+     },
+     {
+      "from": "pl",
+      "to": "fc",
+      "style": "solid"
+     }
+    ],
+    "aria": "The Ethernet frame drawn left to right with byte sizes, showing that the payload length decides whether padding is needed."
+   },
+   "example": "A full 1500-byte IP packet in Ethernet. Header plus trailer without the preamble: 6 + 6 + 2 + 1500 + 4 = 1518 bytes. Add the 7-byte preamble and 1-byte SFD and the wire carries 1526 bytes, but those 8 bytes are not part of the frame for the 64-byte rule. A short 10-byte payload must be padded to 46 bytes, giving 6 + 6 + 2 + 46 + 4 = 64 bytes. Add an 802.1Q tag and the frame grows by 4 bytes: a full frame becomes 1522 bytes.",
+   "trap": "The preamble and SFD are excluded from the 64-byte minimum and from the FCS. Students also count the FCS inside the payload, or forget that a VLAN tag adds 4 bytes to the maximum as well as the minimum.",
+   "prereq": "3.7 for CSMA/CD on a shared cable, and 3.1 for framing.",
+   "leave": "IP addressing and ARP on top of Ethernet go to Unit 4; switch configuration commands stay out of scope here."
+  },
+  {
+   "k": 9,
+   "idea": "A radio channel cannot be sensed reliably and has hidden terminals, so IEEE 802.11 uses CSMA/CA with acknowledgements, priority gaps and optional RTS/CTS.",
+   "depth": "Architecture: BSS as the basic cell, AP, SSID, infrastructure versus ad-hoc IBSS, ESS with several APs and a distribution system, roaming in one line. MAC: DCF as the mandatory access method, PCF mentioned only. CSMA/CA steps: sense the medium, wait DIFS if idle, choose a random backoff in slots, freeze the counter while the medium is busy, transmit, wait SIFS at the receiver, return an ACK. Interframe spaces SIFS < PIFS < DIFS, and why the short SIFS lets the ACK win. Virtual carrier sensing with NAV from the duration field. Hidden terminal problem and the RTS/CTS four-way handshake. Frame format: frame control, duration, four address fields, sequence control, payload, FCS; the three-address case. Physical layers named only: DSSS and OFDM, 2.4 GHz and 5 GHz bands, 802.11b at 11 Mbps and 802.11a/g at 54 Mbps.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Sender",
+     "Receiver",
+     "Other node"
+    ],
+    "messages": [
+     {
+      "from": "Sender",
+      "to": "Receiver",
+      "label": "RTS",
+      "dashed": false
+     },
+     {
+      "from": "Receiver",
+      "to": "Sender",
+      "label": "CTS",
+      "dashed": false
+     },
+     {
+      "from": "Receiver",
+      "to": "Other node",
+      "label": "CTS sets NAV",
+      "dashed": true
+     },
+     {
+      "from": "Sender",
+      "to": "Receiver",
+      "label": "DATA",
+      "dashed": false
+     },
+     {
+      "from": "Receiver",
+      "to": "Sender",
+      "label": "ACK after SIFS",
+      "dashed": false
+     }
+    ],
+    "aria": "A five-message exchange where RTS and CTS reserve the channel, a third station hears the CTS and stays silent, and the data frame is acknowledged."
+   },
+   "example": "Typical textbook timings: SIFS = 10 μs, DIFS = 50 μs, one backoff slot = 20 μs. A station with a 1000-byte frame ready senses the medium idle for DIFS = 50 μs, then draws a backoff of 5 slots = 5 × 20 = 100 μs, so it waits 150 μs before the first bit goes out. At 11 Mbps the frame takes 8000 bits / 11 000 000 bit/s ≈ 727 μs. The receiver waits SIFS = 10 μs and sends the ACK. No other station can grab the channel first, because they must all wait DIFS = 50 μs, which is longer than SIFS.",
+   "trap": "Radio stations cannot hear collisions while transmitting, so CSMA/CA needs ACKs where CSMA/CD does not. Also a station that finds the medium busy does not reset its backoff counter, it freezes it, and RTS/CTS fixes the hidden terminal, not every collision.",
+   "prereq": "3.7 for CSMA/CA basics and 3.8 for the wired LAN it replaces.",
+   "leave": "Radio modulation and spread spectrum are Unit 2; mobile IP and handover across networks are Unit 4."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the trailer holds the check bits"
+  ],
+  [
+   2,
+   3,
+   "parity check bits grow into a Hamming code"
+  ],
+  [
+   2,
+   4,
+   "flow control starts from frames that arrive intact"
+  ],
+  [
+   4,
+   5,
+   "a window plus a timer becomes ARQ"
+  ],
+  [
+   5,
+   6,
+   "HDLC carries ARQ in its control field"
+  ],
+  [
+   6,
+   7,
+   "point-to-point links give way to a shared medium"
+  ],
+  [
+   7,
+   8,
+   "CSMA/CD is frozen into the Ethernet standard"
+  ],
+  [
+   8,
+   9,
+   "wired LAN contrasted with the wireless LAN"
+  ]
+ ]
+}

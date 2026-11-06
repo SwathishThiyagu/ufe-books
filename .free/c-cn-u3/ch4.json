@@ -1,0 +1,266 @@
+{
+ "lead": "A receiver holds incoming frames in a finite buffer. If the sender pushes frames faster than the receiver can check them and pass them upward, the buffer overflows and good frames are dropped. Flow control keeps the sender's rate within what the receiver can take. The simplest rule is one frame at a time, with an acknowledgement before the next frame — stop-and-wait. The standard fix is a sliding window of W unacknowledged frames. HDLC and TCP each carry a version of it, and Wi-Fi acknowledges each MAC frame before the next.",
+ "prereq": "You need: <a href=\"#framing-and-bit-stuffing\">3.1</a> for what a frame is, and <a href=\"#error-detection-parity-checksum-and-crc\">3.2</a> because flow control assumes the frames that arrive are intact.",
+ "sections": [
+  {
+   "h3": "Why the sender must be paced",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Frames that arrive while the receiver is busy checking a header or copying a payload wait in a buffer. If the sender transmits faster than the receiver empties that buffer, frames overflow and are dropped, even though no bit was damaged on the wire. Flow control keeps the sender at or below the rate the receiver can absorb."
+    },
+    {
+     "type": "p",
+     "text": "Flow control is separate from error control. Flow control assumes intact frames and asks how many arrive per second. Error control adds timers and retransmission; see <a href=\"#arq-error-control-go-back-n-and-selective-repeat\">3.5</a>."
+    },
+    {
+     "type": "p",
+     "text": "Three times decide everything on a link."
+    },
+    {
+     "type": "formula",
+     "text": "t_frame = L / R",
+     "where": "t_frame is the time to push one whole frame onto the link, in seconds; L is frame length in bits; R is bit rate in bits per second."
+    },
+    {
+     "type": "formula",
+     "text": "t_prop = d / v",
+     "where": "t_prop is one-way propagation delay in seconds; d is distance in metres; v is signal speed, about 2 × 10⁸ m/s in copper or fibre."
+    },
+    {
+     "type": "formula",
+     "text": "a = t_prop / t_frame",
+     "where": "a is propagation delay divided by frame time, a pure number. Large a means a long or fast link where the sender waits long for each acknowledgement."
+    },
+    {
+     "type": "p",
+     "text": "R × t_prop, in bits, is the bandwidth-delay product: bits in flight at one instant. A 100 kbps link with 20 ms one-way delay holds 100 000 × 0.020 = 2000 bits, two 1000-bit frames."
+    }
+   ]
+  },
+  {
+   "h3": "Stop-and-wait: one frame at a time",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The rule is simple: send one frame, wait for its acknowledgement, then send the next."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The sender builds a frame and stamps it with sequence number 0.",
+      "It transmits the frame and starts a timer.",
+      "The receiver checks the frame, accepts it, and sends back ACK 0.",
+      "The sender receives ACK 0, discards its copy, and sends frame 1 with sequence number 1.",
+      "If the timer runs out before the ACK arrives, the sender retransmits the same frame."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "One bit of sequence number is enough — 0, 1, 0, 1 — because only one frame can be unacknowledged at a time."
+    },
+    {
+     "type": "formula",
+     "text": "U = t_frame / (t_frame + 2t_prop) = 1 / (1 + 2a)",
+     "where": "U is utilisation, the fraction of time the sender transmits bits; t_frame is frame transmission time in seconds; t_prop is one-way propagation delay in seconds; a = t_prop / t_frame. The 2t_prop is one round trip spent idle."
+    },
+    {
+     "type": "p",
+     "text": "When a is small — short link, long frame — the sender is busy almost all the time. When a is large — satellite hop, fast LAN over long cable — the sender waits most of its life for an acknowledgement. The wasted time is a full round trip carrying nothing."
+    },
+    {
+     "type": "table",
+     "head": [
+      "a = t_prop / t_frame",
+      "U for stop-and-wait"
+     ],
+     "rows": [
+      [
+       "0.5",
+       "0.50"
+      ],
+      [
+       "1",
+       "0.33"
+      ],
+      [
+       "2",
+       "0.20"
+      ],
+      [
+       "5",
+       "0.09"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Sliding window: keeping W frames in flight",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The fix is several unacknowledged frames at once. The sender keeps a window of size W_s. Frames from the oldest unacknowledged frame up to W_s frames ahead may be sent without waiting. An acknowledgement that covers one new frame slides the window forward by one; a cumulative ACK n, which says every frame up to n has arrived, slides it forward past all of them at once."
+    },
+    {
+     "type": "p",
+     "text": "Sequence numbers travel in a k-bit header field, so they run from 0 to 2<sup>k</sup> − 1 and wrap. A number may not be reused while an old frame carrying it could still be in the network, so W_s must stay strictly below 2<sup>k</sup>. The receiver also has a window, W_r, saying how many out-of-order frames it will hold."
+    },
+    {
+     "type": "formula",
+     "text": "U = min(1, W / (1 + 2a))",
+     "where": "U is utilisation; W is the sender window in frames, not bits; a = t_prop / t_frame; min(1, …) caps the answer because the sender cannot transmit more than all the time."
+    },
+    {
+     "type": "p",
+     "text": "Read the formula as a budget: W frames of transmission fit into one cycle of 1 + 2a frame times. Once W reaches 1 + 2a, the ACK for the oldest frame arrives exactly as the window runs out, the pipe never empties, and U = 1."
+    },
+    {
+     "type": "p",
+     "text": "Piggybacking: when data flows both ways, the acknowledgement rides inside a reverse data frame, saving one frame of overhead per round trip."
+    },
+    {
+     "type": "p",
+     "text": "With W = 1 the sliding window is exactly stop-and-wait, so the two schemes are one idea at two settings. Adding timers and retransmission gives the ARQ protocols of <a href=\"#arq-error-control-go-back-n-and-selective-repeat\">3.5</a>; TCP's own window is in Unit 5."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Stop-and-wait on a 100 kbps link with 1000-bit frames and 20 ms one-way delay: each 10 ms frame is followed by 40 ms of waiting, so one cycle is 50 ms. ACK boxes are widened for labels; their transmission time is neglected.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "Sender",
+     "bars": [
+      {
+       "label": "Frame 0",
+       "start": 0,
+       "end": 10,
+       "style": "accent"
+      },
+      {
+       "label": "Idle",
+       "start": 10,
+       "end": 50,
+       "style": "muted"
+      },
+      {
+       "label": "Frame 1",
+       "start": 50,
+       "end": 60,
+       "style": "accent"
+      }
+     ]
+    },
+    {
+     "label": "Receiver",
+     "bars": [
+      {
+       "label": "ACK 0",
+       "start": 30,
+       "end": 38,
+       "style": "live"
+      },
+      {
+       "label": "ACK 1",
+       "start": 80,
+       "end": 88,
+       "style": "live"
+      }
+     ]
+    }
+   ],
+   "aria": "Two timelines: the sender transmits a 10 ms frame, sits idle for a 40 ms round trip, then transmits the next frame, while the receiver sends back an acknowledgement that reaches the sender 20 ms after it leaves."
+  }
+ },
+ "examples": [
+  {
+   "question": "A point-to-point link runs at 100 kbps and carries frames of 1000 bits. The one-way propagation delay is 20 ms. (a) Find t_frame, a, and stop-and-wait utilisation. (b) Find the smallest window that fills the link. (c) Find utilisation for W = 3 and W = 5. State the bandwidth-delay product.",
+   "steps": [
+    "t_frame = L / R = 1000 bits / 100 000 bits per second = 0.010 s = 10 ms.",
+    "a = t_prop / t_frame = 20 ms / 10 ms = 2. The link is long compared with the frame.",
+    "Stop-and-wait: U = 1 / (1 + 2a) = 1 / (1 + 4) = 1/5 = 0.20, or 20 percent.",
+    "Check against the cycle: 10 ms to transmit plus 2 × 20 ms round trip = 50 ms per frame; 10 / 50 = 0.20. Agrees.",
+    "Smallest window for full use: W = 1 + 2a = 1 + 4 = 5 frames.",
+    "W = 3: U = 3 / 5 = 0.60, or 60 percent of the link.",
+    "W = 5: U = 5 / 5 = 1, capped at 1, so full use.",
+    "Bandwidth-delay product = R × t_prop = 100 000 × 0.020 = 2000 bits, i.e. a = 2 frames' worth of bits in flight one way. The window needed is larger, 1 + 2a = 5 frames, because it must also cover the frame being transmitted and the ACK's one-way trip."
+   ],
+   "answer": "t_frame = 10 ms, a = 2, stop-and-wait utilisation 0.20; minimum window for full use 5 frames; U = 0.60 at W = 3 and U = 1 at W = 5; bandwidth-delay product 2000 bits.",
+   "check": "L=1000\nR=100000\nprop=20.0\ntf=L*1000/R\na=prop/tf\nprint(round(tf,4), round(a,4), round(1/(1+2*a),4), round(tf+2*prop,4), round(1+2*a,4), round(min(1,3/(1+2*a)),4), round(min(1,5/(1+2*a)),4), round(R*prop/1000,4))",
+   "values": [
+    10.0,
+    2.0,
+    0.2,
+    50.0,
+    5.0,
+    0.6,
+    1.0,
+    2000.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "a uses one-way delay, but the 2 in 1 + 2a is the round trip. Putting the round-trip delay into a doubles a, so the 2a term becomes four times t_prop/t_frame. With a = 2 the denominator goes from 5 to 9 and U drops from 0.20 to 0.11 — wrong, though not by a factor of two.",
+  "W is a count of frames, never bits. Mixing a window in bits with t_frame in seconds is the commonest unit slip.",
+  "U is capped at 1. A window of 10 with a = 1 gives U = 1, not 3.33. Examiners set this on purpose.",
+  "Do not write W = 2<sup>k</sup>. The window must be less than the number of sequence numbers, so a k-bit field needs W ≤ 2<sup>k</sup> − 1.",
+  "Stop-and-wait alternates sequence numbers 0 and 1; it does not send a constant 0. A receiver that always sees 0 cannot tell a retransmission from a fresh frame."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define flow control and name the resource it protects.",
+   "marks": 2,
+   "a": "Flow control keeps the sender's rate at or below the rate the receiver can process. It protects the receiver's finite buffer from overflow."
+  },
+  {
+   "level": "remember",
+   "q": "Write the utilisation formula for a sliding window of W frames and define every symbol.",
+   "marks": 2,
+   "a": "U = min(1, W / (1 + 2a)); U is utilisation, W is sender window in frames, a = t_prop / t_frame with t_prop the one-way delay and t_frame the frame transmission time."
+  },
+  {
+   "level": "understand",
+   "q": "Why does stop-and-wait waste most of a satellite link, while it does well on a short LAN?",
+   "marks": 3,
+   "a": "Satellite: t_prop is large, t_frame small, so a is large and U = 1/(1 + 2a) is tiny; the sender idles a round trip per frame. LAN: t_prop is small, a is small, and the idle gap is short compared with transmission."
+  },
+  {
+   "level": "understand",
+   "q": "What does the bandwidth-delay product tell a designer, and in what unit is it measured?",
+   "marks": 3,
+   "a": "It is R × t_prop, in bits: the number of bits on the link at any instant. It tells the designer how many bits, and hence frames, the sender must keep in flight to fill the pipe."
+  },
+  {
+   "level": "apply",
+   "q": "A link runs at 1 Mbps with frames of 2000 bits and a one-way delay of 10 ms. Find t_frame, a, and stop-and-wait utilisation.",
+   "marks": 4,
+   "a": "t_frame = 2000 / 1 000 000 = 0.002 s = 2 ms. a = 10 / 2 = 5. U = 1/(1 + 10) = 1/11 = 0.0909, about 9.1 percent."
+  },
+  {
+   "level": "apply",
+   "q": "For the same link (2 ms frames, a = 5), find the smallest window that fills the link and utilisation at W = 4.",
+   "marks": 4,
+   "a": "W_min = 1 + 2a = 1 + 10 = 11 frames. At W = 4, U = 4/11 = 0.3636, about 36.4 percent."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must the sender window stay strictly below 2<sup>k</sup> when k bits hold the sequence number?",
+   "marks": 5,
+   "a": "Numbers wrap after 2<sup>k</sup>. If W were 2<sup>k</sup> or more, two frames in flight could carry the same number. A late duplicate would look exactly like a fresh frame, and the receiver would deliver the same data upward a second time. Keeping W < 2<sup>k</sup> guarantees every frame in flight has a distinct number."
+  },
+  {
+   "level": "analyze",
+   "q": "A two-way file transfer can send acknowledgements either as separate small frames or piggybacked on reverse data frames. Which is better and why?",
+   "marks": 5,
+   "a": "Piggybacking is better when reverse traffic exists, because the acknowledgement costs no extra frame header or transmission slot. The cost is delay: the ACK waits for a reverse frame, so on sparse reverse traffic a separate ACK may arrive sooner and keep the window moving."
+  }
+ ],
+ "beyond": "Not for the exam. Real stacks size windows from the bandwidth-delay product; a fixed window of 8 frames dies on long fast paths. TCP window scaling reaches millions of bytes, and operating systems auto-tune buffers from measured round-trip time. Search bandwidth-delay product, TCP window scaling, bufferbloat."
+}

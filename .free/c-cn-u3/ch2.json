@@ -1,0 +1,223 @@
+{
+ "lead": "A sender can never trust a link to keep every bit unchanged. Error detection adds a few redundant bits that are a fixed function of the data, so the receiver can test whether some bits changed. The extra bits are not a copy of the data; they are a fingerprint. Three common fingerprints are parity, the Internet checksum, and the cyclic redundancy check (CRC). They appear in frame trailers, IPv4 headers, TCP and UDP segments, and storage devices. This chapter shows how each is computed and which error patterns each one misses.",
+ "prereq": "You need <a href=\"#framing-and-bit-stuffing\">3.1 Framing and bit stuffing</a>, because the check bits sit in the frame trailer.",
+ "sections": [
+  {
+   "h3": "Parity: one bit, and its blind spot",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Parity adds one bit to a block. For even parity, the parity bit is the XOR of all data bits, so the total number of 1s becomes even. For odd parity, flip that bit, so the total number of 1s becomes odd. The receiver recomputes the XOR of the data plus the received parity bit; even parity expects 0, odd parity expects 1. If the test fails, the receiver asks for a retransmission."
+    },
+    {
+     "type": "formula",
+     "text": "P = b₁ ⊕ b₂ ⊕ ... ⊕ bₙ",
+     "where": "P is the even parity bit; b₁ to bₙ are the data bits; ⊕ is XOR. For odd parity, send the complement of P."
+    },
+    {
+     "type": "p",
+     "text": "Single parity detects any odd number of flipped bits. It misses any even number of flips, because two flips cancel in the XOR. A two-bit error on a phone line is common enough that single parity is weak."
+    },
+    {
+     "type": "p",
+     "text": "Two-dimensional parity fixes part of this. Arrange data as rows. Add one parity bit to each row and one to each column. A single flipped bit breaks its row parity and its column parity, so the receiver can locate the bit and correct it. Any two-bit error also fails at least one parity check. A four-bit error at the four corners of a rectangle passes every row and column check, so it is missed. This scheme costs one parity bit per row plus one per column, more than single parity but less than a CRC of the same strength."
+    }
+   ]
+  },
+  {
+   "h3": "Internet checksum",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Internet checksum works on 16-bit words. The sender adds all words using one's complement addition: add normally, and if a carry leaves bit 15, add that carry back to bit 0. The checksum is the one's complement of the final sum, meaning every bit is flipped. The checksum is placed in the header."
+    },
+    {
+     "type": "formula",
+     "text": "S = w₁ + w₂ + ... + wₙ  (one's complement addition)",
+     "where": "w₁ to wₙ are 16-bit words; any carry out of bit 15 is added back to bit 0; the checksum is the one's complement of S."
+    },
+    {
+     "type": "p",
+     "text": "The receiver adds all 16-bit words, including the checksum, with the same end-around carry. If no error occurred, the result is all 1s, that is 0xFFFF. A result other than 0xFFFF means an error was detected. IPv4 uses this checksum for its header. TCP and UDP use the same arithmetic for their checksum, which covers the segment plus a pseudo-header. The method is fast in software and needs no special hardware. It is not as strong as CRC: swapped words or changes that cancel in the sum can pass."
+    }
+   ]
+  },
+  {
+   "h3": "CRC: modulo-2 division",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CRC treats bit strings as polynomials whose coefficients are 0 or 1. A generator G has degree r, the highest power in its polynomial. Common generators are CRC-32, CRC-16 and CRC-CCITT; their bit patterns are standard tables, not values to invent."
+    },
+    {
+     "type": "formula",
+     "text": "R(x) = (D(x) × x<sup>r</sup>) mod G(x)",
+     "where": "D(x) is the data polynomial; G(x) is the generator polynomial of degree r; R(x) is the remainder polynomial of degree less than r; mod means modulo-2 division with XOR."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write the k data bits as D(x) and choose G(x) of degree r.",
+      "Append r zero bits to D, which gives D(x) × x^r.",
+      "Divide by G using XOR at each step; no borrows are used.",
+      "The r-bit remainder R is the CRC. Append R to the original data.",
+      "The receiver divides the whole frame by G; remainder 0 means accept."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The frame now has k + r bits. A non-zero remainder at the receiver means the frame is dropped. A burst error is a run of damaged bits. A CRC of degree r detects every burst error of length r or less. It detects any single-bit error. Many standard generators include the factor (x+1), so they also catch any odd number of flips. It can miss a burst longer than r, or a pattern that is a multiple of G. The chance of missing a random error is about 2^-r for a good G."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The sender appends three zeros to data 1001, divides by generator 1011 and attaches remainder 110, so the frame is 1001110. The receiver divides the whole frame by 1011 and gets remainder 000.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "CRC at the sender and receiver",
+   "nodes": [
+    {
+     "id": "d",
+     "label": "Data bits",
+     "note": "1001 (k = 4)",
+     "style": "normal"
+    },
+    {
+     "id": "z",
+     "label": "Append r zeros",
+     "note": "r = 3 → 1001000",
+     "style": "normal"
+    },
+    {
+     "id": "div",
+     "label": "Divide by G",
+     "note": "G = 1011, XOR",
+     "style": "normal"
+    },
+    {
+     "id": "rem",
+     "label": "Remainder = CRC",
+     "note": "110 (6 decimal)",
+     "style": "accent"
+    },
+    {
+     "id": "snd",
+     "label": "Send data + CRC",
+     "note": "1001110 (78)",
+     "style": "accent"
+    },
+    {
+     "id": "rcv",
+     "label": "Receiver divides all",
+     "note": "remainder 000 → OK",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "d",
+     "to": "z",
+     "style": "solid"
+    },
+    {
+     "from": "z",
+     "to": "div",
+     "style": "solid"
+    },
+    {
+     "from": "div",
+     "to": "rem",
+     "style": "solid"
+    },
+    {
+     "from": "rem",
+     "to": "snd",
+     "style": "solid"
+    },
+    {
+     "from": "snd",
+     "to": "rcv",
+     "style": "solid"
+    }
+   ],
+   "aria": "A top-to-bottom flow showing data bits padded with three zeros, divided by generator 1011, and the remainder attached as the CRC before transmission."
+  }
+ },
+ "examples": [
+  {
+   "question": "Data bits are 1001 and the generator is G = 1011. Compute the CRC, build the transmitted frame, and show that the receiver accepts it. Work in modulo-2 arithmetic.",
+   "steps": [
+    "D = 1001. G = 1011 has degree r = 3, because the highest power is x³. Append r = 3 zeros to D: 1001 000 = 1001000.",
+    "Divide 1001000 by 1011 modulo 2. Use a 3-bit remainder and feed bits left to right. Start rem = 000.",
+    "Bit 1: rem = 001. Bit 0: rem = 010. Bit 0: rem = 100. Bit 1: rem = 1001; top bit is 1, so rem = 1001 XOR 1011 = 0010 = 2.",
+    "Next bit 0: rem = 0100 = 4. Next bit 0: rem = 1000 = 8; top bit is 1, so rem = 1000 XOR 1011 = 0011 = 3. Last bit 0: rem = 0110 = 6.",
+    "The remainder is 110 in binary, which is 6 in decimal. This is the CRC.",
+    "Frame = D followed by CRC = 1001 110 = 1001110. In decimal this is 78.",
+    "Receiver divides 1001110 by 1011. Bit sequence: 1→1, 0→2, 0→4, 1→9 XOR 1011→2, 1→5, 1→11 XOR 1011→0, 0→0. Remainder is 000 = 0, so accept."
+   ],
+   "answer": "The CRC is 110 (6 decimal), the frame is 1001110 (78 decimal), and the receiver's remainder is 000 (0 decimal), so the frame is accepted.",
+   "check": "def crc_rem(dividend, gen, r):\n    rem = 0\n    for i in range(dividend.bit_length() - 1, -1, -1):\n        rem = (rem << 1) | ((dividend >> i) & 1)\n        if rem & (1 << r):\n            rem ^= gen\n    return rem\n\ndata = 0b1001\ngen = 0b1011\nr = 3\npadded = data << r\nrem_sender = crc_rem(padded, gen, r)\nframe = (data << r) | rem_sender\nrem_receiver = crc_rem(frame, gen, r)\nprint(rem_sender)\nprint(frame)\nprint(rem_receiver)",
+   "values": [
+    6,
+    78,
+    0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "CRC subtraction is XOR with no borrows; do not use ordinary binary subtraction.",
+  "The number of appended zeros equals the degree r of G, not the bit length of G. G = 1011 has length 4 and degree 3, so append 3 zeros.",
+  "Single parity detects any odd number of errors only. Two flips cancel; four flips can also cancel.",
+  "In two-dimensional parity, a single flip is corrected by the row and column that fail; a rectangle of four flips is missed.",
+  "The Internet checksum is not a CRC. It uses one's complement addition with end-around carry, and it can miss reordered or compensating words."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a single parity bit guarantee about the number of 1 bits in an even-parity block?",
+   "marks": 2,
+   "a": "The total number of 1 bits, including the parity bit, is even."
+  },
+  {
+   "level": "understand",
+   "q": "Why can two flipped bits pass a single parity check?",
+   "marks": 3,
+   "a": "Each flip changes the XOR result. Two flips change it twice, so the result returns to its original value and the parity check passes."
+  },
+  {
+   "level": "apply",
+   "q": "Data bits are 1101 with even parity. What parity bit is sent?",
+   "marks": 2,
+   "a": "The data has three 1s. Even parity needs one more 1, so the parity bit is 1. The sent block is 11011."
+  },
+  {
+   "level": "apply",
+   "q": "A two-dimensional parity block has one flipped bit at row 2, column 3. Which parity checks fail?",
+   "marks": 3,
+   "a": "The parity check for row 2 and the parity check for column 3 fail. Their intersection gives the flipped bit."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does CRC use XOR instead of ordinary subtraction?",
+   "marks": 4,
+   "a": "CRC works in modulo-2 arithmetic, where coefficients are bits and addition and subtraction are both XOR. This matches polynomial division over GF(2) and avoids borrows."
+  },
+  {
+   "level": "analyze",
+   "q": "A CRC generator has degree r = 4. How many zeros are appended, and how many check bits are sent?",
+   "marks": 3,
+   "a": "Append 4 zeros. The remainder has 4 bits, so 4 check bits are sent."
+  },
+  {
+   "level": "understand",
+   "q": "What does an Internet checksum receiver get when no error occurs?",
+   "marks": 2,
+   "a": "It gets all 1s, that is 0xFFFF, after adding all 16-bit words including the checksum with end-around carry."
+  }
+ ],
+ "beyond": "Not for the exam. In real hardware, CRC is computed by a shift register or a table-driven loop, not by long division. Wi-Fi, Ethernet, USB and storage devices use CRC or stronger checks. Modern networks add cryptographic checks such as SHA-256 when an attacker, not noise, is the threat. Search for CRC-32 polynomial, one's complement checksum, and error detection versus error correction to go further."
+}
