@@ -1,0 +1,259 @@
+{
+ "lead": "A program reaches the network by calling the socket API. A socket is one end of a conversation, named by an IP address and a port. Two sockets, one at each end, form a connection, and four numbers name it uniquely. TCP sockets carry a reliable byte stream; UDP sockets carry separate datagrams. Web pages, chat, video calls — every application in this unit sits on these calls. This chapter gives the exact order of calls for each protocol and the mistakes that order prevents.",
+ "prereq": "You need Unit 5 for ports, the UDP datagram and TCP connection setup, and <a href=\"#client-server-and-peer-to-peer-architectures\">chapter 6.1</a> for which side starts the conversation.",
+ "sections": [
+  {
+   "h3": "A socket is one end of a conversation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two processes on two machines want to exchange data. The transport layer delivers to ports, but a program cannot touch a port directly; it asks the operating system through the socket API. A socket is a handle — a small integer, like a file descriptor — standing for one end of a conversation."
+    },
+    {
+     "type": "p",
+     "text": "That end is named by a socket address: an IP address plus a port, written 192.168.1.7:50000. The address picks the machine, the port picks the process. A connection is named by four numbers: source IP, source port, destination IP, destination port. No two connections on the Internet share a four-tuple at the same time, which is how one server serves thousands of clients on port 80 — every client differs in its own address."
+    },
+    {
+     "type": "p",
+     "text": "socket(family, type, protocol) creates one. family is AF_INET for IPv4. The type is the real decision: SOCK_STREAM gives TCP, SOCK_DGRAM gives UDP. Protocol 0 means the default for that type. After the call the transport behaviour is fixed for the life of the socket."
+    }
+   ]
+  },
+  {
+   "h3": "TCP: the server listens, the client connects",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The two sides make different calls, in a fixed order."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "socket() — create an unbound TCP socket.",
+      "bind() — attach it to the server's address, say 10.0.0.5:80.",
+      "listen() — mark it passive and give it a backlog queue for clients arriving while the program is busy.",
+      "accept() — block until a client's handshake finishes, then return a new socket for that one connection. The listening socket stays open.",
+      "recv() and send() — read and write bytes on the new socket.",
+      "close() — end it; the peer's recv() then returns 0."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The client calls socket(), then connect(). connect() sends the SYN and returns only when the three-way handshake completes. The client does not bind: the kernel picks its IP address and an ephemeral port at connect time."
+    },
+    {
+     "type": "p",
+     "text": "The socket that accept() returns carries the same local port as the listening socket. That is legal because the four-tuple differs."
+    },
+    {
+     "type": "p",
+     "text": "TCP is a byte stream with no message boundaries. Two send() calls of 100 bytes can arrive as one recv() of 200. recv() returns what is available now, up to the buffer size. The application must frame its own messages with a length field or a delimiter."
+    }
+   ]
+  },
+  {
+   "h3": "UDP: one call per datagram",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A UDP server makes three calls: socket(AF_INET, SOCK_DGRAM, 0), bind() to its port, then recvfrom() in a loop. recvfrom() fills the buffer and also reports the sender's address, because there is no connection to remember it. Replies go out with sendto(), which carries the destination address every time. No listen(), no accept()."
+    },
+    {
+     "type": "p",
+     "text": "Each sendto() is exactly one datagram. The receiver gets it whole or not at all — the boundary is preserved. UDP itself may drop it, deliver it twice or deliver two out of order, and the socket API does not hide that. A file transfer adds sequence numbers and acknowledgements of its own; a video call accepts the loss."
+    },
+    {
+     "type": "p",
+     "text": "Ports are divided by number. Binding a well-known port needs administrator rights on Unix."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Range",
+      "Name",
+      "Examples"
+     ],
+     "rows": [
+      [
+       "0–1023",
+       "Well-known",
+       "HTTP 80, HTTPS 443, DNS 53"
+      ],
+      [
+       "1024–49151",
+       "Registered",
+       "Assigned on request by IANA"
+      ],
+      [
+       "49152–65535",
+       "Ephemeral",
+       "Picked by the kernel for the client side"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Many clients, and the lab",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "One accept() followed by a recv() loop serves one client at a time. Two standard fixes."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "One thread per client: the main thread accept()s and hands each new socket to a thread that loops on recv(). Simple, but each thread costs stack memory, so a few thousand clients is the practical ceiling on one machine.",
+      "One loop over select() or poll(): you pass the kernel a list of sockets, it returns the ready ones, and one thread handles them. It scales further and is harder to write; only a few universities teach it in the networks course."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Write the server before the client; a server you can test with a browser is easiest. Lab work for this unit builds in that order: ping, to watch a round trip; a web server returning one fixed page; a two-user chat; and the same web server behind SSL, where the socket is wrapped before the first byte (see <a href=\"#basics-of-network-security\">6.7</a>)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "connect() starts the handshake, accept() returns a new socket, bytes cross there in both directions, and close() ends it. The listening socket is never used for data.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Client",
+    "Server"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "connect() SYN",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "accept() SYN-ACK",
+     "dashed": true
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "ACK, open",
+     "dashed": false
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "send() bytes",
+     "dashed": false
+    },
+    {
+     "from": "Server",
+     "to": "Client",
+     "label": "recv(), reply",
+     "dashed": true
+    },
+    {
+     "from": "Client",
+     "to": "Server",
+     "label": "close()",
+     "dashed": false
+    }
+   ],
+   "aria": "Six messages over time between a client and a server: connect sends SYN, the server accepts with SYN-ACK, the client acknowledges, data goes to the server, a reply comes back, and the client closes."
+  }
+ },
+ "examples": [
+  {
+   "question": "A client at 192.168.1.7 with port 50000 opens a TCP connection to a web server at 10.0.0.5, port 80, and sends 5000 bytes. Give the socket pair at each end and the number of TCP segments on the wire if the maximum segment size is 1500 bytes (ignore headers).",
+   "steps": [
+    "Client side: local end 192.168.1.7:50000, remote end 10.0.0.5:80, so the pair is (192.168.1.7:50000, 10.0.0.5:80).",
+    "Server side: local end 10.0.0.5:80, remote end the client, so the pair is (10.0.0.5:80, 192.168.1.7:50000). Same four numbers, mirrored.",
+    "Full segments: 5000 ÷ 1500 = 3, carrying 3 × 1500 = 4500 bytes.",
+    "Leftover: 5000 − 4500 = 500 bytes, which needs one more segment.",
+    "Total segments: 3 + 1 = 4."
+   ],
+   "answer": "The client pair is (192.168.1.7:50000, 10.0.0.5:80) and the server pair is (10.0.0.5:80, 192.168.1.7:50000); 5000 bytes travel as 3 full segments of 1500 bytes plus one of 500 bytes, that is 4 segments.",
+   "check": "data = 5000\nmss = 1500\nfull = data // mss\nrem = data % mss\nsegs = full + (1 if rem else 0)\nprint(full)\nprint(rem)\nprint(segs)",
+   "values": [
+    3,
+    500,
+    4
+   ],
+   "code": {
+    "lang": "python",
+    "code": "data, mss = 5000, 1500\nfull, rem = divmod(data, mss)\nsegs = full + (1 if rem else 0)\nprint(\"client\", (\"192.168.1.7\", 50000), \"->\", (\"10.0.0.5\", 80))\nprint(\"server\", (\"10.0.0.5\", 80), \"->\", (\"192.168.1.7\", 50000))\nprint(\"full\", full, \"last\", rem, \"segments\", segs)",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "Step",
+     "full",
+     "rem",
+     "segments"
+    ],
+    "rows": [
+     [
+      "divmod(5000, 1500)",
+      "3",
+      "500",
+      "—"
+     ],
+     [
+      "rem > 0, add one",
+      "3",
+      "500",
+      "4"
+     ]
+    ]
+   },
+   "output": "client ('192.168.1.7', 50000) -> ('10.0.0.5', 80)\nserver ('10.0.0.5', 80) -> ('192.168.1.7', 50000)\nfull 3 last 500 segments 4"
+  }
+ ],
+ "traps": [
+  "Assuming TCP keeps message boundaries. Two send() calls of 100 bytes each can arrive in one recv() of 200 bytes; without a length field or a delimiter the receiver misreads the next message.",
+  "Calling UDP connectionless and therefore portless. A UDP server still binds a port before recvfrom(); without bind the kernel picks a random port and no client can find it.",
+  "Confusing the listening socket with the connected one. accept() returns a new socket, and reading from the listening socket instead is the classic lab bug.",
+  "Believing the port number identifies the connection. A port identifies one endpoint; the connection is the four-tuple."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the TCP server calls in order, up to the first recv().",
+   "marks": 2,
+   "a": "socket(), bind(), listen(), accept(), then recv()."
+  },
+  {
+   "level": "remember",
+   "q": "Give the three port ranges and their names.",
+   "marks": 2,
+   "a": "0–1023 well-known, 1024–49151 registered, 49152–65535 ephemeral."
+  },
+  {
+   "level": "understand",
+   "q": "Two clients on different machines are both connected to port 80 of one server. Why is that not a clash?",
+   "marks": 3,
+   "a": "The four-tuple differs, because each client has a different IP address or source port, so the server's transport layer keeps a separate socket for each connection."
+  },
+  {
+   "level": "apply",
+   "q": "A client at 172.16.0.9:62000 sends 3000 bytes to 203.0.113.4:8080 over TCP with MSS 1000 bytes. Give both socket pairs and the segment count.",
+   "marks": 4,
+   "a": "Client pair (172.16.0.9:62000, 203.0.113.4:8080); server pair (203.0.113.4:8080, 172.16.0.9:62000). 3000 ÷ 1000 = 3 segments with no leftover, so 3 segments."
+  },
+  {
+   "level": "apply",
+   "q": "Which calls does a UDP server make, and what does recvfrom() return that recv() does not?",
+   "marks": 3,
+   "a": "socket(AF_INET, SOCK_DGRAM, 0), bind(), then recvfrom() and sendto() in a loop. recvfrom() also returns the sender's IP address and port with each datagram."
+  },
+  {
+   "level": "analyze",
+   "q": "A chat program sends each line with one send() on TCP and prints each recv(). Users see two short messages joined on one line. Explain the cause and give a fix.",
+   "marks": 6,
+   "a": "TCP is a byte stream: two small sends may be coalesced into one segment and returned by one recv(). Fix: prefix each message with its length, or end it with a newline and split the received buffer on the delimiter, keeping any partial tail for the next recv()."
+  }
+ ],
+ "beyond": "Not for the exam. Production code rarely calls sockets by hand: asyncio in Python, Netty in Java and Node.js wrap the same calls and hide select() behind callbacks. Kernel-bypass frameworks such as io_uring and DPDK push the classic API aside for high-throughput servers. QUIC moves reliable streams into userspace over UDP, which is why browsers now open UDP port 443. Search 'Berkeley sockets', 'epoll vs select' and 'io_uring networking'."
+}

@@ -1,0 +1,262 @@
+{
+ "lead": "FTP, the File Transfer Protocol, copies files between two computers over TCP. Its defining habit is that it runs two TCP connections at once: a long-lived control connection that carries only short commands and replies, and a fresh data connection opened for each file. Splitting them keeps commands out of the way of bulk bytes, so a huge upload never blocks a cancel or a status check. FTP is used to publish web pages to a hosting server, to push firmware to devices on a LAN, and to move large data sets between machines inside an organisation.",
+ "prereq": "You need: <a href=\"#socket-programming-with-tcp-and-udp\">Chapter 6.2</a> for TCP sockets, ports and connection setup, and <a href=\"#world-wide-web-and-http\">Chapter 6.4</a> to compare FTP with HTTP's single connection.",
+ "sections": [
+  {
+   "h3": "One session, two connections",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "FTP copies a file from one computer to another over TCP, so the bytes arrive in order and nothing is lost. One design choice shapes everything else: FTP uses two TCP connections at the same time."
+    },
+    {
+     "type": "p",
+     "text": "The <b>control connection</b> is opened once, when the session starts. The client picks a temporary port, say 50000, and connects to the server's port 21. This connection stays open until the user logs out. It carries only short text lines: commands one way, three-digit replies the other. Every line ends with CRLF, a carriage return followed by a line feed."
+    },
+    {
+     "type": "p",
+     "text": "The <b>data connection</b> is opened fresh for each file. It carries the raw bytes of that file and nothing else, and it is closed the moment the file ends. A directory listing also travels on this second connection, because a listing is just another stream of bytes."
+    },
+    {
+     "type": "p",
+     "text": "Why split them? The control stays <i>out of band</i>, on a separate path. A 2 GB upload cannot block your ability to send ABOR or to ask for progress, because commands never queue behind file data. Compare HTTP in <a href=\"#world-wide-web-and-http\">Chapter 6.4</a>, which puts headers and body on one connection and simply waits."
+    }
+   ]
+  },
+  {
+   "h3": "Active mode and passive mode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The data connection has to be opened by one side or the other, and FTP allows both arrangements."
+    },
+    {
+     "type": "p",
+     "text": "In <b>active mode</b> the client sends PORT with its own IP address and a port it has chosen, written as six comma-separated numbers. The server then opens the data connection from its port 20 to that port. This breaks behind NAT and firewalls: the address the client announced is a private one, and the incoming connection from the server is blocked."
+    },
+    {
+     "type": "p",
+     "text": "In <b>passive mode</b> the client sends PASV. The server replies 227 with its address and a high port it has picked, and the client connects out to it. Because the client starts the connection, NAT creates a mapping and the firewall sees an ordinary outbound flow. This is why passive mode is the default in most clients and browsers today."
+    },
+    {
+     "type": "table",
+     "head": [
+      "",
+      "Active",
+      "Passive"
+     ],
+     "rows": [
+      [
+       "Command used",
+       "PORT",
+       "PASV"
+      ],
+      [
+       "Who opens data connection",
+       "server",
+       "client"
+      ],
+      [
+       "Server-side port",
+       "20",
+       "high port named in reply 227"
+      ],
+      [
+       "Client-side port",
+       "the one named in PORT",
+       "fresh temporary port"
+      ],
+      [
+       "Works behind NAT",
+       "no",
+       "yes"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The reply 227 encodes the port in two bytes. Given (10,0,0,5,195,80), the port is 195 × 256 + 80 = 49 920 + 80 = 50 000."
+    }
+   ]
+  },
+  {
+   "h3": "Commands, replies and transfer type",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "Client connects to server port 21; server replies 220 service ready.",
+      "USER alice → 331 need password; PASS secret → 230 logged in.",
+      "CWD /pub and PWD to move around and confirm the directory.",
+      "TYPE I for binary, TYPE A for text.",
+      "PORT 192,168,1,7,195,81 (active) or PASV → 227 (passive).",
+      "RETR report.pdf to download, STOR upload.zip to upload, LIST for a directory listing.",
+      "Server sends 150 opening data connection, the bytes flow on the data connection, then 226 transfer complete on the control connection.",
+      "QUIT → 221 goodbye; control connection closes."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Every reply is three digits plus optional text. The first digit gives the class: 2xx success, 3xx need more information, 4xx temporary failure (retry), 5xx permanent failure (do not retry). So 331 means the user name was accepted and a password is wanted."
+    },
+    {
+     "type": "p",
+     "text": "<b>TYPE A</b> treats the file as text and translates line endings, which corrupts a .zip or .jpg; <b>TYPE I</b> sends the bytes untouched. Always use TYPE I for anything that is not plain text."
+    },
+    {
+     "type": "p",
+     "text": "<b>Anonymous FTP</b> lets anyone log in with USER anonymous and any email address as the password, for public software archives."
+    },
+    {
+     "type": "p",
+     "text": "The password crosses the control connection as plain text. Anyone who can watch the path reads it. <a href=\"#basics-of-network-security\">Chapter 6.7</a> covers the encrypted replacements."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The whole session runs on the control connection to port 21, while the file itself arrives on a separate connection opened from server port 20 to the client port named with PORT. Notice that the data connection appears only for the transfer and then closes.",
+  "spec": {
+   "type": "sequence",
+   "aria": "Timeline with three parties: the client runs the whole session over port 21, and a separate second connection from server port 20 carries the file bytes, then the control connection reports completion.",
+   "actors": [
+    "Client",
+    "Server :21",
+    "Server :20"
+   ],
+   "messages": [
+    {
+     "from": "Client",
+     "to": "Server :21",
+     "label": "connect to port 21",
+     "dashed": false
+    },
+    {
+     "from": "Server :21",
+     "to": "Client",
+     "label": "220 service ready",
+     "dashed": true
+    },
+    {
+     "from": "Client",
+     "to": "Server :21",
+     "label": "USER, PASS in clear",
+     "dashed": false
+    },
+    {
+     "from": "Client",
+     "to": "Server :21",
+     "label": "PORT 50001, active",
+     "dashed": false
+    },
+    {
+     "from": "Server :20",
+     "to": "Client",
+     "label": "data from port 20",
+     "dashed": false
+    },
+    {
+     "from": "Server :20",
+     "to": "Client",
+     "label": "file bytes",
+     "dashed": false
+    },
+    {
+     "from": "Server :21",
+     "to": "Client",
+     "label": "226 transfer complete",
+     "dashed": true
+    },
+    {
+     "from": "Client",
+     "to": "Server :21",
+     "label": "QUIT",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A client at 192.168.1.7 downloads a 20 MB file from 10.0.0.5 using active FTP. The control connection runs from client port 50000, and the client announced client port 50001 with PORT. (a) Give the ports at both ends of the control connection and of the data connection. (b) The data connection runs at 8 Mbps; how long does the download take if overhead is ignored?",
+   "steps": [
+    "(a) The control connection is started by the client, so its client end is the temporary port 50000 and its server end is the well-known port 21.",
+    "The data connection in active mode is started by the server from its port 20, to the port the client named in PORT, which is 50001.",
+    "So control = 50000 → 21, data = 20 → 50001.",
+    "(b) Convert the file size to bits: 20 MB = 20 × 8 = 160 Mbit.",
+    "The link delivers 8 Mbit every second.",
+    "Time = size ÷ rate = 160 Mbit ÷ 8 Mbit/s = 20 s."
+   ],
+   "answer": "Control connection: client port 50000 to server port 21. Data connection: server port 20 to client port 50001. The 20 MB file takes 20 s at 8 Mbps.",
+   "check": "server_ctrl = 21\nclient_ctrl = 50000\nserver_data = 20\nclient_data = 50001\nmb = 20\nmbit = mb * 8\nt = mbit / 8\nfor v in (server_ctrl, client_ctrl, server_data, client_data, mbit, t):\n    print(v)\n",
+   "values": [
+    21,
+    50000,
+    20,
+    50001,
+    160,
+    20.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Writing port 20 for every FTP connection. Port 20 belongs only to the server end of an active-mode data connection; in passive mode the server uses a high port and the client opens the connection.",
+  "Thinking the data connection lasts the whole session. It exists only while one file or listing is being transferred.",
+  "Using TYPE A for a .zip, .jpg or .exe. The line-ending translation corrupts the file; use TYPE I.",
+  "Reading a PASV reply as a single port number. The last two numbers are two bytes: port = first × 256 + second.",
+  "Assuming FTP is safe because it asks for a password. The password travels in clear text on the control connection."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which server port carries the FTP control connection, and how long does that connection stay open?",
+   "marks": 2,
+   "a": "Port 21. It stays open for the whole session, from login until QUIT."
+  },
+  {
+   "level": "understand",
+   "q": "Why does FTP keep commands on a different connection from file bytes?",
+   "marks": 3,
+   "a": "So control stays out of band. A long transfer cannot block commands such as ABOR or a progress query, because commands never queue behind file data on the same TCP stream."
+  },
+  {
+   "level": "apply",
+   "q": "A client sends PORT 192,168,1,7,195,81. To which port will the server open the data connection?",
+   "marks": 3,
+   "a": "The last two numbers are two bytes: 195 × 256 + 81 = 49 920 + 81 = 50 001. The server connects from port 20 to client port 50001."
+  },
+  {
+   "level": "analyze",
+   "q": "A user behind a home NAT can download with passive FTP but not with active FTP. Explain why.",
+   "marks": 5,
+   "a": "In active mode the server opens a connection to the private address and port the client announced; the NAT has no mapping for that inbound connection and a firewall may block it. In passive mode the client opens the connection outward to the server's high port, which makes the NAT create a mapping, so the replies come back normally."
+  },
+  {
+   "level": "remember",
+   "q": "What does reply code 331 mean, and what does the client send next?",
+   "marks": 2,
+   "a": "331 means the user name is accepted and a password is required. The client sends PASS with the password and expects 230."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a directory listing travel on the data connection and not on the control connection?",
+   "marks": 3,
+   "a": "A listing is an arbitrary amount of data, not a single command line, so it is treated as a transfer: 150 and 226 bracket it on the control connection while the listing bytes flow on the data connection."
+  },
+  {
+   "level": "apply",
+   "q": "A 5 MB file is downloaded over a data connection running at 4 Mbps. Ignoring overhead, how long does the transfer take?",
+   "marks": 4,
+   "a": "5 MB = 5 × 8 = 40 Mbit. Time = 40 ÷ 4 = 10 s."
+  },
+  {
+   "level": "analyze",
+   "q": "An attacker captures packets on the path during an FTP login. What exactly can the attacker learn, and which single change removes that exposure?",
+   "marks": 4,
+   "a": "The attacker reads the USER and PASS lines in clear text, and can also read and modify file bytes. Encrypting the session, for example with FTPS or by switching to SFTP, removes the exposure, because the same data is then inside a protected channel."
+  }
+ ],
+ "beyond": "Not for the exam. Most modern file movement has moved away from FTP: SFTP over SSH and HTTPS-based object storage APIs carry the same job with encryption built in. Web browsers dropped FTP support, so the protocol now lives mostly in build scripts, embedded devices and legacy backup tools. Researchers care about FTP as a clean example of a protocol that separates control from data, an idea reused in SIP and in some media streaming setups. Search for FTPS versus SFTP, and for the FTP reply code list, if you meet one of these systems at work."
+}

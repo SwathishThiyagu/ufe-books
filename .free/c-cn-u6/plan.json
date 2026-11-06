@@ -1,0 +1,480 @@
+{
+ "lead": "The application layer is where the network meets the user: browsers, mail, file transfer and name lookup. This unit shows how a program on one machine talks to a program on another, first with raw sockets and then with the protocols built on them. After it you can trace one click from DNS lookup to HTTP reply, read an FTP or SMTP dialogue, and say what a key or a firewall is protecting.",
+ "about": "Chapter 6.1 fixes the two shapes every network application takes: one server answering many clients, or equals sharing the work. Chapter 6.2 drops to the socket API, where TCP gives a byte stream and UDP gives single datagrams. Chapter 6.3 explains how names become IP addresses, because every later protocol starts with a lookup. Chapter 6.4 builds HTTP on that socket, with requests, status codes, persistent connections and caching. Chapter 6.5 shows the two-connection design of FTP, and Chapter 6.6 the store-and-forward path of email through SMTP, POP3 and IMAP. Chapter 6.7 closes with what all of this lacks — confidentiality, integrity, authentication — and the firewall idea. Each chapter reuses the socket ideas of the one before it.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Every network application is a pair of processes where one side asks for a service and the other provides it, and the whole design follows from that choice.",
+   "depth": "Client-server: the client starts the conversation, the server is always on and reachable at a fixed address. Stateless versus stateful servers. Tiers — two-tier when a database sits directly behind the server, three-tier when a logic layer sits in between. Peer-to-peer: each peer is both client and server; a central directory (a tracker listing who holds which file) versus a fully decentralised overlay. Compare scalability, the rupee cost of one big server against many ordinary machines, and the single point of failure. Name HTTP, FTP, SMTP and DNS only as examples here; their details come later. One line: SNMP is a client-server management protocol that only a few universities teach.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "One request, one reply",
+    "nodes": [
+     {
+      "id": "c",
+      "label": "Client",
+      "note": "starts the request",
+      "style": "accent"
+     },
+     {
+      "id": "s",
+      "label": "Server",
+      "note": "fixed address, always on",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Data store",
+      "note": "pages, files, rows",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c",
+      "to": "s",
+      "label": "request"
+     },
+     {
+      "from": "s",
+      "to": "d",
+      "label": "read/write"
+     },
+     {
+      "from": "s",
+      "to": "c",
+      "label": "reply",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A client box sends a request to a server box, the server reads or writes a data store, and a dashed reply returns to the client."
+   },
+   "example": "A 10 Mbit file is shared with 3 peers. The server upload rate is u_s = 2 Mbps, each peer uploads at u_i = 1 Mbps, and each peer downloads at d = 2 Mbps. Find the distribution time for client-server and for peer-to-peer. Client-server: max(N·F/u_s, F/d) = max(3×10/2, 10/2) = max(15, 5) = 15 s. Peer-to-peer: max(F/u_s, F/d, N·F/(u_s + Σu_i)) = max(10/2, 10/2, 3×10/(2+3)) = max(5, 5, 6) = 6 s.",
+   "trap": "Writing the client-server time as F/u_s alone. The server must upload N copies, so N·F/u_s is usually the binding term. In peer-to-peer all three terms are needed and the answer is the largest of them, not the sum.",
+   "prereq": "Unit 1 for layering and protocol suites; Unit 5 for ports and processes.",
+   "leave": "TCP and UDP behaviour to Unit 5; HTTP, DNS and mail details to chapters 6.3 to 6.6."
+  },
+  {
+   "k": 2,
+   "idea": "A socket is one end of a conversation, named by an IP address and a port, and the calls you make on it differ for TCP and UDP.",
+   "depth": "Socket address = (IP address, port). The four-tuple (source IP, source port, destination IP, destination port) names one connection. TCP calls in order: socket, bind, listen, accept on the server; socket, connect on the client; then send and recv, then close. UDP calls: socket, bind, sendto, recvfrom — no listen, no accept. Serving many clients: one thread per client, or a single loop over select/poll, which only a few universities teach. TCP is a byte stream with no message boundaries; UDP keeps each datagram whole but may drop, duplicate or reorder it. Port ranges: well-known 0–1023, registered 1024–49151, ephemeral 49152–65535. Lab work for this unit: ping, a small web server, a two-user chat, and the same web server behind SSL.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "Server"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "connect() sends SYN",
+      "dashed": false
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "accept(), SYN-ACK",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "ACK, connection open",
+      "dashed": false
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "send() data bytes",
+      "dashed": false
+     },
+     {
+      "from": "Server",
+      "to": "Client",
+      "label": "recv() and reply",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Server",
+      "label": "close()",
+      "dashed": false
+     }
+    ],
+    "aria": "Six messages over time: the client connects, the server accepts, the client acknowledges, data and a reply cross, then the client closes."
+   },
+   "example": "A client at 192.168.1.7 with port 50000 opens a TCP connection to a web server at 10.0.0.5, port 80, and sends 5000 bytes of data. Give the socket pair at each end and the number of TCP segments on the wire if the maximum segment size is 1500 bytes (ignore headers). Client side pair: (192.168.1.7:50000, 10.0.0.5:80). Server side pair: (10.0.0.5:80, 192.168.1.7:50000). Segments: 5000 ÷ 1500 = 3 full segments of 1500 bytes plus one of 500 bytes, so 4 segments.",
+   "trap": "Assuming TCP keeps message boundaries. Two send() calls of 100 bytes each can arrive in one recv() of 200 bytes; the receiver needs a length field or a delimiter. Second trap: calling UDP connectionless and therefore portless — a UDP server still binds a port before recvfrom().",
+   "prereq": "Unit 5 for UDP, the TCP segment, ports and connection establishment; chapter 6.1 for who starts the conversation.",
+   "leave": "Handshake states, flow control and congestion control to Unit 5; TLS wrapping a socket to chapter 6.7; full lab code to the practical session.",
+   "figure_note": ""
+  },
+  {
+   "k": 3,
+   "idea": "DNS is a distributed tree of name servers that turns a readable name into an IP address in a few round trips, with caching to avoid repeating them.",
+   "depth": "Name space as an inverted tree: root, top-level domains (generic and country-code), and the authoritative server of each zone. Resource records: A, AAAA, CNAME, MX, NS. The resolver (also called the local or default name server) and the two query styles: recursive, where the resolver does all the work, and iterative, where each server points to the next. Name-to-address resolution step by step, with caching and TTL. Zones, zone files, primary and secondary servers, and dynamic update of a zone (some syllabi say DNS zone update). Port 53: UDP for ordinary queries, TCP for zone transfer and for answers too large for UDP. Leave DHCP to Unit 4.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Root .",
+     "note": "13 root servers",
+     "children": [
+      {
+       "label": "com",
+       "edge": "NS",
+       "children": [
+        {
+         "label": "example.com",
+         "edge": "NS",
+         "children": [
+          {
+           "label": "www",
+           "edge": "A",
+           "note": "web server"
+          },
+          {
+           "label": "mail",
+           "edge": "MX"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "label": "in",
+       "edge": "NS",
+       "children": [
+        {
+         "label": "ac.in",
+         "edge": "NS",
+         "children": [
+          {
+           "label": "www",
+           "edge": "A"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "label": "org",
+       "edge": "NS",
+       "style": "muted"
+      }
+     ]
+    },
+    "aria": "A name tree: the root delegates to com, in and org; com delegates to example.com, which holds the www and mail records."
+   },
+   "example": "A host with an empty cache asks its resolver for www.example.com. The resolver uses iterative queries. (a) How many servers does the resolver contact and how many DNS messages cross the network before the answer arrives? (b) Later the same name is asked again after 200 s and the TTL is 300 s — how many new messages? (a) Three servers: a root server, the com server, the example.com authoritative server. Each exchange is a query and a reply, so 6 messages. (b) Zero; the cached record is still valid for another 100 s. After 300 s it expires and the next lookup costs 6 messages again.",
+   "trap": "Saying DNS always runs over TCP. Ordinary lookups use UDP port 53; TCP appears for zone transfers and oversized answers. Also do not mix the styles: the resolver is asked recursively and it asks the others iteratively.",
+   "prereq": "Unit 4 for IP addressing; chapter 6.2 for the UDP socket a query uses.",
+   "leave": "DHCP and automatic address assignment to Unit 4; DNSSEC and poisoned caches to chapter 6.7."
+  },
+  {
+   "k": 4,
+   "idea": "HTTP is a short human-readable request and reply carried on a TCP connection, and it remembers nothing between requests.",
+   "depth": "Parts of a URL: scheme, host, port, path, query. Methods GET, HEAD, POST, PUT, DELETE. Status-code classes with the common ones: 200 OK, 301 moved, 304 not modified, 400 bad request, 403 forbidden, 404 not found, 500 server error. Headers: Host, Content-Type, Content-Length, Connection, Cookie. Non-persistent (HTTP/1.0) versus persistent keep-alive versus pipelining. Proxy caches and the conditional GET that returns 304. Cookies as the usual answer to statelessness. HTTPS in one line only — its internals belong to chapter 6.7. HTTP/2 and HTTP/3 named in one line; only a few universities teach them.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "One page load",
+    "nodes": [
+     {
+      "id": "u",
+      "label": "Type URL",
+      "note": "www.example.com/index.html",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "DNS lookup",
+      "note": "name to IP address"
+     },
+     {
+      "id": "t",
+      "label": "TCP connect",
+      "note": "port 80",
+      "style": "accent"
+     },
+     {
+      "id": "g",
+      "label": "GET /index.html",
+      "note": "HTTP request",
+      "style": "live"
+     },
+     {
+      "id": "r",
+      "label": "200 OK + HTML",
+      "note": "browser renders",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "u",
+      "to": "d"
+     },
+     {
+      "from": "d",
+      "to": "t"
+     },
+     {
+      "from": "t",
+      "to": "g"
+     },
+     {
+      "from": "g",
+      "to": "r"
+     }
+    ],
+    "aria": "Five steps left to right: the user types a URL, DNS finds the IP address, TCP connects on port 80, the browser sends GET /index.html, and the server answers 200 OK with HTML."
+   },
+   "example": "A page has one base HTML file and 3 images. The round-trip time is 100 ms and transmission time is ignored. Find the time to load the whole page with (a) non-persistent HTTP with no parallel connections, (b) persistent HTTP with pipelining. (a) Every object costs 2 round trips, one for TCP setup and one for the request and reply: 4 objects × 2 = 8 round trips = 800 ms. (b) 1 round trip for TCP setup, 1 for the base file, 1 for all three images = 3 round trips = 300 ms.",
+   "trap": "Dropping the TCP setup round trip for each object in the non-persistent case, and counting one round trip per image when pipelining is allowed. A third slip is calling HTTP stateful because a site greets you by name — the cookie, not the protocol, carries that.",
+   "prereq": "Chapters 6.2 and 6.3; Unit 5 for the TCP connection underneath.",
+   "leave": "Slow start and congestion control to Unit 5; TLS, certificates and HTTPS internals to chapter 6.7."
+  },
+  {
+   "k": 5,
+   "idea": "FTP keeps its commands on one TCP connection for the whole session and sends the file itself on a second connection opened for each transfer.",
+   "depth": "Control connection to server port 21, open for the whole session and carrying commands. Data connection opened per transfer: in active mode the server opens it from port 20 to a port the client named with PORT; in passive mode the client opens it to a high port the server named with PASV, which is what works behind NAT and firewalls. Commands and three-digit replies: USER, PASS, PWD, CWD, TYPE, PORT or PASV, RETR, STOR, LIST, QUIT; replies 220, 331, 230, 150, 226, 221. ASCII versus binary transfer (TYPE A and TYPE I). Anonymous FTP. The password crosses the control connection in clear text.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Client",
+     "Server :21",
+     "Server :20"
+    ],
+    "messages": [
+     {
+      "from": "Client",
+      "to": "Server :21",
+      "label": "connect to port 21",
+      "dashed": false
+     },
+     {
+      "from": "Server :21",
+      "to": "Client",
+      "label": "220 service ready",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Server :21",
+      "label": "USER, PASS in clear",
+      "dashed": false
+     },
+     {
+      "from": "Client",
+      "to": "Server :21",
+      "label": "PORT 50001, active",
+      "dashed": false
+     },
+     {
+      "from": "Server :20",
+      "to": "Client",
+      "label": "data from port 20",
+      "dashed": false
+     },
+     {
+      "from": "Server :20",
+      "to": "Client",
+      "label": "file bytes",
+      "dashed": false
+     },
+     {
+      "from": "Server :21",
+      "to": "Client",
+      "label": "226 transfer complete",
+      "dashed": true
+     },
+     {
+      "from": "Client",
+      "to": "Server :21",
+      "label": "QUIT",
+      "dashed": false
+     }
+    ],
+    "aria": "Timeline with three parties: the client runs the whole session over port 21, and a separate second connection from server port 20 carries the file bytes, then the control connection reports completion."
+   },
+   "example": "A client at 192.168.1.7 downloads a 20 MB file from 10.0.0.5 with active FTP. (a) Give the ports of the control and data connections. (b) The data connection runs at 8 Mbps; how long does the transfer take if overhead is ignored? (a) Control: client port 50000 to server port 21. Data: server port 20 to client port 50001, the port the client announced with PORT. (b) 20 MB = 20 × 8 = 160 Mbit. Time = 160 ÷ 8 = 20 s.",
+   "trap": "Writing port 20 for every FTP connection. Port 20 belongs only to the active-mode server end of the data connection; in passive mode the server picks a high port and the client connects out to it.",
+   "prereq": "Chapters 6.2 and 6.4.",
+   "leave": "How NAT treats passive mode to Unit 4; encrypted file transfer such as SFTP to chapter 6.7 in one line."
+  },
+  {
+   "k": 6,
+   "idea": "Email is push then pull: SMTP pushes the message to the receiver's mail server, and POP3 or IMAP lets the receiver pull it out.",
+   "depth": "Roles: user agent, mail server, mailbox, and the outgoing queue that retries a failed transfer. SMTP commands and replies: EHLO, MAIL FROM, RCPT TO, DATA, a line with a single dot to end, QUIT; replies 220, 250, 354, 550. SMTP pushes, is used both from client to server and from server to server, and carries only 7-bit ASCII. MIME fixes that: Content-Type, Content-Transfer-Encoding (base64, quoted-printable) and multipart boundaries. POP3 on port 110 downloads and usually deletes; IMAP on port 143 keeps mail on the server and syncs folders and read flags. SMTP on port 25, with submission port 587 named in one line. A small comparison table of the three protocols.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Push out, pull in",
+    "nodes": [
+     {
+      "id": "c1",
+      "label": "Sender's client",
+      "note": "writes the mail",
+      "style": "normal"
+     },
+     {
+      "id": "s1",
+      "label": "Sender's mail server",
+      "note": "SMTP, port 25",
+      "style": "accent"
+     },
+     {
+      "id": "s2",
+      "label": "Receiver's mail server",
+      "note": "holds the mailbox",
+      "style": "normal"
+     },
+     {
+      "id": "c2",
+      "label": "Receiver's client",
+      "note": "phone or laptop",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c1",
+      "to": "s1",
+      "label": "SMTP"
+     },
+     {
+      "from": "s1",
+      "to": "s2",
+      "label": "SMTP"
+     },
+     {
+      "from": "c2",
+      "to": "s2",
+      "label": "IMAP pull",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Four boxes: the sender's client pushes to the sender's mail server, which pushes to the receiver's mail server over SMTP, and the receiver's client pulls the mail back over IMAP."
+   },
+   "example": "A mail has 6 KB of headers and text plus a 300 KB photo. Base64 adds one third to the photo size. (a) What is the total size carried over the SMTP link? (b) The sender's server is in Chennai and the receiver's server in Delhi; which protocol does the receiver's phone use to read the mail? (a) 300 × 4/3 = 400 KB for the encoded photo, plus 6 KB, so 406 KB. (b) IMAP, or POP3 for a simple download; SMTP is never used to read mail.",
+   "trap": "Using SMTP to fetch mail. SMTP only pushes; reading needs POP3 or IMAP. Second trap: ignoring base64 expansion, which makes the message size one third larger than the file on disk.",
+   "prereq": "Chapters 6.2, 6.3 and 6.5.",
+   "leave": "The full base64 bit encoding to a data-encoding topic; SPF, DKIM and spam filtering to chapter 6.7 in one line."
+  },
+  {
+   "k": 7,
+   "idea": "Network security means getting confidentiality, integrity and authentication, and every tool — a key, a certificate, a firewall — serves one of those three.",
+   "depth": "Attacks in one list: eavesdropping, tampering, masquerading, replay, denial of service. Goals: confidentiality, integrity, authentication, non-repudiation, availability. Symmetric encryption: one shared key, fast, but the key must reach the other side safely. Asymmetric encryption: a public and a private key per user, slow, and it solves key distribution. RSA worked with small numbers; Diffie-Hellman as agreeing a key over an open channel in one line. Hash functions, message authentication codes and digital signatures. Certificates and a certificate authority in one line; TLS as the layer that wraps HTTP and a plain socket, matching the lab web server with SSL. Firewalls: stateless packet filter checking addresses, ports and flags; stateful inspection; application proxy; the DMZ idea. Note where a firewall fails: an inside attacker and encrypted malware traffic.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "What a key buys you",
+    "nodes": [
+     {
+      "id": "p",
+      "label": "Plaintext",
+      "note": "readable message",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Encrypt",
+      "note": "with key K",
+      "style": "accent"
+     },
+     {
+      "id": "x",
+      "label": "Ciphertext",
+      "note": "travels on the wire",
+      "style": "live"
+     },
+     {
+      "id": "d",
+      "label": "Decrypt",
+      "note": "same or paired key",
+      "style": "accent"
+     },
+     {
+      "id": "q",
+      "label": "Plaintext",
+      "note": "at the receiver",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "p",
+      "to": "e"
+     },
+     {
+      "from": "e",
+      "to": "x"
+     },
+     {
+      "from": "x",
+      "to": "d"
+     },
+     {
+      "from": "d",
+      "to": "q"
+     }
+    ],
+    "aria": "Five boxes: plaintext is encrypted with a key, the ciphertext crosses the wire, and decryption with the matching key restores the plaintext at the receiver."
+   },
+   "example": "RSA with p = 3, q = 11 and e = 3. Find n, φ(n) and d, then encrypt M = 5 and show that decryption gives 5 back. n = p·q = 33. φ(n) = (p−1)(q−1) = 2 × 10 = 20. d is the inverse of e mod 20: 3 × 7 = 21 ≡ 1 mod 20, so d = 7. Encrypt: C = M^e mod n = 5³ mod 33 = 125 mod 33 = 26. Decrypt: C^d mod n = 26⁷ mod 33 = 5.",
+   "trap": "Swapping the keys. To hide a message, encrypt with the receiver's public key and decrypt with the receiver's private key. To sign, do the opposite: sign with your own private key and verify with your public key. Keep n public but keep φ(n) and d secret.",
+   "prereq": "Chapters 6.4 and 6.6; Unit 1 for where security sits in the stack.",
+   "leave": "Full cryptography, key-exchange proofs, IPsec, VPNs and wireless security to a dedicated security course."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the architecture decides who calls whom; sockets are the call"
+  ],
+  [
+   2,
+   3,
+   "a resolver sends its query from a UDP socket"
+  ],
+  [
+   3,
+   4,
+   "the browser resolves the host name before the first GET"
+  ],
+  [
+   2,
+   4,
+   "HTTP runs on a TCP socket to port 80"
+  ],
+  [
+   4,
+   5,
+   "both are text command-and-reply protocols on TCP"
+  ],
+  [
+   4,
+   6,
+   "HTTP requests and SMTP commands share a line-based format"
+  ],
+  [
+   5,
+   7,
+   "FTP sends the password in clear text, which TLS must fix"
+  ],
+  [
+   6,
+   7,
+   "mail needs keys and certificates once it leaves the server"
+  ],
+  [
+   3,
+   6,
+   "an MX record tells SMTP which server to push to"
+  ]
+ ]
+}
