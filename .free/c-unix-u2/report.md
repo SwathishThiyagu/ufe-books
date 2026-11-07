@@ -1,15 +1,8 @@
 # c-unix-u2: free-model run
 
 - Book: `books/cse/c-unix/c-unix-u2.html`
-- Status: ok
-- Model calls so far: 19 (67,968 tokens in, 141,701 out), 5.3 minutes
-
-## Checker
-
-```
-c-unix-u2.html: 5 chapters, 10735 words, 6 figures, 119 KB
-OK
-```
+- Status: error
+- Model calls so far: 23 (87,860 tokens in, 166,391 out), 8.0 minutes
 
 ## For the reviewer
 
