@@ -1,15 +1,8 @@
 # c-compiler-u6: free-model run
 
 - Book: `books/cse/c-compiler/c-compiler-u6.html`
-- Status: ok
-- Model calls so far: 18 (63,938 tokens in, 148,793 out), 4.4 minutes
-
-## Checker
-
-```
-c-compiler-u6.html: 6 chapters, 11662 words, 7 figures, 126 KB
-OK
-```
+- Status: error
+- Model calls so far: 21 (78,385 tokens in, 155,659 out), 12.7 minutes
 
 ## For the reviewer
 
