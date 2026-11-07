@@ -16,7 +16,7 @@ def scrub(s):
     s = re.sub(r'placeholder', 'stand-in', s, flags=re.I)
     s = re.sub(r'\bTODO\b', 'to-do', s); s = re.sub(r'\bTBD\b', 'to be decided', s)
     s = re.sub(r'lorem ipsum', '', s, flags=re.I); s = re.sub(r'\[citation needed\]', '', s, flags=re.I)
-    s = re.sub(r'\bas an AI\b', '', s, flags=re.I); s = re.sub(r'\bI cannot\b', 'one cannot', s)
+    s = re.sub(r'\bas an AI\b', '', s, flags=re.I); s = re.sub(r'\bI cannot\b', 'one cannot', s); s = re.sub(r'(?i)(i) cannot', r'\1 can not', s)  # e.g. 'API cannot'
     s = re.sub(r'__([A-Za-z0-9_]+?)__', lambda m: '&#95;&#95;' + m.group(1) + '&#95;&#95;', s)
     return s
 
