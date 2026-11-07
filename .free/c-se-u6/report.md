@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-se/c-se-u6.html`
 - Status: ok
-- Model calls so far: 35 (126,144 tokens in, 233,226 out), 7.1 minutes
+- Model calls so far: 45 (174,368 tokens in, 261,067 out), 7.7 minutes
 
 ## Checker
 
 ```
-c-se-u6.html: 9 chapters, 15458 words, 10 figures, 169 KB
+c-se-u6.html: 9 chapters, 15573 words, 10 figures, 172 KB
 OK
 ```
 
