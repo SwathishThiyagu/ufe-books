@@ -1,19 +1,22 @@
 # c-quantum-u1: free-model run
 
 - Book: `books/cse/c-quantum/c-quantum-u1.html`
-- Status: ok
-- Model calls so far: 20 (70,881 tokens in, 170,428 out), 5.2 minutes
+- Status: problems
+- Model calls so far: 28 (108,423 tokens in, 206,649 out), 6.7 minutes
 
 ## Checker
 
 ```
-c-quantum-u1.html: 7 chapters, 12730 words, 8 figures, 134 KB
-OK
+c-quantum-u1.html: 7 chapters, 12820 words, 8 figures, 145 KB
+PROBLEMS:
+ - at 390px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
+ - at 1366px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
 ```
 
 ## For the reviewer
 
-- nothing flagged
+- checker: at 390px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
+- checker: at 1366px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
 
 ## Reviewer notes (after any revision)
 
