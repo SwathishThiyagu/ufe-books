@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-dl/c-dl-u4.html`
 - Status: ok
-- Model calls so far: 21 (76,856 tokens in, 172,873 out), 4.8 minutes
+- Model calls so far: 33 (134,281 tokens in, 219,142 out), 5.9 minutes
 
 ## Checker
 
 ```
-c-dl-u4.html: 7 chapters, 13602 words, 8 figures, 145 KB
+c-dl-u4.html: 7 chapters, 13655 words, 8 figures, 151 KB
 OK
 ```
 
