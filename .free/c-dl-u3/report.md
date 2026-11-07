@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-dl/c-dl-u3.html`
 - Status: ok
-- Model calls so far: 27 (101,356 tokens in, 219,737 out), 5.6 minutes
+- Model calls so far: 37 (148,058 tokens in, 257,853 out), 6.2 minutes
 
 ## Checker
 
 ```
-c-dl-u3.html: 9 chapters, 15530 words, 10 figures, 176 KB
+c-dl-u3.html: 9 chapters, 15599 words, 10 figures, 183 KB
 OK
 ```
 
