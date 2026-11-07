@@ -1,13 +1,13 @@
 # c-dl-u2: free-model run
 
-- Book: `books/cse/c-dl/c-dl-u2.html`
+- Book: `work/claude_figs/c-dl-u2/tree/books/cse/c-dl/c-dl-u2.html`
 - Status: ok
 - Model calls so far: 35 (157,107 tokens in, 305,602 out), 10.3 minutes
 
 ## Checker
 
 ```
-c-dl-u2.html: 9 chapters, 16938 words, 10 figures, 190 KB
+c-dl-u2.html: 9 chapters, 16980 words, 10 figures, 208 KB
 OK
 ```
 
