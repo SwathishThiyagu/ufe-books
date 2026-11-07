@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-cn/c-cn-u3.html`
 - Status: ok
-- Model calls so far: 37 (151,713 tokens in, 300,458 out), 7.1 minutes
+- Model calls so far: 47 (198,924 tokens in, 360,872 out), 9.1 minutes
 
 ## Checker
 
 ```
-c-cn-u3.html: 9 chapters, 18210 words, 10 figures, 179 KB
+c-cn-u3.html: 9 chapters, 18294 words, 10 figures, 201 KB
 OK
 ```
 
