@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-block/c-block-u6.html`
 - Status: ok
-- Model calls so far: 33 (111,218 tokens in, 225,469 out), 6.8 minutes
+- Model calls so far: 43 (152,979 tokens in, 261,544 out), 7.8 minutes
 
 ## Checker
 
 ```
-c-block-u6.html: 9 chapters, 14386 words, 10 figures, 163 KB
+c-block-u6.html: 9 chapters, 14549 words, 10 figures, 174 KB
 OK
 ```
 
