@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-compiler/c-compiler-u2.html`
 - Status: ok
-- Model calls so far: 20 (71,128 tokens in, 168,309 out), 4.7 minutes
+- Model calls so far: 29 (111,199 tokens in, 217,470 out), 7.5 minutes
 
 ## Checker
 
 ```
-c-compiler-u2.html: 7 chapters, 12795 words, 8 figures, 137 KB
+c-compiler-u2.html: 7 chapters, 12852 words, 8 figures, 144 KB
 OK
 ```
 
