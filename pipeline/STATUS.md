@@ -10,3 +10,14 @@ Every CSE unit is now written. In the library (main): 55. Waiting on branches, a
 Merge procedure per unit: read .free/<unit>/report.md (no "serious" flags), spot-check one worked example and one figure,
 `git checkout origin/<branch> -- <out path>` onto main, set queue.json status "ok", append syllabus notes to notes.md, commit "<unit> book".
 Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3 write to ds/ branches). Off-peak is half price.
+
+## Claude hand-drawn figures (pipeline/claude_figs, one line per finished book)
+
+| Book | Branch | Chapters redrawn | Checker | Date |
+|---|---|---|---|---|
+| c-dl-u2 | free/c-dl-u2-book | 1–9 | OK | 7 Nov 2026 |
+| c-os-u1 | ds/c-os-u1-book | 1–9 | OK | 7 Nov 2026 |
+| c-os-u2 | ds/c-os-u2-book | 1–9 | OK | 7 Nov 2026 |
+| c-os-u3 | ds/c-os-u3-book | 1–8 | OK | 7 Nov 2026 |
+| c-os-u4 | ds/c-os-u4-book | 1–9 | OK | 7 Nov 2026 |
+| c-os-u5 | ds/c-os-u5-book | 1–9 | OK | 7 Nov 2026 |
