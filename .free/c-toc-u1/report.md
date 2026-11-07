@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-toc/c-toc-u1.html`
 - Status: ok
-- Model calls so far: 29 (111,537 tokens in, 231,984 out), 6.5 minutes
+- Model calls so far: 39 (156,622 tokens in, 272,894 out), 8.3 minutes
 
 ## Checker
 
 ```
-c-toc-u1.html: 9 chapters, 15528 words, 10 figures, 154 KB
+c-toc-u1.html: 9 chapters, 15691 words, 10 figures, 167 KB
 OK
 ```
 
