@@ -1,15 +1,8 @@
 # c-mobile-u1: free-model run
 
 - Book: `books/cse/c-mobile/c-mobile-u1.html`
-- Status: ok
-- Model calls so far: 30 (100,119 tokens in, 218,422 out), 5.0 minutes
-
-## Checker
-
-```
-c-mobile-u1.html: 8 chapters, 13129 words, 9 figures, 145 KB
-OK
-```
+- Status: error
+- Model calls so far: 37 (130,338 tokens in, 239,258 out), 6.5 minutes
 
 ## For the reviewer
 
