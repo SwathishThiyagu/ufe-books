@@ -257,6 +257,13 @@ same values, names and order as the chapter text and its worked example (recompu
 example is wrong). Pick the figure type that fits the idea best, not the easiest one. Use the styles to pick out the one or two
 things the caption points to.
 
+The readers are students who find textbooks hard, so keep it simple: one idea, few labels, plain words, the example's own
+numbers. Draw the worked example itself whenever it has numbers (its steps, its values, its result), not a generic diagram of
+boxes. Checks before you reply:
+- plot axes fit the data (no long empty stretch), every point is drawn once, and the curves match the example's values;
+- labels number things the same way as the text (if the samples are 1 to 12, never label positions 0 to 11);
+- every label is short enough to read at phone width.
+
 The current figure (replace it if a different type or content would teach better):
 {json.dumps(fig, ensure_ascii=False)}
 
