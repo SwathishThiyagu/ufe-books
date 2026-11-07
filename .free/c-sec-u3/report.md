@@ -1,15 +1,8 @@
 # c-sec-u3: free-model run
 
 - Book: `books/cse/c-sec/c-sec-u3.html`
-- Status: ok
-- Model calls so far: 35 (132,941 tokens in, 301,650 out), 9.7 minutes
-
-## Checker
-
-```
-c-sec-u3.html: 9 chapters, 15458 words, 10 figures, 170 KB
-OK
-```
+- Status: error
+- Model calls so far: 43 (171,151 tokens in, 335,611 out), 12.4 minutes
 
 ## For the reviewer
 
