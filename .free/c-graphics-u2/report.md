@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-graphics/c-graphics-u2.html`
 - Status: ok
-- Model calls so far: 29 (108,384 tokens in, 275,150 out), 7.7 minutes
+- Model calls so far: 40 (159,384 tokens in, 307,349 out), 8.5 minutes
 
 ## Checker
 
 ```
-c-graphics-u2.html: 8 chapters, 14980 words, 9 figures, 152 KB
+c-graphics-u2.html: 8 chapters, 15058 words, 9 figures, 156 KB
 OK
 ```
 
