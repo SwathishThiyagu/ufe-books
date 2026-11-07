@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-mobile/c-mobile-u5.html`
 - Status: ok
-- Model calls so far: 24 (79,436 tokens in, 156,697 out), 5.0 minutes
+- Model calls so far: 30 (104,910 tokens in, 179,715 out), 5.5 minutes
 
 ## Checker
 
 ```
-c-mobile-u5.html: 6 chapters, 10798 words, 7 figures, 120 KB
+c-mobile-u5.html: 6 chapters, 10874 words, 7 figures, 127 KB
 OK
 ```
 
