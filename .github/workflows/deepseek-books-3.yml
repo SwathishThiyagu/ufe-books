@@ -1,0 +1,44 @@
+name: DeepSeek book writer (lane 3)
+# Same pipeline, model from the DeepSeek API (deepseek-flash = DeepSeek V4.1 Flash). Secret: DEEPSEEK_API_KEY.
+# Pay per token; nothing to start or stop. Off-peak (half price) is outside 06:30-09:30 and 11:30-15:30 IST on weekdays.
+on:
+  workflow_dispatch:
+    inputs:
+      units:
+        description: "Unit ids separated by spaces (leave empty to use pipeline/requests-deepseek-3.txt)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths: ["pipeline/requests-deepseek-3.txt"]
+permissions:
+  contents: write
+concurrency:
+  group: deepseek-books-3
+  cancel-in-progress: true   # a new request replaces a run that is still waiting
+jobs:
+  write:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the render checker
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Write the books
+        env:
+          OPENAI_BASE_URL: https://api.deepseek.com
+          OPENAI_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_MODEL: deepseek-flash
+          PARALLEL: "9"
+          BRANCH_PREFIX: ds
+          REQ_FILE: pipeline/requests-deepseek-3.txt
+          UNITS: ${{ github.event.inputs.units }}
+          REDO_FLAGGED: ${{ contains(github.event.head_commit.message, '[redo]') && '1' || '' }}
+        run: bash pipeline/ci.sh
