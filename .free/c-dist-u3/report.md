@@ -1,15 +1,8 @@
 # c-dist-u3: free-model run
 
 - Book: `books/cse/c-dist/c-dist-u3.html`
-- Status: ok
-- Model calls so far: 24 (86,266 tokens in, 201,004 out), 5.1 minutes
-
-## Checker
-
-```
-c-dist-u3.html: 7 chapters, 13686 words, 8 figures, 144 KB
-OK
-```
+- Status: error
+- Model calls so far: 29 (110,121 tokens in, 213,807 out), 14.2 minutes
 
 ## For the reviewer
 
