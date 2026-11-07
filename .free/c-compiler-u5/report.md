@@ -1,15 +1,8 @@
 # c-compiler-u5: free-model run
 
 - Book: `books/cse/c-compiler/c-compiler-u5.html`
-- Status: ok
-- Model calls so far: 22 (81,437 tokens in, 193,662 out), 7.0 minutes
-
-## Checker
-
-```
-c-compiler-u5.html: 6 chapters, 12717 words, 7 figures, 125 KB
-OK
-```
+- Status: error
+- Model calls so far: 24 (90,878 tokens in, 197,315 out), 7.6 minutes
 
 ## For the reviewer
 
