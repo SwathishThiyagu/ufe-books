@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-unix/c-unix-u4.html`
 - Status: ok
-- Model calls so far: 24 (87,973 tokens in, 188,937 out), 5.2 minutes
+- Model calls so far: 34 (137,463 tokens in, 238,471 out), 6.4 minutes
 
 ## Checker
 
 ```
-c-unix-u4.html: 7 chapters, 14033 words, 8 figures, 154 KB
+c-unix-u4.html: 7 chapters, 14115 words, 8 figures, 161 KB
 OK
 ```
 
