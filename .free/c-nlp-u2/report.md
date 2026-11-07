@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-nlp/c-nlp-u2.html`
 - Status: ok
-- Model calls so far: 28 (103,748 tokens in, 238,219 out), 6.7 minutes
+- Model calls so far: 37 (145,844 tokens in, 275,607 out), 7.6 minutes
 
 ## Checker
 
 ```
-c-nlp-u2.html: 9 chapters, 15316 words, 10 figures, 170 KB
+c-nlp-u2.html: 9 chapters, 15406 words, 10 figures, 175 KB
 OK
 ```
 
