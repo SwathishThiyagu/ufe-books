@@ -738,10 +738,18 @@ def r_sequence(spec, uid):
 RENDER = {'blocks': r_blocks, 'flow': r_blocks, 'tree': r_tree, 'graph': r_graph, 'array': r_array, 'plot': r_plot,
           'gantt': r_gantt, 'timeline': r_gantt, 'stack': r_stack, 'layers': r_stack, 'sets': r_sets, 'sequence': r_sequence}
 
+def r_svg(spec, uid):
+    """A figure drawn by hand (Claude figures, pipeline/claude_figs/): spec = {type: svg, h, body, aria}; UID in the body
+    becomes the figure's id so arrowheads stay unique. Not offered to the writing models."""
+    body = str(spec['body'])
+    if re.search(r'<script|on\w+=', body, re.I): raise FigureError('svg figure must not contain scripts')
+    return svg(float(spec['h']), body.replace('UID', uid), spec.get('aria', ''), uid)
+RENDER['svg'] = r_svg
+
 def render(spec, uid):
     if not isinstance(spec, dict): raise FigureError('figure must be an object')
     t = spec.get('type')
-    if t not in RENDER: raise FigureError(f'unknown figure type "{t}"; use one of {sorted(set(RENDER) - {"flow", "timeline", "layers"})}')
+    if t not in RENDER: raise FigureError(f'unknown figure type "{t}"; use one of {sorted(set(RENDER) - {"flow", "timeline", "layers", "svg"})}')
     uid = re.sub(r'[^a-z0-9-]', '', str(uid).lower())
     try:
         return RENDER[t](spec, uid)
