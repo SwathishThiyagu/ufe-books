@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-cv/c-cv-u4.html`
 - Status: ok
-- Model calls so far: 32 (128,889 tokens in, 297,959 out), 6.6 minutes
+- Model calls so far: 41 (171,806 tokens in, 338,291 out), 7.2 minutes
 
 ## Checker
 
 ```
-c-cv-u4.html: 9 chapters, 16632 words, 10 figures, 188 KB
+c-cv-u4.html: 9 chapters, 16759 words, 10 figures, 199 KB
 OK
 ```
 
