@@ -1,0 +1,213 @@
+{
+ "lead": "Deep networks can shift the distribution of activations during training. Batch normalization normalizes each mini-batch activation to zero mean and unit variance, then applies learned scale γ and shift β. This stabilizes the input to the next layer, reduces internal covariate shift, and often allows higher learning rates. It is used in nearly all modern CNN architectures and many MLPs after linear layers and before activation. The same idea appears wherever very deep networks are trained on GPUs in mini-batches.",
+ "prereq": "You need: mini-batch statistics from <a href=\"#stochastic-and-mini-batch-gradient-descent\">Chapter 2.2</a> and stable initialization from <a href=\"#weight-initialization-methods\">Chapter 2.6</a>.",
+ "sections": [
+  {
+   "h3": "Batch normalization forward pass",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Batch normalization is a small layer inserted between a linear transformation and a non-linear activation. It works on one mini-batch at a time. For a mini-batch B with m examples, let x_i be one activation value from one neuron for example i."
+    },
+    {
+     "type": "p",
+     "text": "The operation normalizes the values to zero mean and unit variance, then shifts and scales them with learned parameters."
+    },
+    {
+     "type": "formula",
+     "text": "μ_B = (1/m) Σ_{i=1}^{m} x_i",
+     "where": "μ_B is the mini-batch mean; m is the number of examples in the mini-batch; x_i is the activation value for example i."
+    },
+    {
+     "type": "formula",
+     "text": "σ²_B = (1/m) Σ_{i=1}^{m} (x_i − μ_B)²",
+     "where": "σ²_B is the mini-batch variance; the denominator is m, not m−1, because it is the population variance of the current mini-batch."
+    },
+    {
+     "type": "formula",
+     "text": "x̂_i = (x_i − μ_B) / √(σ²_B + ε)",
+     "where": "x̂_i is the normalized value; ε is a small constant such as 10⁻⁵. It prevents division by zero when all x_i are equal."
+    },
+    {
+     "type": "formula",
+     "text": "y_i = γ x̂_i + β",
+     "where": "γ is the learned scale; β is the learned shift; y_i is the output passed to the next layer. γ and β are updated by backpropagation like any other weights."
+    }
+   ]
+  },
+  {
+   "h3": "Training and inference behavior",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "During training, μ_B and σ²_B are computed from the current mini-batch. This adds a little noise because each mini-batch is a random sample. The noise gives a mild regularizing effect."
+    },
+    {
+     "type": "p",
+     "text": "The network also keeps running averages μ_run and σ²_run over training mini-batches. A common update with momentum ρ is:"
+    },
+    {
+     "type": "formula",
+     "text": "μ_run ← ρ μ_run + (1−ρ) μ_B",
+     "where": "ρ is usually about 0.99; μ_B is the current mini-batch mean; ← means update the stored running mean. The running variance σ²_run updates the same way."
+    },
+    {
+     "type": "p",
+     "text": "At inference, use the fixed running averages, not the current test batch:"
+    },
+    {
+     "type": "formula",
+     "text": "y = γ (x − μ_run) / √(σ²_run + ε) + β",
+     "where": "x is one test activation; μ_run and σ²_run are fixed after training; γ and β are the same learned parameters."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Use the saved running mean and variance for validation and deployment.",
+      "Do not update running averages on test data.",
+      "The learned γ and β apply in both training and inference."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Why batch normalization helps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Deep layers see input distributions that shift as earlier layers update. This shift, often called internal covariate shift, can slow learning. Batch normalization reduces it by re-centering and re-scaling each mini-batch."
+    },
+    {
+     "type": "p",
+     "text": "Stable activation ranges also help gradients flow. This often allows a higher learning rate and can reduce vanishing or exploding gradients (see <a href=\"#vanishing-and-exploding-gradients\">Chapter 2.5</a>)."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Works well after fully connected layers and convolutional layers.",
+      "Usually placed before the activation function such as ReLU.",
+      "Common in CNN and residual network architectures.",
+      "Adds a slight regularization effect from mini-batch noise."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The learned γ and β keep the layer powerful. If identity is better, the network can learn γ = √(σ²_B + ε) and β = μ_B to recover the original value. Batch normalization does not simply force every activation to have unit variance. Some syllabi list batch normalization as part of faster training."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The three rows show a mini-batch of three values, the normalized values with zero mean and unit variance, and the final outputs after learned scale γ=2 and shift β=1. The shaded outputs are the values passed to the next layer.",
+  "spec": {
+   "type": "array",
+   "show_index": false,
+   "title": "Batch norm for x=[2,4,6]",
+   "rows": [
+    {
+     "label": "x",
+     "cells": [
+      "2",
+      "4",
+      "6"
+     ]
+    },
+    {
+     "label": "x̂",
+     "cells": [
+      "-1.22",
+      "0",
+      "1.22"
+     ]
+    },
+    {
+     "label": "y",
+     "cells": [
+      "-1.4",
+      "1",
+      "3.4"
+     ],
+     "marks": {
+      "0": "accent",
+      "1": "accent",
+      "2": "accent"
+     }
+    }
+   ],
+   "aria": "Three rows show the original mini-batch values, the normalized values with zero mean and unit variance, and the final scaled and shifted outputs."
+  }
+ },
+ "examples": [
+  {
+   "question": "Given a mini-batch x = [2, 4, 6], learned scale γ = 2, learned shift β = 1, and ε = 10⁻⁵, compute the batch normalization outputs y.",
+   "steps": [
+    "Mini-batch size m = 3. Compute mean μ_B = (2+4+6)/3 = 12/3 = 4.",
+    "Compute variance σ²_B = [(2−4)² + (4−4)² + (6−4)²] / 3 = (4 + 0 + 4)/3 = 8/3 ≈ 2.667.",
+    "Compute standard deviation σ_B = √(2.667) ≈ 1.633. The small ε = 10⁻⁵ does not change the result at this precision.",
+    "Normalize each value: x̂₁ = (2−4)/1.633 ≈ −1.22; x̂₂ = (4−4)/1.633 = 0; x̂₃ = (6−4)/1.633 ≈ 1.22.",
+    "Apply scale and shift: y₁ = 2×(−1.22) + 1 = −1.44 ≈ −1.4; y₂ = 2×0 + 1 = 1; y₃ = 2×1.22 + 1 = 3.44 ≈ 3.4."
+   ],
+   "answer": "The batch normalization outputs are y ≈ [−1.4, 1.0, 3.4].",
+   "check": "import math\nx = [2, 4, 6]\ngamma = 2\nbeta = 1\neps = 1e-5\nmean = sum(x) / len(x)\nvar = sum((xi - mean) ** 2 for xi in x) / len(x)\nstd = math.sqrt(var + eps)\nxhat = [round((xi - mean) / std, 2) for xi in x]\ny = [round(gamma * xi_hat + beta, 1) for xi_hat in xhat]\nfor val in y:\n    print(val)",
+   "values": [
+    -1.4,
+    1.0,
+    3.4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "At test time, using the current mini-batch mean and variance instead of the saved running averages. This makes predictions depend on the test batch size and order.",
+  "Omitting the learnable γ and β. If you just normalize, the layer may lose expressiveness and sometimes cannot recover the original scale.",
+  "Forgetting ε or setting it too large. Without ε, a constant mini-batch gives division by zero; too large an ε dampens normalization.",
+  "Computing variance with denominator m−1 instead of m. Batch normalization uses the mini-batch population variance with denominator m.",
+  "Updating the running statistics during validation or test. They must be frozen after training."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What are the two learnable parameters in batch normalization?",
+   "marks": 2,
+   "a": "γ (scale) and β (shift)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is ε added inside the square root?",
+   "marks": 2,
+   "a": "To avoid division by zero when the mini-batch variance is zero or very small."
+  },
+  {
+   "level": "understand",
+   "q": "Why do we use running averages of mean and variance at inference?",
+   "marks": 3,
+   "a": "Test data may come one example at a time, and using current batch statistics would make predictions depend on test batch composition. Running averages provide a stable population estimate from training."
+  },
+  {
+   "level": "apply",
+   "q": "A mini-batch has values x = [1, 3, 5] and ε = 0. Compute μ_B, σ²_B and x̂ rounded to two decimals.",
+   "marks": 4,
+   "a": "μ_B = 3; σ²_B = ((1−3)²+(3−3)²+(5−3)²)/3 = 8/3 ≈ 2.667; x̂ = [−1.22, 0, 1.22]."
+  },
+  {
+   "level": "apply",
+   "q": "Using the x̂ from the previous question, γ = 1.5 and β = 0.5. Compute final outputs y.",
+   "marks": 4,
+   "a": "y = [1.5×(−1.22)+0.5 = −1.33, 1.5×0+0.5 = 0.5, 1.5×1.22+0.5 = 2.33]."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can batch normalization allow a larger learning rate during training?",
+   "marks": 3,
+   "a": "It keeps activation distributions more stable, reducing internal covariate shift and the chance of gradient blow-up, so a larger step is less likely to diverge."
+  },
+  {
+   "level": "analyze",
+   "q": "After training, μ_run = 4.1, σ²_run = 2.5, γ = 2, β = 1, ε = 10⁻⁵. Compute the test-time output for input x = 4.",
+   "marks": 5,
+   "a": "σ_run = √2.5 ≈ 1.581; y = 2 × (4−4.1)/1.581 + 1 ≈ 2 × (−0.1)/1.581 + 1 ≈ −0.126 + 1 = 0.874."
+  }
+ ],
+ "beyond": "Not for the exam. Batch normalization is standard in CNNs but less popular in transformers, where layer normalization is used because batch statistics are unstable with variable sequence lengths. Group normalization and instance normalization are common alternatives for small batch sizes or style transfer. In production, frameworks often fuse batch norm into the previous linear layer after training, reducing inference latency. If you want to go deeper, search for layer normalization, group normalization, batch renormalization, and the effect of batch size on batch norm."
+}

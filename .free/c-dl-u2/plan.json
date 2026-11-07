@@ -1,0 +1,553 @@
+{
+ "lead": "This unit moves from building a network to training it reliably. It covers gradient-based optimizers, initialization, normalization, regularization, augmentation, and hyperparameter tuning. After this unit you can diagnose training failures and choose practical training recipes for deep models.",
+ "about": "Unit 2 covers training and optimizing deep networks. Chapter 2.1 starts with batch gradient descent and its local-minima limits. Chapter 2.2 replaces the full batch with SGD and mini-batches, and 2.3 adds momentum and Nesterov acceleration. Chapter 2.4 explains AdaGrad, RMSProp and Adam as per-parameter adaptive step sizes. Chapter 2.5 diagnoses vanishing and exploding gradients, then 2.6 and 2.7 give weight initialization and batch normalization to keep signals stable. Chapter 2.8 controls overfitting with L2, dropout and early stopping. Chapter 2.9 increases data through augmentation and searches hyperparameters systematically. The chapters build a practical training loop you can tune and debug, not just a network that exists on paper.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Gradient descent steps opposite the gradient of the loss, but it can land in bad local minima and the learning rate is sensitive.",
+   "depth": "Batch gradient descent uses the full dataset for one update: θ ← θ − η∇J(θ). Explain the cost surface, local minima, saddle points, uneven curvature, and what happens when η is too high or too low. Some syllabi list this as limitations of gradient descent learning algorithm and heuristics for avoiding bad local minima. Basic heuristics such as random restarts and careful initialization are mentioned here; momentum is left to Chapter 2.3.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "w",
+     "min": 0,
+     "max": 5
+    },
+    "y": {
+     "label": "J(w)",
+     "min": -10,
+     "max": 10
+    },
+    "series": [
+     {
+      "name": "J(w)",
+      "expr": "0.25*x**4 - 1.6667*x**3 + 2*x**2 + 3",
+      "style": "accent"
+     },
+     {
+      "name": "GD step",
+      "points": [
+       [
+        0.5,
+        3.3073
+       ],
+       [
+        0.4125,
+        3.2306
+       ]
+      ],
+      "style": "live"
+     }
+    ]
+   },
+   "aria": "A one-dimensional loss curve has a shallow local minimum at w equals 0 and a much lower global minimum at w equals 4; the gradient descent step moves toward the shallow one.",
+   "example": "For J(w)=¼w⁴ − (5/3)w³ + 2w² + 3, start at w=0.5 with η=0.1. Compute one batch gradient descent step and explain why the result need not be global optimum. Gradient is w³−5w²+4w=0.875, so w ← 0.5−0.1×0.875=0.4125. Loss falls from 3.307 to 3.231, but a much lower global minimum lies at w=4 with J≈−7.67, so this step heads toward a shallow local minimum.",
+   "trap": "Adding the gradient instead of subtracting it, or forgetting that the derivative is evaluated at the current point before updating.",
+   "prereq": "Unit 1 forward propagation, backpropagation, and loss functions; basic calculus.",
+   "leave": "Learning rate schedules, momentum, and adaptive optimizers are left to Chapters 2.3 and 2.4; detailed backpropagation is in Unit 1."
+  },
+  {
+   "k": 2,
+   "idea": "Stochastic and mini-batch gradient descent estimate the full gradient from one sample or a small subset, giving speed and often better generalization.",
+   "depth": "Full batch gradient descent is slow on large data. Stochastic gradient descent updates on one sample at a time. Mini-batch gradient descent updates on a small batch: θ ← θ − η (1/m)∑ᵢ∇Lᵢ(θ). Define an epoch, shuffling, and common batch sizes such as 32, 64, 128. Explain why noise from small batches is not always bad and can help escape certain minima. Some syllabi list stochastic gradient descent and mini-batch gradient descent as separate methods.",
+   "figure": {
+    "type": "array",
+    "show_index": false,
+    "title": "Gradient data selection",
+    "rows": [
+     {
+      "label": "Full batch",
+      "cells": [
+       "1",
+       "2",
+       "3"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent",
+       "2": "accent"
+      }
+     },
+     {
+      "label": "Mini-batch",
+      "cells": [
+       "1",
+       "2"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent"
+      }
+     },
+     {
+      "label": "SGD",
+      "cells": [
+       "1"
+      ],
+      "marks": {
+       "0": "live"
+      }
+     }
+    ]
+   },
+   "aria": "Three rows show full batch using all three samples, mini-batch using two samples, and stochastic gradient descent using one sample.",
+   "example": "Given samples (1,2), (2,4), (3,6), model y=wx, loss L=½(y−wx)², start w=1, η=0.1. Mini-batch with first two samples: gradients −1 and −4, average −2.5, so w←1−0.1×(−2.5)=1.25. SGD on sample (1,2): gradient −1, so w←1−0.1×(−1)=1.1. Full batch on all three: average gradient −14/3≈−4.67, so w←1−0.1×(−4.67)=1.467.",
+   "trap": "Forgetting to divide by mini-batch size when averaging gradients, or not shuffling samples at the start of every epoch.",
+   "prereq": "Chapter 2.1 gradient descent; Unit 1 loss-function derivatives.",
+   "leave": "Momentum-modified SGD is left to Chapter 2.3; adaptive step-size algorithms are left to Chapter 2.4."
+  },
+  {
+   "k": 3,
+   "idea": "Momentum keeps a running velocity from past gradients, while Nesterov momentum evaluates the gradient at a lookahead point before moving.",
+   "depth": "Momentum update: v_t = βv_{t−1} + ηg_t, then θ ← θ − v_t. β is usually around 0.9. Nesterov accelerated gradient uses the lookahead position θ − βv_{t−1} when computing g_t. This damps oscillation in ravines and often converges faster. Some syllabi call this Nesterov accelerated gradient descent; a few write Nestors by accident.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "iteration",
+     "min": 0,
+     "max": 2
+    },
+    "y": {
+     "label": "w",
+     "min": 0.4,
+     "max": 1.0
+    },
+    "series": [
+     {
+      "name": "plain GD",
+      "points": [
+       [
+        0,
+        1
+       ],
+       [
+        1,
+        0.9
+       ],
+       [
+        2,
+        0.81
+       ]
+      ],
+      "style": "muted"
+     },
+     {
+      "name": "momentum",
+      "points": [
+       [
+        0,
+        1
+       ],
+       [
+        1,
+        0.9
+       ],
+       [
+        2,
+        0.72
+       ]
+      ],
+      "style": "accent"
+     },
+     {
+      "name": "NAG",
+      "points": [
+       [
+        0,
+        1
+       ],
+       [
+        1,
+        0.9
+       ],
+       [
+        2,
+        0.729
+       ]
+      ],
+      "style": "live"
+     }
+    ]
+   },
+   "aria": "A plot of weight value versus iteration shows momentum and Nesterov acceleration moving toward zero faster than plain gradient descent.",
+   "example": "For J=½w², gradient g=w, start w=1, η=0.1, β=0.9. Two momentum updates: v₁=0.1, w₁=0.9; v₂=0.18, w₂=0.72. Two Nesterov updates: first v=0.1, w=0.9; second lookahead is 0.81, gradient is 0.81, v=0.171, w=0.729. Plain GD reaches only w=0.81.",
+   "trap": "Using the old gradient at the original point for NAG instead of the lookahead point, or forgetting the β factor on stored velocity.",
+   "prereq": "Chapter 2.2 stochastic and mini-batch gradient descent.",
+   "leave": "Adaptive per-parameter step sizes are left to Chapter 2.4."
+  },
+  {
+   "k": 4,
+   "idea": "AdaGrad, RMSProp and Adam adapt each weight's learning rate using its own gradient history.",
+   "depth": "AdaGrad accumulates squared gradients: G_t = G_{t−1} + g_t², then θ ← θ − η g_t /(√G_t+ε). It suits sparse data but the denominator grows forever. RMSProp uses a moving average of squared gradients: E[g²]_t = βE[g²]_{t−1}+(1−β)g_t². Adam adds a momentum term and bias correction; standard defaults are η=0.001, β₁=0.9, β₂=0.999, ε=10⁻⁸. Some syllabi list AdaGrad, RMSProp, and Adam learning algorithm separately.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "iteration",
+     "min": 0,
+     "max": 2
+    },
+    "y": {
+     "label": "w",
+     "min": 0.4,
+     "max": 1.0
+    },
+    "series": [
+     {
+      "name": "AdaGrad",
+      "points": [
+       [
+        0,
+        1
+       ],
+       [
+        1,
+        0.9
+       ],
+       [
+        2,
+        0.833
+       ]
+      ],
+      "style": "muted"
+     },
+     {
+      "name": "RMSProp",
+      "points": [
+       [
+        0,
+        1
+       ],
+       [
+        1,
+        0.684
+       ],
+       [
+        2,
+        0.499
+       ]
+      ],
+      "style": "accent"
+     },
+     {
+      "name": "Adam",
+      "points": [
+       [
+        0,
+        1
+       ],
+       [
+        1,
+        0.9
+       ],
+       [
+        2,
+        0.8
+       ]
+      ],
+      "style": "live"
+     }
+    ]
+   },
+   "aria": "A weight-versus-iteration plot compares AdaGrad, RMSProp and Adam on the same quadratic loss; the three algorithms reach different weights at iteration 2.",
+   "example": "For J=½w², start w=1, η=0.1, β₁=0.9, β₂=0.999, ε=10⁻⁸. Compute two Adam iterations. Step 1: m=0.1, v=0.001, bias-corrected m̂=1, v̂=1, so w=0.9. Step 2: g=0.9, m=0.18, v=0.001809, m̂≈0.947, v̂≈0.905, so w≈0.800.",
+   "trap": "Forgetting Adam bias correction makes the first few steps much too small, or adding ε outside the square root.",
+   "prereq": "Chapter 2.3 momentum and Chapter 2.2 mini-batch updates.",
+   "leave": "Learning-rate schedules and warm restarts are left to advanced courses."
+  },
+  {
+   "k": 5,
+   "idea": "Repeated multiplication through many layers can make gradients shrink exponentially or blow up, so training stalls or diverges.",
+   "depth": "Backpropagation multiplies many Jacobians or weight matrices. If the factors are smaller than 1, gradients vanish; if larger than 1, gradients explode. Saturated sigmoid derivatives have maximum 0.25, so deep sigmoid networks vanish quickly. Causes include saturating activations, poor initialization, and very deep chains. Mitigations include ReLU or Leaky ReLU, good initialization, batch normalization, gradient clipping, residual connections, and LSTM gates. Some syllabi call this vanishing gradient problem and mitigation.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "depth",
+     "min": 1,
+     "max": 10
+    },
+    "y": {
+     "label": "gradient multiplier",
+     "min": 0,
+     "max": 1024
+    },
+    "series": [
+     {
+      "name": "factor 0.25",
+      "expr": "0.25**x",
+      "style": "accent"
+     },
+     {
+      "name": "factor 2",
+      "expr": "2**x",
+      "style": "live"
+     }
+    ]
+   },
+   "aria": "A log-shaped growth plot shows factor 0.25 shrinking to near zero over ten layers while factor 2 grows to 1024.",
+   "example": "For 10 layers, each layer multiplies the gradient by factor 0.25 or 2.0. Compute total multipliers. 0.25¹⁰≈9.54×10⁻⁷, so gradients vanish. 2¹⁰=1024, so gradients explode.",
+   "trap": "Confusing activation value saturation with gradient magnitude, or looking only at weight magnitudes and ignoring activation derivatives.",
+   "prereq": "Unit 1 backpropagation and the chain rule.",
+   "leave": "Detailed fixes are left to Chapter 2.6 initialization, Chapter 2.7 batch normalization, and residual/LSTM designs in Units 3 and 4."
+  },
+  {
+   "k": 6,
+   "idea": "Weight initialization sets the variance of initial weights so activations and gradients do not immediately vanish or explode.",
+   "depth": "Zero initialization keeps all units symmetric. Small random values can vanish, large random values can saturate. Xavier/Glorot initialization is designed for symmetric activations such as tanh or sigmoid: variance 2/(fan_in+fan_out), or uniform bound √(6/(fan_in+fan_out)). He/Kaiming initialization is for ReLU: variance 2/fan_in, or uniform bound √(6/fan_in). fan_in is the number of inputs to the layer; fan_out is the number of outputs. Some syllabi call this weight initialization methods or He initialization.",
+   "figure": {
+    "type": "array",
+    "show_index": false,
+    "title": "He init for ReLU, fan_in=256",
+    "rows": [
+     {
+      "label": "Normal std",
+      "cells": [
+       "0.09"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "Uniform bound",
+      "cells": [
+       "0.15"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     }
+    ]
+   },
+   "aria": "Two rows show the rounded He normal standard deviation and uniform bound for a ReLU layer with fan-in 256.",
+   "example": "A ReLU layer has fan_in=256. Compute He normal std and uniform bound: normal std=√(2/256)=√(1/128)≈0.0884; uniform bound=√(6/256)=√(3/128)≈0.153. For tanh with fan_out=128, Xavier normal std=√(2/(256+128))≈0.0722.",
+   "trap": "Using the same standard deviation for every layer, or using fan_in+fan_out for ReLU when He uses fan_in only.",
+   "prereq": "Chapter 2.5 vanishing/exploding gradients; activation derivative shapes.",
+   "leave": "How batch normalization removes much of the initial-scale sensitivity is left to Chapter 2.7."
+  },
+  {
+   "k": 7,
+   "idea": "Batch normalization normalizes each mini-batch activation to zero mean and unit variance, then learns scale γ and shift β.",
+   "depth": "For a mini-batch, compute mean μ_B and variance σ²_B. Normalize: x̂_i=(x_i−μ_B)/√(σ²_B+ε). Output: y_i=γx̂_i+β, where γ and β are learned. A small ε such as 10⁻⁵ avoids division by zero. At inference time use saved running mean and variance, not the current mini-batch statistics. Benefits include less internal covariate shift, tolerance of higher learning rates, and a slight regularizing effect. Some syllabi list batch normalization as part of faster training.",
+   "figure": {
+    "type": "array",
+    "show_index": false,
+    "title": "Batch norm for x=[2,4,6]",
+    "rows": [
+     {
+      "label": "x",
+      "cells": [
+       "2",
+       "4",
+       "6"
+      ]
+     },
+     {
+      "label": "x̂",
+      "cells": [
+       "-1.2",
+       "0",
+       "1.2"
+      ]
+     },
+     {
+      "label": "y",
+      "cells": [
+       "-1.4",
+       "1",
+       "3.4"
+      ],
+      "marks": {
+       "0": "accent",
+       "1": "accent",
+       "2": "accent"
+      }
+     }
+    ]
+   },
+   "aria": "Three rows show the original mini-batch values, the normalized values with zero mean and unit variance, and the final scaled and shifted outputs.",
+   "example": "Batch x=[2,4,6], γ=2, β=1, ε=10⁻⁵. Compute batch norm outputs. Mean μ=4, variance σ²=8/3≈2.667, σ≈1.633. Normalized x̂=[−1.22, 0, 1.22]. Outputs y=[−1.4, 1, 3.4] rounded to one decimal.",
+   "trap": "At test time, using the current mini-batch mean and variance instead of saved running averages, or omitting the learnable γ and β.",
+   "prereq": "Chapter 2.6 initialization and Chapter 2.2 mini-batch statistics.",
+   "leave": "Layer normalization and group normalization are left to advanced courses; transformer normalization is in Unit 5."
+  },
+  {
+   "k": 8,
+   "idea": "Regularization reduces overfitting by penalizing large weights, randomly dropping units during training, or stopping when validation loss stops improving.",
+   "depth": "L2 regularization adds (λ/2)∑w² to the loss, so the gradient adds λw. Dropout samples a Bernoulli mask and keeps a unit with probability p; common p is 0.5 for hidden layers and 0.8 for inputs. Use inverted dropout by dividing kept activations by p at training time. Early stopping tracks validation loss, waits for patience epochs, and restores the best weights. Some syllabi include L2 regularization, dropout, early stopping, and adversarial training. Adversarial training belongs to advanced courses.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Data gradient",
+      "note": "-0.5",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "L2 penalty",
+      "note": "0.02",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Total gradient",
+      "note": "-0.48",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Updated weight",
+      "note": "2.048",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "c",
+      "label": "plus",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "label": "add",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "η=0.1",
+      "style": "solid"
+     }
+    ]
+   },
+   "aria": "A small flow diagram shows the data gradient and L2 penalty combining into a total gradient, then updating the weight.",
+   "example": "For one weight w=2, data gradient −0.5, λ=0.01, η=0.1: total gradient = −0.5 + 0.01×2 = −0.48, so w ← 2 − 0.1×(−0.48)=2.048. Separately, with dropout p=0.5 and activations [4,6,8], mask [1,0,1] gives inverted dropout outputs [4/0.5=8, 0, 8/0.5=16].",
+   "trap": "Using dropout at test time without the p scaling, or early stopping on the training loss instead of validation loss.",
+   "prereq": "Unit 1 overfitting and bias-variance; Chapter 2.2 mini-batch training.",
+   "leave": "Adversarial training is left to advanced topics; dataset augmentation and hyperparameter tuning are in Chapter 2.9."
+  },
+  {
+   "k": 9,
+   "idea": "Dataset augmentation creates realistic label-preserving variations of training data, and hyperparameter tuning searches the training settings systematically.",
+   "depth": "Augmentation techniques for images include horizontal flip, random crop, rotation, color jitter, and mixup; text can use synonym replacement or back-translation; audio can use noise or speed changes. Hyperparameters include learning rate, batch size, depth, width, dropout probability, and weight decay. Tuning methods include grid search, random search, and Bayesian search. Use a validation set or cross-validation. Some syllabi list dataset augmentation and hyperparameter tuning, while PCA and autoencoders are left to Unit 6.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Original data",
+      "note": "1000 images",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Two augmentations",
+      "note": "flip + noise",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Augmented data",
+      "note": "4000 images",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Grid search",
+      "note": "2 LR × 3 BS × 5 folds",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Total runs",
+      "note": "30 runs, 300 min",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "label": "apply",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "label": "×4",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "tune",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "label": "run",
+      "style": "solid"
+     }
+    ]
+   },
+   "aria": "A flow diagram shows original data being augmented to four times as many images, then grid search producing 30 training runs.",
+   "example": "1000 original images. Independent horizontal flip and Gaussian noise augmentation produce 4 variants per image, so 4000 images in total. Hyperparameter grid: 2 learning rates × 3 batch sizes × 5-fold cross-validation = 30 training runs. At 10 minutes per run, total time is 300 minutes.",
+   "trap": "Augmenting the test set or using augmentation that changes the label, and tuning hyperparameters on the test set instead of a separate validation fold.",
+   "prereq": "Chapter 2.8 early stopping; Unit 1 cross-validation and overfitting.",
+   "leave": "PCA and autoencoders are left to Unit 6; distributed hyperparameter tuning is left to advanced topics."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "full gradient to sampled gradients"
+  ],
+  [
+   2,
+   3,
+   "noisy gradients benefit from velocity"
+  ],
+  [
+   3,
+   4,
+   "momentum is one moment; Adam generalizes it"
+  ],
+  [
+   4,
+   5,
+   "an optimizer cannot fix pathological gradients alone"
+  ],
+  [
+   5,
+   6,
+   "right initialization reduces the scale problem"
+  ],
+  [
+   6,
+   7,
+   "batch normalization further stabilizes signal"
+  ],
+  [
+   5,
+   7,
+   "batch norm is one mitigation for gradient scale"
+  ],
+  [
+   7,
+   8,
+   "stable learning still needs regularization"
+  ],
+  [
+   8,
+   9,
+   "regularization pairs with more data and tuning"
+  ]
+ ]
+}

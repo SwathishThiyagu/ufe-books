@@ -1,0 +1,805 @@
+{
+ "lead": "Deep networks multiply many small numbers in backpropagation. When these numbers are below 1, the gradient for early layers becomes so small that the weight update is almost zero: the gradient vanishes. When the numbers are above 1, the gradient grows rapidly and the update becomes huge: the gradient explodes. Vanishing gradients make training stall; exploding gradients make the loss jump and weights become unusable. This chapter explains why the product behaves this way, shows the math for a ten-layer chain, and lists the common fixes.",
+ "prereq": "You need: <a href=\"#unit-1-foundations-neural-networks-and-learning\">Unit 1 backpropagation and the chain rule</a>, and <a href=\"#gradient-descent-and-its-limitations\">gradient descent</a> from this unit.",
+ "sections": [
+  {
+   "h3": "Repeated multiplication through layers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In backpropagation, the upstream gradient flows from the output back to each weight. Between layer l and the loss, the gradient passes through every later layer. Each layer applies its local derivative, often called a Jacobian. For depth L, the gradient at layer l can be written as a product:"
+    },
+    {
+     "type": "formula",
+     "text": "g<sub>l</sub> = J<sub>l+1</sub><sup>T</sup> J<sub>l+2</sub><sup>T</sup> ⋯ J<sub>L</sub><sup>T</sup> g<sub>L</sub>",
+     "where": "g<sub>l</sub> is the gradient column vector of the loss with respect to the outputs of layer l; g<sub>L</sub> is the gradient at the top layer; J<sub>k</sub> is the Jacobian matrix ∂h<sub>k</sub>/∂h<sub>k−1</sub>. For row-vector gradients, the order is reversed: g<sub>l</sub> = g<sub>L</sub> J<sub>L</sub> J<sub>L−1</sub> ⋯ J<sub>l+1</sub>."
+    },
+    {
+     "type": "p",
+     "text": "For a scalar chain, each Jacobian is just a number. Suppose the chain has L layers. To move the gradient from the output of layer L back to the output of layer 1, we multiply L−1 factors, one for each later layer from L down to 2. If each factor is 0.25 and L = 10, the total multiplier is 0.25⁹ ≈ 3.81×10⁻⁶. If each factor is 2, the total multiplier is 2⁹ = 512. The figure below plots both curves for 1 to 9 multiplication steps. The vanishing product falls so fast that it looks flat on a scale that reaches 512."
+    }
+   ]
+  },
+  {
+   "h3": "Why sigmoid and weight choices make it worse",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The most common vanishing cause is a saturating activation. The sigmoid function is s(x) = 1/(1+e<sup>−x</sup>). Its derivative is s(x)(1−s(x)), whose maximum is 0.25 at x=0. For large positive or negative x, the derivative is close to zero. A deep network with sigmoid in every layer multiplies many numbers at most 0.25, so the gradient becomes tiny. Tanh has derivative 1−tanh²(x), with maximum 1 at x=0, but it also saturates to zero away from zero. ReLU derivative is 1 for positive input and 0 for negative input, so it avoids the 0.25 cap, but negative half can still kill gradients if many units are dead."
+    },
+    {
+     "type": "p",
+     "text": "Weight initialization also controls the product. If initial weights are too large, Jacobian entries become large and gradients can explode. If they are too small, gradients shrink. For a scalar chain, a per-layer weight multiplier of 0.1 gives a product of 0.1<sup>L−1</sup>, which vanishes. A multiplier of 3 gives 3<sup>L−1</sup>, which explodes. For an actual matrix layer, the effective multiplier is the spectral norm, the largest singular value of the layer's Jacobian. If that norm is below 1, gradient products shrink; if it is above 1, they grow. Recurrent networks unfold the same matrix at every time step, so backpropagation through time multiplies the same factors again and again."
+    }
+   ]
+  },
+  {
+   "h3": "Practical mitigations",
+   "blocks": [
+    {
+     "type": "bullets",
+     "items": [
+      "Use ReLU or Leaky ReLU for hidden layers. Leaky ReLU gives a small slope, for example 0.01, for negative input, so the gradient never becomes exactly zero.",
+      "Initialize weights carefully. He initialization for ReLU and Xavier/Glorot for sigmoid/tanh set the variance so that activations and gradients stay at a similar scale. See <a href=\"#weight-initialization-methods\">Chapter 2.6: Weight initialization methods</a>.",
+      "Add batch normalization after linear layers. It normalizes each mini-batch to zero mean and unit variance, then learns scale γ and shift β. See <a href=\"#batch-normalization\">Chapter 2.7: Batch normalization</a>.",
+      "Clip gradients when training deep or recurrent networks. If the gradient norm exceeds a threshold, scale the gradient to that threshold. This stops explosion.",
+      "Add residual connections, such as H(x) = F(x) + x. The gradient can flow through the identity path, even if F(x) has a small derivative. ResNet uses this idea (see Unit 3).",
+      "Use LSTM or GRU in sequence models. Their gates control how much of the previous state is kept, so the gradient can flow for many time steps. See Unit 4."
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The curve for factor 0.25 falls to about 4×10⁻⁶ after 9 multiplication steps, while the curve for factor 2 grows to 512. The y-axis spans from 0 to 512, so the vanishing curve is almost flat at zero.",
+  "spec": {
+   "type": "plot",
+   "x": {
+    "label": "number of multiplied derivatives",
+    "min": 1,
+    "max": 9
+   },
+   "y": {
+    "label": "gradient multiplier",
+    "min": 0,
+    "max": 512
+   },
+   "series": [
+    {
+     "name": "factor 0.25",
+     "expr": "0.25**x",
+     "style": "accent",
+     "_pts": [
+      [
+       1.0,
+       0.25
+      ],
+      [
+       1.1,
+       0.217637640824031
+      ],
+      [
+       1.2,
+       0.18946457081379978
+      ],
+      [
+       1.3,
+       0.16493848884661177
+      ],
+      [
+       1.4,
+       0.1435872943746294
+      ],
+      [
+       1.5,
+       0.125
+      ],
+      [
+       1.6,
+       0.1088188204120155
+      ],
+      [
+       1.7,
+       0.09473228540689989
+      ],
+      [
+       1.8,
+       0.08246924442330589
+      ],
+      [
+       1.9,
+       0.0717936471873147
+      ],
+      [
+       2.0,
+       0.0625
+      ],
+      [
+       2.1,
+       0.05440941020600775
+      ],
+      [
+       2.2,
+       0.04736614270344993
+      ],
+      [
+       2.3,
+       0.04123462221165296
+      ],
+      [
+       2.4,
+       0.03589682359365735
+      ],
+      [
+       2.5,
+       0.03125
+      ],
+      [
+       2.6,
+       0.027204705103003875
+      ],
+      [
+       2.7,
+       0.023683071351724965
+      ],
+      [
+       2.8,
+       0.02061731110582648
+      ],
+      [
+       2.9,
+       0.017948411796828673
+      ],
+      [
+       3.0,
+       0.015625
+      ],
+      [
+       3.1,
+       0.013602352551501938
+      ],
+      [
+       3.2,
+       0.011841535675862483
+      ],
+      [
+       3.3,
+       0.01030865555291324
+      ],
+      [
+       3.4,
+       0.008974205898414337
+      ],
+      [
+       3.5,
+       0.0078125
+      ],
+      [
+       3.6,
+       0.006801176275750969
+      ],
+      [
+       3.7,
+       0.005920767837931241
+      ],
+      [
+       3.8,
+       0.00515432777645662
+      ],
+      [
+       3.9,
+       0.004487102949207168
+      ],
+      [
+       4.0,
+       0.00390625
+      ],
+      [
+       4.1,
+       0.0034005881378754866
+      ],
+      [
+       4.2,
+       0.0029603839189656206
+      ],
+      [
+       4.3,
+       0.00257716388822831
+      ],
+      [
+       4.4,
+       0.002243551474603583
+      ],
+      [
+       4.5,
+       0.001953125
+      ],
+      [
+       4.6,
+       0.0017002940689377433
+      ],
+      [
+       4.7,
+       0.0014801919594828103
+      ],
+      [
+       4.8,
+       0.001288581944114155
+      ],
+      [
+       4.9,
+       0.0011217757373017914
+      ],
+      [
+       5.0,
+       0.0009765625
+      ],
+      [
+       5.1,
+       0.0008501470344688716
+      ],
+      [
+       5.2,
+       0.0007400959797414052
+      ],
+      [
+       5.3,
+       0.0006442909720570775
+      ],
+      [
+       5.4,
+       0.0005608878686508957
+      ],
+      [
+       5.5,
+       0.00048828125
+      ],
+      [
+       5.6,
+       0.0004250735172344358
+      ],
+      [
+       5.7,
+       0.0003700479898707026
+      ],
+      [
+       5.8,
+       0.00032214548602853873
+      ],
+      [
+       5.9,
+       0.00028044393432544786
+      ],
+      [
+       6.0,
+       0.000244140625
+      ],
+      [
+       6.1,
+       0.0002125367586172179
+      ],
+      [
+       6.2,
+       0.0001850239949353513
+      ],
+      [
+       6.3,
+       0.00016107274301426937
+      ],
+      [
+       6.4,
+       0.00014022196716272393
+      ],
+      [
+       6.5,
+       0.0001220703125
+      ],
+      [
+       6.6,
+       0.00010626837930860896
+      ],
+      [
+       6.7,
+       9.251199746767564e-05
+      ],
+      [
+       6.8,
+       8.053637150713468e-05
+      ],
+      [
+       6.9,
+       7.011098358136196e-05
+      ],
+      [
+       7.0,
+       6.103515625e-05
+      ],
+      [
+       7.1,
+       5.313418965430448e-05
+      ],
+      [
+       7.2,
+       4.625599873383782e-05
+      ],
+      [
+       7.3,
+       4.026818575356734e-05
+      ],
+      [
+       7.4,
+       3.505549179068098e-05
+      ],
+      [
+       7.5,
+       3.0517578125e-05
+      ],
+      [
+       7.6,
+       2.656709482715224e-05
+      ],
+      [
+       7.7,
+       2.312799936691891e-05
+      ],
+      [
+       7.8,
+       2.013409287678367e-05
+      ],
+      [
+       7.9,
+       1.752774589534049e-05
+      ],
+      [
+       8.0,
+       1.52587890625e-05
+      ],
+      [
+       8.1,
+       1.328354741357612e-05
+      ],
+      [
+       8.2,
+       1.156399968345947e-05
+      ],
+      [
+       8.3,
+       1.0067046438391822e-05
+      ],
+      [
+       8.4,
+       8.763872947670246e-06
+      ],
+      [
+       8.5,
+       7.62939453125e-06
+      ],
+      [
+       8.6,
+       6.64177370678806e-06
+      ],
+      [
+       8.7,
+       5.781999841729735e-06
+      ],
+      [
+       8.8,
+       5.033523219195911e-06
+      ],
+      [
+       8.9,
+       4.381936473835123e-06
+      ],
+      [
+       9.0,
+       3.814697265625e-06
+      ]
+     ]
+    },
+    {
+     "name": "factor 2",
+     "expr": "2**x",
+     "style": "live",
+     "_pts": [
+      [
+       1.0,
+       2.0
+      ],
+      [
+       1.1,
+       2.1435469250725863
+      ],
+      [
+       1.2,
+       2.2973967099940698
+      ],
+      [
+       1.3,
+       2.4622888266898326
+      ],
+      [
+       1.4,
+       2.6390158215457884
+      ],
+      [
+       1.5,
+       2.8284271247461903
+      ],
+      [
+       1.6,
+       3.0314331330207964
+      ],
+      [
+       1.7,
+       3.249009585424942
+      ],
+      [
+       1.8,
+       3.4822022531844965
+      ],
+      [
+       1.9,
+       3.7321319661472296
+      ],
+      [
+       2.0,
+       4.0
+      ],
+      [
+       2.1,
+       4.2870938501451725
+      ],
+      [
+       2.2,
+       4.59479341998814
+      ],
+      [
+       2.3,
+       4.924577653379664
+      ],
+      [
+       2.4,
+       5.278031643091577
+      ],
+      [
+       2.5,
+       5.656854249492381
+      ],
+      [
+       2.6,
+       6.062866266041593
+      ],
+      [
+       2.7,
+       6.498019170849885
+      ],
+      [
+       2.8,
+       6.964404506368992
+      ],
+      [
+       2.9,
+       7.464263932294459
+      ],
+      [
+       3.0,
+       8.0
+      ],
+      [
+       3.1,
+       8.574187700290345
+      ],
+      [
+       3.2,
+       9.18958683997628
+      ],
+      [
+       3.3,
+       9.849155306759329
+      ],
+      [
+       3.4,
+       10.556063286183154
+      ],
+      [
+       3.5,
+       11.313708498984761
+      ],
+      [
+       3.6,
+       12.125732532083186
+      ],
+      [
+       3.7,
+       12.99603834169977
+      ],
+      [
+       3.8,
+       13.928809012737984
+      ],
+      [
+       3.9,
+       14.928527864588919
+      ],
+      [
+       4.0,
+       16.0
+      ],
+      [
+       4.1,
+       17.148375400580687
+      ],
+      [
+       4.2,
+       18.37917367995256
+      ],
+      [
+       4.3,
+       19.698310613518657
+      ],
+      [
+       4.4,
+       21.112126572366314
+      ],
+      [
+       4.5,
+       22.627416997969522
+      ],
+      [
+       4.6,
+       24.251465064166364
+      ],
+      [
+       4.7,
+       25.99207668339954
+      ],
+      [
+       4.8,
+       27.85761802547597
+      ],
+      [
+       4.9,
+       29.857055729177844
+      ],
+      [
+       5.0,
+       32.0
+      ],
+      [
+       5.1,
+       34.29675080116137
+      ],
+      [
+       5.2,
+       36.75834735990512
+      ],
+      [
+       5.3,
+       39.396621227037315
+      ],
+      [
+       5.4,
+       42.22425314473263
+      ],
+      [
+       5.5,
+       45.254833995939045
+      ],
+      [
+       5.6,
+       48.50293012833273
+      ],
+      [
+       5.7,
+       51.98415336679908
+      ],
+      [
+       5.8,
+       55.71523605095194
+      ],
+      [
+       5.9,
+       59.71411145835569
+      ],
+      [
+       6.0,
+       64.0
+      ],
+      [
+       6.1,
+       68.59350160232275
+      ],
+      [
+       6.2,
+       73.51669471981025
+      ],
+      [
+       6.3,
+       78.79324245407463
+      ],
+      [
+       6.4,
+       84.44850628946526
+      ],
+      [
+       6.5,
+       90.50966799187809
+      ],
+      [
+       6.6,
+       97.00586025666546
+      ],
+      [
+       6.7,
+       103.96830673359815
+      ],
+      [
+       6.8,
+       111.43047210190387
+      ],
+      [
+       6.9,
+       119.42822291671138
+      ],
+      [
+       7.0,
+       128.0
+      ],
+      [
+       7.1,
+       137.1870032046455
+      ],
+      [
+       7.2,
+       147.0333894396205
+      ],
+      [
+       7.3,
+       157.58648490814926
+      ],
+      [
+       7.4,
+       168.89701257893051
+      ],
+      [
+       7.5,
+       181.01933598375618
+      ],
+      [
+       7.6,
+       194.0117205133309
+      ],
+      [
+       7.7,
+       207.9366134671963
+      ],
+      [
+       7.8,
+       222.86094420380775
+      ],
+      [
+       7.9,
+       238.85644583342275
+      ],
+      [
+       8.0,
+       256.0
+      ],
+      [
+       8.1,
+       274.374006409291
+      ],
+      [
+       8.2,
+       294.0667788792408
+      ],
+      [
+       8.3,
+       315.17296981629875
+      ],
+      [
+       8.4,
+       337.79402515786103
+      ],
+      [
+       8.5,
+       362.03867196751236
+      ],
+      [
+       8.6,
+       388.0234410266618
+      ],
+      [
+       8.7,
+       415.8732269343924
+      ],
+      [
+       8.8,
+       445.7218884076158
+      ],
+      [
+       8.9,
+       477.7128916668455
+      ],
+      [
+       9.0,
+       512.0
+      ]
+     ]
+    }
+   ],
+   "aria": "A plot shows factor 0.25 shrinking to near zero over nine multiplication steps while factor 2 grows to 512."
+  }
+ },
+ "examples": [
+  {
+   "question": "A toy network has ten layers in a chain. For network A, each connection from a later layer output to the previous layer output multiplies the incoming gradient by 0.25 because of sigmoid saturation. For network B, each connection multiplies it by 2.0 because of large weights. Compute the total gradient multiplier from the output of layer 10 back to the output of layer 1 for each network. State which problem each network has.",
+   "steps": [
+    "There are 9 connections from layer 10 output to layer 1 output, so the total multiplier is 0.25⁹ for A and 2⁹ for B.",
+    "Compute 0.25⁹ = (1/4)⁹ = 1/4⁹ = 1/262,144 ≈ 3.81×10⁻⁶.",
+    "Compute 2⁹ = 512.",
+    "Compare with 1. A's multiplier is much less than 1, so the gradient vanishes. B's multiplier is much greater than 1, so the gradient explodes."
+   ],
+   "answer": "Network A has a total gradient multiplier of about 3.81×10⁻⁶ (vanishing gradient), and network B has 512 (exploding gradient).",
+   "check": "mult_a = 0.25 ** 9\nmult_b = 2 ** 9\nprint(f\"{mult_a:.2e}\")\nprint(mult_b)",
+   "values": [
+    3.81e-06,
+    512
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Confusing activation value saturation with gradient saturation. A sigmoid output near 1 or 0 is saturated, but the gradient is also near zero because the derivative is small. The value being large is not the problem; the derivative is.",
+  "Checking only weight magnitudes. Even if weights are moderate, a long chain of sigmoid derivatives each below 0.25 can vanish. You must multiply weight and activation derivatives together.",
+  "Thinking ReLU eliminates vanishing gradients completely. ReLU avoids positive-side saturation, but if too many units receive negative input, the gradient through those units is exactly zero (dead ReLU). Leaky ReLU reduces this.",
+  "Forgetting that exploding gradients can happen before loss becomes NaN. Even a multiplier of 2 over 9 connections gives 512; the loss may jump but not yet be NaN. Clip early.",
+  "Using gradient clipping as a fix for vanishing gradients. Clipping only reduces large gradients; it does not help small ones."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define the vanishing gradient problem.",
+   "marks": 2,
+   "a": "In deep networks, the gradient of the loss with respect to early layers becomes extremely small because backpropagation multiplies many factors less than 1, so early-layer weights almost do not update."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the sigmoid derivative a common cause of vanishing gradients?",
+   "marks": 3,
+   "a": "Sigmoid derivative is σ(x)(1−σ(x)), whose maximum is 0.25. In a deep network, many layers multiply derivatives of at most 0.25, so the product becomes very small, making the gradient vanish."
+  },
+  {
+   "level": "apply",
+   "q": "A five-layer chain has each connection from a later layer output to the previous layer output multiply the upstream gradient by 0.5. Compute the total gradient multiplier from the output of layer 5 to the output of layer 1.",
+   "marks": 3,
+   "a": "Total multiplier = 0.5⁴ = 0.0625. Since 0.0625 < 1, the gradient shrinks; it does not completely vanish but is small."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare a 20-layer network using ReLU with He initialization and a 20-layer network using sigmoid with default small random weights. Which is more likely to suffer from vanishing gradients? Justify.",
+   "marks": 4,
+   "a": "The sigmoid network is more likely. Sigmoid derivatives are at most 0.25 and saturate to zero; many sigmoid layers multiply numbers ≤0.25, giving a very small gradient. ReLU derivative is 1 for positive input, and He initialization keeps activations at a similar scale, so gradients do not shrink automatically."
+  },
+  {
+   "level": "remember",
+   "q": "What is gradient clipping?",
+   "marks": 2,
+   "a": "Gradient clipping scales down the gradient vector when its norm exceeds a chosen threshold, preventing exploding updates."
+  },
+  {
+   "level": "understand",
+   "q": "How does a residual connection H(x)=F(x)+x help gradients?",
+   "marks": 3,
+   "a": "During backpropagation, the derivative with respect to x includes the identity term ∂x/∂x=1, so the gradient can flow through the skip path even if the derivative of F(x) is small. This avoids a long product of small derivatives."
+  },
+  {
+   "level": "apply",
+   "q": "A recurrent network unfolds the same weight matrix for 4 time steps. Each step multiplies the gradient by 1.5. Compute the total multiplier and state the problem.",
+   "marks": 3,
+   "a": "1.5⁴ = 5.0625. The gradient grows by about 5 times, so it is beginning to explode."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, gradient clipping is standard for training large recurrent networks and transformers. Mixed-precision training also watches gradient scales, because half-precision numbers overflow more easily when gradients explode. Researchers use gradient norms to diagnose training health; a sudden spike often means the learning rate is too high or the initialization is poor. Newer curricula sometimes introduce gradient checkpointing, which trades compute for memory but does not change vanishing/exploding behavior. Search for \"gradient flow in transformers\" and \"LSTM constant error carousel\" for more."
+}
