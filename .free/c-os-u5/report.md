@@ -1,13 +1,13 @@
 # c-os-u5: free-model run
 
-- Book: `books/cse/c-os/c-os-u5.html`
+- Book: `work/claude_figs/c-os-u5/tree/books/cse/c-os/c-os-u5.html`
 - Status: ok
 - Model calls so far: 40 (146,774 tokens in, 242,176 out), 6.1 minutes
 
 ## Checker
 
 ```
-c-os-u5.html: 9 chapters, 16101 words, 10 figures, 174 KB
+c-os-u5.html: 9 chapters, 16064 words, 10 figures, 187 KB
 OK
 ```
 
