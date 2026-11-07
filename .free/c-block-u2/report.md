@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-block/c-block-u2.html`
 - Status: ok
-- Model calls so far: 19 (65,772 tokens in, 152,990 out), 4.2 minutes
+- Model calls so far: 29 (114,431 tokens in, 184,624 out), 4.8 minutes
 
 ## Checker
 
 ```
-c-block-u2.html: 7 chapters, 13532 words, 8 figures, 139 KB
+c-block-u2.html: 7 chapters, 13594 words, 8 figures, 142 KB
 OK
 ```
 
