@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-os/c-os-u2.html`
 - Status: ok
-- Model calls so far: 29 (112,329 tokens in, 219,385 out), 5.4 minutes
+- Model calls so far: 38 (153,291 tokens in, 248,047 out), 6.2 minutes
 
 ## Checker
 
 ```
-c-os-u2.html: 9 chapters, 17201 words, 10 figures, 179 KB
+c-os-u2.html: 9 chapters, 17271 words, 10 figures, 183 KB
 OK
 ```
 
