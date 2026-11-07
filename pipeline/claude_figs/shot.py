@@ -7,6 +7,6 @@ with sync_playwright() as p:
     for f in pg.query_selector_all('figure.fig'):
         cap = f.inner_text()
         import re
-        m = re.search(r'Figure 2\.(\d)\.1', cap)
+        m = re.search(r'Figure \d+\.(\d+)\.1', cap)
         if m: f.screenshot(path=f'{out}-{m.group(1)}.png')
     b.close()
