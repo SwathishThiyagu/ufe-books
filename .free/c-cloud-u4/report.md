@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-cloud/c-cloud-u4.html`
 - Status: ok
-- Model calls so far: 30 (109,943 tokens in, 225,097 out), 5.8 minutes
+- Model calls so far: 39 (152,631 tokens in, 278,070 out), 7.2 minutes
 
 ## Checker
 
 ```
-c-cloud-u4.html: 9 chapters, 16487 words, 10 figures, 175 KB
+c-cloud-u4.html: 9 chapters, 16557 words, 10 figures, 178 KB
 OK
 ```
 
