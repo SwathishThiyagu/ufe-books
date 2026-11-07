@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-iot/c-iot-u2.html`
 - Status: ok
-- Model calls so far: 32 (122,707 tokens in, 252,713 out), 6.3 minutes
+- Model calls so far: 40 (161,436 tokens in, 281,542 out), 6.8 minutes
 
 ## Checker
 
 ```
-c-iot-u2.html: 7 chapters, 13306 words, 8 figures, 139 KB
+c-iot-u2.html: 7 chapters, 13402 words, 8 figures, 151 KB
 OK
 ```
 
