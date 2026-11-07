@@ -1,10 +1,12 @@
-# Book writer status (5 Nov 2026, 20:55 IST)
+# Book writer status (6 Nov 2026, 11:30 IST)
 
-- RunPod pod `ufe-books` (H100 SXM, $4.02/hr, gpt-oss-120b on vLLM). STOP IT when no RunPod run is in progress.
-- Gemini free writer: c-os-u1 in progress, resumes daily at 14:17 IST (requests.txt).
-- RunPod writer: OS u2-u6 and CN u1-u6 written on branches free/<unit>-book; a [redo] clean-up pass ran at 20:50.
-- Before merging a branch: read .free/<unit>/report.md (checker OK, no "serious" flags left), spot-check examples,
-  then copy only books/... into main and set queue.json status "ok". Known: c-os-u3 ch 3.7 Banker's example had wrong
-  totals (check it after the redo pass).
-- Next: queue more units in requests-runpod.txt (one per line), push, start the pod first; a commit message with [redo]
-  re-reviews flagged chapters.
+Every CSE unit is now written. In the library (main): 55. Waiting on branches, all passing check_book --render:
+
+- DeepSeek, branch ds/<unit>-book (preferred over the gpt-oss free/ version of the same unit):
+  c-os-u1..u6, c-cn-u1..u6, c-ml-u1..u3, c-ml-u5, c-toc-u1, c-toc-u2
+- gpt-oss (RunPod), branch free/<unit>-book: c-ml-u4 (its DeepSeek rewrite fails the phone-width check)
+- DeepSeek, branch free/<unit>-book: every other remaining CSE unit (the 100 queued on 6 Nov, incl. c-se-u6, c-iot-u4, c-unix-u2)
+
+Merge procedure per unit: read .free/<unit>/report.md (no "serious" flags), spot-check one worked example and one figure,
+`git checkout origin/<branch> -- <out path>` onto main, set queue.json status "ok", append syllabus notes to notes.md, commit "<unit> book".
+Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3 write to ds/ branches). Off-peak is half price.

@@ -232,6 +232,30 @@ def main():
     try:
         plan = S.get('plan') or S.put('plan', ask.json('plan', PR.SYSTEM, PR.plan(P), check=check_plan(P)))
         while len(plan.get('chapters', [])) < len(subs): plan.setdefault('chapters', []).append({})
+        if os.environ.get('FIGS_ONLY'):
+            # redraw every chapter's figure with the current model; the text stays as it is
+            def chkfig(d):
+                if not isinstance(d, dict) or not isinstance(d.get('spec'), dict): return ['reply must be {after_section, caption, spec}']
+                try: F.render(d['spec'], 'chk')
+                except F.FigureError as e: return [f'the figure cannot be drawn: {e}']
+                cap = str(d.get('caption', ''))
+                if not cap.strip(): return ['the figure needs a caption']
+                if re.search(r'\b(accent|live|next|muted|style)\b', cap): return ['the caption must not name styles (accent, live, next, muted)']
+                return []
+            def redo(k):
+                if S.get(f'figredo{k}'): return
+                ch = S.get(f'ch{k}'); old = ch.get('figure') or {}
+                d = ask.json(f'figredo{k}', PR.SYSTEM, PR.figure_redo(P, k, R.plain_text(P, k, ch), old), check=chkfig, temperature=0.4)
+                if not chkfig(d):
+                    S.put(f'figold{k}', old)
+                    ch['figure'] = {'after_section': d.get('after_section', old.get('after_section', 1)), 'caption': d['caption'], 'spec': d['spec']}
+                    S.put(f'ch{k}', ch); log(f'  figure {N}.{k}: {old.get("spec", {}).get("type")} -> {d["spec"].get("type")}')
+                S.put(f'figredo{k}', True)
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max(1, int(os.environ.get('PARALLEL', '1')))) as pool:
+                for f in [pool.submit(redo, k) for k in range(1, len(subs) + 1)]: f.result()
+            for fn in os.listdir(S.d):
+                if re.match(r'(chfix|resize|spill|figfix)\d+', fn): os.remove(os.path.join(S.d, fn))
         def do_chapter(k):
             key = f'ch{k}'
             ch = S.get(key)
@@ -260,6 +284,20 @@ def main():
                     else:
                         flag(f'chapter {k}: the reviewer found {len(high)} serious problem(s) and the revision did not pass the checks; read the review in the state folder')
                 S.put(f'review{k}', issues); S.put(key + '.reviewed', True)
+        def quiz_ok(ch):
+            qz = [q for q in (ch.get('quiz') or []) if isinstance(q, dict) and q.get('q') and q.get('a')]
+            return len(qz) >= 5 and set(R.LEVELS) <= {str(q.get('level', '')).lower() for q in qz}
+        def fix_quiz(k):
+            ch = S.get(f'ch{k}')
+            if not ch or quiz_ok(ch): return
+            def chk(d):
+                qz = d.get('quiz') if isinstance(d, dict) else None
+                return [] if isinstance(qz, list) and quiz_ok({'quiz': qz}) else ['give 6 to 8 quiz objects covering remember, understand, apply and analyze']
+            d = ask.json(f'quiz{k}', PR.SYSTEM, PR.quiz(P, k, R.plain_text(P, k, ch)), check=chk)
+            if not chk(d):
+                ch['quiz'] = d['quiz']; S.put(f'ch{k}', ch); log(f'  quiz {N}.{k} rewritten')
+            else:
+                flag(f'chapter {k}: the quiz could not be rewritten')
         workers = max(1, int(os.environ.get('PARALLEL', '1')))
         if workers == 1:
             for k in range(1, len(subs) + 1): do_chapter(k)
@@ -267,6 +305,7 @@ def main():
             from concurrent.futures import ThreadPoolExecutor
             with ThreadPoolExecutor(workers) as pool:
                 for f in [pool.submit(do_chapter, k) for k in range(1, len(subs) + 1)]: f.result()
+        for k in range(1, len(subs) + 1): fix_quiz(k)
         us = S.get('unit')
         if us is None:
             brief = []

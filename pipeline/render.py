@@ -16,9 +16,14 @@ def scrub(s):
     s = re.sub(r'placeholder', 'stand-in', s, flags=re.I)
     s = re.sub(r'\bTODO\b', 'to-do', s); s = re.sub(r'\bTBD\b', 'to be decided', s)
     s = re.sub(r'lorem ipsum', '', s, flags=re.I); s = re.sub(r'\[citation needed\]', '', s, flags=re.I)
-    s = re.sub(r'\bas an AI\b', '', s, flags=re.I); s = re.sub(r'\bI cannot\b', 'one cannot', s)
+    s = re.sub(r'\bas an AI\b', '', s, flags=re.I); s = re.sub(r'\bI cannot\b', 'one cannot', s); s = re.sub(r'(?i)(i) cannot', r'\1 can not', s)  # e.g. 'API cannot'
     s = re.sub(r'__([A-Za-z0-9_]+?)__', lambda m: '&#95;&#95;' + m.group(1) + '&#95;&#95;', s)
     return s
+
+
+def brk(text):
+    """Break points inside very long words (ids, URLs, hyphen chains) so phones do not scroll sideways."""
+    return re.sub(r'[^\s<>&]{24,}', lambda m: re.sub(r'([-\u2011_/.(,=])(?=.)', r'\1<wbr>', m.group(0)), text)
 
 
 def inline(s, ids=()):
@@ -26,7 +31,7 @@ def inline(s, ids=()):
     s = html.unescape(str(s or '')).strip()
     out, pos, stack = [], 0, []
     for m in ALLOWED.finditer(s):
-        out.append(html.escape(s[pos:m.start()], quote=False))
+        out.append(brk(html.escape(s[pos:m.start()], quote=False)))
         tag = m.group(0)
         low = tag.lower()
         if low.startswith('<a '):
@@ -45,7 +50,7 @@ def inline(s, ids=()):
         else:
             name = low[1:-1]; stack.append(name); out.append(f'<{name}>')
         pos = m.end()
-    out.append(html.escape(s[pos:], quote=False))
+    out.append(brk(html.escape(s[pos:], quote=False)))
     for name in reversed(stack):
         if name != 'a-skip': out.append(f'</{name}>')
     t = ''.join(out)

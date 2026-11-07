@@ -236,3 +236,42 @@ Reply with JSON:
   "wikipedia": ["Exact title of an English Wikipedia article on a main topic of this unit"]
 }}
 Counts: 12-20 key terms with their chapter number k; 6-10 takeaways; 12-14 bank questions (8-16 marks) spread over the three groups, at least two of them spanning several chapters; 18-26 glossary terms; 2-4 textbooks you are sure exist; 4-8 web resources whose exact URL you are sure of (each link is opened and checked; wrong ones are dropped); 3-6 Wikipedia article titles."""
+
+
+def quiz(P, k, chapter_text):
+    return f"""Write the "Check yourself" quiz for chapter {P['unit']['n']}.{k} ("{P['unit']['subtopics'][k - 1]['t']}") below.
+Reply with JSON {{"quiz": [{{"level": "remember", "q": "question", "marks": 2, "a": "model answer"}}]}}: 6 to 8 items, at least one of each level
+remember, understand, apply, analyze; marks 2 to 6; for apply, give the key steps and the final value in the answer.
+
+The chapter:
+<<<
+{chapter_text[:9000]}
+>>>"""
+
+
+def figure_redo(P, k, chapter_text, fig):
+    U = P['unit']; st = U['subtopics'][k - 1]
+    return f"""Design the single best figure for chapter {U['n']}.{k} ("{st['t']}") of a {P['subject']['name']} unit book.
+The figure must show the chapter's central mechanism so a student understands it at a glance, and it must use exactly the
+same values, names and order as the chapter text and its worked example (recompute them; a figure that disagrees with the
+example is wrong). Pick the figure type that fits the idea best, not the easiest one. Use the styles to pick out the one or two
+things the caption points to.
+
+The readers are students who find textbooks hard, so keep it simple: one idea, few labels, plain words, the example's own
+numbers. Draw the worked example itself whenever it has numbers (its steps, its values, its result), not a generic diagram of
+boxes. Checks before you reply:
+- plot axes fit the data (no long empty stretch), every point is drawn once, and the curves match the example's values;
+- labels number things the same way as the text (if the samples are 1 to 12, never label positions 0 to 11);
+- every label is short enough to read at phone width.
+
+The current figure (replace it if a different type or content would teach better):
+{json.dumps(fig, ensure_ascii=False)}
+
+The chapter:
+<<<
+{chapter_text[:12000]}
+>>>
+
+Reply with JSON {{"after_section": 1, "caption": "what it shows and what to notice, 1-2 sentences", "spec": {{...}}}}.
+
+{FIGURES}"""
