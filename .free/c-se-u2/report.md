@@ -1,15 +1,8 @@
 # c-se-u2: free-model run
 
 - Book: `books/cse/c-se/c-se-u2.html`
-- Status: ok
-- Model calls so far: 37 (125,371 tokens in, 258,448 out), 7.5 minutes
-
-## Checker
-
-```
-c-se-u2.html: 9 chapters, 14605 words, 10 figures, 169 KB
-OK
-```
+- Status: error
+- Model calls so far: 49 (178,846 tokens in, 308,782 out), 9.5 minutes
 
 ## For the reviewer
 
