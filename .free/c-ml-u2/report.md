@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-ml/c-ml-u2.html`
 - Status: ok
-- Model calls so far: 21 (81,884 tokens in, 152,025 out), 4.6 minutes
+- Model calls so far: 28 (127,180 tokens in, 174,442 out), 5.3 minutes
 
 ## Checker
 
 ```
-c-ml-u2.html: 7 chapters, 12872 words, 8 figures, 146 KB
+c-ml-u2.html: 7 chapters, 12927 words, 8 figures, 153 KB
 OK
 ```
 
