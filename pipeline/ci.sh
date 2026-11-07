@@ -12,7 +12,7 @@ else
 fi
 [ -z "$reqs" ] && { echo "nothing requested"; exit 0; }
 echo "$reqs" | while read -r unit out; do
-  br="free/${unit}-book"
+  br="${BRANCH_PREFIX:-free}/${unit}-book"
   echo "::group::$unit"
   if git ls-remote --exit-code --heads origin "$br" >/dev/null 2>&1; then
     git fetch -q origin "$br"
