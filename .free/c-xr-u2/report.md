@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-xr/c-xr-u2.html`
 - Status: ok
-- Model calls so far: 28 (95,525 tokens in, 189,410 out), 5.9 minutes
+- Model calls so far: 35 (126,391 tokens in, 211,769 out), 6.9 minutes
 
 ## Checker
 
 ```
-c-xr-u2.html: 7 chapters, 12610 words, 8 figures, 136 KB
+c-xr-u2.html: 7 chapters, 12724 words, 8 figures, 144 KB
 OK
 ```
 
