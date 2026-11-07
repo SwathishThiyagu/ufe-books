@@ -2,12 +2,12 @@
 
 - Book: `books/cse/c-quantum/c-quantum-u3.html`
 - Status: ok
-- Model calls so far: 28 (102,697 tokens in, 207,385 out), 4.5 minutes
+- Model calls so far: 37 (146,256 tokens in, 230,457 out), 5.0 minutes
 
 ## Checker
 
 ```
-c-quantum-u3.html: 8 chapters, 14198 words, 9 figures, 154 KB
+c-quantum-u3.html: 8 chapters, 14284 words, 9 figures, 157 KB
 OK
 ```
 
