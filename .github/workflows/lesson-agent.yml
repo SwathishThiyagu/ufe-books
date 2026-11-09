@@ -1,0 +1,56 @@
+name: Lesson writer agent (DeepSeek, usual loop)
+# Runs pipeline/lessons/agent.py on each folder listed in pipeline/lessons/agent-request.txt (paths under pipeline/lessons/):
+# the same read → fill → build → look → fix loop as Claude's writer threads, silent builds only. Pushes to lesson/agent.
+on:
+  push:
+    branches: [main]
+    paths: ["pipeline/lessons/agent-request.txt"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: lesson-agent
+  cancel-in-progress: false
+jobs:
+  write:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Engine dependencies
+        run: |
+          pip install -q pillow playwright
+          cd pipeline/lessons/engine && npm init -y >/dev/null && npm i -s playwright@1.47.2 && npx playwright install --with-deps chromium >/dev/null
+          python -m playwright install chromium >/dev/null
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+      - name: Fonts
+        run: |
+          git clone -q --depth 1 --filter=blob:none --sparse https://github.com/google/fonts /tmp/gf
+          cd /tmp/gf && git sparse-checkout set ofl/rubik ofl/nunitosans ofl/notosansmath >/dev/null
+          mkdir -p ~/.fonts && find /tmp/gf/ofl -name '*.ttf' -exec cp {} ~/.fonts/ \; && fc-cache -f >/dev/null
+      - name: Write the lessons
+        env:
+          OPENAI_BASE_URL: https://api.deepseek.com
+          OPENAI_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_MODEL: deepseek-flash
+          MAX_TOKENS: "32000"
+          UFE_ENGINE: ${{ github.workspace }}/pipeline/lessons/engine
+          NODE_PATH: ${{ github.workspace }}/pipeline/lessons/engine/node_modules
+        run: |
+          for line in $(grep -v '^#' pipeline/lessons/agent-request.txt | tr ' ' '|'); do
+            d=$(echo $line | cut -d'|' -f1); n=$(echo $line | cut -d'|' -f2)
+            python pipeline/lessons/agent.py "pipeline/lessons/$d" "$n" --steps 90 || true
+          done
+      - name: Push the result
+        if: always()
+        run: |
+          git config user.name ufe-free-books; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -B lesson/agent
+          for line in $(grep -v '^#' pipeline/lessons/agent-request.txt | tr ' ' '|'); do d=$(echo $line | cut -d'|' -f1); git add -f "pipeline/lessons/$d"; done
+          git commit -qm "lesson agent run" || true; git push -q -f origin lesson/agent
