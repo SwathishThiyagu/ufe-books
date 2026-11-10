@@ -27,3 +27,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-compiler-u3 | free/c-compiler-u3-book | 1–6 | OK (library updated) | 10 Nov 2026 |
 | c-compiler-u4 | free/c-compiler-u4-book | 1–7 | OK (library updated) | 10 Nov 2026 |
 | c-compiler-u5 | free/c-compiler-u5-book | 1–6 | OK (library updated) | 10 Nov 2026 |
+| c-coa-u1 | main (library only, apply_html.py) | 1–7 | OK | 10 Nov 2026 |
