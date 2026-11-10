@@ -18,6 +18,13 @@ costs about twice as much per step). Text and examples are not touched.
 Wait until the Flash redraw lane has finished that book (its branch has a commit after 7 Nov 2026 06:40 UTC) so the two do
 not race.
 
+## Order (updated 10 Nov 2026)
+
+Lessons are being made now from the library copies of Compiler Design and Deep Learning, so do these next, in this
+order, then continue with the rest of the table: c-compiler-u1 … u6, c-dl-u1, c-dl-u3 … u6, then c-cn, c-toc, c-graphics.
+For any book that is already in the library (main has `books/cse/<sid>/<unit>.html`; true for all c-compiler and c-dl
+units), push with `--push --library` so the library copy on main gets the new figures too.
+
 ## Per book
 
 1. `git fetch origin <branch>` and read each chapter's worked example and current figure from `.free/<unit>/ch<k>.json`

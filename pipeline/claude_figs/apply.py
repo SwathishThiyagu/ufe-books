@@ -12,6 +12,7 @@ import sys, os, json, subprocess, importlib.util, shutil, re
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 unit, branch = sys.argv[1], sys.argv[2]
 push = '--push' in sys.argv
+library = '--library' in sys.argv
 q = json.load(open(os.path.join(ROOT, 'queue.json')))
 out = next(u['out'] for u in q if u['unit'] == unit)
 wt = os.path.join(ROOT, 'work', 'claude_figs', unit, 'tree')
@@ -68,3 +69,11 @@ if push:
     run('git', '-C', wt, 'commit', '-q', '-m', f'{unit}: figures redrawn by Claude (chapters {done}); text unchanged')
     run('git', '-C', wt, 'push', '-q', 'origin', f'HEAD:{branch}')
     print('pushed to', branch)
+if push and library:
+    # the book is also the library copy on main: update it there too
+    run('git', '-C', ROOT, 'pull', '-q', '--rebase', 'origin', 'main')
+    shutil.copy(os.path.join(wt, out), os.path.join(ROOT, out))
+    run('git', '-C', ROOT, 'add', out)
+    run('git', '-C', ROOT, 'commit', '-q', '-m', f'Library: {unit} with figures redrawn by Claude')
+    run('git', '-C', ROOT, 'push', '-q', 'origin', 'main')
+    print('library copy on main updated')
