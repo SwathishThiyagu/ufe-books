@@ -1,13 +1,13 @@
 # c-cn-u2: free-model run
 
-- Book: `books/cse/c-cn/c-cn-u2.html`
+- Book: `work/claude_figs/c-cn-u2/tree/books/cse/c-cn/c-cn-u2.html`
 - Status: ok
 - Model calls so far: 54 (240,672 tokens in, 378,536 out), 12.5 minutes
 
 ## Checker
 
 ```
-c-cn-u2.html: 8 chapters, 13954 words, 9 figures, 173 KB
+c-cn-u2.html: 8 chapters, 13932 words, 9 figures, 188 KB
 OK
 ```
 
