@@ -54,3 +54,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-toc-u1 | ds/c-toc-u1-book | 1–9 | OK | 10 Nov 2026 |
 | c-data-u1 | main (library only, apply_html.py) | 1–5 | OK | 10 Nov 2026 |
 | c-toc-u2 | ds/c-toc-u2-book | 1–9 | OK | 10 Nov 2026 |
+| c-data-u2 | main (library only, apply_html.py) | 1–9 | OK | 10 Nov 2026 |
