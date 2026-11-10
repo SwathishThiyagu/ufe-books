@@ -1,8 +1,15 @@
 # c-sec-u2: free-model run
 
-- Book: `books/cse/c-sec/c-sec-u2.html`
-- Status: error
-- Model calls so far: 27 (97,649 tokens in, 208,628 out), 12.1 minutes
+- Book: `work/claude_figs/c-sec-u2/tree/books/cse/c-sec/c-sec-u2.html`
+- Status: ok
+- Model calls so far: 27 (97,649 tokens in, 208,628 out), 12.2 minutes
+
+## Checker
+
+```
+c-sec-u2.html: 7 chapters, 11453 words, 8 figures, 152 KB
+OK
+```
 
 ## For the reviewer
 
