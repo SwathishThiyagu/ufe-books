@@ -1,13 +1,13 @@
 # c-compiler-u2: free-model run
 
-- Book: `books/cse/c-compiler/c-compiler-u2.html`
+- Book: `work/claude_figs/c-compiler-u2/tree/books/cse/c-compiler/c-compiler-u2.html`
 - Status: ok
-- Model calls so far: 29 (111,199 tokens in, 217,470 out), 7.5 minutes
+- Model calls so far: 29 (111,199 tokens in, 217,470 out), 7.6 minutes
 
 ## Checker
 
 ```
-c-compiler-u2.html: 7 chapters, 12852 words, 8 figures, 144 KB
+c-compiler-u2.html: 7 chapters, 12881 words, 8 figures, 160 KB
 OK
 ```
 
