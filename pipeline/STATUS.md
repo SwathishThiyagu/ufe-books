@@ -38,3 +38,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-coa-u5 | main (library only, apply_html.py) | 1–9 | OK | 10 Nov 2026 |
 | c-coa-u6 | main (library only, apply_html.py) | 1–9 | OK | 10 Nov 2026 |
 | c-dl-u5 | free/c-dl-u5-book | 1–7 | OK (library updated) | 10 Nov 2026 |
+| c-dl-u6 | free/c-dl-u6-book | 1–7 | OK (library updated) | 10 Nov 2026 |
