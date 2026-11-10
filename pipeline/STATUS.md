@@ -43,3 +43,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-cn-u1 | ds/c-cn-u1-book | 1–8 | OK | 10 Nov 2026 |
 | c-sec-u2 | free/c-sec-u2-book | 1–7 | OK (library updated) | 10 Nov 2026 |
 | c-cn-u2 | ds/c-cn-u2-book | 1–8 | OK | 10 Nov 2026 |
+| c-sec-u3 | free/c-sec-u3-book | 1–9 | OK (library updated) | 10 Nov 2026 |
