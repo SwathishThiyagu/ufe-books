@@ -67,3 +67,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-graphics-u5 | free/c-graphics-u5-book | 1–9 | OK | 10 Nov 2026 |
 | c-cv-u2 | free/c-cv-u2-book | 1–8 | OK (library updated) | 10 Nov 2026 |
 | c-graphics-u6 | free/c-graphics-u6-book | 1–9 | OK | 10 Nov 2026 |
+| c-cv-u3 | free/c-cv-u3-book | 1–9 | OK (library updated) | 10 Nov 2026 |
