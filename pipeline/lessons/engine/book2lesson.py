@@ -370,7 +370,7 @@ def lesson_js(B, k, K, chs, meta):
     w("/* ---- exam practice: the book's own questions and model answers. vis (an animated answer picture on the left) is IMPROVISE: add it where the answer can be drawn ---- */")
     for n_, q in enumerate(pick_questions(chs, B['bank']), 1):
         al = sentences(q['a'])[:4]
-        w(f"{{s:QZ,k:'pq',term:'Question {n_}',lv:'{q['lv']}',n:{n_},q:{js(q['q'])},say:'TODO ask it in your own words, then: Pause, and answer out loud.',cues:{{k:'TODO',q:'TODO'}},pause:3.4}},   // {q['marks']}")
+        w(f"{{s:QZ,k:'pq',term:'Question {n_}',lv:'{q['lv']}',n:{n_},q:{js(q['q'])},say:'TODO ask it in your own words (no "pause" or "answer out loud" line: the thinking clock gives the time)',cues:{{k:'TODO',q:'TODO'}},pause:3.4}},   // {q['marks']}")
         numeric = bool(re.search(r'\d\s*(?:[×x÷/=+−-]|µm|nm|mV|kJ|atm|M\b|s\b)', q['a']))
         tip = '   // the answer is a calculation: replace al with calc:{f,hint,fk,steps,live} so the working transforms on screen' if numeric else '   // shorten each line to fit; book answer above'
         w(f"{{s:QZ,k:'pa',term:'Answer {n_}',lv:'{q['lv']}',n:{n_},q:{js(q['q'])},say:'TODO',cues:{{{','.join(f'a{j}:' + js('TODO') for j in range(1, len(al) + 1))}}},al:[{','.join('[' + js(x) + ",'a" + str(j) + "']" for j, x in enumerate(al, 1))}]}},{tip}")
