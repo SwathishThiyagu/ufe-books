@@ -1,13 +1,13 @@
 # c-cv-u6: free-model run
 
-- Book: `books/cse/c-cv/c-cv-u6.html`
+- Book: `work/claude_figs/c-cv-u6/tree/books/cse/c-cv/c-cv-u6.html`
 - Status: ok
 - Model calls so far: 39 (161,828 tokens in, 275,163 out), 6.0 minutes
 
 ## Checker
 
 ```
-c-cv-u6.html: 9 chapters, 17036 words, 10 figures, 183 KB
+c-cv-u6.html: 9 chapters, 17005 words, 10 figures, 203 KB
 OK
 ```
 
