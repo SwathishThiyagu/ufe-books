@@ -1,13 +1,13 @@
 # c-graphics-u2: free-model run
 
-- Book: `books/cse/c-graphics/c-graphics-u2.html`
+- Book: `work/claude_figs/c-graphics-u2/tree/books/cse/c-graphics/c-graphics-u2.html`
 - Status: ok
-- Model calls so far: 40 (159,384 tokens in, 307,349 out), 8.5 minutes
+- Model calls so far: 40 (159,384 tokens in, 307,349 out), 8.6 minutes
 
 ## Checker
 
 ```
-c-graphics-u2.html: 8 chapters, 15058 words, 9 figures, 156 KB
+c-graphics-u2.html: 8 chapters, 15125 words, 9 figures, 191 KB
 OK
 ```
 
