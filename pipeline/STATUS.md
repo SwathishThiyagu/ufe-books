@@ -48,3 +48,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-sec-u4 | free/c-sec-u4-book | 1–9 | OK (library updated) | 10 Nov 2026 |
 | c-cn-u4 | ds/c-cn-u4-book | 1–9 | OK | 10 Nov 2026 |
 | c-cn-u5 | ds/c-cn-u5-book | 1–8 | OK | 10 Nov 2026 |
+| c-sec-u5 | free/c-sec-u5-book | 1–9 | OK (library updated) | 10 Nov 2026 |
