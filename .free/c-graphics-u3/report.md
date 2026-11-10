@@ -1,13 +1,13 @@
 # c-graphics-u3: free-model run
 
-- Book: `books/cse/c-graphics/c-graphics-u3.html`
+- Book: `work/claude_figs/c-graphics-u3/tree/books/cse/c-graphics/c-graphics-u3.html`
 - Status: ok
-- Model calls so far: 38 (153,456 tokens in, 285,428 out), 7.2 minutes
+- Model calls so far: 38 (153,456 tokens in, 285,428 out), 7.3 minutes
 
 ## Checker
 
 ```
-c-graphics-u3.html: 8 chapters, 12590 words, 9 figures, 145 KB
+c-graphics-u3.html: 8 chapters, 12679 words, 9 figures, 183 KB
 OK
 ```
 
