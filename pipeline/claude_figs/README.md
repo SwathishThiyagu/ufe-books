@@ -25,6 +25,13 @@ order, then continue with the rest of the table: c-compiler-u1 … u6, c-dl-u1, 
 For any book that is already in the library (main has `books/cse/<sid>/<unit>.html`; true for all c-compiler and c-dl
 units), push with `--push --library` so the library copy on main gets the new figures too.
 
+## Text that describes a figure (added 10 Nov 2026)
+
+A new drawing must never sit next to text that describes the old one. For every chapter you redraw, read the chapter text
+for sentences about its figure ("Figure 3.1.1 draws this clock", "the figure shows ...") and rewrite them to match the new
+drawing, changing nothing else. Put them in the same drawing module as `text_fixes(k)` returning `[(old sentence, new
+sentence), ...]`; `apply.py` applies them with the figure and stops if a sentence is not found exactly once.
+
 ## Per book
 
 1. `git fetch origin <branch>` and read each chapter's worked example and current figure from `.free/<unit>/ch<k>.json`

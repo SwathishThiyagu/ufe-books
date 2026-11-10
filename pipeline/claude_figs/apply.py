@@ -36,6 +36,15 @@ for k in range(1, 30):
     if not os.path.exists(os.path.join(st, f'figclaude_old{k}.json')):
         json.dump(old, open(os.path.join(st, f'figclaude_old{k}.json'), 'w'), ensure_ascii=False, indent=1)
     ch['figure'] = {'after_section': d.get('after_section', old.get('after_section', 1)), 'caption': d['caption'], 'spec': d['spec']}
+    # sentences in the chapter text that describe this figure: the drawing module gives them as (old, new) pairs
+    fixes = getattr(F, 'text_fixes', lambda k: [])(k) or []
+    if fixes:
+        raw = json.dumps(ch, ensure_ascii=False)
+        for a, b in fixes:
+            if raw.count(json.dumps(a, ensure_ascii=False)[1:-1]) != 1:
+                sys.exit(f'chapter {k}: text to replace not found exactly once: {a[:80]!r}')
+            raw = raw.replace(json.dumps(a, ensure_ascii=False)[1:-1], json.dumps(b, ensure_ascii=False)[1:-1])
+        ch = json.loads(raw)
     json.dump(ch, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=1); done.append(k)
 for fn in os.listdir(st):
     if re.match(r'(chfix|resize|spill|figfix)\d+', fn): os.remove(os.path.join(st, fn))
