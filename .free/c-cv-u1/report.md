@@ -1,13 +1,13 @@
 # c-cv-u1: free-model run
 
-- Book: `books/cse/c-cv/c-cv-u1.html`
+- Book: `work/claude_figs/c-cv-u1/tree/books/cse/c-cv/c-cv-u1.html`
 - Status: ok
-- Model calls so far: 43 (174,926 tokens in, 289,533 out), 7.6 minutes
+- Model calls so far: 43 (174,926 tokens in, 289,533 out), 7.7 minutes
 
 ## Checker
 
 ```
-c-cv-u1.html: 9 chapters, 17028 words, 10 figures, 185 KB
+c-cv-u1.html: 9 chapters, 16939 words, 10 figures, 192 KB
 OK
 ```
 
