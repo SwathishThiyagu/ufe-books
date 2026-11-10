@@ -91,3 +91,47 @@ def make_spec(FIG):
         h, body = fn()
         return {'caption': cap, 'spec': {'type': 'svg', 'h': h, 'body': body, 'aria': aria}}
     return spec
+
+
+# ---- added for the compiler / automata books ----
+def TM(x, y, s, size=14, anchor='middle', fill=INK, bold=False):
+    """monospace text, for code, lexemes and buffer cells"""
+    w = ' font-weight="700"' if bold else ''
+    return f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" text-anchor="{anchor}" style="fill:{fill};font-family:var(--mono)"{w}>{s}</text>'
+
+
+def arc(x1, y1, x2, y2, bend=0.0, c=AC, w=2, arrow='n', dash=None):
+    """quadratic curve from (x1,y1) to (x2,y2); bend > 0 bulges to the left of the direction of travel"""
+    mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+    dx, dy = x2 - x1, y2 - y1
+    cx, cy = mx + dy * bend, my - dx * bend
+    d = f';stroke-dasharray:{dash}' if dash else ''
+    m = f' marker-end="url(#ar-UID-{arrow})"' if arrow else ''
+    return f'<path d="M{x1:.1f},{y1:.1f} Q{cx:.1f},{cy:.1f} {x2:.1f},{y2:.1f}" style="fill:none;stroke:{c};stroke-width:{w}{d}"{m}/>'
+
+
+def edge(p, q, r=24, bend=0.0, c=AC, w=2, arrow='n', dash=None):
+    """arrow between two state centres p, q, stopping at the circles of radius r"""
+    import math
+    (x1, y1), (x2, y2) = p, q
+    a = math.atan2(y2 - y1, x2 - x1)
+    off = math.atan(bend * 2) if bend else 0
+    sx, sy = x1 + r * math.cos(a - off), y1 + r * math.sin(a - off)
+    ex, ey = x2 - (r + 3) * math.cos(a + off), y2 - (r + 3) * math.sin(a + off)
+    return arc(sx, sy, ex, ey, bend, c, w, arrow, dash)
+
+
+def state(x, y, name, accept=False, start=False, r=24, fill=PANEL, stroke=AC, size=15):
+    o = [f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" style="fill:{fill};stroke:{stroke};stroke-width:2"/>']
+    if accept: o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r - 5}" style="fill:none;stroke:{stroke};stroke-width:1.6"/>')
+    o.append(T(x, y + size * 0.35, name, size, bold=True))
+    if start: o.append(L(x - r - 34, y, x - r - 3, y, stroke, 2, arrow='n'))
+    return ''.join(o)
+
+
+def loop(x, y, r=24, c=AC, up=True, w=2):
+    """self-loop above (or below) a state"""
+    s = -1 if up else 1
+    x1, y1, x2, y2 = x - 10, y + s * (r - 3), x + 10, y + s * (r - 1)
+    return (f'<path d="M{x1:.1f},{y1:.1f} C{x - 30:.1f},{y + s * (r + 44):.1f} {x + 30:.1f},{y + s * (r + 44):.1f} {x2:.1f},{y2 + s * 2:.1f}" '
+            f'style="fill:none;stroke:{c};stroke-width:{w}" marker-end="url(#ar-UID-n)"/>')
