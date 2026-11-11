@@ -51,6 +51,15 @@ for k in range(1, 30):
     if fixes: fixed.append(k)
 for fn in os.listdir(st):
     if re.match(r'(chfix|resize|spill|figfix)\d+', fn): os.remove(os.path.join(st, fn))
+# web sources to leave out of the book (e.g. university-hosted pages): the drawing module may list URL fragments
+drops = getattr(F, 'drop_sources', lambda: [])() or []
+wp = os.path.join(st, 'web.json')
+if drops and os.path.exists(wp):
+    web = json.load(open(wp, encoding='utf-8'))
+    keep = [w for w in web if not any(d in (w.get('url') or '') for d in drops)]
+    if len(keep) != len(web):
+        json.dump(keep, open(wp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        print(f'dropped {len(web) - len(keep)} web source(s)')
 
 # assemble only: refuse to enter the fix loop with mock answers
 sys.path.insert(0, os.path.join(ROOT, 'pipeline'))
