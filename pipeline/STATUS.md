@@ -95,3 +95,9 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-web-u4 | free/c-web-u4-book | 1–9 | OK (library updated; figure text: existing sentences already match; no university names left) | 11 Nov 2026 |
 | c-web-u5 | free/c-web-u5-book | 1–9 | OK (library updated; figure text: existing sentences already match; no university names left) | 11 Nov 2026 |
 | c-web-u6 | free/c-web-u6-book | 1–9 | OK (library updated; 6.6 answer typo affactedRows fixed; no university names left) | 11 Nov 2026 |
+| c-ml-u1 | ds/c-ml-u1-book | 1–7 | OK (library updated; figure sentences in 1.4 and 1.5 rewritten) | 11 Nov 2026 |
+| c-ml-u2 | ds/c-ml-u2-book | 1–7 | OK (library updated; Stanford course-notes source dropped) | 11 Nov 2026 |
+| c-ml-u3 | ds/c-ml-u3-book | 1–9 | OK (library updated) | 11 Nov 2026 |
+| c-ml-u4 | free/c-ml-u4-book | 1–9 | OK (library updated; 4.2 SSE sentence and 4.5 PCA example corrected) | 11 Nov 2026 |
+| c-ml-u5 | ds/c-ml-u5-book | 1–9 | OK (library updated; Stanford course-notes source dropped) | 11 Nov 2026 |
+| c-ml-u6 | main (library only, apply_html.py) | 1–5 | OK (college colour codes removed) | 11 Nov 2026 |
