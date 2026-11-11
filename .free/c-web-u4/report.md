@@ -1,13 +1,13 @@
 # c-web-u4: free-model run
 
-- Book: `books/cse/c-web/c-web-u4.html`
+- Book: `work/claude_figs/c-web-u4/tree/books/cse/c-web/c-web-u4.html`
 - Status: ok
 - Model calls so far: 39 (156,232 tokens in, 275,756 out), 6.8 minutes
 
 ## Checker
 
 ```
-c-web-u4.html: 9 chapters, 15430 words, 10 figures, 184 KB
+c-web-u4.html: 9 chapters, 15365 words, 10 figures, 196 KB
 OK
 ```
 
