@@ -101,3 +101,9 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-ml-u4 | free/c-ml-u4-book | 1–9 | OK (library updated; 4.2 SSE sentence and 4.5 PCA example corrected) | 11 Nov 2026 |
 | c-ml-u5 | ds/c-ml-u5-book | 1–9 | OK (library updated; Stanford course-notes source dropped) | 11 Nov 2026 |
 | c-ml-u6 | main (library only, apply_html.py) | 1–5 | OK (college colour codes removed) | 11 Nov 2026 |
+| c-se-u1 | free/c-se-u1-book | 1–7 | OK (library updated; university colour codes removed) | 11 Nov 2026 |
+| c-se-u2 | free/c-se-u2-book | 1–9 (figure text: ch 2) | OK (library updated; university colour codes removed) | 11 Nov 2026 |
+| c-se-u3 | free/c-se-u3-book | 1–8 (figure text: ch 2; ch 3 pipeline-capacity fix) | OK (library updated; university colour codes removed) | 11 Nov 2026 |
+| c-se-u4 | free/c-se-u4-book | 1–9 | OK (library updated; university colour codes removed) | 11 Nov 2026 |
+| c-se-u5 | free/c-se-u5-book | 1–8 | OK (library updated; university colour codes removed) | 11 Nov 2026 |
+| c-se-u6 | free/c-se-u6-book | 1–9 (figure text: ch 8, 9) | OK (library updated; university colour codes removed) | 11 Nov 2026 |
