@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-ml-u2.html: 7 chapters, 12928 words, 8 figures, 164 KB
+c-ml-u2.html: 7 chapters, 12923 words, 8 figures, 164 KB
 OK
 ```
 
