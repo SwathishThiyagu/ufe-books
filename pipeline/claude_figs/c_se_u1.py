@@ -274,3 +274,8 @@ def spec(k):
 
 def text_fixes(k):
     return TEXT.get(k, [])
+
+
+def drop_sources():
+    # university-hosted pages: the books name no universities
+    return ['sei.cmu.edu', 'ocw.mit.edu']
