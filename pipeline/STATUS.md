@@ -77,3 +77,9 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-iot-u4 | free/c-iot-u4-book | 1–7 | OK (library updated; figure text rewritten) | 11 Nov 2026 |
 | c-iot-u5 | free/c-iot-u5-book | 1–7 | OK (library updated; figure text rewritten) | 11 Nov 2026 |
 | c-iot-u6 | free/c-iot-u6-book | 1–6 | OK (library updated; figure text rewritten) | 11 Nov 2026 |
+| c-cloud-u1 | free/c-cloud-u1-book | 1–9 (figure text: ch 8) | OK (library updated) | 11 Nov 2026 |
+| c-cloud-u2 | free/c-cloud-u2-book | 1–7 (figure text: ch 2) | OK (library updated) | 11 Nov 2026 |
+| c-cloud-u3 | free/c-cloud-u3-book | 1–9 (figure text: ch 7) | OK (library updated) | 11 Nov 2026 |
+| c-cloud-u4 | free/c-cloud-u4-book | 1–9 | OK (library updated) | 11 Nov 2026 |
+| c-cloud-u5 | free/c-cloud-u5-book | 1–9 | OK (library updated) | 11 Nov 2026 |
+| c-cloud-u6 | free/c-cloud-u6-book | 1–9 | OK (library updated) | 11 Nov 2026 |
