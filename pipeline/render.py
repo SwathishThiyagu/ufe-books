@@ -269,6 +269,9 @@ def book(P, shell, plan, chapters_html, us, web_checked):
            '__UNIT_NAME__': html.escape(U['name'], quote=False), '__LEAD__': scrub(inline(plan.get('lead'))),
            '__CHIPS__': chips, '__FOOT__': html.escape(foot, quote=False)}
     page = shell.replace('Fill the __PLACEHOLDERS__ and the <main> only', 'Fill the marked fields and the <main> only')
+    # the shell's unused per-college colour variables and dot classes carry college names: drop them
+    page = re.sub(r'\s*--u-[a-z]+:#[0-9a-fA-F]{3,8};', '', page)
+    page = re.sub(r'\n\.d-[a-z]+\{background:var\(--u-[a-z]+\)\}[^\n]*', '', page)
     for k, v in rep.items():
         page = page.replace(k, v)
     page = page.replace('__MAIN__', main)
