@@ -83,3 +83,9 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-cloud-u4 | free/c-cloud-u4-book | 1–9 | OK (library updated) | 11 Nov 2026 |
 | c-cloud-u5 | free/c-cloud-u5-book | 1–9 | OK (library updated) | 11 Nov 2026 |
 | c-cloud-u6 | free/c-cloud-u6-book | 1–9 | OK (library updated) | 11 Nov 2026 |
+| c-toc-u1 | ds/c-toc-u1-book | 1–9 | OK (library updated; figure text rewritten: 1.3, 1.9; university-named web sources removed) | 11 Nov 2026 |
+| c-toc-u2 | ds/c-toc-u2-book | 1–9 | OK (library updated; figure text rewritten: 2.9; university-named web sources removed) | 11 Nov 2026 |
+| c-toc-u3 | free/c-toc-u3-book | 1–9 | OK (library updated; figure text rewritten: 3.5; university-named web sources removed) | 11 Nov 2026 |
+| c-toc-u4 | free/c-toc-u4-book | 1–5 | OK (library updated; figure text rewritten: none needed; university-named web sources removed) | 11 Nov 2026 |
+| c-toc-u5 | free/c-toc-u5-book | 1–7 | OK (library updated; figure text rewritten: none needed; university-named web sources removed) | 11 Nov 2026 |
+| c-toc-u6 | free/c-toc-u6-book | 1–8 | OK (library updated; figure text rewritten: 6.8; university-named web sources removed) | 11 Nov 2026 |
