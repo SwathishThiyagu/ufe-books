@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-se-u6.html: 9 chapters, 15592 words, 10 figures, 189 KB
+c-se-u6.html: 9 chapters, 15582 words, 10 figures, 188 KB
 OK
 ```
 
