@@ -26,7 +26,7 @@ run('git', '-C', ROOT, 'worktree', 'add', '-q', '-B', f'cf-{unit}', wt, f'origin
 spec = importlib.util.spec_from_file_location('figs', os.path.join(ROOT, 'pipeline', 'claude_figs', unit.replace('-', '_') + '.py'))
 F = importlib.util.module_from_spec(spec); spec.loader.exec_module(F)
 st = os.path.join(wt, '.free', unit)
-done = []
+done, fixed = [], []
 for k in range(1, 30):
     p = os.path.join(st, f'ch{k}.json')
     if not os.path.exists(p): break
@@ -46,6 +46,7 @@ for k in range(1, 30):
             raw = raw.replace(json.dumps(a, ensure_ascii=False)[1:-1], json.dumps(b, ensure_ascii=False)[1:-1])
         ch = json.loads(raw)
     json.dump(ch, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=1); done.append(k)
+    if fixes: fixed.append(k)
 for fn in os.listdir(st):
     if re.match(r'(chfix|resize|spill|figfix)\d+', fn): os.remove(os.path.join(st, fn))
 
@@ -75,7 +76,10 @@ real([sys.executable, os.path.join(ROOT, 'pipeline', 'claude_figs', 'shot.py'), 
 print(f'redrew chapters {done}; screenshots in {shots}/fig-<k>.png')
 if push:
     run('git', '-C', wt, 'add', '-A', '.free', out)
-    run('git', '-C', wt, 'commit', '-q', '-m', f'{unit}: figures redrawn by Claude (chapters {done}); text unchanged')
+    textnote = f'figure sentences rewritten in chapters {fixed}' if fixed else 'text unchanged'
+    trailer = os.environ.get('CF_TRAILER', '')  # e.g. Co-Authored-By / session lines, appended to every commit
+    msg = f'{unit}: figures redrawn by Claude (chapters {done}); {textnote}' + (f'\n\n{trailer}' if trailer else '')
+    run('git', '-C', wt, 'commit', '-q', '-m', msg)
     run('git', '-C', wt, 'push', '-q', 'origin', f'HEAD:{branch}')
     print('pushed to', branch)
 if push and library:
@@ -83,6 +87,6 @@ if push and library:
     run('git', '-C', ROOT, 'pull', '-q', '--rebase', 'origin', 'main')
     shutil.copy(os.path.join(wt, out), os.path.join(ROOT, out))
     run('git', '-C', ROOT, 'add', out)
-    run('git', '-C', ROOT, 'commit', '-q', '-m', f'Library: {unit} with figures redrawn by Claude')
+    run('git', '-C', ROOT, 'commit', '-q', '-m', f'Library: {unit} with figures redrawn by Claude' + (f'\n\n{trailer}' if trailer else ''))
     run('git', '-C', ROOT, 'push', '-q', 'origin', 'main')
     print('library copy on main updated')
