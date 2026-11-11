@@ -259,3 +259,15 @@ FIG[9] = (f9, 'The head sweeps right through a, b, a in q1, reads ⊣ and steps 
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    """sentences in the chapter text that describe the figure, rewritten to match the drawing above"""
+    return {
+        3: [('The figure shows δ̂(A, 1001). The rows are prefixes, not separate runs. The last row gives C, a final state, so 1001 is accepted.',
+             'The figure draws δ̂(A, 1001) as one row of states, a column for each symbol read, with the run of 110 beside it for contrast. The 1001 row ends in C, a final state, so 1001 is accepted.')],
+        9: [('Using the machine in the figure (states q0, q1, q2, qf, d), trace the inputs aba and abb',
+             'A 2FA has states q0, q1, q2, qf and d, with F = {qf}: δ(q0, ⊢) = (q1, R), q1 moves R over a and b, δ(q1, ⊣) = (q2, L), δ(q2, a) = (qf, R) and δ(q2, b) = (d, R). The figure draws its run on aba. Trace the inputs aba and abb'),
+            ('Trace input ba on the figure\'s machine and give the verdict.',
+             'Trace input ba on the 2FA of the worked example (the machine whose run on aba the figure draws) and give the verdict.')],
+    }.get(k, [])

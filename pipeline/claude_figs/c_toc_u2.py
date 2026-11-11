@@ -239,3 +239,11 @@ FIG[9] = (f9, 'The DFA for [6-9][0-9]{9} reads ten digits from q0 to the accepti
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    """sentences in the chapter text that describe the figure, rewritten to match the drawing above"""
+    return {
+        9: [('The figure follows one short run on x12+7.',
+             'The figure shows a small scanner-style DFA of the same kind: the 10-digit mobile-number checker built in the worked example below, with one number accepted and one rejected.')],
+    }.get(k, [])
