@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-toc-u1.html: 9 chapters, 15681 words, 10 figures, 178 KB
+c-toc-u1.html: 9 chapters, 15729 words, 10 figures, 177 KB
 OK
 ```
 
