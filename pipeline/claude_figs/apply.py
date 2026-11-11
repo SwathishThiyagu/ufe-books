@@ -41,6 +41,8 @@ for k in range(1, 30):
     if fixes:
         raw = json.dumps(ch, ensure_ascii=False)
         for a, b in fixes:
+            if raw.count(json.dumps(a, ensure_ascii=False)[1:-1]) == 0 and raw.count(json.dumps(b, ensure_ascii=False)[1:-1]) == 1:
+                continue  # already rewritten by an earlier run on this branch
             if raw.count(json.dumps(a, ensure_ascii=False)[1:-1]) != 1:
                 sys.exit(f'chapter {k}: text to replace not found exactly once: {a[:80]!r}')
             raw = raw.replace(json.dumps(a, ensure_ascii=False)[1:-1], json.dumps(b, ensure_ascii=False)[1:-1])
