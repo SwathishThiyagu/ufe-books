@@ -47,6 +47,9 @@ for k in range(1, 30):
                 sys.exit(f'chapter {k}: text to replace not found exactly once: {a[:80]!r}')
             raw = raw.replace(json.dumps(a, ensure_ascii=False)[1:-1], json.dumps(b, ensure_ascii=False)[1:-1])
         ch = json.loads(raw)
+    # a wrong worked example the drawing exposed: the module may correct the chapter in place (idempotent)
+    if hasattr(F, 'chapter_fix'):
+        ch = F.chapter_fix(k, ch) or ch
     json.dump(ch, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=1); done.append(k)
     if fixes: fixed.append(k)
 for fn in os.listdir(st):
