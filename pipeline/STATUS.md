@@ -89,3 +89,9 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-toc-u4 | free/c-toc-u4-book | 1–5 | OK (library updated; figure text rewritten: none needed; university-named web sources removed) | 11 Nov 2026 |
 | c-toc-u5 | free/c-toc-u5-book | 1–7 | OK (library updated; figure text rewritten: none needed; university-named web sources removed) | 11 Nov 2026 |
 | c-toc-u6 | free/c-toc-u6-book | 1–8 | OK (library updated; figure text rewritten: 6.8; university-named web sources removed) | 11 Nov 2026 |
+| c-web-u1 | free/c-web-u1-book | 1–6 | OK (library updated; figure text: existing sentences already match; no university names left) | 11 Nov 2026 |
+| c-web-u2 | free/c-web-u2-book | 1–9 | OK (library updated; figure text: existing sentences already match; no university names left) | 11 Nov 2026 |
+| c-web-u3 | free/c-web-u3-book | 1–9 | OK (library updated; figure text: existing sentences already match; no university names left) | 11 Nov 2026 |
+| c-web-u4 | free/c-web-u4-book | 1–9 | OK (library updated; figure text: existing sentences already match; no university names left) | 11 Nov 2026 |
+| c-web-u5 | free/c-web-u5-book | 1–9 | OK (library updated; figure text: existing sentences already match; no university names left) | 11 Nov 2026 |
+| c-web-u6 | free/c-web-u6-book | 1–9 | OK (library updated; 6.6 answer typo affactedRows fixed; no university names left) | 11 Nov 2026 |
