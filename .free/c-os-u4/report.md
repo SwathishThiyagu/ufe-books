@@ -2,7 +2,7 @@
 
 - Book: `work/claude_figs/c-os-u4/tree/books/cse/c-os/c-os-u4.html`
 - Status: ok
-- Model calls so far: 38 (148,029 tokens in, 257,672 out), 6.9 minutes
+- Model calls so far: 38 (148,029 tokens in, 257,672 out), 7.0 minutes
 
 ## Checker
 
