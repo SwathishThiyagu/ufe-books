@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-toc-u2.html: 9 chapters, 16702 words, 10 figures, 188 KB
+c-toc-u2.html: 9 chapters, 16715 words, 10 figures, 187 KB
 OK
 ```
 
