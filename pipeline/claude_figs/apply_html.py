@@ -47,6 +47,19 @@ for k in range(1, 30):
     html = html[:m.start()] + fh + html[m.end():]
     done.append(k)
 
+# sentences that describe a figure: the module's text_fixes(k) as (old, new) pairs, matched in the HTML
+fixed = []
+for k in done:
+    for a, b in (getattr(F, 'text_fixes', lambda k: [])(k) or []):
+        if html.count(a) == 0 and html.count(b) == 1:
+            continue  # already rewritten
+        if html.count(a) != 1:
+            sys.exit(f'chapter {k}: text to replace not found exactly once: {a[:80]!r}')
+        html = html.replace(a, b); fixed.append(k)
+# the shell's unused per-college colour variables and dot classes carry college names (as in render.py)
+html = re.sub(r'\s*--u-[a-z]+:#[0-9a-fA-F]{3,8};', '', html)
+html = re.sub(r'\n\.d-[a-z]+\{background:var\(--u-[a-z]+\)\}[^\n]*', '', html)
+
 os.makedirs(os.path.dirname(oldp), exist_ok=True)
 json.dump(old, open(oldp, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 open(src, 'w', encoding='utf-8').write(html)
@@ -62,6 +75,8 @@ if last != 'OK':
     sys.exit('checker not clean: fix the drawings and run again (the book file is changed; git checkout it to undo)')
 if push:
     run('git', '-C', ROOT, 'add', out, oldp, os.path.join(ROOT, 'pipeline', 'claude_figs', unit.replace('-', '_') + '.py'))
-    run('git', '-C', ROOT, 'commit', '-q', '-m', f'Library: {unit} with figures redrawn by Claude (chapters {done}); text unchanged')
+    note = f'figure sentences rewritten in chapters {sorted(set(fixed))}' if fixed else 'text unchanged'
+    trailer = os.environ.get('CF_TRAILER', '')
+    run('git', '-C', ROOT, 'commit', '-q', '-m', f'Library: {unit} with figures redrawn by Claude (chapters {done}); {note}; college colour codes removed' + (f'\n\n{trailer}' if trailer else ''))
     run('git', '-C', ROOT, 'push', '-q', 'origin', 'HEAD:main')
     print('pushed to main')
