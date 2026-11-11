@@ -1,13 +1,13 @@
 # c-toc-u3: free-model run
 
-- Book: `books/cse/c-toc/c-toc-u3.html`
+- Book: `work/claude_figs/c-toc-u3/tree/books/cse/c-toc/c-toc-u3.html`
 - Status: ok
 - Model calls so far: 33 (124,619 tokens in, 316,705 out), 8.6 minutes
 
 ## Checker
 
 ```
-c-toc-u3.html: 9 chapters, 16046 words, 10 figures, 157 KB
+c-toc-u3.html: 9 chapters, 16221 words, 10 figures, 180 KB
 OK
 ```
 
