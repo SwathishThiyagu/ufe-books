@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-cloud-u1.html: 9 chapters, 17515 words, 10 figures, 192 KB
+c-cloud-u1.html: 9 chapters, 17515 words, 10 figures, 191 KB
 OK
 ```
 
