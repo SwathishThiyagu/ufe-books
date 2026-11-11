@@ -1,13 +1,13 @@
 # c-iot-u3: free-model run
 
-- Book: `books/cse/c-iot/c-iot-u3.html`
+- Book: `work/claude_figs/c-iot-u3/tree/books/cse/c-iot/c-iot-u3.html`
 - Status: ok
 - Model calls so far: 36 (135,421 tokens in, 223,773 out), 5.6 minutes
 
 ## Checker
 
 ```
-c-iot-u3.html: 9 chapters, 16452 words, 10 figures, 179 KB
+c-iot-u3.html: 9 chapters, 16440 words, 10 figures, 226 KB
 OK
 ```
 
