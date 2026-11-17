@@ -87,7 +87,7 @@ def f3():
     o = [T(x0 + c, 26, 'actual class', 14, fill=MUT), T(x0 + c / 2, 52, 'spam', 14, bold=True), T(x0 + 1.5 * c, 52, 'ham', 14, bold=True)]
     o.append(f'<text x="44" y="{y0 + c:.1f}" font-size="14" text-anchor="middle" transform="rotate(-90 44 {y0 + c:.1f})" style="fill:var(--muted)">predicted</text>')
     o.append(T(x0 - 14, y0 + c / 2 + 5, 'spam', 14, 'end', INK, True)); o.append(T(x0 - 14, y0 + 1.5 * c + 5, 'ham', 14, 'end', INK, True))
-    cells = [(0, 0, 'TP', 80, ACS, AC), (1, 0, 'FP', 20, NXS, NX), (0, 1, 'FN', 10, NXS, NX), (1, 1, 'TN', 890, PANEL, L2)]
+    cells = [(0, 0, 'TP', 80, ACS, AC), (1, 0, 'FP', 20, LVS, LV), (0, 1, 'FN', 10, LVS, LV), (1, 1, 'TN', 890, PANEL, L2)]
     for cx, cy, lab, n, f, s in cells:
         x, y = x0 + cx * c, y0 + cy * c
         o.append(R(x + 3, y + 3, c - 6, c - 6, f, s, 8, 2))

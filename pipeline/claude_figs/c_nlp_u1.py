@@ -82,12 +82,12 @@ def f3():
     o.append(T(xs[4], ys + 48, 'final', 13, fill=MUT))
     o.append(T(xs[0], ys + 48, 'start', 13, fill=MUT))
     # q2 has no ! arc
-    o.append(L(xs[2], ys + 26, xs[2], ys + 62, NX, 2, '5 4'))
-    o.append(T(xs[2], ys + 78, 'no ! arc from q2', 13, fill=NX, bold=True))
+    o.append(L(xs[2], ys + 26, xs[2], ys + 62, LV, 2, '5 4'))
+    o.append(T(xs[2], ys + 78, 'no ! arc from q2', 13, fill=LV, bold=True))
     # traces
     tr = [('baa!', 'q0 → q1 → q2 → q3 → q4', 'accepted', AC, ACS),
           ('baaa!', 'q0 → q1 → q2 → q3 → q3 → q4', 'accepted', AC, ACS),
-          ('ba!', 'q0 → q1 → q2, then ! has nowhere to go', 'rejected', NX, NXS)]
+          ('ba!', 'q0 → q1 → q2, then ! has nowhere to go', 'rejected', LV, LVS)]
     y = 214
     for s, path, res, c, cs in tr:
         o.append(R(40, y, 640, 40, cs, c, 6, 1.5))
@@ -147,18 +147,18 @@ def f5():
         o.append(R(x + 3, 44, cw - 6, 36, NXS if stop else PANEL, NX if stop else L2, 6, 1.5))
         o.append(TM(x + cw / 2, 68, t, 15, bold=not stop, fill=MUT if stop else INK))
         if stop:
-            o.append(L(x + 12, 62, x + cw - 12, 62, NX, 2.5))
-            o.append(T(x + cw / 2, 136, 'stop word,', 13, fill=NX))
-            o.append(T(x + cw / 2, 154, 'dropped', 13, fill=NX))
+            o.append(L(x + 12, 62, x + cw - 12, 62, LV, 2.5))
+            o.append(T(x + cw / 2, 136, 'stop word,', 13, fill=LV))
+            o.append(T(x + cw / 2, 154, 'dropped', 13, fill=LV))
             continue
         bad = stems[i] == 'li'
         o.append(L(x + cw / 2, 82, x + cw / 2, 104, L2, 1.5, arrow='m'))
-        o.append(R(x + 3, 108, cw - 6, 36, NXS if bad else ACS, NX if bad else AC, 6, 2 if bad else 1.5))
+        o.append(R(x + 3, 108, cw - 6, 36, LVS if bad else ACS, LV if bad else AC, 6, 2 if bad else 1.5))
         o.append(TM(x + cw / 2, 132, stems[i], 15))
         o.append(R(x + 3, 160, cw - 6, 36, PANEL, AC, 6, 1.5))
         o.append(TM(x + cw / 2, 184, lem[i], 15))
         o.append(T(x + cw / 2, 236, cut[i], 16, bold=cut[i] != '0', fill=INK if cut[i] != '0' else MUT))
-    o.append(T(x0 + 6.5 * cw, 266, 'li is not a word', 13, fill=NX, bold=True))
+    o.append(T(x0 + 6.5 * cw, 266, 'li is not a word', 13, fill=LV, bold=True))
     y = 290
     o.append(boxt(30, y, 210, 50, ['6 tokens survive'], PANEL, AC, 15))
     o.append(boxt(255, y, 210, 50, ['5 stems, 3 lemmas'], PANEL, AC, 15))

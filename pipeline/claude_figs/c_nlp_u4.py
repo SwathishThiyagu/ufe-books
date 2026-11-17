@@ -27,9 +27,9 @@ def f1():
             r.append(boxt(x - 36, y - 15, 72, 30, [n], FIGBG, L2 if n == 'Gita' else AC, 14))
         r.append(T(x0 + 80, 252, 'not a student: no duty', 12, fill=MUT))
         if not ok:
-            r.append(T(x0 + 172, 160, '✗', 22, fill=NX, bold=True))
+            r.append(T(x0 + 172, 160, '✗', 22, fill=LV, bold=True))
         r.append(boxt(x0 + 10, 270, 320, 52, ['2 of 2 students read a book', 'formula TRUE'] if ok else ['Meera reads no book: 1 of 2', 'formula FALSE'],
-                      ACS if ok else NXS, AC if ok else NX, 14, True))
+                      ACS if ok else LVS, AC if ok else LV, 14, True))
         return ''.join(r)
     o.append(model(0, '(b) Reads = {(Ravi, book1), (Meera, book2)}', [('Ravi', 'book1'), ('Meera', 'book2')], True))
     o.append(model(370, '(c) Reads = {(Ravi, book1)}', [('Ravi', 'book1')], False))
@@ -147,8 +147,8 @@ def f5():
     o.append(T(520, y + 33, '→ always say finance', 14, 'start'))
     for i, (s, ok) in enumerate([('finance', 1), ('finance', 1), ('river', 0), ('river', 0)]):
         x = 20 + i * 130
-        o.append(R(x, y + 58, 120, 32, LVS if ok else NXS, LV if ok else NX, 6, 1.5))
-        o.append(T(x + 60, y + 79, f'{s} {"✓" if ok else "✗"}', 14, bold=True, fill=LV if ok else NX))
+        o.append(R(x, y + 58, 120, 32, NXS if ok else LVS, NX if ok else LV, 6, 1.5))
+        o.append(T(x + 60, y + 79, f'{s} {"✓" if ok else "✗"}', 14, bold=True, fill=NX if ok else LV))
     o.append(T(560, y + 79, '2 of 4 = 50%', 15, 'start', INK, True))
     return y + 104, ''.join(o)
 FIG[5] = (f5, 'Lesk compares the context with each gloss: river is the only shared word, and it is in the bank2 gloss, so the river-edge sense wins 1 to 0. The most frequent sense baseline always answers finance and gets 2 of the 4 test items right.',

@@ -231,13 +231,13 @@ def f8():
     # system spans
     def span(i0, i1, lab, ok):
         x = x0 + i0 * cw + 4; w = (i1 - i0 + 1) * cw - 8
-        return R(x, 138, w, 32, LVS if ok else NXS, LV if ok else NX, 5, 2) + T(x + w / 2, 159, lab, 14, bold=True)
+        return R(x, 138, w, 32, NXS if ok else LVS, NX if ok else LV, 5, 2) + T(x + w / 2, 159, lab, 14, bold=True)
     o.append(span(1, 1, 'PER', True)); o.append(span(3, 3, 'ORG', True)); o.append(span(6, 8, 'LOC: team in Pune', False))
-    o.append(T(x0 + 1.5 * cw, 192, '✓ match', 13, fill=LV, bold=True)); o.append(T(x0 + 3.5 * cw, 192, '✓ match', 13, fill=LV, bold=True))
-    o.append(T(x0 + 7.5 * cw, 192, '✗ wrong boundary', 13, fill=NX, bold=True))
+    o.append(T(x0 + 1.5 * cw, 192, '✓ match', 13, fill=NX, bold=True)); o.append(T(x0 + 3.5 * cw, 192, '✓ match', 13, fill=NX, bold=True))
+    o.append(T(x0 + 7.5 * cw, 192, '✗ wrong boundary', 13, fill=LV, bold=True))
     y = 222
-    o.append(boxt(20, y, 220, 64, ['false positive:', 'team in Pune (LOC)'], NXS, NX, 14))
-    o.append(boxt(250, y, 220, 64, ['false negative:', 'Pune (LOC) missed'], NXS, NX, 14))
+    o.append(boxt(20, y, 220, 64, ['false positive:', 'team in Pune (LOC)'], LVS, LV, 14))
+    o.append(boxt(250, y, 220, 64, ['false negative:', 'Pune (LOC) missed'], LVS, LV, 14))
     o.append(boxt(480, y, 220, 64, ['C = 2, N = 3, G = 3', 'P = R = F1 = 0.67'], ACS, AC, 14, True))
     return y + 76, ''.join(o)
 FIG[8] = (f8, 'Gold BIO tags against the system\'s spans. Rao and TCS match exactly; the system\'s LOC span covers team in Pune where gold has only Pune, so one wrong boundary costs a false positive and a false negative, and P = R = F1 = 0.67.',
@@ -265,9 +265,9 @@ def f9():
     for i in range(5):
         x = 20 + i * 64
         ok = i < 2
-        o.append(R(x, y, 56, 34, LVS if ok else PANEL, LV if ok else L2, 5, 1.5, None if ok else '5 4'))
-        o.append(T(x + 28, y + 23, 'found' if ok else 'missed', 13, fill=LV if ok else MUT, bold=ok))
-    o.append(R(360, y, 56, 34, NXS, NX, 5, 1.5)); o.append(T(388, y + 23, 'wrong', 13, fill=NX, bold=True))
+        o.append(R(x, y, 56, 34, NXS if ok else PANEL, NX if ok else L2, 5, 1.5, None if ok else '5 4'))
+        o.append(T(x + 28, y + 23, 'found' if ok else 'missed', 13, fill=NX if ok else MUT, bold=ok))
+    o.append(R(360, y, 56, 34, LVS, LV, 5, 1.5)); o.append(T(388, y + 23, 'wrong', 13, fill=LV, bold=True))
     for i, t in enumerate(['P = 2 ÷ 3 = 0.67', 'R = 2 ÷ 5 = 0.40', 'F1 = 0.50']):
         o.append(T(20 + i * 180, y + 58, t, 15, 'start', INK, True))
     return y + 72, ''.join(o)

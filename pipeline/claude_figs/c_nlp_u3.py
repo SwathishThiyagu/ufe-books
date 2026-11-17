@@ -168,7 +168,7 @@ def f6():
     o.append(harc(2, 5, 'advmod (gold)', AC, hgt=140))
     o.append(harc(None, 2, 'root', AC, hgt=175))
     # system's wrong arc, drawn below the words
-    o.append(harc(4, 5, 'advmod (system: wrong head)', NX, '6 4', up=False, w=2.5, arrow='x'))
+    o.append(harc(4, 5, 'advmod (system: wrong head)', LV, '6 4', up=False, w=2.5, arrow='l'))
     y = 296
     o.append(T(20, y, '6 gold arcs (5 between words + 1 to ROOT). The system gets 5 right.', 14, 'start'))
     o.append(boxt(20, y + 16, 330, 44, ['UAS = 5 ÷ 6 = 0.8333'], ACS, AC, 15, True))
