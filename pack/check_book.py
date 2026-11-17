@@ -70,8 +70,9 @@ def main():
     if not raw.lstrip().lower().startswith('<!doctype html'): probs.append('file must start with <!doctype html> (copy book_shell.html)')
     left = re.findall(r'__[A-Z_]+__', raw)
     if left: probs.append(f'placeholders not filled: {sorted(set(left))}')
-    for bad in ('lorem ipsum', 'TODO', 'TBD', '[citation needed]', 'as an AI', 'I cannot', 'placeholder'):
-        if bad.lower() in raw.lower(): probs.append(f'text contains "{bad}"')
+    # whole words only, so "as an air gap", "airspeed" and "Gouy-Stodola" are not caught; TODO, TBD and AI must be upper case
+    for bad, flags in (('lorem ipsum', re.I), ('TODO', 0), ('TBD', 0), ('[citation needed]', re.I), ('as an AI', 0), ('I cannot', 0), ('placeholder', re.I)):
+        if re.search(r'(?<![A-Za-z])' + re.escape(bad) + r'(?![A-Za-z])', raw, flags): probs.append(f'text contains "{bad}"')
     w = Walk(); w.feed(raw)
     if w.ext: probs.append(f'external resources are not allowed (books must be self-contained): {w.ext[:3]}')
     dup = {i for i in w.ids if w.ids.count(i) > 1}
