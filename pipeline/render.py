@@ -240,7 +240,7 @@ def sources_html(us, web_checked):
         s = f'{inline(b.get("authors"))}, <i>{inline(b.get("title"))}</i>'
         if b.get('edition'): s += f', {inline(b["edition"])}'
         if b.get('pointer'): s += f': {inline(b["pointer"])}'
-        books.append(f'<li>{s} (from memory; check).</li>')
+        books.append(f'<li>{s}{"" if s.endswith(".") else "."}</li>')
     out = ['<section id="sources"><h2>Sources and further reading</h2><h3>Textbooks</h3><ul class="srcs">' + ''.join(books) + '</ul>']
     if web_checked:
         out.append('<h3>Open web resources</h3>')
