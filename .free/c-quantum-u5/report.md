@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-quantum-u5.html: 8 chapters, 13136 words, 9 figures, 164 KB
+c-quantum-u5.html: 8 chapters, 13141 words, 9 figures, 164 KB
 OK
 ```
 
