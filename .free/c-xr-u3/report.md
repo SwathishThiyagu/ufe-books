@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-xr-u3.html: 8 chapters, 14594 words, 9 figures, 166 KB
+c-xr-u3.html: 8 chapters, 14597 words, 9 figures, 166 KB
 OK
 ```
 
