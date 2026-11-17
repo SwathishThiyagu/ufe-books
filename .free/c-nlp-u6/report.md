@@ -2,7 +2,7 @@
 
 - Book: `work/claude_figs/c-nlp-u6/tree/books/cse/c-nlp/c-nlp-u6.html`
 - Status: ok
-- Model calls so far: 46 (195,778 tokens in, 309,183 out), 8.3 minutes
+- Model calls so far: 46 (195,778 tokens in, 309,183 out), 8.4 minutes
 
 ## Checker
 
