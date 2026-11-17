@@ -124,16 +124,16 @@ def f4():
     o.append(T(30 - 18, 356, '8 → 4 → 2 → 1: log₂ 8 = 3 rounds, cost 3 × 8 = 24', 14, 'start', bold=True))
     # CRCW
     cx, cy = 570, 150
-    o.append(T(cx, 72, 'all 8 write at once;', 13, fill=MUT)); o.append(T(cx, 90, 'lowest index P0 wins', 13, fill=MUT))
+    o.append(T(cx, 72, 'all 8 write at once;', 13, fill=MUT)); o.append(T(cx, 90, 'highest index P7 wins', 13, fill=MUT))
     o.append(R(cx - 50, cy - 16, 100, 32, LVS, LV, 6)); o.append(T(cx, cy + 5, 'A', 15, bold=True))
     for i in range(8):
         x = 455 + i * 33
         o.append(R(x - 15, 296, 30, 28, PANEL, AC, 6)); o.append(T(x, 315, f'P{i}', 13, bold=True))
-        o.append(L(x, 294, cx + (x - cx) * 0.36, cy + 20, NX if i else LV, 1.8 if i else 2.5, arrow='x' if i else 'l'))
+        o.append(L(x, 294, cx + (x - cx) * 0.36, cy + 20, NX if i < 7 else LV, 1.8 if i < 7 else 2.5, arrow='x' if i < 7 else 'l'))
     o.append(T(cx, 356, '1 round, cost 1 × 8 = 8', 14, bold=True))
     return 376, ''.join(o)
 FIG[4] = (f4, 'Eight processors want to write cell A. Under EREW a tree combine halves the writers each round, 8 → 4 → 2 → 1, so 3 rounds and cost 24 processor-time units; priority CRCW lets all 8 write in 1 round, cost 8.',
-          'Left: eight processors merge pairwise in three rounds into cell A. Right: eight processors all send arrows to cell A in one round, with P0 winning.')
+          'Left: eight processors merge pairwise in three rounds into cell A. Right: eight processors all send arrows to cell A in one round, with P7, the highest index, winning.')
 
 
 # ---- 1.5 three networks on N = 8 ----
@@ -250,6 +250,8 @@ FIG[8] = (f8, 'Data parallel: both GPUs train 32 images on the full model for 80
 
 
 TEXT = {
+    2: [('SIMD is a SIMD computer: one control unit', 'A SIMD computer has one control unit:'),
+        ('MIMD is a MIMD multiprocessor: each processor', 'In a MIMD multiprocessor, each processor')],
     4: [('Only a few universities teach it in detail; it remains the standard analysis model for shared-memory algorithms.',
          'It remains the standard analysis model for shared-memory algorithms.')],
     5: [('In stage i, node x links to the node differing in bit i in stage i + 1, and to matching nodes in stage i − 1.',
