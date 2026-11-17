@@ -165,7 +165,7 @@ def f6():
     return stages('cut -d, -f1,3 sales.csv | grep \'^Delhi\' | sort -t, -k2 -n | head -2', [
         ('cut -f1,3', ['Delhi,120', 'Mumbai,80', 'Delhi,300', 'Chennai,50', 'Delhi,150'], [1, 0, 1, 0, 1]),
         ("grep '^Delhi'", ['Delhi,120', 'Delhi,300', 'Delhi,150'], None),
-        ('sort -n -k2', ['Delhi,120', 'Delhi,150', 'Delhi,300'], [1, 1, 0]),
+        ('sort -t, -k2 -n', ['Delhi,120', 'Delhi,150', 'Delhi,300'], [1, 1, 0]),
         ('head -2', ['Delhi,120', 'Delhi,150'], None)], 'Two rows reach the screen: 120 and 150 rupees', 290)
 FIG[6] = (f6, 'Each column is the stream after one command: grep drops the Mumbai and Chennai lines, sort puts 120, 150, 300 in order, and head -2 keeps Delhi,120 and Delhi,150.',
           'Four columns of lines, one per command in the pipeline; struck-out lines are the ones the next command drops, and the last column holds Delhi,120 and Delhi,150.')
@@ -228,7 +228,14 @@ def text_fixes(k):
 
 
 def chapter_fix(k, ch):
-    return unix_text.clean(ch)
+    ch = unix_text.clean(ch)
+    if k == 5:
+        # 3.5 analyze question: /etc/passwd is world-readable, so grep on it never prints "Permission denied";
+        # /etc/shadow, run by an ordinary user, does
+        for q in ch.get('quiz', []):
+            if 'grep root /etc/passwd' in q['q']:
+                q['q'] = 'Run by an ordinary user, why does ' + q['q'][len('Why does '):].replace('grep root /etc/passwd', 'grep root /etc/shadow')
+    return ch
 
 
 def drop_sources():

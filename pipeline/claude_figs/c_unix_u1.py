@@ -192,7 +192,10 @@ def text_fixes(k):
 
 
 def chapter_fix(k, ch):
-    return unix_text.clean(ch)
+    ch = unix_text.clean(ch)
+    if k == 2 and ch.get('prereq', '').startswith('You need Chapter 1, '):
+        ch['prereq'] = 'You need Chapter 1.1, ' + ch['prereq'][len('You need Chapter 1, '):]
+    return ch
 
 
 def drop_sources():
