@@ -250,6 +250,8 @@ TEXT[6] = [
     ('RIGHT-ARC makes the stack top the head of the first buffer word and pushes that buffer word on the stack.',
      'RIGHT-ARC makes the stack top the head of the first buffer word, removes that buffer word, and moves the stack top back to the front of the buffer.'),
 ]
+TEXT[6] += [('Four actions are possible.', 'Three actions are possible, plus a stop rule.'),
+            ('the four actions above', 'the three actions above')]
 
 
 def text_fixes(k):
