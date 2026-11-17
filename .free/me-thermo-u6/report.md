@@ -2,7 +2,7 @@
 
 - Book: `books/mech/me-thermo/me-thermo-u6.html`
 - Status: error
-- Model calls so far: 23 (99,141 tokens in, 217,287 out), 4.7 minutes
+- Model calls so far: 26 (110,897 tokens in, 246,504 out), 7.1 minutes
 
 ## For the reviewer
 
