@@ -1,0 +1,271 @@
+{
+ "lead": "A parallel byte needs eight wires; a serial link needs two. The 8051 UART (universal asynchronous receiver/transmitter) shifts a byte out one bit at a time, adds a start and stop bit, and rebuilds incoming bits. Timer 1 sets the bit rate. RS-232 raises 0–5 V logic to ±3 to ±15 V so a cable can reach a PC. GSM modems, GPS modules and old display boards use this link.",
+ "prereq": "You need: <a href=\"#8051-architecture-pins-memory-and-special-function-registers\">4.1</a> for SCON, SBUF and PCON, and <a href=\"#timers-and-counters-modes-and-programming\">4.3</a> for Timer 1 in auto-reload mode.",
+ "sections": [
+  {
+   "h3": "The mode 1 frame, SCON and SBUF",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Serial transmission sends bits one after another on one wire. In mode 1 the 8051 frame is ten bits: start bit (0), eight data bits least significant first, stop bit (1). No clock wire is used; the receiver restarts its clock on the start bit's falling edge, so the link is asynchronous. At 9600 baud a ten-bit frame carries 960 bytes per second, not 1200."
+    },
+    {
+     "type": "p",
+     "text": "SCON (0x98) selects the mode and holds flags. SM0 = 0, SM1 = 1 selects mode 1; REN = 1 enables the receiver."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Bit",
+      "Name",
+      "Job in mode 1"
+     ],
+     "rows": [
+      [
+       "2",
+       "SM2",
+       "multiprocessor flag, keep 0"
+      ],
+      [
+       "3",
+       "REN",
+       "1 = receiver enabled"
+      ],
+      [
+       "4",
+       "TB8",
+       "9th transmit bit, modes 2 and 3"
+      ],
+      [
+       "6",
+       "TI",
+       "set after transmit, cleared by software"
+      ],
+      [
+       "7",
+       "RI",
+       "set after receive, cleared by software"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "SBUF (0x99) has two registers behind one address. Writing SBUF loads the transmit register and starts the frame. Reading SBUF returns the received byte. Hardware sets TI when it puts the stop bit on the line, and sets RI when a whole frame arrives. Neither flag clears itself; a routine without CLR TI waits forever on the second byte."
+    }
+   ]
+  },
+  {
+   "h3": "Baud rate from Timer 1",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Baud rate is bits per second. At 9600 baud one bit lasts 1/9600 s ≈ 104 µs. In mode 1 the shift clock comes from Timer 1 in mode 2, 8-bit auto-reload. The timer counts at fosc/12 and overflows every (256 − TH1) counts. Each overflow shifts one bit."
+    },
+    {
+     "type": "formula",
+     "text": "baud = (2^SMOD / 32) × fosc / (12 × (256 − TH1))",
+     "where": "baud is bits per second; SMOD is bit 7 of PCON, 0 or 1; fosc is the crystal frequency in Hz; TH1 is the 8-bit reload value held in TH1; 12 converts fosc into the timer clock; (256 − TH1) is the number of timer clocks per overflow; 32 is the fixed divider inside the UART."
+    },
+    {
+     "type": "p",
+     "text": "Rearranged: TH1 = 256 − fosc / (12 × 32 × 2^SMOD × baud). The 11.0592 MHz crystal is popular because 11,059,200 = 384 × 28,800, so standard rates divide it exactly. SMOD = 1 doubles the baud rate for the same TH1."
+    }
+   ]
+  },
+  {
+   "h3": "RS-232 levels and the MAX232",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 8051 pins carry TTL levels: 0 V is logic 0, 5 V is logic 1. RS-232 inverts this and uses higher voltages. Logic 0 is +3 V to +15 V (space); logic 1 is −3 V to −15 V (mark). Between −3 V and +3 V is undefined, and that dead band gives noise immunity on a long cable. A TTL pin cannot drive such a line, and ±12 V on an 8051 pin would destroy it."
+    },
+    {
+     "type": "p",
+     "text": "The MAX232 converts both ways. It has two drivers, two receivers and a charge pump that doubles and inverts the 5 V rail, giving about +9 V and −9 V from one supply and four small capacitors. TXD (port 3.1) feeds a driver, whose output goes to DB9 pin 3. The PC signal arrives on pin 2, passes through a receiver, and reaches RXD (port 3.0) as TTL. Pin 5 is ground; the two data wires cross over."
+    }
+   ]
+  },
+  {
+   "h3": "Polling transmit and receive",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Polling repeats a test until a flag changes. To transmit, write SBUF, wait for TI, clear TI. To receive, wait for RI, read SBUF, clear RI. One frame takes about 1 ms at 9600 baud, so the CPU spins doing nothing else. The interrupt version is in <a href=\"#interrupts-and-interrupt-programming\">4.5</a>."
+    },
+    {
+     "type": "code",
+     "lang": "pseudo",
+     "code": "TX:  MOV  SBUF, A     ; writing SBUF starts the frame\nWAIT: JNB  TI, WAIT    ; wait until TI = 1\n     CLR  TI          ; clear the flag by software\n     RET\n\nRX:  JNB  RI, RX      ; wait for a full frame\n     MOV  A, SBUF     ; read the received byte\n     CLR  RI          ; clear the flag by software\n     RET",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "The same two routines in C, with registers simulated so the program runs on a PC:"
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n\nstatic unsigned char SBUF;\nstatic int TI = 0, RI = 0;\n\nstatic void tx_byte(unsigned char c) {\n    SBUF = c;              /* write starts the frame */\n    TI = 1;                /* hardware sets TI */\n    while (TI) TI = 0;     /* software clears TI */\n    printf(\"TX %02X\\n\", c);\n}\n\nstatic unsigned char rx_byte(unsigned char c) {\n    SBUF = c; RI = 1;      /* hardware fills SBUF, sets RI */\n    unsigned char d = SBUF;\n    RI = 0;                /* software clears RI */\n    printf(\"RX %02X\\n\", d);\n    return d;\n}\n\nint main(void) {\n    const char *s = \"OK\";\n    for (int i = 0; s[i] != '\\0'; i++)\n        tx_byte((unsigned char)s[i]);\n    rx_byte(0x41);\n    return 0;\n}\n",
+     "stdin": "",
+     "output": "TX 4F\nTX 4B\nRX 41\n"
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "A byte leaves TXD as a 0–5 V TTL signal, is inverted and raised to RS-232 levels by the MAX232 charge pump, and travels down the DB9 cable to the PC receive pin.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "RS-232 signal path",
+   "nodes": [
+    {
+     "id": "txd",
+     "label": "8051 TXD",
+     "note": "TTL 0-5 V",
+     "style": "accent"
+    },
+    {
+     "id": "max",
+     "label": "MAX232",
+     "note": "charge pump",
+     "style": "normal"
+    },
+    {
+     "id": "db9",
+     "label": "DB9 cable",
+     "note": "RS-232 levels",
+     "style": "live"
+    },
+    {
+     "id": "rxd",
+     "label": "PC RXD",
+     "note": "UART input",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "txd",
+     "to": "max"
+    },
+    {
+     "from": "max",
+     "to": "db9"
+    },
+    {
+     "from": "db9",
+     "to": "rxd"
+    }
+   ],
+   "aria": "Signal path from the 8051 TXD pin through a MAX232 level converter and a DB9 cable to the PC receive pin."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8051 board runs at fosc = 11.0592 MHz, serial mode 1, SMOD = 0, Timer 1 in mode 2. (a) Find the TH1 reload value for 9600 baud. (b) A student loads TH1 = 0xFA instead. Find the baud rate actually produced.",
+   "steps": [
+    "Mode 1: baud = (2^SMOD / 32) × fosc / (12 × (256 − TH1)).",
+    "Solve: 256 − TH1 = fosc / (12 × 32 × 2^SMOD × baud).",
+    "(a) SMOD = 0, fosc = 11,059,200 Hz, baud = 9600. Denominator = 12 × 32 × 9600 = 3,686,400.",
+    "256 − TH1 = 11,059,200 / 3,686,400 = 3, so TH1 = 256 − 3 = 253 = 0xFD.",
+    "(b) TH1 = 0xFA = 250, so 256 − 250 = 6 counts per overflow.",
+    "baud = 11,059,200 / (12 × 32 × 6) = 11,059,200 / 2304 = 4800 bit/s."
+   ],
+   "answer": "TH1 = 0xFD (253) gives 9600 baud, and TH1 = 0xFA gives 4800 baud.",
+   "check": "fosc = 11_059_200\nbaud = 9600\ndivisor = fosc / (12 * 32 * baud)\nth1 = 256 - divisor\nprint(int(th1))\nth1b = 0xFA\nbaud2 = fosc / (12 * 32 * (256 - th1b))\nprint(int(baud2))\n",
+   "values": [
+    253,
+    4800
+   ],
+   "code": {
+    "lang": "c",
+    "code": "",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "part",
+     "quantity",
+     "value"
+    ],
+    "rows": [
+     [
+      "a",
+      "256 − TH1",
+      "3"
+     ],
+     [
+      "a",
+      "TH1",
+      "253"
+     ],
+     [
+      "b",
+      "256 − TH1",
+      "6"
+     ],
+     [
+      "b",
+      "baud",
+      "4800"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "TI and RI are set by hardware and never cleared by hardware. A polling loop without CLR TI hangs on the second byte.",
+  "Reading or writing SBUF clears nothing; only software clears TI and RI.",
+  "TH1 is a reload count, not the divisor. The divisor is 256 − TH1, so 0xFD divides by 3, not 253.",
+  "RS-232 logic is inverted: idle is about −12 V (logic 1, mark). A TTL idle is +5 V, also logic 1, but opposite on the wire.",
+  "Mode 0 is not a UART. It is a synchronous shift register clocked at fosc/12, using RXD for data and TXD for the clock."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many bits make one mode 1 frame, and what are they?",
+   "marks": 2,
+   "a": "Ten bits: one start bit (0), eight data bits sent least significant bit first, one stop bit (1)."
+  },
+  {
+   "level": "remember",
+   "q": "Which SCON bits select mode 1, and which flag shows a byte has been received?",
+   "marks": 2,
+   "a": "SM0 = 0 and SM1 = 1 select mode 1. RI = 1 after a complete frame is received."
+  },
+  {
+   "level": "understand",
+   "q": "Why can one address, 0x99, serve both transmitting and receiving?",
+   "marks": 3,
+   "a": "SBUF is two registers at one address. A write goes to the transmit register and starts a frame; a read returns the receive register. A byte can be sent and another received without clash because the CPU uses different physical registers."
+  },
+  {
+   "level": "understand",
+   "q": "Why does RS-232 use ±12 V instead of 0 V and 5 V?",
+   "marks": 3,
+   "a": "A large swing and the undefined −3 V to +3 V band give a big noise margin on long cables. The standard also inverts the logic and was designed for electromechanical terminals and modems. A TTL pin cannot produce or survive these levels, so a converter is needed."
+  },
+  {
+   "level": "apply",
+   "q": "fosc = 12 MHz, SMOD = 0, mode 1, Timer 1 in mode 2. Find TH1 for 2400 baud and the resulting error.",
+   "marks": 4,
+   "a": "256 − TH1 = 12,000,000 / (12 × 32 × 2400) = 12,000,000 / 921,600 = 13.02. TH1 = 256 − 13 = 243 = 0xF3. Actual baud = 12,000,000 / (12 × 32 × 13) = 12,000,000 / 4992 = 2403.8 bit/s. Error = 3.8 / 2400 ≈ 0.16 %, because 12,000,000 / (12 × 32 × 2400) = 13.02 is not a whole number, so the reload value has to be rounded."
+  },
+  {
+   "level": "apply",
+   "q": "TH1 = 0xE8, fosc = 11.0592 MHz, SMOD = 1, mode 1. Find the baud rate.",
+   "marks": 4,
+   "a": "TH1 = 0xE8 = 232, so 256 − 232 = 24. baud = (2/32) × 11,059,200 / (12 × 24) = (1/16) × 11,059,200 / 288 = 11,059,200 / 4608 = 2400 bit/s. With SMOD = 1 the UART divides by 16 instead of 32, so the baud rate doubles. With SMOD = 0 the same TH1 would give 1200 bit/s."
+  },
+  {
+   "level": "analyze",
+   "q": "A program sends three bytes by writing SBUF three times in a row with no wait for TI. What appears on the line, and why?",
+   "marks": 5,
+   "a": "The second write overwrites the transmit register while the first frame is still shifting out, and the third overwrites it again. Bytes are lost or corrupted, and TI becomes meaningless because it is set by the wrong frame. Each write must be separated by a wait for TI (polling) or by an interrupt that loads the next byte."
+  }
+ ],
+ "beyond": "Not for the exam. Real boards now use a USB-serial chip such as CH340 or CP2102 instead of a DB9 socket; the MAX232 survives in industrial panels and teaching kits. Newer 8051s and ARM Cortex-M add FIFOs, fractional baud generators and DMA, so the CPU is not woken for each byte. Above the byte layer sits Modbus RTU, still common on energy meters and PLCs in Indian plants. Search 'CH340 driver', 'Modbus RTU frame format' and 'Cortex-M USART baud register' to go further."
+}

@@ -1,0 +1,271 @@
+{
+ "lead": "The 8051 has four 8-bit parallel ports, P0 to P3. Each port is a latch plus an output driver, and that pair explains every rule of port programming: to use a pin as an input you first write 1 to it, so the driver stops holding the pin low and a weak internal pull-up can raise it. Some instructions then read the pin, others read the latch. LEDs, switches, keypads, relays and LCD panels all connect through these ports, which makes them the most-used pins on the chip.",
+ "prereq": "You need: <a href=\"#8051-architecture-pins-memory-and-special-function-registers\">Chapter 4.1</a> for the port SFR addresses, bit addressing and the pin functions of P3.",
+ "sections": [
+  {
+   "h3": "Four ports, four latches",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The four port registers are special function registers at fixed direct addresses: P0 at 80H, P1 at 90H, P2 at A0H and P3 at B0H. All four are bit addressable, so P1.3 means bit 3 of P1, bit address 93H. Writing a byte to P1 writes its latch; the latch output drives the pin through an output transistor."
+    },
+    {
+     "type": "p",
+     "text": "P0 is open drain. Its driver can pull a pin to 0 V but has no pull-up of its own, so it cannot pull a pin high. Put an external resistor from the pin to +5 V (10 kΩ is a common choice) or the pin floats when its latch holds 1. P0 also becomes the multiplexed address/data bus AD0–AD7 when external memory is used."
+    },
+    {
+     "type": "p",
+     "text": "P1, P2 and P3 are quasi-bidirectional. Each pin has a weak internal pull-up. Writing 1 to the latch switches the strong driver off, and the weak pull-up holds the pin near +5 V; an external circuit that pulls the pin low wins, because the pull-up supplies only tens of microamps. Writing 0 switches the strong driver on and forces the pin to 0 V."
+    },
+    {
+     "type": "p",
+     "text": "A pin sinks more current than it sources: the classic part lists about 1.6 mA sink for P1–P3 and 3.2 mA for P0, but only a small source current. So an LED is wired with its anode to +5 V through a resistor and its cathode to the pin: pin low means LED on."
+    },
+    {
+     "type": "p",
+     "text": "P2 supplies A8–A15 in expanded memory systems. P3 pins carry RXD, TXD, INT0, INT1, T0, T1, WR and RD, so check those chapters before using P3 as plain I/O (see <a href=\"#timers-and-counters-modes-and-programming\">4.3</a>, <a href=\"#serial-communication-and-rs-232-interfacing\">4.4</a>, <a href=\"#interrupts-and-interrupt-programming\">4.5</a>)."
+    }
+   ]
+  },
+  {
+   "h3": "Input means writing 1 first",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "If the latch holds 0, the driver holds the pin at 0 V. A switch to ground then changes nothing, and the CPU always reads 0. Writing 1 turns the driver off, so a switch, keypad or sensor output can decide the pin level. The standard line before reading a port is <code>MOV P1,#0FFH</code>."
+    },
+    {
+     "type": "p",
+     "text": "Two kinds of instruction touch a port. Read-pin instructions look at the outside world. Read-modify-write instructions (RMW) read the latch, change it, and write it back, so an external load that drags the pin slowly cannot be misread as the value the software intended."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Instruction (port is destination)",
+      "Reads"
+     ],
+     "rows": [
+      [
+       "MOV A,P1 ; MOV C,P1.0",
+       "the pin"
+      ],
+      [
+       "MOV 30H,P1 ; ANL A,P1 ; ADD A,P1",
+       "the pin"
+      ],
+      [
+       "ANL P1,#0FH ; ORL P1,A ; XRL P1,#0FH",
+       "the latch"
+      ],
+      [
+       "INC P1 ; DEC P1 ; CPL P1.0",
+       "the latch"
+      ],
+      [
+       "SETB P1.0 ; CLR P1.0 ; MOV P1.0,C",
+       "the latch"
+      ],
+      [
+       "DJNZ P1,rel ; JBC P1.0,rel",
+       "the latch"
+      ],
+      [
+       "JB P1.0,rel ; JNB P1.0,rel",
+       "the pin"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The table is the examinable core: when the port is the destination of a logical or bit instruction, the latch value is used, not the voltage on the pin."
+    }
+   ]
+  },
+  {
+   "h3": "Three short port programs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Blink an LED on P1.0 in assembly. <code>CPL P1.0</code> is read-modify-write, which is safe here because the pin is an output."
+    },
+    {
+     "type": "code",
+     "lang": "pseudo",
+     "code": "        ORG 0000H\n        MOV P1,#00H          ; every P1 pin driven low\nAGAIN:  CPL P1.0             ; toggle the LED pin\n        ACALL DELAY\n        SJMP AGAIN\nDELAY:  MOV R7,#200\nD1:     MOV R6,#250\nD2:     DJNZ R6,D2\n        DJNZ R7,D1\n        RET\n        END",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "The delay is about 200 × 250 × 2 = 100000 machine cycles, roughly 0.1 s with a 12 MHz crystal (1 µs per machine cycle)."
+    },
+    {
+     "type": "p",
+     "text": "Copy a switch on P1.1 to the LED on P1.0. <code>MOV C,P1.1</code> reads the pin; <code>MOV P1.0,C</code> writes the latch bit."
+    },
+    {
+     "type": "code",
+     "lang": "pseudo",
+     "code": "        MOV P1,#0FFH         ; release all pins: P1.1 can be an input\nREAD:   MOV C,P1.1           ; read the switch pin\n        MOV P1.0,C           ; drive the LED pin\n        SJMP READ",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "The same job in C for Keil-style 8051 compilers:"
+    },
+    {
+     "type": "code",
+     "lang": "pseudo",
+     "code": "#include <reg51.h>\nsbit LED = P1^0;\nsbit SW  = P1^1;\nvoid main(void) {\n    P1 = 0xFF;          /* release every pin */\n    while (1) {\n        LED = SW;       /* read the pin, write the latch bit */\n    }\n}",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "Masking changes some bits and keeps the rest: <code>P1 = (P1 & 0xF0) | 0x05;</code> keeps P1.4–P1.7 and sets P1.0 and P1.2. The compiler reads P1 with <code>MOV A,P1</code>, which reads the pin, unlike the 8051's own RMW instruction. Any pin used as an input must already have its latch at 1, or the mask writes 0 back to it."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Writing 1 releases the pin, the switch pulls it to ground, and MOV A,P1 reports 0 while the latch still holds 1. Every read-modify-write instruction follows the dashed path.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Reading a port pin",
+   "nodes": [
+    {
+     "id": "w1",
+     "label": "Write 1 to latch",
+     "note": "releases pin",
+     "style": "accent"
+    },
+    {
+     "id": "pin",
+     "label": "Pin pulled high",
+     "note": "weak internal pull-up",
+     "style": "normal"
+    },
+    {
+     "id": "sw",
+     "label": "Switch to ground",
+     "note": "external input",
+     "style": "normal"
+    },
+    {
+     "id": "read",
+     "label": "Pin reads 0",
+     "note": "MOV A,P1",
+     "style": "live"
+    },
+    {
+     "id": "latch",
+     "label": "Latch stays 1",
+     "note": "output driver off",
+     "style": "normal"
+    },
+    {
+     "id": "rmw",
+     "label": "Read-modify-write",
+     "note": "uses latch, not pin",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "w1",
+     "to": "pin"
+    },
+    {
+     "from": "pin",
+     "to": "sw"
+    },
+    {
+     "from": "sw",
+     "to": "read"
+    },
+    {
+     "from": "read",
+     "to": "latch"
+    },
+    {
+     "from": "latch",
+     "to": "rmw",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Flow of reading an 8051 port pin: write 1 to the latch, let a switch pull the pin low, read the pin, while the latch stays high for read-modify-write instructions."
+  }
+ },
+ "examples": [
+  {
+   "question": "Port 1 is written 0FFH. An external switch from P1.0 to ground is closed and holds that pin low. The program then runs MOV A,P1 / ANL P1,#0FH / MOV A,P1. Give A after the first read, the P1 latch after ANL, and A after the second read. (Hex and decimal.)",
+   "steps": [
+    "Initial latch P1 = 1111 1111 = FFH. The switch holds pin P1.0 at 0; pins P1.1–P1.7 have latch 1 and nothing pulling them, so the weak pull-up makes them 1.",
+    "MOV A,P1 reads the pin: 1111 1110 = FEH = 254. So A = 254.",
+    "ANL P1,#0FH is read-modify-write. It reads the latch (FFH), not the pin (FEH): FFH AND 0FH = 0FH = 15. The latch becomes 15, so P1.4–P1.7 latch bits are 0 and those pins are driven low.",
+    "ANL P1,#0FH does not touch A, so A is still 254.",
+    "Second MOV A,P1 reads the pin. P1.7–P1.4 are driven low = 0000. P1.3–P1.1 have latch 1 and are released = 111. P1.0 is still held by the switch = 0. Pin byte = 0000 1110 = 0EH = 14. So A = 14."
+   ],
+   "answer": "A = FEH (254) after the first read, the P1 latch becomes 0FH (15) after the ANL, and A = 0EH (14) after the second read.",
+   "check": "latch = 0xFF\nswitch = 0x01          # bits an external switch holds at 0\n\ndef read_pin(latch, switch):\n    return latch & ~switch & 0xFF   # latch 0 drives the pin low; switch overrides 1 to 0\n\nA = read_pin(latch, switch)\nprint(A)                # 254 = FEH\nlatch = latch & 0x0F    # ANL P1,#0FH reads the latch\nprint(latch)            # 15 = 0FH\nA = read_pin(latch, switch)\nprint(A)                # 14 = 0EH\n",
+   "values": [
+    254,
+    15,
+    14
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Writing 0 to a pin and then expecting an external switch to change it. The driver holds the pin low, so the CPU always reads 0. Write 1 first.",
+  "Mixing up MOV A,P1 (reads the pin) with ANL P1,#data (reads the latch). Examiners love giving a latch value, a switch position and two reads, then asking for both A and P1.",
+  "Forgetting that P0 is open drain. Without external pull-up resistors P0 cannot produce a logic 1, so an LED or gate on P0 with no resistor never goes high.",
+  "Believing that writing 1 to P1, P2 or P3 drives the pin strongly high. It only releases the pin to a weak pull-up; the pin can still be pulled low, and it cannot source an LED.",
+  "Reading a whole port in C (P1 = P1 | 0x0F) reads the pins, not the latch, because the compiler emits MOV A,P1. Input pins must be kept at 1 or the mask writes 0 back."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Give the direct addresses of the port SFRs P0, P1, P2 and P3, and the bit address of P1.3.",
+   "marks": 2,
+   "a": "P0 = 80H, P1 = 90H, P2 = A0H, P3 = B0H. P1.3 is bit 3 of the register at 90H, so bit address 93H."
+  },
+  {
+   "level": "understand",
+   "q": "Why must software write 1 to a port bit before using that pin as an input?",
+   "marks": 3,
+   "a": "Writing 1 switches the strong output driver off, so the pin is no longer forced low. The weak internal pull-up then holds the pin high, and an external switch or logic output can pull it low. With the latch at 0 the driver overpowers the switch and the pin always reads 0."
+  },
+  {
+   "level": "apply",
+   "q": "The P2 latch is 0FFH. Switches hold pins P2.0 and P2.1 at ground. The program runs MOV A,P2 / CPL P2.0. Give A and the P2 latch.",
+   "marks": 4,
+   "a": "MOV A,P2 reads the pin: P2.0 and P2.1 are 0, others 1, so A = 1111 1100 = FCH = 252. CPL P2.0 is read-modify-write: it reads the latch FFH, complements bit 0, and writes FEH = 254 to the latch. A is unchanged at 252."
+  },
+  {
+   "level": "analyze",
+   "q": "A program does MOV P3,#00H and then JB P3.2,KEY to test a push button to ground. Explain why the button is never seen, and give the fix.",
+   "marks": 5,
+   "a": "MOV P3,#00H drives every P3 pin low. The strong driver holds P3.2 at 0 V, so pressing a button to ground changes nothing, and JB reads the pin, which is always 0. The jump never happens. Fix: write MOV P3,#0FFH (or SETB P3.2) before testing, so the driver is released and the pull-up holds the pin at 1."
+  },
+  {
+   "level": "analyze",
+   "q": "List three read-pin instructions and three read-modify-write instructions for the 8051 ports, and state the rule that separates them.",
+   "marks": 4,
+   "a": "Read-pin: MOV A,P1, MOV C,P1.0, MOV 30H,P1 (JB and JNB also read the pin). Read-modify-write: ANL P1,#0FH, CPL P1.0, DJNZ P1,rel (also INC, DEC, ORL, XRL, SETB, CLR, JBC, MOV Px.y,C). Rule: if the port is the destination of the logical or bit instruction, it is read-modify-write and uses the latch."
+  },
+  {
+   "level": "understand",
+   "q": "Why is P0 described as open drain, and what external component does it need for general I/O?",
+   "marks": 3,
+   "a": "Its output stage has only a pull-down transistor, so it can pull a pin to 0 V but has no pull-up to +5 V. For general I/O add an external resistor, typically 10 kΩ, from each used pin to +5 V."
+  },
+  {
+   "level": "remember",
+   "q": "Name the alternate functions of P3.0 and P3.1.",
+   "marks": 2,
+   "a": "P3.0 is RXD, the serial receive pin, and P3.1 is TXD, the serial transmit pin."
+  }
+ ],
+ "beyond": "Not for the exam. Every modern microcontroller keeps the same two ideas but exposes them as configuration registers: an ARM Cortex-M GPIO port has a mode register (input, output, alternate function, analog), an output-type bit that selects push-pull or open-drain, and pull-up/pull-down controls. Because reading a whole 32-bit port register and writing it back can race with an interrupt, these chips add atomic set/reset registers (BSRR on STM32) that change single bits without a read-modify-write. Cheap port expanders such as the PCF8574 give an I²C bus eight quasi-bidirectional pins that behave much like an 8051 port, including the write-1-before-read rule. Search next for GPIO push-pull versus open-drain, bit-band aliasing, and PCF8574 keypad scanning."
+}

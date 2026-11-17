@@ -1,0 +1,484 @@
+{
+ "lead": "Unit 4 explains the 8051 microcontroller from its registers outward: pins and memory, I/O ports, timers, serial links, interrupts and Embedded C. After it you can configure an 8051 for a delay, a UART link or an interrupt-driven task, and read a PIC or MSP430 datasheet with the same vocabulary.",
+ "about": "Unit 4 moves from the 8085 and general processor ideas of Units 1–3 to a single-chip microcontroller. Chapter 4.1 maps the 8051 core, pins, memory spaces and special function registers. Chapter 4.2 uses those registers to drive the four I/O ports. Chapter 4.3 configures the two timers and counters for delays and pulse counting. Chapter 4.4 turns Timer 1 into a baud-rate source for serial data and adds RS-232 level conversion. Chapter 4.5 connects timer, external and serial flags to the interrupt system. Chapter 4.6 writes the same port, timer, serial and interrupt work in Embedded C. Chapter 4.7 compares the 8051 with PIC18F452 and MSP430 designs. The order follows the hardware: registers, ports, timing, serial links, interrupts, C, then other families.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "The 8051 is a Harvard-architecture 8-bit microcontroller whose code space, data space and special function registers are separate and fixed by the pin and register map.",
+   "depth": "Only a few universities teach this chapter at register level, so keep it compact. Show the internal block diagram: 8-bit CPU and ALU, 4 KB program ROM, 128 B data RAM, two 16-bit timers, one UART, interrupt control and four 8-bit ports. Give the 40-pin DIP pin groups: P0 (AD0-AD7), P2 (A8-A15), P3 alternate functions RXD, TXD, INT0, INT1, T0, T1, WR, RD; XTAL1/XTAL2, RST, EA, PSEN, ALE, Vcc, GND. Draw the memory map: code 0000-0FFF, data 00-7F direct and indirect, 80-FF indirect only, SFRs 80-FF direct only; register banks 0-3 at 00-1F; bit-addressable bytes 20-2F. List the SFRs with addresses: ACC E0, B F0, PSW D0, SP 81, DPL 82, DPH 83, P0 80, P1 90, P2 A0, P3 B0, IE A8, IP B8, TCON 88, TMOD 89, TH0 8C, TL0 8A, TH1 8D, TL1 8B, SCON 98, SBUF 99, PCON 87. Some syllabi call the pin list the pin diagram and the SFR list the SFR map.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "8051 internal blocks",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "CPU and ALU",
+      "note": "8-bit core",
+      "style": "accent"
+     },
+     {
+      "id": "rom",
+      "label": "Program ROM 4 KB",
+      "note": "code 0000-0FFF",
+      "style": "normal"
+     },
+     {
+      "id": "ram",
+      "label": "Data RAM 128 B",
+      "note": "00-7F direct",
+      "style": "normal"
+     },
+     {
+      "id": "sfr",
+      "label": "SFRs",
+      "note": "80-FF direct",
+      "style": "live"
+     },
+     {
+      "id": "tim",
+      "label": "Timer 0/1",
+      "note": "two 16-bit counters",
+      "style": "normal"
+     },
+     {
+      "id": "uart",
+      "label": "UART",
+      "note": "serial port",
+      "style": "normal"
+     },
+     {
+      "id": "int",
+      "label": "Interrupt control",
+      "note": "IE and IP",
+      "style": "normal"
+     },
+     {
+      "id": "ports",
+      "label": "Ports P0-P3",
+      "note": "32 I/O pins",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cpu",
+      "to": "rom"
+     },
+     {
+      "from": "cpu",
+      "to": "ram"
+     },
+     {
+      "from": "cpu",
+      "to": "sfr"
+     },
+     {
+      "from": "sfr",
+      "to": "tim"
+     },
+     {
+      "from": "sfr",
+      "to": "uart"
+     },
+     {
+      "from": "sfr",
+      "to": "int"
+     },
+     {
+      "from": "sfr",
+      "to": "ports"
+     }
+    ],
+    "aria": "Block diagram of the 8051 core with program ROM, data RAM, special function registers, timers, UART, interrupt control and four ports."
+   },
+   "example": "RAM byte 0x2A holds 0x84. Find the bit address of its bit 2 and bit 7. Answer: 0x2A is the 11th byte in the bit-addressable block that starts at 0x20, so its bit base is (0x2A − 0x20) × 8 = 0x50. Bit 2 = 0x52 and bit 7 = 0x57. Both are set because 0x84 = 1000 0100.",
+   "trap": "Direct addresses 80-FF reach SFRs, not upper data RAM; upper 128 bytes need indirect addressing (@R0 or @R1). Also EA must be high for internal ROM.",
+   "prereq": "Unit 1: microprocessor vs microcontroller, Harvard and von Neumann, memory organization.",
+   "leave": "Instruction set and addressing modes to Unit 3; external memory chips and address decoding to Unit 2; port circuits to 4.2."
+  },
+  {
+   "k": 2,
+   "idea": "Each 8051 port is a latch plus a driver, so software must write 1 before using a pin as an input and must know when an instruction reads the latch rather than the pin.",
+   "depth": "Cover P0, P1, P2, P3 as SFRs at 80, 90, A0, B0. P0 is open-drain and needs external pull-up resistors for general I/O; P1, P2, P3 are quasi-bidirectional with weak internal pull-ups. Writing 0 turns the pin low; writing 1 lets the pin be pulled high or driven low by an external switch. Use MOV Px,#0FFH before input. Distinguish read-pin instructions (MOV A,Px) from read-modify-write instructions (ANL, ORL, XRL, INC, DEC, CPL, MOV Px.y,C, CLR Px.y, SETB Px.y), which read the latch. Show assembly and C examples for LED blink, switch input and bit masking. Some syllabi call this parallel port programming.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Reading a port pin",
+    "nodes": [
+     {
+      "id": "w1",
+      "label": "Write 1 to latch",
+      "note": "releases pin",
+      "style": "accent"
+     },
+     {
+      "id": "pin",
+      "label": "Pin pulled high",
+      "note": "weak internal pull-up",
+      "style": "normal"
+     },
+     {
+      "id": "sw",
+      "label": "Switch to ground",
+      "note": "external input",
+      "style": "normal"
+     },
+     {
+      "id": "read",
+      "label": "Pin reads 0",
+      "note": "MOV A,P1",
+      "style": "live"
+     },
+     {
+      "id": "latch",
+      "label": "Latch still 1",
+      "note": "output driver off",
+      "style": "normal"
+     },
+     {
+      "id": "rmw",
+      "label": "Read-modify-write",
+      "note": "uses latch, not pin",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "w1",
+      "to": "pin"
+     },
+     {
+      "from": "pin",
+      "to": "sw"
+     },
+     {
+      "from": "sw",
+      "to": "read"
+     },
+     {
+      "from": "read",
+      "to": "latch"
+     },
+     {
+      "from": "latch",
+      "to": "rmw",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Flow of reading an 8051 port pin: write 1 to the latch, let a switch pull the pin low, read the pin, while the latch stays high for read-modify-write instructions."
+   },
+   "example": "P1 is written 0xFF. A switch on P1.0 pulls the pin to ground. What does MOV A,P1 return? Then ANL P1,#0xFE is executed. Give P1 and A. Answer: MOV A,P1 reads the pin, so A = 0xFE (P1.0 = 0, P1.1-P1.7 = 1). ANL reads the latch 0xFF, ANDs with 0xFE, writes 0xFE to P1; P1.0 latch becomes 0. A stays 0xFE.",
+   "trap": "Do not write 0 to a pin and then expect an external switch to change it. A read-modify-write instruction uses the latch value, so a switch on a pin may not be seen.",
+   "prereq": "4.1: port SFR addresses and bit addressing.",
+   "leave": "Keypad scanning, seven-segment and LCD interfacing to Unit 5; port pin AC timing to Unit 2 timing diagrams."
+  },
+  {
+   "k": 3,
+   "idea": "The two 8051 timer/counter blocks count internal machine cycles or external pulses and raise a flag on overflow, with TMOD choosing one of four modes.",
+   "depth": "TMOD: GATE, C/T, M1, M0 for Timer 0 (low nibble) and Timer 1 (high nibble). C/T = 0 counts machine cycles (timer); C/T = 1 counts falling edges on T0/T1 (counter). Modes: 0 = 13-bit, 1 = 16-bit, 2 = 8-bit auto-reload, 3 = split Timer 0. TCON bits TR0, TF0, TR1, TF1; GATE lets INT0/INT1 gate the run. Machine cycle = 12 / fosc. At 12 MHz, one count = 1 µs. Delay: counts N = delay / machine-cycle time; reload = 65536 − N for mode 1. Maximum mode 1 delay at 12 MHz = 65.536 ms; repeat for longer delays. Show assembly and C setup: TMOD, TH0/TL0, TR0, polling TF0, clearing TF0. Some syllabi call this timer programming and time-delay calculation.",
+   "figure": {
+    "type": "gantt",
+    "unit": "µs",
+    "lanes": [
+     {
+      "label": "Timer 0",
+      "bars": [
+       {
+        "label": "50000 counts",
+        "start": 0,
+        "end": 50000,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "TF0",
+      "bars": [
+       {
+        "label": "set",
+        "start": 50000,
+        "end": 50010,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "Timeline showing Timer 0 counting 50,000 machine cycles for 50 ms, then setting the TF0 overflow flag."
+   },
+   "example": "Crystal = 12 MHz. Find TH0 and TL0 for a 50 ms delay in Timer 0 mode 1. Then find the delay when TH0:TL0 = 0x3CB0. Answer: machine cycle = 1 µs, N = 50,000, reload = 65,536 − 50,000 = 15,536 = 0x3CB0. So TH0 = 0x3C, TL0 = 0xB0. The given reload 0x3CB0 gives 65,536 − 15,536 = 50,000 counts = 50 ms.",
+   "trap": "Mode 0 is 13-bit, not 16-bit. The machine cycle is 12 oscillator periods, so 11.0592 MHz does not give 1 µs. Clear TF0 in software when polling.",
+   "prereq": "4.1: TMOD, TCON and TH/TL SFRs; Unit 3: assembly loops and delay programs.",
+   "leave": "PWM generation and 8253/8254 timer chip to Unit 5; baud-rate use of Timer 1 to 4.4."
+  },
+  {
+   "k": 4,
+   "idea": "The 8051 UART turns parallel bytes into asynchronous serial frames through SBUF, and Timer 1 sets the baud rate; RS-232 adds voltage conversion.",
+   "depth": "SCON bits SM0, SM1, SM2, REN, TB8, RB8, TI, RI. Mode 1 is 8-bit UART, one start bit, eight data bits, one stop bit. SBUF is two registers at the same address: write to transmit, read to receive. TI sets after transmit; RI sets after receive; both must be cleared by software. Baud rate in mode 1: baud = (2^SMOD / 32) × (fosc / (12 × (256 − TH1))). At 11.0592 MHz, 9600 baud, SMOD = 0 gives TH1 = 0xFD. RS-232 levels: logic 0 = +3 V to +15 V, logic 1 = −3 V to −15 V; MAX232 converts TTL to RS-232 and back. Show a polling transmit and receive routine in assembly and C. Some syllabi call this serial data I/O or UART programming.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "RS-232 signal path",
+    "nodes": [
+     {
+      "id": "txd",
+      "label": "8051 TXD",
+      "note": "TTL 0-5 V",
+      "style": "accent"
+     },
+     {
+      "id": "max",
+      "label": "MAX232",
+      "note": "charge pump",
+      "style": "normal"
+     },
+     {
+      "id": "db9",
+      "label": "DB9 cable",
+      "note": "RS-232 levels",
+      "style": "live"
+     },
+     {
+      "id": "rxd",
+      "label": "PC RXD",
+      "note": "UART input",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "txd",
+      "to": "max"
+     },
+     {
+      "from": "max",
+      "to": "db9"
+     },
+     {
+      "from": "db9",
+      "to": "rxd"
+     }
+    ],
+    "aria": "Signal path from the 8051 TXD pin through a MAX232 level converter and a DB9 cable to the PC receive pin."
+   },
+   "example": "fosc = 11.0592 MHz, SMOD = 0, mode 1. Find TH1 for 9600 baud. Then find the baud rate for TH1 = 0xFA. Answer: TH1 = 256 − 11,059,200 / (12 × 32 × 9600) = 256 − 3 = 253 = 0xFD. For TH1 = 0xFA = 250, divisor = 6, baud = 11,059,200 / (12 × 32 × 6) = 4800.",
+   "trap": "TI and RI are not cleared by hardware; the ISR or polling loop must clear them. Writing SBUF sends; reading SBUF receives. RS-232 logic is inverted and uses higher voltages.",
+   "prereq": "4.3: Timer 1 overflow as baud-rate clock; 4.1: SCON, SBUF and PCON.",
+   "leave": "8251 USART and SPI/I2C protocols to Unit 5; multi-processor serial modes only as a one-line mention if a syllabus lists them."
+  },
+  {
+   "k": 5,
+   "idea": "The 8051 has five interrupt sources with fixed vector addresses; IE enables them, IP sets priority, and each source has its own flag-clearing rule.",
+   "depth": "Sources and vectors: INT0 0003, Timer 0 000B, INT1 0013, Timer 1 001B, serial 0023. IE bits: EA, ES, ET1, EX1, ET0, EX0. IP bits set high priority. TCON IT0/IT1 choose edge or low-level external interrupt; IE0/IE1 are flags. Timer flags TF0/TF1 are cleared by hardware when the vector is taken. Serial flags RI/TI are not cleared by hardware; the ISR must clear them. Latency includes the current instruction and a call to the vector. In C, use the interrupt keyword with the vector number; keep ISRs short and set a volatile flag for the main loop. Some syllabi call this interrupt structure and interrupt programming.",
+   "figure": {
+    "type": "array",
+    "title": "8051 interrupt vectors",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "Vector",
+      "cells": [
+       "0003",
+       "000B",
+       "0013",
+       "001B",
+       "0023"
+      ],
+      "marks": {
+       "0": "accent",
+       "4": "live"
+      }
+     },
+     {
+      "label": "Source",
+      "cells": [
+       "INT0",
+       "T0",
+       "INT1",
+       "T1",
+       "UART"
+      ],
+      "marks": {
+       "1": "next"
+      }
+     }
+    ],
+    "aria": "Array of 8051 interrupt vector addresses with their sources INT0, T0, INT1, T1 and UART."
+   },
+   "example": "IE = 0x83, IP = 0x02, TCON = 0x01. Which interrupts are enabled, which has high priority, and how is INT0 triggered? Answer: IE = 1000 0011 sets EA, ET0 and EX0, so Timer 0 and external interrupt 0 are enabled. IP = 0x02 sets PT0, so Timer 0 is high priority. TCON = 0x01 sets IT0 = 1, so INT0 is edge-triggered.",
+   "trap": "Forgetting EA disables all masked interrupts. Serial ISR must clear RI and TI. Vector addresses are 8 bytes apart; a long ISR should jump to a service routine.",
+   "prereq": "4.1 IE/IP SFRs; 4.3 TF0/TF1; 4.4 RI/TI.",
+   "leave": "8259 programmable interrupt controller and ARM exception model to Units 5 and 6."
+  },
+  {
+   "k": 6,
+   "idea": "Embedded C for the 8051 uses the same C language but adds SFR declarations, bit variables, volatile data and small memory models so code fits the chip.",
+   "depth": "Data types: unsigned char is 8 bits, unsigned int is 16 bits on C51; use char for port and counter bytes. Declare SFRs with sfr and bits with sbit (Keil C51 style) or use a vendor header. volatile tells the compiler that an ISR or hardware can change a variable. Use bitwise operators for masking: set with |, clear with &~, toggle with ^. Show port, timer, serial and interrupt programs in C. Memory models: small (data), compact (pdata), large (xdata); code size and stack limits matter. Some syllabi call this C51 programming or 8051 C programming.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Embedded C build flow",
+    "nodes": [
+     {
+      "id": "src",
+      "label": "C source",
+      "note": ".c file",
+      "style": "accent"
+     },
+     {
+      "id": "cc",
+      "label": "C51 compiler",
+      "note": "Keil or SDCC",
+      "style": "normal"
+     },
+     {
+      "id": "hex",
+      "label": "HEX file",
+      "note": "machine code",
+      "style": "normal"
+     },
+     {
+      "id": "flash",
+      "label": "8051 flash",
+      "note": "program ROM",
+      "style": "live"
+     },
+     {
+      "id": "run",
+      "label": "Run",
+      "note": "ports and timers",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "src",
+      "to": "cc"
+     },
+     {
+      "from": "cc",
+      "to": "hex"
+     },
+     {
+      "from": "hex",
+      "to": "flash"
+     },
+     {
+      "from": "flash",
+      "to": "run"
+     }
+    ],
+    "aria": "Build flow from C source through a C51 compiler and HEX file into 8051 program flash, then execution."
+   },
+   "example": "P1 = 0xA5 and P2 = 0x00. Execute P1 = (P1 | 0x09) & 0x7F; P2 ^= 0x04;. Give P1 and P2. Answer: 0xA5 | 0x09 = 0xAD; 0xAD & 0x7F = 0x2D. P2 ^= 0x04 gives 0x04.",
+   "trap": "Do not assume int is 32 bits; on the 8051 it is usually 16 bits. A variable changed by an ISR must be volatile, or the compiler may cache it.",
+   "prereq": "4.2-4.5 for ports, timers, serial and interrupts; Unit 3 for assembly equivalents.",
+   "leave": "ARM C and Cortex-M programming to Unit 6; full toolchain and simulator details to Unit 3."
+  },
+  {
+   "k": 7,
+   "idea": "PIC18F452 and MSP430 are alternative microcontroller families: PIC uses banked 8-bit data with 16-bit instructions, while MSP430 uses a 16-bit RISC core and low-power modes.",
+   "depth": "Only some syllabi include these families; keep the treatment comparative. PIC18F452: Harvard architecture, 16-bit instruction words, 8-bit data path, 32 KB flash, 1536 B RAM, 256 B EEPROM, 256-byte RAM banks with BSR, access bank, WREG, STATUS, TRIS registers for port direction, timers and interrupts, MPLAB IDE, C and assembly. Mention bank switching and table processing briefly if a syllabus lists them. MSP430: 16-bit RISC, 16 registers R0-R15, memory-mapped peripherals, clock module with DCO, low-power modes LPM0-LPM4, timers for PWM, UART/SPI/I2C, Code Composer Studio and Embedded C. Compare with 8051 on data width, instruction width, memory banking, power and toolchain.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Microcontrollers",
+     "children": [
+      {
+       "label": "8051",
+       "note": "8-bit",
+       "children": [
+        {
+         "label": "4 KB ROM"
+        },
+        {
+         "label": "SFRs"
+        }
+       ]
+      },
+      {
+       "label": "PIC18F452",
+       "note": "8-bit data",
+       "style": "accent",
+       "children": [
+        {
+         "label": "Banked RAM"
+        },
+        {
+         "label": "16-bit words"
+        },
+        {
+         "label": "MPLAB IDE"
+        }
+       ]
+      },
+      {
+       "label": "MSP430",
+       "note": "16-bit RISC",
+       "style": "live",
+       "children": [
+        {
+         "label": "16 registers"
+        },
+        {
+         "label": "Low power"
+        },
+        {
+         "label": "CCS"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "Tree comparing the 8051 with PIC18F452 and MSP430, showing banked RAM and MPLAB for PIC, and registers and low power for MSP430."
+   },
+   "example": "PIC18F452 has 32 KB program flash and 1536 B data RAM. A program uses 16-bit instruction words and one instruction takes 4 clock cycles at 10 MHz. Find (a) instruction words in flash, (b) number of 256-byte RAM banks, (c) time for one instruction. Answer: (a) 32,768 / 2 = 16,384 words. (b) 1536 / 256 = 6 banks. (c) 4 / 10,000,000 s = 0.4 µs.",
+   "trap": "PIC program memory is counted in 16-bit instruction words, not bytes; flash size in bytes is twice the word count. MSP430 is 16-bit and byte-addressable; do not treat it as an 8-bit 8051.",
+   "prereq": "4.1 and 4.6 for 8051 architecture and Embedded C; Unit 1 for RISC/CISC and Harvard/von Neumann.",
+   "leave": "ARM architecture to Unit 6; detailed peripheral interfacing to Unit 5; full PIC instruction set to a datasheet, not this unit."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "SFR addresses P0-P3 drive port chapter"
+  ],
+  [
+   2,
+   3,
+   "P3.4 and P3.5 are timer inputs"
+  ],
+  [
+   3,
+   4,
+   "Timer 1 overflow sets UART baud rate"
+  ],
+  [
+   3,
+   5,
+   "TF0 and TF1 are interrupt flags"
+  ],
+  [
+   4,
+   5,
+   "RI and TI request serial interrupt"
+  ],
+  [
+   5,
+   6,
+   "ISR syntax written in Embedded C"
+  ],
+  [
+   6,
+   7,
+   "C skills transfer to PIC and MSP430"
+  ],
+  [
+   1,
+   5,
+   "IE and IP are SFRs"
+  ]
+ ]
+}

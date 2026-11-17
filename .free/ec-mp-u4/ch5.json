@@ -1,0 +1,154 @@
+{
+ "lead": "An interrupt is a hardware request that makes the 8051 stop its current program and run a short routine. The chip has five sources: two external pins, two timers and the serial port. Each source has a fixed entry address called a vector. Interrupt programming means enabling only the sources you need, choosing priority, and writing short service routines that clear the correct flags. It is used for urgent events such as a key press, a timer tick, or a byte arriving on the serial line.",
+ "prereq": "You need: <a href=\"#8051-architecture-pins-memory-and-special-function-registers\">4.1</a> for the SFRs, <a href=\"#timers-and-counters-modes-and-programming\">4.3</a> for TF0/TF1, and <a href=\"#serial-communication-and-rs-232-interfacing\">4.4</a> for RI/TI.",
+ "sections": [
+  {
+   "h3": "Five sources, five vectors",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An interrupt is a request for the CPU to leave its main program and run a short routine. The 8051 has five sources. Two come from pins: external interrupt 0 (INT0) and external interrupt 1 (INT1). Two come from timers: Timer 0 overflow (TF0) and Timer 1 overflow (TF1). One comes from the serial port: a byte received or transmitted (RI or TI). Each source has a fixed code address, called its vector. The five vectors are 0003H for INT0, 000BH for Timer 0, 0013H for INT1, 001BH for Timer 1, and 0023H for the serial port. The gap is 8 bytes. The reset address is 0000H. At a vector, the CPU jumps to the routine. If the routine is longer than 8 bytes, place a jump at the vector to a service routine elsewhere. Timer flags TF0 and TF1 are cleared by hardware when the vector is taken. Serial flags RI and TI are not; the routine must clear them. External requests use TCON: IT0 and IT1 choose falling-edge or low-level; IE0 and IE1 are the request flags."
+    }
+   ]
+  },
+  {
+   "h3": "IE, IP and priority",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The IE register is the master switch and the per-source switch. Bit EA (IE.7) must be 1, or no masked interrupt reaches the CPU. The source bits are EX0 (IE.0) for INT0, ET0 (IE.1) for Timer 0, EX1 (IE.2) for INT1, ET1 (IE.3) for Timer 1, and ES (IE.4) for the serial port. Write IE = 0x83 to set EA, ET0 and EX0: binary 1000 0011. That enables Timer 0 and INT0 only. The IP register sets priority. PS (IP.4), PT1 (IP.3), PX1 (IP.2), PT0 (IP.1), and PX0 (IP.0) match the five sources. A 1 makes that source high priority; a 0 leaves it low. If two requests arrive together, high priority wins. If both are same priority, a fixed internal order applies; do not rely on it for new designs. Latency is the time from the request to the first instruction of the ISR. It includes finishing the current instruction and the call to the vector. A long instruction such as MUL or DIV adds to latency. Some syllabi call this the 8051 interrupt structure and interrupt programming."
+    }
+   ]
+  },
+  {
+   "h3": "Writing short ISRs in C",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In C, the interrupt keyword attaches a function to a vector number. Vector 0 is INT0, 1 is Timer 0, 2 is INT1, 3 is Timer 1, 4 is serial. A Timer 0 routine is <code>void t0_isr(void) interrupt 1</code>. Keep the routine short. Do the urgent work, set a <code>volatile</code> flag, and return. The main loop tests the flag and does slow work such as display or UART formatting. Declare the flag volatile so the compiler reloads it. For the serial port, read the cause: if RI is set, read SBUF; if TI is set, prepare the next byte. Clear RI and TI in software. Do not call large library functions inside an ISR. Do not wait for a flag inside an ISR. In assembly, the vector often holds <code>SJMP service</code> or <code>LJMP service</code>; the service routine ends with <code>RETI</code>. RETI restores the program counter and the interrupt logic. This pattern is used in a timer tick for a seven-segment display or a serial receive handler."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The five fixed vector addresses and their sources; the first and last vector slots are picked out, and the vectors sit 8 bytes apart.",
+  "spec": {
+   "type": "array",
+   "title": "8051 interrupt vectors",
+   "show_index": false,
+   "rows": [
+    {
+     "label": "Vector",
+     "cells": [
+      "0003",
+      "000B",
+      "0013",
+      "001B",
+      "0023"
+     ],
+     "marks": {
+      "0": "accent",
+      "4": "live"
+     }
+    },
+    {
+     "label": "Source",
+     "cells": [
+      "INT0",
+      "T0",
+      "INT1",
+      "T1",
+      "UART"
+     ],
+     "marks": {
+      "1": "next"
+     }
+    }
+   ],
+   "aria": "Array of 8051 interrupt vector addresses with their sources INT0, T0, INT1, T1 and UART."
+  }
+ },
+ "examples": [
+  {
+   "question": "IE = 0x83, IP = 0x02, and TCON = 0x01. Which interrupts are enabled, which source has high priority, and how is INT0 triggered?",
+   "steps": [
+    "IE = 0x83 = 131 decimal = 1000 0011₂. Mask EA = 0x80 = 128: 131 AND 128 = 128, so EA = 1. Mask ET0 = 0x02 = 2: 131 AND 2 = 2, so ET0 = 1. Mask EX0 = 0x01 = 1: 131 AND 1 = 1, so EX0 = 1. ES, ET1 and EX1 are 0.",
+    "Enabled sources: Timer 0 overflow and INT0. Serial and INT1 are disabled. EA = 1 allows the enabled requests to reach the CPU.",
+    "IP = 0x02 = 2 decimal = 0000 0010₂. Mask PT0 = 0x02 = 2: 2 AND 2 = 2, so PT0 = 1. Timer 0 is high priority; all other sources are low priority.",
+    "TCON = 0x01 = 1 decimal = 0000 0001₂. Mask IT0 = 0x01 = 1: 1 AND 1 = 1, so IT0 = 1. INT0 is falling-edge triggered, not low-level."
+   ],
+   "answer": "Timer 0 and external interrupt 0 are enabled; Timer 0 is high priority; INT0 is falling-edge triggered.",
+   "check": "ie=0x83\nip=0x02\ntcon=0x01\nprint(ie)\nprint(ip)\nprint(tcon)\nprint(ie & 0x80)\nprint(ie & 0x02)\nprint(ie & 0x01)\nprint(ip & 0x02)\nprint(tcon & 0x01)",
+   "values": [
+    131,
+    2,
+    1,
+    128,
+    2,
+    1,
+    2,
+    1
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Forgetting EA = 1 leaves every masked source silent even when EX0 or ET0 is 1.",
+  "Timer flags TF0/TF1 are cleared by hardware at the vector; serial flags RI/TI are not, so the serial ISR must clear them.",
+  "Each vector has only 8 bytes. Writing a full routine at 000BH can spill into 0013H; use a jump to a service routine.",
+  "IE0/IE1 are request flags; EX0/EX1 are enable bits; IT0/IT1 choose edge or low level. Do not mix them.",
+  "A low-level external interrupt remains active while the pin is low, so the ISR may re-enter unless the source is removed."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the five 8051 interrupt sources and their vector addresses.",
+   "marks": 2,
+   "a": "INT0 0003H, Timer 0 000BH, INT1 0013H, Timer 1 001BH, serial 0023H."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the EA bit needed even when ET0 = 1?",
+   "marks": 3,
+   "a": "EA is the global enable; with EA = 0 the CPU masks all source requests."
+  },
+  {
+   "level": "apply",
+   "q": "IE = 0x90. Which sources are enabled?",
+   "marks": 3,
+   "a": "0x90 = 1001 0000₂: EA = 1 and ES = 1. Only the serial interrupt is enabled; INT0, T0, INT1 and T1 are disabled."
+  },
+  {
+   "level": "analyze",
+   "q": "Timer 0 and serial interrupts are both enabled. Which flag is cleared by hardware and which by software?",
+   "marks": 4,
+   "a": "TF0 is cleared by hardware when vector 000BH is taken. RI and TI are not; the serial ISR must clear them."
+  },
+  {
+   "level": "apply",
+   "q": "TCON = 0x05. How are INT0 and INT1 triggered?",
+   "marks": 4,
+   "a": "0x05 = 0000 0101₂: IT0 = 1 and IT1 = 1, so both are falling-edge triggered."
+  },
+  {
+   "level": "analyze",
+   "q": "An ISR at 000BH is 12 bytes long. What goes wrong and what is the fix?",
+   "marks": 5,
+   "a": "It overwrites addresses 0013H and 0014H, which hold the INT1 vector. Put a jump at 000BH to a routine elsewhere."
+  },
+  {
+   "level": "understand",
+   "q": "What two parts make up interrupt latency?",
+   "marks": 2,
+   "a": "Finishing the current instruction and the call to the vector; the ISR's own execution follows."
+  },
+  {
+   "level": "apply",
+   "q": "Which C vector number is used for the serial ISR?",
+   "marks": 3,
+   "a": "Vector 4."
+  }
+ ],
+ "beyond": "Not for the exam. Modern microcontrollers replace this fixed vector table with a nested vectored interrupt controller, as in the ARM NVIC, so priorities can be grouped and pre-empted. Real systems also measure interrupt latency in clock cycles and use DMA to move data without CPU entry. Search for 'NVIC priority grouping', 'interrupt latency measurement' and 'DMA vs interrupt-driven I/O' to go further."
+}

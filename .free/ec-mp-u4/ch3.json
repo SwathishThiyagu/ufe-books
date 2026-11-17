@@ -1,0 +1,223 @@
+{
+ "lead": "The 8051 has two identical 16-bit counter blocks. Each block adds 1 to a register pair on every pulse and sets a flag when the pair rolls over. The pulses are either internal machine cycles — the block is then a timer — or falling edges on a pin — the block is then an event counter. One byte, TMOD, chooses the source, the width and the gating for both blocks. Timers give the 8051 accurate delays without tying up the CPU, count external events such as pulses from a sensor, and also set the serial baud rate (see 4.4).",
+ "prereq": "You need: the TMOD, TCON and TH/TL special function registers from <a href=\"#8051-architecture-pins-memory-and-special-function-registers\">4.1</a>, and the assembly loop delay programs from Unit 3.",
+ "sections": [
+  {
+   "h3": "Two counter blocks and the machine cycle",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Timer 0 and Timer 1 are two identical 16-bit blocks. Each is a register pair — TH0:TL0 for Timer 0, TH1:TL1 for Timer 1 — that adds 1 on every pulse. When the value rolls from FFFFH to 0000H, hardware sets an overflow flag, TF0 or TF1, which software can poll or turn into an interrupt (see <a href=\"#interrupts-and-interrupt-programming\">4.5</a>)."
+    },
+    {
+     "type": "p",
+     "text": "The bit C/T in TMOD chooses where the pulses come from. With C/T = 0 the block counts internal machine cycles, so it is a timer and gives accurate delays. With C/T = 1 it counts falling edges on pin T0 (P3.4) or T1 (P3.5), so it is an event counter — counting pulses from a slotted wheel to measure motor speed, for example."
+    },
+    {
+     "type": "p",
+     "text": "One machine cycle is 12 oscillator periods: T = 12 / fosc. At fosc = 12 MHz, T = 1 µs, so the whole 16-bit range 0 to 65,535 is 65.536 ms. At fosc = 11.0592 MHz, T = 1.085 µs."
+    },
+    {
+     "type": "p",
+     "text": "The CPU stays free while the timer counts. A software loop delay blocks everything else; here the CPU looks at the flag only when it needs to."
+    }
+   ]
+  },
+  {
+   "h3": "TMOD and TCON: choosing the source and the mode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "TMOD at address 89H is one control byte, not bit-addressable. Its low nibble configures Timer 0 and its high nibble Timer 1, in the same bit order: GATE, C/T, M1, M0."
+    },
+    {
+     "type": "p",
+     "text": "GATE = 0 means the timer runs whenever TRx = 1. GATE = 1 means it runs only when TRx = 1 and the matching pin INT0 or INT1 is high, so an external pulse opens and closes the counting window. That is how the 8051 measures the width of a pulse."
+    },
+    {
+     "type": "table",
+     "head": [
+      "M1 M0",
+      "Mode",
+      "Width",
+      "Counts before overflow"
+     ],
+     "rows": [
+      [
+       "0 0",
+       "Mode 0",
+       "13-bit: THx + low 5 bits of TLx",
+       "8192"
+      ],
+      [
+       "0 1",
+       "Mode 1",
+       "16-bit",
+       "65,536"
+      ],
+      [
+       "1 0",
+       "Mode 2",
+       "8-bit, auto-reload from THx",
+       "256"
+      ],
+      [
+       "1 1",
+       "Mode 3",
+       "Timer 0 split into two 8-bit timers, TL0 and TH0, 256 counts each",
+       "256 each; Timer 1 in mode 3 stops counting and holds its value"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "TCON at 88H is bit-addressable and holds the control and flag bits. TR0 (bit 4) and TR1 (bit 6) are run bits set by software. TF0 (bit 5) and TF1 (bit 7) are overflow flags set by hardware."
+    },
+    {
+     "type": "p",
+     "text": "Mode 2 is worth a second look. TLx counts and THx holds a reload value copied into TLx on every overflow, so the timer repeats with no software action. The price is range: only 256 counts. Mode 2 also drives the serial baud rate (see <a href=\"#serial-communication-and-rs-232-interfacing\">4.4</a>)."
+    }
+   ]
+  },
+  {
+   "h3": "Programming a mode 1 delay",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "For Timer 0 as a plain 16-bit timer with no gating, TMOD = 0000 0001B = 01H. The same five steps set up either timer."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write TMOD to select timer or counter, mode, and gating.",
+      "Compute the count N = delay ÷ T, where T = 12 / fosc is one machine cycle.",
+      "Load the reload value 65,536 − N into THx (high byte) and TLx (low byte).",
+      "Clear TFx, then set TRx to start counting.",
+      "Wait until TFx = 1, then clear TFx and reload, or stop."
+     ]
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "        MOV  TMOD, #01H    ; Timer 0, mode 1, internal clock, no gate\n        MOV  TH0,  #3CH    ; high byte of the reload\n        MOV  TL0,  #0B0H   ; low byte of the reload\n        CLR  TF0           ; clear any old flag\n        SETB TR0           ; start counting\nWAIT:   JNB  TF0, WAIT     ; poll until overflow\n        CLR  TR0           ; stop the timer\n        CLR  TF0           ; ready for the next round",
+     "output": "About 50 ms after SETB TR0, TF0 becomes 1, the JNB loop falls through, and TR0 and TF0 are cleared. TH0:TL0 now reads 0000H, so it must be reloaded with 3CB0H before the next round."
+    },
+    {
+     "type": "p",
+     "text": "The timer counts up from the reload value, so a bigger reload means a shorter delay. TF0 stays set until software clears it; a stale flag makes the next wait return at once."
+    },
+    {
+     "type": "p",
+     "text": "For longer delays, reload inside the loop. At 12 MHz the longest single mode 1 delay is 65.536 ms, so 1 s needs twenty rounds of 50 ms."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Timer 0 is loaded with 65,536 − 50,000, so it needs 50,000 counts of 1 µs each, that is 50 ms; TF0 then becomes 1 and stays set until the program clears it.",
+  "spec": {
+   "type": "gantt",
+   "unit": "µs",
+   "lanes": [
+    {
+     "label": "Timer 0",
+     "bars": [
+      {
+       "label": "50000 counts",
+       "start": 0,
+       "end": 50000,
+       "style": "accent"
+      }
+     ]
+    },
+    {
+     "label": "TF0",
+     "bars": [
+      {
+       "label": "TF0 set",
+       "start": 50000,
+       "end": 65000,
+       "style": "live"
+      }
+     ]
+    }
+   ],
+   "aria": "Timeline showing Timer 0 counting 50,000 machine cycles of 1 microsecond each for 50 milliseconds, after which the TF0 overflow flag is set and stays set."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8051 system uses a 12 MHz crystal. Timer 0 must produce a 50 ms delay in mode 1. (a) Find the machine cycle time. (b) Find the number of counts needed. (c) Find the reload value in hex and the bytes written to TH0 and TL0. (d) Verify the delay produced if TH0:TL0 is loaded with 3CB0H.",
+   "steps": [
+    "Machine cycle: T = 12 / fosc = 12 / (12 × 10⁶ Hz) = 1 µs.",
+    "Counts needed: N = 50 ms / 1 µs = 50,000.",
+    "Range check: mode 1 overflows after 65,536 counts, and 50,000 ≤ 65,536, so one round is enough.",
+    "Reload = 65,536 − 50,000 = 15,536.",
+    "To hex: 3 × 4096 = 12,288, remainder 3,248; 12 × 256 = 3,072, so the next digit is C, remainder 176 = B0H. Hence 15,536 = 3CB0H.",
+    "Write TH0 = 3CH and TL0 = B0H. The timer runs 3CB0H, 3CB1H … FFFFH and then overflows, which is 65,536 − 15,536 = 50,000 counts.",
+    "Check for (d): 50,000 × 1 µs = 50 ms."
+   ],
+   "answer": "T = 1 µs, N = 50,000 counts, reload = 15,536 = 3CB0H, so TH0 = 3CH and TL0 = B0H; loading 3CB0H gives exactly 50 ms.",
+   "check": "fosc = 12e6                 # crystal frequency in Hz\nT = 12.0 / fosc             # machine cycle in seconds\nN = 0.050 / T               # counts needed for 50 ms\nreload = int(round(65536 - N))\ndelay_ms = (65536 - reload) * T * 1000\nprint(round(N, 6))\nprint(reload)\nprint(round(delay_ms, 6))",
+   "values": [
+    50000.0,
+    15536,
+    50.0
+   ],
+   "output": "50000.0\n15536\n50.0"
+  }
+ ],
+ "traps": [
+  "Mode 0 is 13 bits, not 16. It allows only 8192 counts, so a reload worked out for mode 1 gives a delay about eight times too short when the mode bits are wrong.",
+  "The machine cycle is 12 oscillator periods. At 11.0592 MHz one count is 1.085 µs, not 1 µs. Using 1 µs makes every delay about 8.5% too long — 10 ms becomes about 10.85 ms — because the count taken is 8.5% too large.",
+  "The reload is 65,536 − N, not N. Loading N itself runs the timer 65,536 − N counts: the 50 ms case then gives 15,536 counts ≈ 15.5 ms, and for small N the delay comes out longer instead of shorter.",
+  "In mode 2 the reload sits in THx and TLx is the counter; in mode 1 both bytes are the count. Swapping the two bytes changes the delay completely.",
+  "TF0 is set by hardware but not cleared by hardware when you poll. Clear it before the next round, or the next wait exits at once and the delay collapses."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many bits does Timer 0 use in mode 1, and after how many counts does it overflow?",
+   "marks": 2,
+   "a": "16 bits. It counts up from the reload value to FFFFH and then overflows, so the number of counts is 65,536 − reload."
+  },
+  {
+   "level": "understand",
+   "q": "Explain what the C/T bit does, and give one use of each setting.",
+   "marks": 3,
+   "a": "C/T = 0 counts internal machine cycles, used for time delays. C/T = 1 counts falling edges on pin T0 (P3.4) or T1 (P3.5), used to count events such as pulses from a flow sensor."
+  },
+  {
+   "level": "understand",
+   "q": "What happens when GATE = 1?",
+   "marks": 3,
+   "a": "The timer runs only while TRx = 1 and the matching pin INT0 or INT1 is high. An external pulse opens and closes the counting window, so the final count measures the pulse width."
+  },
+  {
+   "level": "apply",
+   "q": "An 8051 with fosc = 11.0592 MHz needs a 10 ms delay from Timer 1 in mode 1. Find TH1 and TL1.",
+   "marks": 4,
+   "a": "T = 12 / 11.0592 MHz = 1.0851 µs. N = 10 ms / 1.0851 µs = 9216 counts. Reload = 65,536 − 9216 = 56,320 = DC00H. So TH1 = DCH and TL1 = 00H."
+  },
+  {
+   "level": "apply",
+   "q": "Using the 50 ms mode 1 block at 12 MHz, how do you obtain a 1 s delay, and what is the largest single mode 1 delay at that frequency?",
+   "marks": 4,
+   "a": "1 s / 50 ms = 20 rounds of the block, reloading TH0:TL0 and clearing TF0 in every round. The largest single delay is 65,536 counts × 1 µs = 65.536 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A program waits with JNB TF0,$ and repeats a 50 ms delay in a loop. After the first round the LED blinks far too fast. What is the likely bug?",
+   "marks": 5,
+   "a": "TF0 is never cleared. It stays 1 after the first overflow, so every later JNB falls through immediately and the delay shrinks to the loop time. Adding CLR TF0 before each start fixes it."
+  },
+  {
+   "level": "analyze",
+   "q": "Timer 1 is configured in mode 3. What does it do? What does Timer 0 do in mode 3?",
+   "marks": 5,
+   "a": "Timer 1 in mode 3 stops counting and holds its value. Timer 0 in mode 3 splits into two 8-bit timers: TL0 uses TR0, TF0, GATE and INT0, while TH0 uses TR1 and TF1."
+  }
+ ],
+ "beyond": "Not for the exam. Modern parts keep the idea and add registers: input capture latches the counter value on a pin edge, output compare toggles a pin when the counter matches a stored value, which is how hardware PWM is built. ARM Cortex-M cores carry a 24-bit SysTick timer that most RTOS code uses as its tick. Worth searching next: input capture, output compare, STM32 timer PWM, SysTick reload."
+}

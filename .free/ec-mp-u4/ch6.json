@@ -1,0 +1,218 @@
+{
+ "lead": "Embedded C keeps the C language you know but ties every byte to the 8051's fixed memory and registers. A program that would run on a PC must be told which names are special function registers, which variables a hardware interrupt can change, and where variables live. The compiler then turns the source into a HEX file for program flash. This style is used for small control tasks: reading a key on P1, timing a pulse with Timer 0, sending a byte on the UART, or blinking an LED from an interrupt.",
+ "prereq": "You need: <a href=\"#i-o-ports-and-port-programming\">4.2</a> for port latches, <a href=\"#timers-and-counters-modes-and-programming\">4.3</a> for timer modes, <a href=\"#serial-communication-and-rs-232-interfacing\">4.4</a> for SBUF and baud rate, and <a href=\"#interrupts-and-interrupt-programming\">4.5</a> for vectors and IE/IP.",
+ "sections": [
+  {
+   "h3": "C with hardware addresses",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Standard C has no idea that address 0x90 is Port 1. Embedded C adds a small set of keywords so the programmer can name hardware. The C51 compiler from Keil and the free SDCC compiler both accept this idea; exact keyword spelling can differ, so check the header. The source file is compiled and linked into a HEX file, which a programmer writes into the 8051's program flash. Some syllabi call this C51 programming or 8051 C programming."
+    },
+    {
+     "type": "p",
+     "text": "Choose data types by size, not habit. On C51, <code>unsigned char</code> is 8 bits (0 to 255), <code>unsigned int</code> is 16 bits (0 to 65535), and <code>bit</code> is one bit. A port byte, a counter below 256, or a bit mask should be <code>unsigned char</code>. Use <code>unsigned int</code> only for values that need more than 8 bits, such as a 16-bit timer count or a delay loop count. This saves data memory and code space."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Type",
+      "Size on C51",
+      "Typical use"
+     ],
+     "rows": [
+      [
+       "unsigned char",
+       "8 bits",
+       "port byte, mask, small counter"
+      ],
+      [
+       "unsigned int",
+       "16 bits",
+       "timer count, delay"
+      ],
+      [
+       "bit",
+       "1 bit",
+       "flag, single pin"
+      ],
+      [
+       "volatile unsigned char",
+       "8 bits",
+       "variable changed by an ISR"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "SFRs, bits and volatile",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A special function register (SFR) is declared with <code>sfr</code> and its byte address. For example, <code>sfr P1 = 0x90;</code> tells the compiler that the name P1 is the byte at address 0x90. A single pin is declared with <code>sbit</code>: <code>sbit LED = P1^0;</code> means bit 0 of P1. Most projects include a vendor header such as <code>reg51.h</code> instead of writing these lines by hand. The header also declares IE, IP, TMOD, SCON and SBUF."
+    },
+    {
+     "type": "p",
+     "text": "Use bitwise operators to change selected bits without disturbing the rest. Set bits with OR: <code>P1 = P1 | 0x09;</code> sets bit 0 and bit 3. Clear bits with AND plus NOT: <code>P1 = P1 &amp; ~0x7F;</code> clears bits 0 to 6 and leaves bit 7. Toggle bits with XOR: <code>P2 = P2 ^ 0x04;</code> flips bit 2. The symbol <code>~</code> is bitwise NOT; <code>&amp;</code> is bitwise AND. Do not confuse <code>&amp;</code> with logical <code>&amp;&amp;</code>."
+    },
+    {
+     "type": "p",
+     "text": "A variable changed outside normal flow must be <code>volatile</code>. An interrupt service routine (ISR), a hardware register, or another task can change it between two reads. Without <code>volatile</code>, the compiler may keep the value in a register and never reload memory. Example: <code>volatile unsigned char ticks;</code> then <code>ticks++;</code> inside the Timer 0 ISR and <code>if (ticks &gt;= 10)</code> in main."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<code>sfr</code> names a byte at an address.",
+      "<code>sbit</code> names one bit of an SFR or bit-addressable RAM.",
+      "<code>volatile</code> forces a fresh read from memory.",
+      "Use parentheses around mixed bitwise expressions."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Memory models and small programs",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 8051 has several data spaces, and the compiler must choose where variables go. The small model puts variables in internal RAM (<code>data</code>), which is fast but only about 128 bytes. The compact model uses one 256-byte page of external RAM (<code>pdata</code>), addressed through a pointer. The large model uses up to 64 KB of external RAM (<code>xdata</code>), which is slower and needs 16-bit pointers. Small and compact models are faster than the large model: small-model data is reached with direct and register addressing, and compact-model data uses 8-bit pointers into one page. The large model needs 16-bit pointers and external-memory (MOVX) cycles; keeping data out of xdata also leaves internal RAM free for the stack. The stack sits in internal RAM and grows upward; deep recursion or large local arrays can overflow it."
+    },
+    {
+     "type": "p",
+     "text": "Port program: <code>P1 = 0x0F;</code> writes 0000 1111 to Port 1. To make P1.0 an input, set only that pin's latch to 1: <code>P1 = P1 | 0x01;</code> then read P1.0. Every pin must have latch 1 before it is used as an input; see <a href=\"#i-o-ports-and-port-programming\">4.2</a>. Timer 0 program in C: <code>TMOD = 0x01; TH0 = 0xFC; TL0 = 0x18; TR0 = 1; while (!TF0); TF0 = 0;</code> This uses mode 1, 16-bit timer, and waits for overflow. Serial program: <code>SCON = 0x50; TMOD = 0x20; TH1 = 0xFD; TR1 = 1; SBUF = 'A'; while (!TI); TI = 0;</code> This sets mode 1 UART with Timer 1 mode 2 baud rate. Interrupt program: <code>volatile unsigned char ticks; void timer0_isr(void) interrupt 1 { TH0 = 0xFC; TL0 = 0x18; ticks++; } void main(void) { TMOD = 0x01; TH0 = 0xFC; TL0 = 0x18; ET0 = 1; EA = 1; TR0 = 1; while (1) { } }</code> Mode 1 has no auto-reload, so the ISR must write TH0 and TL0 again for every 1000-count interval. The Timer 0 vector is 1 in C51; check your compiler header for exact syntax."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The C source is compiled to a HEX file, written to program flash, and then run on the 8051. Notice that the HEX file is the handoff between software and the chip.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Embedded C build flow",
+   "nodes": [
+    {
+     "id": "src",
+     "label": "C source",
+     "note": ".c file",
+     "style": "accent"
+    },
+    {
+     "id": "cc",
+     "label": "C51 compiler",
+     "note": "Keil or SDCC",
+     "style": "normal"
+    },
+    {
+     "id": "hex",
+     "label": "HEX file",
+     "note": "machine code",
+     "style": "normal"
+    },
+    {
+     "id": "flash",
+     "label": "8051 flash",
+     "note": "program ROM",
+     "style": "live"
+    },
+    {
+     "id": "run",
+     "label": "Run",
+     "note": "ports and timers",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "src",
+     "to": "cc"
+    },
+    {
+     "from": "cc",
+     "to": "hex"
+    },
+    {
+     "from": "hex",
+     "to": "flash"
+    },
+    {
+     "from": "flash",
+     "to": "run"
+    }
+   ],
+   "aria": "Build flow from C source through a C51 compiler and HEX file into 8051 program flash, then execution."
+  }
+ },
+ "examples": [
+  {
+   "question": "Port 1 holds 0xA5 and Port 2 holds 0x00. Execute these two C statements on an 8051: <code>P1 = (P1 | 0x09) &amp; 0x7F;</code> <code>P2 ^= 0x04;</code> Give P1 and P2 after both statements, in hex and decimal.",
+   "steps": [
+    "Start: P1 = 0xA5 = 165 decimal; P2 = 0x00 = 0 decimal.",
+    "P1 | 0x09: 0xA5 is 1010 0101; 0x09 is 0000 1001; OR gives 1010 1101 = 0xAD = 173 decimal.",
+    "0xAD &amp; 0x7F: 0xAD is 1010 1101; 0x7F is 0111 1111; AND gives 0010 1101 = 0x2D = 45 decimal.",
+    "P2 ^= 0x04: 0x00 XOR 0x04 = 0x04 = 4 decimal."
+   ],
+   "answer": "After both statements, P1 = 0x2D (45 decimal) and P2 = 0x04 (4 decimal).",
+   "check": "p1 = 0xA5\np2 = 0x00\np1 = (p1 | 0x09) & 0x7F\np2 ^= 0x04\nprint(p1)\nprint(p2)",
+   "values": [
+    45,
+    4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not assume <code>int</code> is 32 bits. On C51 <code>int</code> is usually 16 bits; a 32-bit value costs more code and time.",
+  "A variable changed by an ISR must be <code>volatile</code>, or the compiler may cache it and the main loop never sees the change.",
+  "<code>sbit</code> declares one bit; <code>sfr</code> declares a whole byte. An <code>sbit</code> can be declared only for a bit-addressable SFR (address ending in 0x0 or 0x8) or for bit-addressable RAM. TMOD (0x89) and SBUF (0x99) cannot have an <code>sbit</code> name; to change one bit of TMOD, mask the byte with bitwise operators.",
+  "The small memory model is fast but has little space. Large arrays in <code>data</code> can overflow the 8051 stack or leave no room for locals.",
+  "Use <code>&amp;</code> for bit masking and <code>&amp;&amp;</code> for logical AND; the same trap exists for <code>|</code> and <code>||</code>."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "On C51, how many bits are in <code>unsigned char</code> and <code>unsigned int</code>?",
+   "marks": 2,
+   "a": "<code>unsigned char</code> is 8 bits (0 to 255). <code>unsigned int</code> is 16 bits (0 to 65535)."
+  },
+  {
+   "level": "understand",
+   "q": "Why must a variable changed by an ISR be declared <code>volatile</code>?",
+   "marks": 3,
+   "a": "The compiler may keep it in a register and reuse that copy. <code>volatile</code> forces each read to come from memory, so the main code sees the ISR's change."
+  },
+  {
+   "level": "apply",
+   "q": "P1 = 0x3C. What is P1 after <code>P1 = P1 | 0x03;</code> and then <code>P1 = P1 &amp; ~0x0F;</code>?",
+   "marks": 4,
+   "a": "0x3C | 0x03 = 0x3F. Then ~0x0F has low byte 0xF0, and 0x3F &amp; 0xF0 = 0x30. Final P1 = 0x30."
+  },
+  {
+   "level": "apply",
+   "q": "Write one C line that toggles bit 5 of P2 without changing other bits.",
+   "marks": 3,
+   "a": "<code>P2 ^= 0x20;</code> because 0x20 is 0010 0000, which selects bit 5."
+  },
+  {
+   "level": "analyze",
+   "q": "A C51 program declares <code>unsigned int i;</code> and uses <code>for (i=0; i&lt;70000; i++);</code>. Explain what goes wrong.",
+   "marks": 4,
+   "a": "On C51 <code>unsigned int</code> is 16 bits, so i wraps from 65535 to 0. It never reaches 70000, and the loop continues forever unless another condition stops it."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can the large memory model be slower than the small model on the 8051?",
+   "marks": 4,
+   "a": "Large-model variables live in <code>xdata</code>, reached by 16-bit pointers and external-memory cycles. Small-model <code>data</code> lives in internal RAM with direct and register addressing, so it needs fewer machine cycles."
+  },
+  {
+   "level": "understand",
+   "q": "What does <code>sbit LED = P1^0;</code> mean?",
+   "marks": 2,
+   "a": "It declares LED as bit 0 of the SFR P1. Writing LED changes only P1.0; reading LED returns that one bit."
+  }
+ ],
+ "beyond": "Not for the exam. Modern 8051 tools still use this model: Keil C51 and SDCC generate code for small memory models, and vendor headers hide SFR addresses. In industry, the same ideas appear as memory-mapped I/O in ARM Cortex-M headers, where <code>volatile</code> pointers replace <code>sfr</code>. Search for \"SDCC 8051 memory models\", \"Keil C51 sfr sbit\", and \"volatile interrupt variable\" to go further. The next step is Unit 6, where ARM C uses similar <code>volatile</code> rules but a 32-bit flat address space."
+}
