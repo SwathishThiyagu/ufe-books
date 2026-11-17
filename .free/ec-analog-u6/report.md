@@ -1,8 +1,15 @@
 # ec-analog-u6: free-model run
 
 - Book: `books/ece/ec-analog/ec-analog-u6.html`
-- Status: error
-- Model calls so far: 26 (114,649 tokens in, 284,661 out), 5.1 minutes
+- Status: ok
+- Model calls so far: 35 (154,931 tokens in, 355,562 out), 10.7 minutes
+
+## Checker
+
+```
+ec-analog-u6.html: 9 chapters, 17991 words, 10 figures, 182 KB
+OK
+```
 
 ## For the reviewer
 
@@ -20,6 +27,13 @@
 - ch 2 [low] Worked example 1, step 6: Calling 1 + Rf/R1 = 11 the 'loop factor' is nonstandard and can be confused with loop gain. The actual loop gain is A_OL R1/(R1 + Rf).
 - ch 2 [low] Section 3: The sentence 'Finite open-loop gain A_OL makes the closed-loop gain slightly smaller than ideal' is technically wrong for the signed inverting gain: −9.9989 is larger than −10. It is correct only for gain magnitude.
 - ch 3 [high] Section 3 (last sentence) and exam trap 5: The noise gain is quoted as 1 + R_f/R₁ and trap 5 applies it to 'the summer'. That value is the noise gain of the four-resistor subtractor (or of a single-input inverting amplifier). In an n-input inverting summer the offset voltage sees all input resistors in parallel to ground, so its gain is 1 + R_f/(R₁∥R₂∥…∥Rₙ), which is much larger. Example: with R_f = 10 kΩ and three 10 kΩ inputs the offset gain is 1 + 10k/3.33k = 4, not 2. A student will under-estimate the output offset of the summer.
+- ch 4 [high] Section 1, third bullet ("the two inputs do not look alike"): This describes the four-resistor difference amplifier wrongly, and contradicts the first bullet of the same section and the answer to Q4. In the difference amplifier both sources are loaded by a resistor R₁ (one goes to the virtual node at the inverting input, the other to the non-inverting input which also has R₁ to ground), so neither input is "a high-resistance op-amp input". The description given belongs to the two-op-amp instrumentation amplifier (Section 3), not to a plain difference amplifier.
+- ch 4 [low] Section 1, closing paragraph: The text says the bridge, thermocouple or skin electrode "asks for four things" but only three items are listed (high input resistance, gain set by one resistor, CMRR above 100 dB).
+- ch 4 [low] Section 3, CMRR bullet: "the first stage's very high value" is inaccurate. The input stage has common-mode gain exactly 1 and differential gain 1 + 2R/R_G, so its own CMRR is only 1 + 2R/R_G (60 dB at a gain of 1000, 0 dB when R_G is open). What makes the first stage harmless is that its common-mode gain is 1, not a very high CMRR.
+- ch 4 [low] Section 4, Practical bullet (driven shield): "take the shield from the R_G node" is ambiguous and, read literally, wrong: R_G has two ends, one sitting at v₁ and the other at v₂, so a shield connected there would be driven by the signal itself and its capacitance would be charged by the signal. A driven shield must follow the common-mode voltage.
+- ch 4 [low] Quiz Q5, answer: The question says only that the four second-stage resistors are equal; it never gives a value. The answer inserts 10 kΩ ("10 kΩ/10 kΩ = 1"), which is a number the student cannot know from the question.
+- ch 4 [low] Figure spec: The label "1 + 2R/R_G" is placed on the buffer→R_G edge, which suggests the signal (and the gain) passes through R_G into the next block, and R_G has no onward edge. Students may read the gain as coming out of R_G instead of out of the two buffers.
+- ch 4 [low] Lead: "Strain-gauge weighings" is not idiomatic English and is vague for a second-language reader.
 - ch 5 [low] Section 1, frequency-response sentence: The text says the gain falls at 20 dB per decade 'above the corner f = 1/(2πR₁C)'. For an ideal integrator the magnitude falls at 20 dB per decade at every frequency; the corner is only the point where the gain passes through 1 (0 dB). As written, a student may think the gain is flat below the corner, which is true of the practical circuit in Section 2, not the ideal one.
 - ch 5 [low] Section 3, sine-input sentence: 'A sine input gives a cosine output, shifted by 90°' drops the minus sign from vout = −RC dvin/dt. The true output for vin = V sin(ωt) is −RCω cos(ωt), an inverted cosine, i.e. the output lags the input by 90°. A student reading only this sentence will sketch a plain +cosine.
 - ch 5 [low] Figure (plot spec data): The sample points for both series are spaced 1250 Hz apart on a linear grid, so the first plotted point is at about 1.25 kHz. On a 1 Hz to 100 kHz log axis the integrator line and the differentiator line are drawn only in the right-hand part of the plot; the whole 1 Hz to 1.25 kHz region has no curve, so the figure does not show the low-frequency behaviour it describes.
