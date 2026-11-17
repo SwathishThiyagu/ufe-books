@@ -181,6 +181,8 @@ FIG[7] = (f7, 'Global size 8 with local size 4 gives 2 work-groups of 4. Each wo
 
 
 TEXT = {
+    4: [('The writes for i = 1000 to 1023 are out of bounds, so four writes go past C.',
+         'The writes for i = 1000 to 1023 are out of bounds, so 1023 − 1000 + 1 = 24 writes go past C.')],
     3: [('A grid is all blocks from one kernel launch. The figure shows the three levels.',
          'A grid is all blocks from one kernel launch. The figure shows a grid of 2 blocks with 4 threads each.')],
 }
