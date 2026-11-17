@@ -1,0 +1,187 @@
+{
+ "lead": "UART turns a byte into a timed sequence of bits on one wire, and RS-232 gives that sequence real voltage levels for a cable. The receiver recovers each byte from the start bit and the agreed bit time, with no shared clock. This cheap link connects a microcontroller to a PC, a GPS module, a barcode scanner or another board. You meet it as the serial port or COM port on old equipment, and as the debug console on many embedded boards today.",
+ "prereq": "You need the 8051 special function registers SBUF and SCON from Unit 2, and the idea of interrupts from Unit 3; <a href=\"#spi-and-i2c-buses\">Chapter 4.2</a> compares this with synchronous board buses.",
+ "sections": [
+  {
+   "h3": "The UART frame and the bit clock",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A UART is a Universal Asynchronous Receiver Transmitter. Asynchronous means there is no clock wire. Both ends agree on a baud rate B, the number of line bits per second. The line rests high when idle. A frame begins with a start bit at logic 0. Then come 5 to 9 data bits, sent least significant bit first. An optional parity bit follows. The frame ends with 1 or 2 stop bits at logic 1. The short form 8N1 means 8 data bits, no parity, 1 stop bit."
+    },
+    {
+     "type": "formula",
+     "text": "Tb = 1 / B",
+     "where": "Tb is the time for one line bit in seconds; B is the baud rate in bits per second."
+    },
+    {
+     "type": "formula",
+     "text": "N = 1 + D + P + S; R = B / N",
+     "where": "N is the number of bits in one frame; D is the number of data bits; P is 1 with parity and 0 without parity; S is the number of stop bits; R is the maximum byte rate in bytes per second."
+    },
+    {
+     "type": "p",
+     "text": "For 8N1, N = 1 + 8 + 0 + 1 = 10 bits. At B = 9600 baud, Tb = 1/9600 s = 0.1042 ms and R = 960 bytes/s. A receiver samples near the middle of each bit. If the stop bit is not logic 1, the receiver reports a framing error. If a new byte is ready before the old byte is read, the receiver reports an overrun. TX and RX are separate wires, so full-duplex traffic can flow both ways at once."
+    }
+   ]
+  },
+  {
+   "h3": "RS-232: the electrical layer",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "UART defines the bit order and timing. RS-232 defines the voltages and connector for a cable. RS-232 uses inverted, large voltages. Logic 0 is +3 V to +15 V and is called space. Logic 1 is -3 V to -15 V and is called mark. A 0 V to 5 V TTL pin cannot drive this directly. The MAX232 chip uses a charge pump and four small capacitors to make about ±10 V from a 5 V supply, then converts TTL to RS-232 and back."
+    },
+    {
+     "type": "p",
+     "text": "The common connector is the 9-pin DB9. A computer or terminal is DTE, data terminal equipment. A modem or similar device is DCE, data communication equipment. TX from one side goes to RX on the other. A null-modem cable crosses TX and RX and swaps the handshake lines so two DTE devices can talk. RS-232 often works to about 15 m at 9600 baud; longer cable or higher baud rate increases errors. Some syllabi call RS-232 the serial port, COM port or EIA-232."
+    }
+   ]
+  },
+  {
+   "h3": "8051 serial port: SBUF, SCON, TI and RI",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "On the 8051, SBUF is the serial buffer register. Writing SBUF loads the transmit register. Reading SBUF returns the received byte. SCON is the serial control register. In mode 1, set SM0 = 0 and SM1 = 1 for 8-bit UART. Set REN = 1 to enable reception. TI is the transmit flag; hardware sets TI = 1 after the stop bit leaves TXD. RI is the receive flag; hardware sets RI = 1 when a byte is complete in SBUF. Software must clear TI and RI."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Polled transmit: wait until TI = 0, write the byte to SBUF, wait until TI = 1, then clear TI.",
+      "Polled receive: set REN = 1, wait until RI = 1, read SBUF, then clear RI.",
+      "Interrupt-driven serial sets TI or RI as an interrupt source; the ISR design belongs to Unit 3."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Polling wastes processor time but is simple. Interrupt-driven serial is better when the main program has other work. The same 8051 UART can use Timer 1 to set the baud rate; check the crystal and reload value in Unit 2."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The line is high when idle. The start bit at index 0 pulls it low, the data bits follow least significant first, and the stop bit at index 9 returns the line high.",
+  "spec": {
+   "type": "array",
+   "title": "UART frame for 'A' = 0x41, 8N1",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Line",
+     "cells": [
+      "0",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "1",
+      "0",
+      "1"
+     ],
+     "marks": {
+      "0": "accent",
+      "7": "live",
+      "9": "accent"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 0,
+     "label": "start"
+    },
+    {
+     "row": 0,
+     "cell": 9,
+     "label": "stop"
+    }
+   ],
+   "aria": "A ten-bit 8N1 UART frame for the byte 0x41, showing the start bit 0, data bits LSB first, and stop bit 1."
+  }
+ },
+ "examples": [
+  {
+   "question": "The ASCII character 'A' is 0x41. Send it over a UART link at 9600 baud with 8N1. (a) List the ten line bits in order. (b) Find the time for one character and for 100 characters.",
+   "steps": [
+    "Write 0x41 in binary as 0100 0001. The data bits D0 to D7, least significant first, are 1 0 0 0 0 0 1 0.",
+    "8N1 means 8 data bits, no parity, 1 stop bit. The frame has 1 start bit + 8 data bits + 1 stop bit = 10 bits.",
+    "The start bit is 0. Place D0 to D7 after it. The stop bit is 1. The line order is 0, 1, 0, 0, 0, 0, 0, 1, 0, 1.",
+    "Bit time Tb = 1 / 9600 s = 0.1041667 ms.",
+    "One character takes 10 × 0.1041667 ms = 1.041667 ms, about 1.0417 ms.",
+    "100 characters take 100 × 1.041667 ms = 104.1667 ms, about 104.17 ms."
+   ],
+   "answer": "The ten line bits are start 0, D0 to D7 = 1 0 0 0 0 0 1 0, stop 1; one character takes 1.0417 ms and 100 characters take 104.17 ms.",
+   "check": "bits_total = 1 + 8 + 1\nbaud = 9600\nt_one_ms = bits_total / baud * 1000\nt_hundred_ms = t_one_ms * 100\nprint(bits_total)\nprint(round(t_one_ms, 4))\nprint(round(t_hundred_ms, 2))",
+   "values": [
+    10,
+    1.0417,
+    104.17
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Baud is not byte rate. With 8N1 each byte needs 10 line bits, so 9600 baud carries at most 960 bytes/s, not 9600 bytes/s.",
+  "UART sends data least significant bit first. For 0x41 the first data bit after the start bit is 1, not 0.",
+  "RS-232 logic is inverted and large: logic 1 is -3 V to -15 V and logic 0 is +3 V to +15 V. A TTL 5 V pin needs a MAX232 or similar driver.",
+  "8N1 is 10 bits per frame: 1 start + 8 data + 1 stop. Parity adds one bit; two stop bits add another.",
+  "TX and RX must cross. Two DTE devices need a null-modem cable; a straight-through cable connects TX to TX."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What do the three characters in 8N1 mean?",
+   "marks": 2,
+   "a": "8 data bits, no parity, 1 stop bit."
+  },
+  {
+   "level": "remember",
+   "q": "Which RS-232 voltage range represents logic 1?",
+   "marks": 2,
+   "a": "-3 V to -15 V, called mark."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a UART called asynchronous?",
+   "marks": 3,
+   "a": "It has no shared clock wire. Both ends use the same agreed baud rate and the start bit to align each frame."
+  },
+  {
+   "level": "apply",
+   "q": "A link runs at 19200 baud with 8N1. Find the time for one frame and the maximum byte rate.",
+   "marks": 4,
+   "a": "N = 10 bits; T = 10/19200 s = 0.5208 ms; R = 19200/10 = 1920 bytes/s."
+  },
+  {
+   "level": "analyze",
+   "q": "A receiver sees the stop bit as 0. What error is reported and why?",
+   "marks": 3,
+   "a": "A framing error. The stop bit must be logic 1, so the receiver and transmitter baud rates or framing may disagree."
+  },
+  {
+   "level": "analyze",
+   "q": "What is an overrun in a UART receiver?",
+   "marks": 3,
+   "a": "A new byte is complete before the previous byte in the receive buffer is read, so the old byte is lost."
+  },
+  {
+   "level": "apply",
+   "q": "Give the 8051 polled steps to transmit one byte after the previous transmission is complete.",
+   "marks": 4,
+   "a": "Wait until TI = 0; write the byte to SBUF; wait until TI = 1; clear TI to 0."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a MAX232 needed between an 8051 and a DB9 RS-232 port?",
+   "marks": 3,
+   "a": "The 8051 pins are TTL 0 V/5 V; RS-232 needs inverted ±3 V to ±15 V levels. MAX232 converts both directions."
+  }
+ ],
+ "beyond": "Not for the exam. Many modern boards replace the DB9 with a USB-UART bridge, but the same UART frame appears inside the USB data. RS-485 uses the UART frame on a differential pair for long industrial cable runs. Flow control with RTS and CTS prevents overrun when the receiver is slow. Search next for UART FIFO, RS-485, and USB CDC."
+}

@@ -1,0 +1,268 @@
+{
+ "lead": "Inside a chip the CPU, memory and peripherals must move data without leaving the package. AMBA — Advanced Microcontroller Bus Architecture — is ARM's family of standards for that internal wiring. AHB (Advanced High-performance Bus) carries fast traffic such as CPU-to-memory and DMA. APB (Advanced Peripheral Bus) carries slow, cheap traffic to UART, SPI, GPIO and timers. AMBA also names AXI at the high end. Almost every ARM-based chip — a phone, a set-top box, a car body controller — is stitched together with these buses, so their timing decides the system's throughput.",
+ "prereq": "You need: the master-slave idea and synchronous transfers from <a href=\"#spi-and-i2c-buses\">4.2</a>, and the ARM core from Unit 2.",
+ "sections": [
+  {
+   "h3": "Why a chip needs its own bus",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A board bus such as SPI or I2C (<a href=\"#spi-and-i2c-buses\">4.2</a>) crosses copper traces on a PCB and costs package pins. Inside a chip the wires are short, wide and pin-free, so the rules change: no line drivers, no termination, a fast synchronous clock, and 32 or 64 bits moved at a time."
+    },
+    {
+     "type": "p",
+     "text": "AMBA — Advanced Microcontroller Bus Architecture — is ARM's family of standards for these internal buses. Three names matter. AHB (Advanced High-performance Bus) carries fast traffic. APB (Advanced Peripheral Bus) carries slow traffic to simple peripherals. AXI is the high-end member with separate read and write channels; only a few universities teach it, so treat it as a name here."
+    },
+    {
+     "type": "p",
+     "text": "Four roles repeat on every AMBA bus. A <b>master</b> starts a transfer (the CPU, a DMA engine). A <b>slave</b> answers it (memory controller, UART). An <b>arbiter</b> decides which master owns the bus next. A <b>decoder</b> reads the address and selects which slave is being addressed."
+    }
+   ]
+  },
+  {
+   "h3": "AHB: pipelined, bursty, multi-master",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "AHB splits every transfer into an <b>address phase</b>, where the master drives HADDR, HTRANS and HWRITE, and a <b>data phase</b>, where HWDATA is written or HRDATA is read. It is pipelined: the address phase of transfer N+1 runs while the data phase of transfer N is still in progress. After one filling cycle, one transfer completes per clock."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Master requests the bus; the arbiter grants it with HGRANT.",
+      "Master drives the address and control lines (address phase).",
+      "Decoder decodes the address and selects one slave.",
+      "Next clock, the data phase runs: HWDATA out on a write, HRDATA in on a read.",
+      "Slave raises HREADY when it finishes. Holding HREADY low inserts wait states, which stretch the data phase and freeze the pipeline.",
+      "HRESP reports OKAY in a single cycle. ERROR takes two cycles, and so do the SPLIT and RETRY responses that a slave uses when it cannot finish at once."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Bursts are the bandwidth trick. HBURST (burst type and length) and HSIZE (bytes per beat) let the master send several beats back to back, but each beat still has its own address phase: the master drives the incremented (or wrapped) address for the next beat while the current data phase runs, so no clock is wasted. Because a burst must not cross a 1 KB boundary, the decoder's slave select stays the same for the whole burst and the slave can prepare the following beats. Sending one start address and letting the slave count is AXI, not AHB."
+    }
+   ]
+  },
+  {
+   "h3": "APB: two phases, no pipeline",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "APB is deliberately plain: no arbiter, no bursts, no pipelining, one master only. Every transfer takes two phases."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Setup phase: the bridge drives PSEL, PADDR, PWRITE and, for a write, PWDATA; PENABLE stays low.",
+      "Access phase: PENABLE goes high.",
+      "The slave asserts PREADY when done and the transfer ends. PSLVERR flags an error.",
+      "Minimum cost: two clock cycles per transfer."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "APB normally sits behind an AHB-to-APB bridge. The bridge is a slave on AHB and the only master on APB; it converts one AHB transfer into one setup plus access, holding HREADY low meanwhile. UART, SPI, GPIO and timers hang off APB. They are slow and rarely accessed, so two cycles cost little, and the simple logic saves gates and power; the APB clock is often a divided-down copy of the AHB clock."
+    }
+   ]
+  },
+  {
+   "h3": "Turning timing into bandwidth",
+   "blocks": [
+    {
+     "type": "formula",
+     "text": "B = (W ÷ 8) ÷ T",
+     "where": "B is bandwidth in bytes per second; W is the data width in bits per transfer; T is the time for one transfer in seconds."
+    },
+    {
+     "type": "p",
+     "text": "APB needs T = 2 ÷ f_APB, because of the two phases. A pipelined AHB in steady state needs T = 1 ÷ f_AHB, one beat per clock. Two cautions. Wait states push T above the ideal, so the result is a ceiling, not a measurement. And APB usually runs slower than AHB, so the real gap is wider than the 2:1 that cycle counts alone suggest."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Feature",
+      "AHB",
+      "APB"
+     ],
+     "rows": [
+      [
+       "Pipelining",
+       "Yes, address and data overlap",
+       "No"
+      ],
+      [
+       "Cycles per transfer",
+       "1 in steady state",
+       "2 minimum"
+      ],
+      [
+       "Masters",
+       "Several, via arbiter",
+       "One (the bridge)"
+      ],
+      [
+       "Typical slaves",
+       "Memory, DMA, bridge",
+       "UART, SPI, GPIO, timers"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One CPU sits on the fast AHB; a bridge turns AHB transfers into the slower two-phase APB, which then reaches UART, SPI and GPIO. Notice that every peripheral shares one APB and one bridge.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "aria": "A CPU on AHB connected through a bridge to APB, which drives UART, SPI and GPIO peripherals.",
+   "nodes": [
+    {
+     "id": "cpu",
+     "label": "CPU",
+     "style": "normal"
+    },
+    {
+     "id": "ahb",
+     "label": "AHB",
+     "style": "accent"
+    },
+    {
+     "id": "br",
+     "label": "Bridge",
+     "style": "normal"
+    },
+    {
+     "id": "apb",
+     "label": "APB",
+     "style": "live"
+    },
+    {
+     "id": "uart",
+     "label": "UART",
+     "style": "normal"
+    },
+    {
+     "id": "spi",
+     "label": "SPI",
+     "style": "normal"
+    },
+    {
+     "id": "gpio",
+     "label": "GPIO",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cpu",
+     "to": "ahb",
+     "label": "master"
+    },
+    {
+     "from": "ahb",
+     "to": "br"
+    },
+    {
+     "from": "br",
+     "to": "apb"
+    },
+    {
+     "from": "apb",
+     "to": "uart"
+    },
+    {
+     "from": "apb",
+     "to": "spi"
+    },
+    {
+     "from": "apb",
+     "to": "gpio"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An APB runs at 50 MHz and takes two clock cycles per transfer (setup plus access). Each transfer moves 32 bits. Find the time per transfer and the theoretical bandwidth. Compare with a 32-bit AHB at 100 MHz that moves one beat per cycle. Use 1 MB = 10⁶ bytes.",
+   "steps": [
+    "APB clock period = 1 ÷ 50,000,000 Hz = 20 ns.",
+    "APB transfer time T = 2 cycles × 20 ns = 40 ns.",
+    "Bytes per transfer = 32 ÷ 8 = 4 bytes.",
+    "APB bandwidth = 4 bytes ÷ 40 ns = 4 ÷ (40 × 10⁻⁹) B/s = 100 × 10⁶ B/s = 100 MB/s.",
+    "AHB clock period = 1 ÷ 100,000,000 Hz = 10 ns; one beat per cycle gives T = 10 ns.",
+    "AHB bandwidth = 4 bytes ÷ 10 ns = 400 × 10⁶ B/s = 400 MB/s.",
+    "Ratio = 400 ÷ 100 = 4. The AHB wins twice from clock (2×) and twice from pipelining (2×)."
+   ],
+   "answer": "APB: 40 ns per transfer and 100 MB/s. AHB: 10 ns per transfer and 400 MB/s, four times the APB bandwidth.",
+   "check": "f_apb = 50e6\ncycles_apb = 2\nf_ahb = 100e6\ncycles_ahb = 1\nwidth_bits = 32\nnbytes = width_bits / 8\n\nt_apb_ns = cycles_apb / f_apb * 1e9\nt_ahb_ns = cycles_ahb / f_ahb * 1e9\nbw_apb = nbytes / (t_apb_ns * 1e-9) / 1e6\nbw_ahb = nbytes / (t_ahb_ns * 1e-9) / 1e6\n\nprint(round(t_apb_ns, 6))\nprint(round(t_ahb_ns, 6))\nprint(round(bw_apb, 6))\nprint(round(bw_ahb, 6))",
+   "values": [
+    40.0,
+    10.0,
+    100.0,
+    400.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "APB always costs at least two cycles. Writing T = 1/f_APB for an APB transfer is the most common slip.",
+  "AHB pipelining does not mean two cycles per transfer. Address and data phases overlap, so steady state is one transfer per clock.",
+  "An AHB burst is not one address followed by slave-counted beats. Each beat has its own address phase, driven by the master while the previous data phase completes.",
+  "Clock frequency is not bandwidth. Bandwidth = (bits ÷ 8) ÷ time per transfer; forgetting the ÷ 8 gives an answer eight times too large.",
+  "HREADY low (AHB) or PREADY low (APB) adds wait states, so the computed bandwidth is an upper bound, not the observed figure.",
+  "A split response is not an error. It frees the bus for other masters; errors come on HRESP."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Expand AMBA, AHB and APB, and state which one carries a UART.",
+   "marks": 2,
+   "a": "AMBA = Advanced Microcontroller Bus Architecture; AHB = Advanced High-performance Bus; APB = Advanced Peripheral Bus. A UART sits on APB."
+  },
+  {
+   "level": "remember",
+   "q": "What do the arbiter and the decoder each do on AHB?",
+   "marks": 2,
+   "a": "The arbiter decides which master gets the bus next. The decoder decodes the address and selects the slave for that transfer."
+  },
+  {
+   "level": "understand",
+   "q": "Why does AHB overlap the address phase of one transfer with the data phase of the previous one?",
+   "marks": 3,
+   "a": "A separate address phase would leave the data wires idle half the time. Overlapping them makes one transfer complete per clock in steady state, roughly doubling throughput without raising the clock."
+  },
+  {
+   "level": "apply",
+   "q": "An APB runs at 25 MHz, takes two cycles per transfer and moves 16 bits. Find the transfer time and the bandwidth.",
+   "marks": 4,
+   "a": "Clock period = 1 ÷ 25,000,000 = 40 ns. T = 2 × 40 ns = 80 ns. Bytes = 16 ÷ 8 = 2. Bandwidth = 2 ÷ 80 ns = 25 × 10⁶ B/s = 25 MB/s."
+  },
+  {
+   "level": "apply",
+   "q": "A 32-bit AHB runs at 100 MHz. Every transfer suffers 3 wait states. Find the bandwidth.",
+   "marks": 4,
+   "a": "Clock period = 10 ns. Cycles per transfer = 1 data cycle + 3 wait states = 4. T = 40 ns. Bandwidth = 4 bytes ÷ 40 ns = 100 MB/s, one quarter of the no-wait-state 400 MB/s."
+  },
+  {
+   "level": "analyze",
+   "q": "Why put a bridge between AHB and APB instead of hanging the UART and GPIO directly on AHB?",
+   "marks": 4,
+   "a": "AHB needs arbitration, pipelining and burst logic in every slave, which is wasted silicon and power for a slow peripheral touched rarely. The bridge is one AHB slave that hides all of it, so peripherals stay small and can run on a slower divided clock."
+  },
+  {
+   "level": "analyze",
+   "q": "A slow memory on AHB takes 20 cycles per access. Explain how a split response helps a second master.",
+   "marks": 5,
+   "a": "Without split, the slow slave holds HREADY low and freezes the whole bus for 20 cycles. With split, it releases the bus, the arbiter grants it to the other master, and the slave signals when its data is ready so the first master retries. Bus utilisation rises; latency per access does not fall."
+  },
+  {
+   "level": "understand",
+   "q": "What does HREADY control, and what happens to the pipeline when it is low?",
+   "marks": 3,
+   "a": "HREADY tells the master the current data phase is complete. When a slave holds it low, the data phase stretches, and because the phases overlap, the following address phase is also held, so the pipeline stalls until HREADY rises."
+  }
+ ],
+ "beyond": "Not for the exam. Production SoCs move to AXI, which splits read and write into five independent channels and allows out-of-order completion, and to ACE or CHI once several cores must share coherent caches. Large chips replace the shared bus with a network-on-chip, where each master has its own path. Open alternatives such as TileLink cover similar ground. Useful search terms: AMBA AXI specification, AHB-Lite timing diagrams, APB protocol PREADY, network-on-chip arbitration."
+}

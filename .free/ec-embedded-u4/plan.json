@@ -1,0 +1,441 @@
+{
+ "lead": "Embedded systems rarely work alone. This unit explains the main wired, wireless and on-chip buses, when to use each, and how to compute their speed, frame time and load. After it you can read a bus datasheet, choose a protocol for a product, and solve numerical questions on UART, SPI, CAN, USB, wireless links and AMBA.",
+ "about": "This unit is about how an embedded system talks to the world: to a sensor on the same board, to a car network, to a USB host, or to a cloud service. Chapter 4.1 starts with asynchronous UART and RS-232. Chapter 4.2 moves to the synchronous board buses SPI and I2C. Chapter 4.3 applies wired buses to vehicles with CAN and LIN. Chapter 4.4 compares USB with parallel interfaces. Chapter 4.5 covers wireless choices from Bluetooth to LoRaWAN. Chapter 4.6 puts these links into an IoT architecture with MQTT and CoAP. Chapter 4.7 goes inside the chip to AMBA, AHB and APB, which connect the CPU to the controllers used in earlier chapters.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "UART sends bytes asynchronously as a framed bit stream, and RS-232 defines the voltage levels for that stream.",
+   "depth": "UART frame: idle high, start bit 0, 5 to 9 data bits sent LSB first, optional parity, 1 or 2 stop bits; baud rate, bit time, 8N1, framing error, overrun, full-duplex TX and RX. RS-232 electrical layer: logic 0 is +3 V to +15 V, logic 1 is -3 V to -15 V, MAX232 charge pump, DB9, DTE and DCE, null-modem cable, practical cable length limit. 8051 SBUF and SCON, TI and RI flags, a short polled transmit and receive routine; interrupt-driven serial is named and left to Unit 3. Some syllabi call RS-232 the serial port, COM port or EIA-232.",
+   "figure": {
+    "type": "array",
+    "title": "UART frame for 'A' = 0x41, 8N1",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Line",
+      "cells": [
+       "0",
+       "1",
+       "0",
+       "0",
+       "0",
+       "0",
+       "0",
+       "1",
+       "0",
+       "1"
+      ],
+      "marks": {
+       "0": "accent",
+       "7": "live",
+       "9": "accent"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 0,
+      "cell": 0,
+      "label": "start"
+     },
+     {
+      "row": 0,
+      "cell": 9,
+      "label": "stop"
+     }
+    ],
+    "aria": "A ten-bit 8N1 UART frame for the byte 0x41, showing the start bit 0, data bits LSB first, and stop bit 1."
+   },
+   "example": "The ASCII character 'A' is 0x41. Send it over a UART link at 9600 baud with 8N1. (a) List the ten line bits in order. (b) Find the time for one character and for 100 characters. Answer: start 0, D0 to D7 = 1 0 0 0 0 0 1 0, stop 1; one frame is 10 bits, so 10/9600 = 1.0417 ms; 100 characters take 104.17 ms.",
+   "trap": "Baud is not byte rate: with 8N1 each byte needs 10 bits, so 9600 baud gives at most 960 bytes/s. UART sends data LSB first, and RS-232 voltages are inverted and much larger than TTL.",
+   "prereq": "Unit 2 for 8051 SBUF and SCON; Unit 3 for interrupts.",
+   "leave": "8051 architecture and SFR details to Unit 2; interrupt latency and ISR design to Unit 3."
+  },
+  {
+   "k": 2,
+   "idea": "SPI and I2C are short synchronous board buses with a master controlling one or more slaves.",
+   "depth": "SPI: four wires SCLK, MOSI, MISO and SS or CS; master and slave, full duplex, CPOL and CPHA modes 0 to 3, shift register, multi-slave with separate SS or daisy chain, no address and no ACK. I2C: two open-drain wires SDA and SCL with pull-up resistors, 7-bit address plus R/W bit, START and STOP, ACK and NACK, clock stretching, arbitration, 100 kbit/s standard, 400 kbit/s fast, 1 Mbit/s fast-plus. Compare wires, overhead, distance and use. I2C is also called IIC or TWI; SMBus and PMBus are I2C relatives.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "nodes": [
+     {
+      "id": "m",
+      "label": "Master",
+      "style": "accent"
+     },
+     {
+      "id": "spi",
+      "label": "SPI slave",
+      "style": "normal"
+     },
+     {
+      "id": "i2c",
+      "label": "I2C slave",
+      "style": "live"
+     },
+     {
+      "id": "pull",
+      "label": "3.3 V pull-ups",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "m",
+      "to": "spi",
+      "label": "SCLK MOSI MISO SS"
+     },
+     {
+      "from": "m",
+      "to": "i2c",
+      "label": "SDA SCL"
+     },
+     {
+      "from": "pull",
+      "to": "i2c",
+      "label": "pull-ups",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A master connected to an SPI slave by four wires and to an I2C slave by two open-drain wires with pull-up resistors."
+   },
+   "example": "An SPI sensor needs 3 bytes per sample. The master takes 100 samples per second and the SPI clock is 2 MHz. Find the SPI time per sample, the bus load as a percentage, and the average bit rate. Answer: 3 bytes = 24 bits; 24/2,000,000 = 12 microsecond per sample; 12 microsecond × 100 = 1.2 ms per second = 0.12 % load; average rate = 24 × 100 = 2400 bit/s.",
+   "trap": "SPI has no address or ACK, so each slave needs its own SS line. I2C needs pull-ups because the lines are open-drain; the 7-bit address is followed by a separate R/W bit.",
+   "prereq": "Unit 3 GPIO and Unit 1 serial versus parallel ideas.",
+   "leave": "GPIO electrical details to Unit 3; AHB and APB connection to 4.7."
+  },
+  {
+   "k": 3,
+   "idea": "CAN is a robust multi-master differential bus for vehicles, while LIN is a cheap single-wire master-slave sub-bus.",
+   "depth": "CAN: differential CAN_H and CAN_L, dominant 0 and recessive 1, multi-master CSMA/CA with priority by identifier, 11-bit standard and 29-bit extended IDs, classic frame up to 8 data bytes, CAN FD up to 64 bytes, bit stuffing, CRC, ACK, error frames, 120 ohm termination, 125 kbit/s to 1 Mbit/s. LIN: single-wire 12 V master-slave, up to 20 kbit/s, schedule table, break, sync, ID, data and checksum, used for windows, mirrors and seats. CAN is also called Controller Area Network; LIN is Local Interconnect Network.",
+   "figure": {
+    "type": "array",
+    "title": "Classic CAN data frame, 11-bit ID",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Fields",
+      "cells": [
+       "SOF",
+       "ID",
+       "RTR",
+       "IDE",
+       "r0",
+       "DLC",
+       "Data",
+       "CRC",
+       "ACK",
+       "EOF",
+       "IFS"
+      ],
+      "marks": {
+       "1": "accent",
+       "8": "live"
+      }
+     }
+    ],
+    "aria": "The fields of a classic CAN data frame from start of frame through identifier, control, data, CRC, acknowledge and end of frame."
+   },
+   "example": "A classic CAN standard data frame carries 8 data bytes at 500 kbit/s. Its fields plus intermission total 111 bits before bit stuffing. Find the frame time and the maximum frame rate. Answer: 111/500,000 = 222 microsecond; 1/222 microsecond ≈ 4505 frames/s.",
+   "trap": "A CAN identifier is not a destination address; a lower ID wins arbitration because dominant 0 beats recessive 1. LIN is single-wire master-slave, not multi-master like CAN.",
+   "prereq": "Unit 3 timers and interrupts; 4.2 for master-slave bus ideas.",
+   "leave": "Automotive application design to Unit 6; CAN controller register programming is not required here."
+  },
+  {
+   "k": 4,
+   "idea": "USB is a host-controlled serial bus, while parallel interfaces move many bits at once with handshake lines.",
+   "depth": "USB: host-centric tiered star, host and device, endpoints, four transfer types control, bulk, interrupt and isochronous, enumeration and descriptors, USB 1.1 full speed 12 Mbit/s, USB 2.0 high speed 480 Mbit/s, USB 3.x 5 or 10 Gbit/s, bus power 5 V and 500 mA for USB 2.0, OTG. Parallel: Centronics and IEEE 1284, 8-bit data with STROBE, BUSY and ACK handshake, DB25, GPIO parallel ports. IEEE 488 or GPIB: 8-bit parallel, up to 15 devices, handshake; only a few universities teach its details.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Host",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Root hub",
+       "edge": "downstream",
+       "children": [
+        {
+         "label": "Hub",
+         "children": [
+          {
+           "label": "Keyboard"
+          },
+          {
+           "label": "Camera"
+          }
+         ]
+        },
+        {
+         "label": "Printer"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "A USB host with a root hub branching to a hub with keyboard and camera, and to a printer, showing the tiered star topology."
+   },
+   "example": "A USB 2.0 full-speed bulk transfer sends a 1 MB file at 12 Mbit/s. Ignore protocol overhead. Find the transfer time. Answer: 1 MB = 1,048,576 bytes = 8,388,608 bits; 8,388,608/12,000,000 = 0.699 s.",
+   "trap": "USB is not peer-to-peer except with OTG; the host controls all transfers. Parallel means many bits at once, not a faster version of UART.",
+   "prereq": "4.1 for serial versus parallel; Unit 1 processor choices.",
+   "leave": "USB device firmware and class drivers to advanced courses; parallel port programming to lab work."
+  },
+  {
+   "k": 5,
+   "idea": "Wireless links trade range, data rate, power and topology, so the product requirement chooses the technology.",
+   "depth": "Compare Bluetooth Classic on 2.4 GHz at 1 to 3 Mbit/s in a piconet, BLE with advertising and GATT for low duty cycle, ZigBee on IEEE 802.15.4 at 2.4 GHz and 250 kbit/s with mesh, Wi-Fi on IEEE 802.11 at 2.4, 5 or 6 GHz with high rate, and LoRaWAN on sub-GHz LoRa chirp with km range and low bit rate, classes A, B and C. Cover range, data rate, power, topology, 2.4 GHz coexistence and product choice. Only a few universities go deep into LoRaWAN MAC commands.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Start",
+      "note": "choose link",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Range > 1 km?",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "LoRaWAN",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "High data rate?",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Wi-Fi",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Mesh, low power?",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "ZigBee",
+      "style": "live"
+     },
+     {
+      "id": "h",
+      "label": "BLE/Bluetooth",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "label": "yes"
+     },
+     {
+      "from": "b",
+      "to": "d",
+      "label": "no"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "label": "yes"
+     },
+     {
+      "from": "d",
+      "to": "f",
+      "label": "no"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "label": "yes"
+     },
+     {
+      "from": "f",
+      "to": "h",
+      "label": "no"
+     }
+    ],
+    "aria": "A decision flow from start to range, data rate and mesh questions, leading to LoRaWAN, Wi-Fi, ZigBee or BLE/Bluetooth."
+   },
+   "example": "A sensor sends 20 bytes every 10 minutes. Ignore protocol overhead. Find the airtime and duty cycle for (a) BLE at 1 Mbit/s and (b) LoRa at 250 bit/s. Answer: 20 bytes = 160 bits. BLE: 160/1,000,000 = 160 microsecond; duty = 160 microsecond/600 s = 0.0000267 %. LoRa: 160/250 = 0.64 s; duty = 0.64/600 = 0.1067 %.",
+   "trap": "All 2.4 GHz radios are not the same; BLE is not Bluetooth Classic; LoRaWAN is a network protocol over the LoRa physical layer; Wi-Fi is not a low-power sensor link.",
+   "prereq": "4.1 to 4.4 for wired link trade-offs.",
+   "leave": "Antenna design and RF physics; protocol stack internals beyond the named layers."
+  },
+  {
+   "k": 6,
+   "idea": "IoT systems stack device, network, middleware and application layers, with MQTT and CoAP carrying the data.",
+   "depth": "IoT architecture: perception or device, network, middleware and application layers; edge and cloud. MQTT publish-subscribe through a broker with topics and QoS 0, 1 and 2 over TCP; CoAP request-response over UDP with GET, POST, PUT and DELETE; HTTP; 6LoWPAN and RPL for IPv6 low-power networks; security with TLS and DTLS. Mention MQTT-SN and AMQP briefly. Some syllabi call the middleware layer the processing layer.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "Application",
+      "note": "MQTT, CoAP, HTTP",
+      "style": "accent"
+     },
+     {
+      "label": "Middleware",
+      "note": "broker, cloud",
+      "style": "normal"
+     },
+     {
+      "label": "Network",
+      "note": "Wi-Fi, LoRaWAN, 6LoWPAN",
+      "style": "live"
+     },
+     {
+      "label": "Perception",
+      "note": "sensors, actuators",
+      "style": "normal"
+     }
+    ],
+    "side": {
+     "top": "data",
+     "bottom": "devices"
+    },
+    "aria": "A four-layer IoT stack from perception devices through network and middleware to the application, with example protocols on the top and network layers."
+   },
+   "example": "100 sensors each send a 50-byte payload every 60 s. Find the total data per day and the average bit rate. Answer: data per day = 100 × 50 × (86,400/60) = 100 × 50 × 1440 = 7,200,000 bytes = 7.2 MB; average rate = 100 × 50 × 8/60 = 666.7 bit/s.",
+   "trap": "MQTT is publish-subscribe through a broker, not direct device-to-device. CoAP uses UDP, so it has different reliability from HTTP over TCP.",
+   "prereq": "4.5 for wireless links; 4.1 to 4.4 for device links.",
+   "leave": "Cloud platform setup and security implementation details; RTOS tasks to Unit 5."
+  },
+  {
+   "k": 7,
+   "idea": "AMBA defines on-chip buses such as AHB for high performance and APB for low-power peripherals.",
+   "depth": "AMBA as ARM's on-chip bus family. AHB: high-performance pipelined bus with address and data phases, bursts, split transactions, masters, slaves, arbiter and decoder. APB: low-power non-pipelined peripheral bus with setup and access phases, simple handshake, often behind an AHB-to-APB bridge. AXI is named as the high-end member, not detailed. Only a few universities teach AXI; leave it as a name here. AMBA is Advanced Microcontroller Bus Architecture.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "CPU",
+      "style": "normal"
+     },
+     {
+      "id": "ahb",
+      "label": "AHB",
+      "style": "accent"
+     },
+     {
+      "id": "br",
+      "label": "Bridge",
+      "style": "normal"
+     },
+     {
+      "id": "apb",
+      "label": "APB",
+      "style": "live"
+     },
+     {
+      "id": "uart",
+      "label": "UART",
+      "style": "normal"
+     },
+     {
+      "id": "spi",
+      "label": "SPI",
+      "style": "normal"
+     },
+     {
+      "id": "gpio",
+      "label": "GPIO",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cpu",
+      "to": "ahb",
+      "label": "master"
+     },
+     {
+      "from": "ahb",
+      "to": "br"
+     },
+     {
+      "from": "br",
+      "to": "apb"
+     },
+     {
+      "from": "apb",
+      "to": "uart"
+     },
+     {
+      "from": "apb",
+      "to": "spi"
+     },
+     {
+      "from": "apb",
+      "to": "gpio"
+     }
+    ],
+    "aria": "A CPU on AHB connected through a bridge to APB, which drives UART, SPI and GPIO peripherals."
+   },
+   "example": "An APB runs at 50 MHz and takes two cycles per transfer (setup plus access). Each transfer moves 32 bits. Find the time per transfer and the theoretical bandwidth. Compare with a 32-bit AHB at 100 MHz moving one beat per cycle. Answer: APB time = 2/50,000,000 = 40 ns; bandwidth = 4 bytes/40 ns = 100 MB/s. AHB = 4 bytes/10 ns = 400 MB/s.",
+   "trap": "APB is not pipelined and needs two phases per transfer. AHB has pipelined address and data phases, so its bandwidth is higher at the same width.",
+   "prereq": "Unit 1 Harvard and von Neumann; Unit 2 ARM; 4.2 for SPI and I2C peripherals.",
+   "leave": "AXI, ACE and coherency to advanced courses; DMA details to Unit 3."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "UART point-to-point leads to board-level synchronous SPI and I2C"
+  ],
+  [
+   2,
+   3,
+   "Short board buses lead to robust CAN and LIN vehicle buses"
+  ],
+  [
+   3,
+   4,
+   "Wired vehicle buses compared with USB and parallel host links"
+  ],
+  [
+   4,
+   5,
+   "USB and parallel cables give way to wireless links"
+  ],
+  [
+   5,
+   6,
+   "Wireless links carry IoT data into MQTT and CoAP"
+  ],
+  [
+   6,
+   7,
+   "IoT devices need on-chip buses to reach their controllers"
+  ],
+  [
+   7,
+   2,
+   "AHB and APB connect SPI and I2C controllers to the CPU"
+  ],
+  [
+   1,
+   7,
+   "UART and other controllers sit behind APB or AHB"
+  ]
+ ]
+}

@@ -1,0 +1,251 @@
+{
+ "lead": "SPI and I2C are short, synchronous board buses. A master drives a clock and exchanges data with one or more slaves. SPI uses four wires and shifts bits in both directions at once. I2C uses two open-drain wires with pull-up resistors, and it addresses each slave. Both sit on the same printed circuit board, linking a microcontroller to sensors, memory, displays and power chips. They avoid the overhead of a long network stack, so they are cheap and fast for short distances. This chapter shows how each bus moves a byte, how multiple devices are handled, and when to choose one over the other.",
+ "prereq": "You need: GPIO pin behaviour from Unit 3 and the serial-versus-parallel idea from Unit 1; see <a href=\"#uart-and-rs-232-serial-communication\">UART</a> for the asynchronous contrast.",
+ "sections": [
+  {
+   "h3": "SPI: four wires and a shift register",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SPI is a synchronous serial bus. A clock line carries timing, so no start and stop bits are needed. One device, the master, controls the clock and starts every transfer. Each other device is a slave."
+    },
+    {
+     "type": "p",
+     "text": "Four wires carry the signals. SCLK is the serial clock. MOSI is master-out slave-in. MISO is master-in slave-out. SS or CS is slave select, often active low. The master pulls one SS low to choose a slave. Data moves in both directions at the same time, so SPI is full duplex."
+    },
+    {
+     "type": "p",
+     "text": "Inside the master and the chosen slave there is an 8-bit shift register. On each SCLK pulse, the master sends one bit on MOSI and receives one bit on MISO. After eight pulses, the two bytes have swapped places, so a 16-bit transfer needs 16 SCLK pulses: the 8-bit exchange is performed twice."
+    },
+    {
+     "type": "p",
+     "text": "CPOL sets the clock idle level: 0 means low, 1 means high. CPHA sets the sampling edge: 0 means the first edge, 1 means the second edge. These two bits give modes 0 to 3, where mode = 2×CPOL + CPHA. Both ends must use the same mode."
+    },
+    {
+     "type": "p",
+     "text": "Adding a slave needs another SS line, because SPI has no address and no ACK. A daisy chain is the alternative: the master MOSI goes to the first slave's data input, that slave's MISO goes to the next slave's MOSI (data input), and the last slave's MISO returns to the master MISO. All slaves share one SS, and bits pass through the chain."
+    }
+   ]
+  },
+  {
+   "h3": "I2C: two wires, address and ACK",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "I2C uses two wires. SDA is serial data and SCL is serial clock. Both are open-drain: a device can pull a line low, or release it. A pull-up resistor to 3.3 V, or another supply, returns the released line high. Two devices can therefore share the same wire without shorting their outputs."
+    },
+    {
+     "type": "p",
+     "text": "A transaction starts with START: SDA falls while SCL is high. It ends with STOP: SDA rises while SCL is high. Between them, the master sends a 7-bit address and then a separate R/W bit. R/W = 0 means write, 1 means read. All slaves compare the address; the one that matches responds."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Master issues START.",
+      "Master sends 7-bit address and R/W bit.",
+      "Selected slave pulls SDA low for the ninth clock: ACK.",
+      "Master and slave exchange 8-bit data bytes, each followed by an ACK or NACK.",
+      "Master issues STOP."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "ACK means the receiver pulled SDA low; NACK means it left SDA high. Clock stretching lets a slow slave hold SCL low and pause the master. Arbitration lets more than one master share the bus: a master that drives high but reads low loses and stops."
+    },
+    {
+     "type": "p",
+     "text": "Standard I2C runs at 100 kbit/s, fast mode at 400 kbit/s, and fast-plus at 1 Mbit/s. I2C is also written IIC or TWI. SMBus and PMBus are I2C relatives with extra rules."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing between SPI and I2C",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "SPI and I2C solve the same board-level job with different trade-offs."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Feature",
+      "SPI",
+      "I2C"
+     ],
+     "rows": [
+      [
+       "Wires",
+       "4: SCLK, MOSI, MISO, SS",
+       "2: SDA, SCL plus pull-ups"
+      ],
+      [
+       "Addressing",
+       "None; separate SS per slave",
+       "7-bit address plus R/W bit"
+      ],
+      [
+       "Data direction",
+       "Full duplex",
+       "Half duplex"
+      ],
+      [
+       "Acknowledge",
+       "No ACK",
+       "ACK or NACK bit"
+      ],
+      [
+       "Typical board speed",
+       "tens of MHz",
+       "100 kbit/s, 400 kbit/s, 1 Mbit/s"
+      ],
+      [
+       "Typical use",
+       "flash, display, fast ADC",
+       "sensor, EEPROM, RTC, power chip"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Choose SPI for speed, full duplex and no frame overhead: flash memory, a colour display, a fast ADC. Choose I2C when wires matter and devices are slow: a temperature sensor, EEPROM, real-time clock or power-management chip. Both are centimetre-scale buses; long cables need a different bus such as <a href=\"#can-and-lin-automotive-buses\">CAN</a>."
+    },
+    {
+     "type": "formula",
+     "text": "t = 8B / f<sub>SCLK</sub>",
+     "where": "t is the time for one sample in seconds; B is the number of bytes per sample; f<sub>SCLK</sub> is the SPI clock in Hz."
+    },
+    {
+     "type": "p",
+     "text": "The bus load is (t × S) × 100 %, where S is samples per second. The worked example below uses these two relations."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The master uses four wires to the SPI slave and two open-drain wires to the I2C slave. Notice the pull-up resistors that return SDA and SCL to 3.3 V.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "nodes": [
+    {
+     "id": "m",
+     "label": "Master",
+     "style": "accent"
+    },
+    {
+     "id": "spi",
+     "label": "SPI slave",
+     "style": "normal"
+    },
+    {
+     "id": "i2c",
+     "label": "I2C slave",
+     "style": "live"
+    },
+    {
+     "id": "pull",
+     "label": "3.3 V pull-ups",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "m",
+     "to": "spi",
+     "label": "SCLK MOSI MISO SS"
+    },
+    {
+     "from": "m",
+     "to": "i2c",
+     "label": "SDA SCL"
+    },
+    {
+     "from": "pull",
+     "to": "i2c",
+     "label": "pull-ups",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A master connected to an SPI slave by four wires and to an I2C slave by two open-drain wires with pull-up resistors."
+  }
+ },
+ "examples": [
+  {
+   "question": "An SPI sensor needs 3 bytes per sample. The master takes 100 samples per second and the SPI clock is 2 MHz. Find the SPI time per sample, the bus load as a percentage, and the average bit rate.",
+   "steps": [
+    "Bits per sample = 3 bytes × 8 bits/byte = 24 bits.",
+    "Time per sample = 24 bits / 2,000,000 bit/s = 12×10⁻⁶ s = 12 µs.",
+    "Total SPI time per second = 12 µs × 100 = 1200 µs = 1.2 ms.",
+    "Bus load = 1.2 ms / 1000 ms = 0.0012 = 0.12 %.",
+    "Average bit rate = 24 bits × 100 samples/s = 2400 bit/s."
+   ],
+   "answer": "The SPI transfer takes 12 µs per sample, the bus load is 0.12 %, and the average bit rate is 2400 bit/s.",
+   "check": "bytes_per_sample = 3\nsamples_per_second = 100\nspi_clock = 2_000_000\nbits = bytes_per_sample * 8\nt_seconds = bits / spi_clock\nt_microseconds = t_seconds * 1_000_000\nload_percent = (t_seconds * samples_per_second) * 100\naverage_bit_rate = bits * samples_per_second\nprint(t_microseconds)\nprint(load_percent)\nprint(average_bit_rate)",
+   "values": [
+    12.0,
+    0.12,
+    2400.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "SPI has no address and no ACK, so each slave needs its own SS line; a daisy chain is the alternative, not an address scheme.",
+  "The I2C 7-bit address is followed by a separate R/W bit; do not call the address 8 bits.",
+  "I2C lines are open-drain and need pull-up resistors; without them the bus cannot return high.",
+  "CPOL and CPHA must match at both ends, and mode 0 is only one of modes 0 to 3.",
+  "I2C is also written IIC or TWI, and SMBus and PMBus are relatives with extra rules, not identical buses."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Expand SCLK, MOSI, MISO, SDA and SCL.",
+   "marks": 2,
+   "a": "SCLK is serial clock; MOSI is master-out slave-in; MISO is master-in slave-out; SDA is serial data; SCL is serial clock."
+  },
+  {
+   "level": "understand",
+   "q": "Why is SPI called full duplex?",
+   "marks": 3,
+   "a": "MOSI and MISO carry bits in opposite directions on the same SCLK pulses, so the master sends and receives at the same time."
+  },
+  {
+   "level": "apply",
+   "q": "An SPI master sends 4 bytes at 1 MHz. Find the transfer time.",
+   "marks": 3,
+   "a": "4 bytes = 32 bits. Time = 32 bits / 1,000,000 bit/s = 32 µs."
+  },
+  {
+   "level": "analyze",
+   "q": "A designer has four SPI sensors and only one SS pin left. Compare separate SS lines with a daisy chain.",
+   "marks": 4,
+   "a": "Separate SS lines let the master select any sensor independently, but need one pin per sensor. A daisy chain uses one SS and passes bits through all sensors, so it needs all four in the chain and suits fixed-order shifts, not random access. A daisy chain needs slaves that support pass-through shifting, and every transfer shifts all bits through every device, so reading one sensor means shifting 4 bytes; many sensors do not offer this."
+  },
+  {
+   "level": "remember",
+   "q": "What electrical condition defines START and STOP in I2C?",
+   "marks": 2,
+   "a": "START is SDA falling while SCL is high. STOP is SDA rising while SCL is high."
+  },
+  {
+   "level": "understand",
+   "q": "Why do I2C lines need pull-up resistors?",
+   "marks": 3,
+   "a": "The lines are open-drain, so a device can only pull low or release. Pull-ups return the released line high and let many devices share the wire."
+  },
+  {
+   "level": "apply",
+   "q": "At 400 kbit/s, find the time for one address byte plus one data byte, including one ACK after each byte.",
+   "marks": 4,
+   "a": "Address byte 8 bits + ACK 1 bit = 9 bits. Data byte 8 bits + ACK 1 bit = 9 bits. Total = 18 bits. Time = 18 / 400,000 = 45 µs."
+  },
+  {
+   "level": "analyze",
+   "q": "A board has eight slow sensors and one fast display. Choose SPI or I2C for each and justify.",
+   "marks": 5,
+   "a": "Use I2C for the eight slow sensors: two wires and addressing save pins, and 100 kbit/s or 400 kbit/s is enough. Use SPI for the fast display: full duplex and tens of MHz move pixels faster, and the display can have its own SS."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, I2C buses often need recovery logic because a slave can hold SDA low after a glitch. SPI is common behind display and flash-memory controllers, where a dedicated SS and high clock rate matter. Some newer designs use I3C, a faster relative of I2C, and power systems use SMBus or PMBus rules on top of I2C. Search next for I2C bus recovery, SPI daisy chain timing, and I3C basics."
+}
