@@ -1,0 +1,334 @@
+{
+ "lead": "The 8086 has one mode pin, MN/MX. Tie it high and the CPU drives the system control bus itself; tie it low and the CPU hands status to an external 8288 bus controller. This choice decides whether a board is a small single-processor system or a larger system with bus masters and coprocessors. The same address latches and data transceivers are used in both modes. The mode changes which pins carry ALE, DEN, DT/R, RD and WR, so read every pin name together with its mode.",
+ "prereq": "You need: <a href=\"#8086-architecture-registers-and-signal-description\">Chapter 2.3</a> for 8086 signals and the BIU, and <a href=\"#timing-diagrams-and-machine-cycles\">Chapter 2.2</a> for T-states and bus timing.",
+ "sections": [
+  {
+   "h3": "One pin selects the control source",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>MN/MX is pin 33.</b> A high level (+5 V) selects minimum mode. A low level (0 V) selects maximum mode. The pin does not change the instruction set or registers. It changes the control pins on the right side of the chip."
+    },
+    {
+     "type": "p",
+     "text": "In minimum mode the 8086 itself drives the control bus. It produces <code>RD</code>, <code>WR</code>, <code>M/IO</code>, <code>ALE</code>, <code>DEN</code>, <code>DT/R</code> and <code>INTA</code>. It accepts <code>HOLD</code> and returns <code>HLDA</code>. One processor owns the bus, so no bus controller is needed."
+    },
+    {
+     "type": "p",
+     "text": "In maximum mode the same pins carry different signals. The 8086 sends status <code>S2</code>, <code>S1</code>, <code>S0</code>, queue status <code>QS1</code>, <code>QS0</code>, <code>LOCK</code>, <code>RQ/GT1</code> and <code>RQ/GT0</code>. It does not drive <code>RD</code> or <code>WR</code>. An external <b>8288 bus controller</b> decodes S2-S0 into memory and I/O commands. The 8288 also produces <code>ALE</code>, <code>DEN</code> and <code>DT/R</code>. Maximum mode exists for systems with a coprocessor, a DMA controller, or more than one bus master. Minimum mode is cheaper for a small single-processor board."
+    }
+   ]
+  },
+  {
+   "h3": "Minimum mode system",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Tie MN/MX to +5 V. The <b>8284 clock generator</b> supplies CLK, READY and RESET to the 8086. A crystal connects to the 8284; it divides the crystal frequency and gives a clean clock. READY inserts wait states for slow memory. RESET starts the CPU."
+    },
+    {
+     "type": "p",
+     "text": "The address bus needs latches. AD0-AD15 carry both address bits A0-A15 and data bits D0-D15. A16-A19 share pins with status S3-S6. ALE is high at the start of a bus cycle. An <b>8282 latch</b> (two chips for the 16 lower address bits, one for A16-A19 and BHE) stores the address on the falling edge of ALE. The address stays stable while the same pins carry data later in the cycle. See <a href=\"#timing-diagrams-and-machine-cycles\">Chapter 2.2</a> for the T-states."
+    },
+    {
+     "type": "p",
+     "text": "The data bus needs a transceiver. Two <b>8286 chips</b> buffer D0-D15. DEN enables the buffer. DT/R sets direction: high for transmit (CPU to memory), low for receive (memory to CPU). The 8086 drives M/IO to select memory or I/O, and RD or WR to set the direction of the transfer. Memory and I/O chips connect to the latched address, the buffered data bus, and these control lines."
+    },
+    {
+     "type": "p",
+     "text": "HOLD and HLDA allow bus sharing. A DMA controller raises HOLD. The 8086 floats its buses and raises HLDA. The DMA controller then uses the bus. Minimum mode is used in small trainer kits and simple single-board systems."
+    }
+   ]
+  },
+  {
+   "h3": "Maximum mode system and status decoding",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Tie MN/MX to 0 V. The 8086 sends S2-S0 to the 8288. The 8288 decodes the three bits into active-low bus commands. It also uses CLK and AEN; AEN can force the command outputs to a known state when another master owns the bus."
+    },
+    {
+     "type": "table",
+     "head": [
+      "S2 S1 S0",
+      "8288 output and operation"
+     ],
+     "rows": [
+      [
+       "000",
+       "INTA (active low): interrupt acknowledge"
+      ],
+      [
+       "001",
+       "IORC (active low): I/O read"
+      ],
+      [
+       "010",
+       "IOWC (active low): I/O write"
+      ],
+      [
+       "011",
+       "No command: halt"
+      ],
+      [
+       "100",
+       "MRDC (active low): instruction fetch"
+      ],
+      [
+       "101",
+       "MRDC (active low): memory read"
+      ],
+      [
+       "110",
+       "MWTC (active low): memory write"
+      ],
+      [
+       "111",
+       "No command: passive"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The 8288 produces MRDC, MWTC, IORC, IOWC, INTA and AMWC. It also produces ALE, DEN and DT/R for the 8282 latches and 8286 transceivers. The address and data path is the same as in minimum mode; only the source of control changes."
+    },
+    {
+     "type": "p",
+     "text": "Queue status QS1-QS0 tells what the BIU is doing: no operation, first byte of the queue, empty queue, or later byte. LOCK prevents another bus master from taking the bus during a locked instruction. RQ/GT0 and RQ/GT1 let another master request and receive the bus. Maximum mode is used with the 8087 numeric coprocessor, the 8089 I/O processor, and multiprocessor boards."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing the mode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Some syllabi call these “min mode system configuration” and “max mode system configuration”. The choice is wiring, not software: the same 8086 runs the same instructions in either mode."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Feature",
+      "Minimum mode",
+      "Maximum mode"
+     ],
+     "rows": [
+      [
+       "MN/MX pin",
+       "High (+5 V)",
+       "Low (0 V)"
+      ],
+      [
+       "Control source",
+       "8086 directly",
+       "8288 decodes S2-S0"
+      ],
+      [
+       "ALE, DEN, DT/R",
+       "From 8086",
+       "From 8288"
+      ],
+      [
+       "Bus sharing",
+       "HOLD and HLDA",
+       "RQ/GT0, RQ/GT1, LOCK"
+      ],
+      [
+       "Typical use",
+       "Small single CPU board",
+       "Coprocessor or multiprocessor"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A small board with one CPU and ordinary memory uses minimum mode: fewer chips, direct control, lower cost. A board with a coprocessor, a DMA controller that must become bus master, or two processors uses maximum mode: the 8288 gives standard commands and the RQ/GT pins arbitrate the bus. A common exam mistake is to place an 8288 on a minimum-mode board or to look for RD and WR from the 8086 in maximum mode."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The 8086 uses the 8284 clock, 8282 address latches and 8286 data transceivers in both modes; the 8288 is present only in maximum mode, where it drives the control bus from S2-S0.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "8086 minimum and maximum mode",
+   "nodes": [
+    {
+     "id": "cpu",
+     "label": "8086 CPU",
+     "note": "MN/MX selects mode",
+     "style": "accent"
+    },
+    {
+     "id": "clk",
+     "label": "8284 clock",
+     "note": "CLK READY RESET",
+     "style": "normal"
+    },
+    {
+     "id": "latch",
+     "label": "8282 latch",
+     "note": "A19-A16",
+     "style": "normal"
+    },
+    {
+     "id": "xcvr",
+     "label": "8286 transceiver",
+     "note": "D7-D0",
+     "style": "normal"
+    },
+    {
+     "id": "ctl",
+     "label": "8288 controller",
+     "note": "max mode only",
+     "style": "live"
+    },
+    {
+     "id": "bus",
+     "label": "Control bus",
+     "note": "RD WR M/IO",
+     "style": "normal"
+    },
+    {
+     "id": "mem",
+     "label": "Memory and I/O",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cpu",
+     "to": "clk",
+     "label": "timing",
+     "style": "solid"
+    },
+    {
+     "from": "cpu",
+     "to": "latch",
+     "label": "address",
+     "style": "solid"
+    },
+    {
+     "from": "cpu",
+     "to": "xcvr",
+     "label": "data",
+     "style": "solid"
+    },
+    {
+     "from": "cpu",
+     "to": "ctl",
+     "label": "S2-S0",
+     "style": "solid"
+    },
+    {
+     "from": "ctl",
+     "to": "bus",
+     "label": "max mode",
+     "style": "solid"
+    },
+    {
+     "from": "cpu",
+     "to": "bus",
+     "label": "min mode",
+     "style": "dashed"
+    },
+    {
+     "from": "bus",
+     "to": "mem",
+     "label": "control",
+     "style": "solid"
+    },
+    {
+     "from": "latch",
+     "to": "mem",
+     "label": "A19-A16",
+     "style": "solid"
+    },
+    {
+     "from": "xcvr",
+     "to": "mem",
+     "label": "D7-D0",
+     "style": "solid"
+    }
+   ],
+   "aria": "The 8086 uses the 8284 clock, 8282 latches and 8286 transceivers in both modes; in maximum mode it sends status S2-S0 to the 8288 bus controller, which drives the control bus, while in minimum mode the 8086 drives control directly."
+  }
+ },
+ "examples": [
+  {
+   "question": "In a maximum-mode 8086 system the status lines are S2 S1 S0 = 101. Which 8288 output is active, and what bus operation does it perform?",
+   "steps": [
+    "MN/MX is low, so the 8086 is in maximum mode. It drives status bits S2, S1 and S0 to the 8288 bus controller.",
+    "Read the bits in the order S2 S1 S0: S2 = 1, S1 = 0, S0 = 1. The status code is binary 101, which is decimal 5.",
+    "In the 8288 status table, code 101 means a memory read. The 8288 asserts its MRDC (active-low memory read command) output.",
+    "The address comes from the 8282 latches, and the memory places data on D0-D15 for the 8086 to read."
+   ],
+   "answer": "MRDC (active low) is active, so the 8288 performs a memory read; the status code is decimal 5.",
+   "check": "s2 = 1\ns1 = 0\ns0 = 1\nstatus = (s2 << 2) | (s1 << 1) | s0\nprint(status)",
+   "values": [
+    5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Learning pin names without the mode. ALE, DEN and DT/R are minimum-mode names; in maximum mode the same pins carry queue status and S2-S0, and the 8288 produces the control signals.",
+  "Thinking the 8288 generates the clock. The 8284 generates CLK, READY and RESET; the 8288 decodes S2-S0 into bus commands.",
+  "Connecting an 8288 in minimum mode or expecting RD and WR from the 8086 in maximum mode. Read the MN/MX level first, then choose the control source.",
+  "Reversing the status order. S2 S1 S0 = 101 is a memory read (MRDC); S2 S1 S0 = 110 is a memory write (MWTC).",
+  "Confusing the 8282 latch with the 8286 transceiver. The 8282 holds the address; the 8286 buffers the data and uses DEN and DT/R."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the MN/MX pin of the 8086 select?",
+   "marks": 2,
+   "a": "It selects minimum mode when high (+5 V) and maximum mode when low (0 V)."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a maximum-mode 8086 system need an 8288 bus controller?",
+   "marks": 3,
+   "a": "In maximum mode the 8086 does not drive RD and WR directly. It sends status S2-S0, and the 8288 decodes those bits into MRDC, MWTC, IORC, IOWC and INTA. The 8288 also gives ALE, DEN and DT/R for the latches and transceivers."
+  },
+  {
+   "level": "apply",
+   "q": "A maximum-mode 8086 sends S2 S1 S0 = 110. Which 8288 output is active, and what operation is performed?",
+   "marks": 3,
+   "a": "Code 110 means memory write. The 8288 asserts MWTC (active low), so data is written from the 8086 to memory."
+  },
+  {
+   "level": "analyze",
+   "q": "A student ties MN/MX high and also connects an 8288 to the 8086. Explain why this board will not work as intended.",
+   "marks": 4,
+   "a": "MN/MX high selects minimum mode. In minimum mode the 8086 pins carry ALE, DEN, DT/R, RD and WR, not the status S2-S0 and queue status that the 8288 needs. The 8288 therefore gets no valid status and its control outputs are wrong. The 8288 belongs only in maximum mode."
+  },
+  {
+   "level": "remember",
+   "q": "Name two control signals produced by the 8086 in minimum mode but not produced by the 8086 in maximum mode.",
+   "marks": 2,
+   "a": "Any two of RD, WR, M/IO, ALE, DEN, DT/R and INTA. In maximum mode these functions move to the 8288 or become status signals."
+  },
+  {
+   "level": "apply",
+   "q": "In a minimum-mode 8086 system, a DMA controller raises HOLD. What does the 8086 do?",
+   "marks": 3,
+   "a": "The 8086 finishes its current bus cycle, floats its address, data and control buses, and raises HLDA. The DMA controller can then use the bus."
+  },
+  {
+   "level": "analyze",
+   "q": "Why are 8282 latches needed when the 8086 already has address pins?",
+   "marks": 4,
+   "a": "AD0-AD15 carry address and data at different times, and A16-A19 share pins with status. The address is valid only early in the bus cycle. ALE stores it in the 8282 latch so memory and I/O see a stable address while the same pins carry data later."
+  },
+  {
+   "level": "understand",
+   "q": "What are S2, S1 and S0 in a maximum-mode 8086 system?",
+   "marks": 2,
+   "a": "They are the three status bits that tell the 8288 what bus operation the 8086 wants: interrupt acknowledge, I/O read, I/O write, halt, instruction fetch, memory read, memory write, or passive."
+  }
+ ],
+ "beyond": "Not for the exam. Modern x86 chips integrate the bus controller and memory controller on the same die, so the 8288 is a museum part. The idea survives as a bus bridge or memory controller that decodes a request type into read and write strobes. Bus arbitration appears today in AMBA AHB/APB and PCIe root complexes. Search “8086 maximum mode 8288 timing” and “bus arbiter RQ/GT” to go deeper."
+}

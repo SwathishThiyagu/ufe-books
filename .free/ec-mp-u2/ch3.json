@@ -1,0 +1,304 @@
+{
+ "lead": "The 8085 fetches an instruction, then executes it, then fetches the next. The 8086 breaks that chain. One unit keeps talking to memory and fetching ahead; a second unit decodes and executes what was already fetched. Fetching and executing overlap, so a straight-line program finishes sooner than the clock alone suggests. This split is why an 8086 looks faster than an 8085 at the same crystal. Every later x86 chip, and so every PC and laptop you use, still carries these segment registers and the segment-base-plus-offset idea, though the address width grew: 20 bits on the 8086, 24 bits on the 80286, 32 bits on the 80386, and 64 bits in x86-64.",
+ "prereq": "You need: <a href=\"#8085-architecture-registers-flags-and-pin-diagram\">Chapter 2.1</a> for the 8-bit baseline, and Unit 1 for buses, registers and the stored-program idea.",
+ "sections": [
+  {
+   "h3": "Bus interface unit and execution unit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 8086 is a 16-bit microprocessor in a 40-pin package. Inside, it is two machines sharing one bus. The bus interface unit (BIU) owns everything that touches the outside world: address calculation, segment registers, the instruction pointer and the queue. The execution unit (EU) owns everything that touches an instruction: decoding, the ALU, the general registers and the flags."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The EU needs the next opcode byte and takes it from the front of the instruction queue.",
+      "If the queue is not full, the BIU forms an address from CS and IP, reads a byte or word from memory, writes it at the back of the queue, and advances IP.",
+      "The EU decodes and executes from the queue, without using the address and data buses at all.",
+      "While a slow instruction such as MUL runs, the BIU keeps fetching until all 6 queue bytes are filled.",
+      "A jump, call, return or interrupt discards the queued bytes, because they belong to instructions that will never run. The BIU refills from the new address."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "This is prefetching. The 8085 fetches and then executes, one after the other; the 8086 does both at once. The gain is free in straight-line code and is paid back at every branch, where the queue must be flushed and refilled."
+    }
+   ]
+  },
+  {
+   "h3": "The register set",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "All registers are 16 bits wide. The first four split into two usable bytes each, which is how 8-bit code works on a 16-bit machine."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Register(s)",
+      "Job",
+      "Default segment"
+     ],
+     "rows": [
+      [
+       "AX, BX, CX, DX",
+       "16-bit data; each splits into H and L bytes (AH, AL, BH, BL, …)",
+       "DS"
+      ],
+      [
+       "SI, DI",
+       "source and destination offsets in string moves",
+       "DS and ES"
+      ],
+      [
+       "SP, BP",
+       "stack top, and base of the current stack frame",
+       "SS"
+      ],
+      [
+       "CS, DS, SS, ES",
+       "the four segment base values",
+       "—"
+      ],
+      [
+       "IP, FLAGS",
+       "offset of the next opcode, and the 16-bit flag word",
+       "CS for IP"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "FLAGS is 16 bits but only 9 are defined. Six are status flags: CF (carry out of the most significant bit — bit 15 of a word operation, bit 7 of a byte operation), PF (even parity of the low byte), AF (carry from bit 3, used by BCD adjust), ZF (result was zero), SF (copy of the sign bit) and OF (signed overflow). Three are control flags: TF (single-step), IF (allow maskable interrupts) and DF (string direction: 0 counts up, 1 counts down). Among the general registers only AX to DX can be used as 8-bit halves; SP, BP, SI and DI are always 16-bit. String use of SI and DI with CX is in <a href=\"#8086-string-and-control-transfer-instructions\">Chapter 2.6</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Making a 20-bit address from 16-bit registers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A 16-bit register sees only 64 KB. The 8086 needs 1 MB, so it never stores a full address anywhere. It keeps a segment base and an offset, both 16-bit, and the address adder in the BIU combines them on every bus cycle."
+    },
+    {
+     "type": "formula",
+     "text": "physical address = segment × 10H + offset",
+     "where": "segment is the value in CS, DS, SS or ES; offset is IP, a register, or a constant in the instruction; 10H is 16 decimal. Multiplying by 10H shifts the segment left by 4 bits, so every base ends in 0H."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write the segment value and append one hex digit 0 — the same as shifting left 4 bits, or multiplying by 16.",
+      "Add the 16-bit offset.",
+      "Keep the low 20 bits: 0H to FFFFFH. A carry out of bit 19 is dropped, so the address wraps at 1 MB.",
+      "Pick the segment by the kind of access: CS with IP for an opcode fetch, SS with SP or BP for the stack, DS with BX, SI, DI or a constant for data, ES with DI for a string destination."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Because bases move in steps of 16 bytes, segments overlap and one physical byte has many names: 1000H:0020H and 1001H:0010H both mean 10020H. That overlap is useful — a small program can keep code, data and stack in separate 64 KB windows without wasting memory."
+    }
+   ]
+  },
+  {
+   "h3": "Signal groups of the 40-pin package",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Learn the pins in seven groups. Each group answers one question the outside circuit asks."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Address and data: AD0–AD15 carry address bits A0–A15 in the first clock of a cycle and data D0–D15 afterwards, so they are multiplexed. A16/S3 to A19/S6 carry the top four address bits and then status.",
+      "Control: RD and WR are active-low read and write strobes; M/IO selects memory or I/O; DT/R sets data direction; DEN enables the data buffers; BHE (active low) selects the high byte lane; READY stretches the cycle for slow memory.",
+      "Status: ALE (address latch enable) goes high at the start of a cycle so an external latch can hold the address, and A16–A19 carry the status bits S3 to S6 for the rest of the cycle.",
+      "Interrupts: INTR is a maskable request, acknowledged by active-low INTA; NMI cannot be masked; only INTR is controlled by IF.",
+      "DMA: HOLD asks the CPU to release the bus, and HLDA acknowledges it.",
+      "System: RESET starts the CPU from FFFF0H — it forces CS = FFFFH and IP = 0000H, so the first fetch is at FFFF0H. TEST is the pin checked by the WAIT instruction, and MN/MX chooses minimum or maximum mode (Chapter 2.4).",
+      "Clock and power: CLK from the 8284 generator, Vcc at +5 V, and GND."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Pins whose meaning changes with MN/MX are in <a href=\"#8086-pins-minimum-and-maximum-mode-systems\">Chapter 2.4</a>, and the chip-select logic those address lines drive is in <a href=\"#memory-interfacing-and-address-decoding\">Chapter 2.5</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The execution unit takes opcodes from the six-byte queue while the bus interface unit fetches ahead; the address adder is the only place where a segment value and an offset are combined.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "8086 BIU and EU",
+   "nodes": [
+    {
+     "id": "biu",
+     "label": "Bus interface unit",
+     "note": "address and bus control",
+     "style": "normal"
+    },
+    {
+     "id": "seg",
+     "label": "Segment registers",
+     "note": "CS DS SS ES",
+     "style": "normal"
+    },
+    {
+     "id": "ip",
+     "label": "Instruction pointer",
+     "note": "IP",
+     "style": "normal"
+    },
+    {
+     "id": "adder",
+     "label": "Address adder",
+     "note": "1234H × 10H + 0056H",
+     "style": "accent"
+    },
+    {
+     "id": "queue",
+     "label": "Instruction queue",
+     "note": "6 bytes",
+     "style": "live"
+    },
+    {
+     "id": "eu",
+     "label": "Execution unit",
+     "note": "decodes and executes",
+     "style": "normal"
+    },
+    {
+     "id": "greg",
+     "label": "General registers",
+     "note": "AX BX CX DX",
+     "style": "normal"
+    },
+    {
+     "id": "alu",
+     "label": "ALU and flags",
+     "note": "16-bit operations",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "biu",
+     "to": "seg",
+     "label": "holds",
+     "style": "solid"
+    },
+    {
+     "from": "biu",
+     "to": "ip",
+     "label": "holds",
+     "style": "solid"
+    },
+    {
+     "from": "biu",
+     "to": "adder",
+     "label": "makes",
+     "style": "solid"
+    },
+    {
+     "from": "biu",
+     "to": "queue",
+     "label": "fills",
+     "style": "solid"
+    },
+    {
+     "from": "queue",
+     "to": "eu",
+     "label": "opcodes",
+     "style": "solid"
+    },
+    {
+     "from": "eu",
+     "to": "greg",
+     "label": "reads",
+     "style": "solid"
+    },
+    {
+     "from": "eu",
+     "to": "alu",
+     "label": "executes",
+     "style": "solid"
+    }
+   ],
+   "aria": "The 8086 bus interface unit holds the segment registers, instruction pointer, address adder and six-byte queue; the queue feeds the execution unit, which contains the general registers and the ALU with flags."
+  }
+ },
+ "examples": [
+  {
+   "question": "The 8086 has CS = 1234H and IP = 0056H. Find the 20-bit physical address of the next instruction byte.",
+   "steps": [
+    "Segment base = CS × 10H = 1234H × 10H = 12340H. This is a 4-bit left shift, so one hex 0 is appended.",
+    "Offset = IP = 0056H.",
+    "Add: 12340H + 0056H = 12396H.",
+    "The value 12396H is 20 bits (below FFFFFH), so there is no wrap.",
+    "In decimal the base is 74560 and the physical address is 74646."
+   ],
+   "answer": "The physical address is 12396H, that is 74646 in decimal, and the byte fetched from it is the next opcode byte.",
+   "check": "cs = 0x1234\nip = 0x0056\nbase = cs * 0x10\nphys = (base + ip) & 0xFFFFF\nprint(base)\nprint(phys)",
+   "values": [
+    74560,
+    74646
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using decimal 10 instead of 10H. 1234H × 10H = 12340H. Multiplying by 10 decimal instead gives 1234H × 10 = 46600 = B608H, a different and wrong physical address.",
+  "Pairing the wrong segment. Opcode fetch is always CS with IP; a push or pop is always SS with SP. DS:IP does not exist.",
+  "Trying MOV IP, 1234H. IP cannot be loaded by a data-transfer instruction; only JMP, CALL, RET and interrupts change it.",
+  "Saying the queue holds six instructions. It holds six bytes, and one instruction is 1 to 6 bytes long.",
+  "Assuming the address stays on AD0–AD15 for the whole bus cycle. Those pins become the data bus after T1, so a latch driven by ALE is required."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many bytes does the 8086 instruction queue hold?",
+   "marks": 2,
+   "a": "Six bytes. The unit is bytes, not instructions."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the 8086 prefetch instruction bytes while the 8085 does not?",
+   "marks": 3,
+   "a": "Fetching is done by the BIU and execution by the EU, so the two run at the same time. The EU does not wait for memory as long as the queue is not empty; that overlap hides memory access time in straight-line code."
+  },
+  {
+   "level": "apply",
+   "q": "DS = 2000H and an instruction uses the offset 1234H. Give the physical address.",
+   "marks": 3,
+   "a": "Base = 2000H × 10H = 20000H. 20000H + 1234H = 21234H. It fits in 20 bits, so the physical address is 21234H."
+  },
+  {
+   "level": "understand",
+   "q": "Which registers sit in the BIU and which in the EU?",
+   "marks": 3,
+   "a": "BIU: CS, DS, SS, ES, IP, the address adder and the 6-byte queue. EU: AX, BX, CX, DX, SP, BP, SI, DI, the ALU and FLAGS."
+  },
+  {
+   "level": "analyze",
+   "q": "A JMP is taken. Explain what happens to the queue and why the branch costs extra time.",
+   "marks": 4,
+   "a": "The bytes already queued belong to instructions that will not run. The BIU throws them away, loads IP (and also CS, if it is a far jump) from the jump target, and refills from the new address. During the refill the EU has nothing to decode, so the branch costs the refill time."
+  },
+  {
+   "level": "analyze",
+   "q": "CS = FFFFH and IP = 0010H. Find the physical address and explain the wrap.",
+   "marks": 4,
+   "a": "Base = FFFF0H. FFFF0H + 0010H = 100000H, which is 21 bits. Dropping the carry out of bit 19 gives 00000H, so the fetch goes to the bottom of memory. This is why the reset vector sits at FFFF0H and must contain a jump."
+  },
+  {
+   "level": "remember",
+   "q": "Which signal tells an external latch that a valid address is on AD0–AD15?",
+   "marks": 2,
+   "a": "ALE, the address latch enable. It goes high in T1, and the latch driven by it grabs the address on the falling edge."
+  }
+ ],
+ "beyond": "Not for the exam. The segmented model still lives inside every 64-bit PC: x86-64 kept FS and GS as segment bases, and an operating system uses FS to reach a thread's own data in one instruction. Emulators and retro-computing cores model the six-byte prefetch queue cycle by cycle so that old timing-sensitive code still runs. Search 'x86 segmentation', 'FS segment thread-local storage' and '8086 prefetch queue emulation' to go further."
+}
