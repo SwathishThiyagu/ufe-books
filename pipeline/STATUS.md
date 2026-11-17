@@ -144,7 +144,7 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-dist-u5 | free/c-dist-u5-book | 1–7 | OK (library updated; university mention in 5.6 removed; university-hosted course page dropped; 5.4 FLP trap wording and Ricart-Agrawala and Suzuki-Kasami glossary entries fixed) | 17 Nov 2026 |
 | c-nlp-u5 | free/c-nlp-u5-book | 1–7 | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
 | c-quantum-u6 | free/c-quantum-u6-book | 1–5 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
-| c-mobile-u6 | free/c-mobile-u6-book | 1–8 (figure text: ch 4) | OK (library added; university counts removed; 6.5 fare code now shows ₹92.00) | 17 Nov 2026 |
+| c-mobile-u6 | free/c-mobile-u6-book | 1–8 (figure text: ch 4) | OK (library added; university counts removed; 6.5 fare code now shows ₹92.00; 6.3 super.init exception added) | 17 Nov 2026 |
 | c-block-u6 | free/c-block-u6-book | 1–9 | OK (library added; university mentions in 6.2, 6.6–6.9 removed; MIT course page dropped) | 17 Nov 2026 |
 | c-nlp-u6 | free/c-nlp-u6-book | 1–8 (figure text: ch 6) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
 | c-dist-u6 | free/c-dist-u6-book | 1–8 | OK (library updated; university mentions in 6.1 and 6.7 removed; university-hosted course page dropped; closure glossary entry fixed) | 17 Nov 2026 |
