@@ -1,13 +1,13 @@
 # c-mobile-u6: free-model run
 
-- Book: `books/cse/c-mobile/c-mobile-u6.html`
+- Book: `work/claude_figs/c-mobile-u6/tree/books/cse/c-mobile/c-mobile-u6.html`
 - Status: ok
-- Model calls so far: 45 (152,516 tokens in, 234,655 out), 6.2 minutes
+- Model calls so far: 45 (152,516 tokens in, 234,655 out), 6.3 minutes
 
 ## Checker
 
 ```
-c-mobile-u6.html: 8 chapters, 11872 words, 9 figures, 140 KB
+c-mobile-u6.html: 8 chapters, 11805 words, 9 figures, 147 KB
 OK
 ```
 
