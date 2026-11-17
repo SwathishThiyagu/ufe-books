@@ -115,3 +115,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-quantum-u2 | free/c-quantum-u2-book | 1–9 | OK (library updated; university mention removed; 2 university sources dropped) | 17 Nov 2026 |
 | c-xr-u1 | free/c-xr-u1-book | 1–6 | OK (library added) | 17 Nov 2026 |
 | c-xr-u2 | free/c-xr-u2-book | 1–7 | OK (library added) | 17 Nov 2026 |
+| c-nlp-u2 | free/c-nlp-u2-book | 1–9 (figure text: ch 3) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
