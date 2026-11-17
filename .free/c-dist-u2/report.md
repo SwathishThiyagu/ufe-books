@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-dist-u2.html: 7 chapters, 11790 words, 8 figures, 163 KB
+c-dist-u2.html: 7 chapters, 11791 words, 8 figures, 163 KB
 OK
 ```
 
