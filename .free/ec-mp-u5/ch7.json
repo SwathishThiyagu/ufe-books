@@ -1,0 +1,270 @@
+{
+ "lead": "A sensor gives a voltage; a processor handles numbers. An ADC sits between them, measuring the voltage and returning the nearest 8-bit code. A DAC runs the other way, turning a code into a voltage. Both work from one reference voltage, and that reference fixes the step size — the smallest change either can see. The two chips to know are the DAC0808 and the ADC0808/0809, plus the way an 8086 reads a conversion through an 8255. Digital thermometers, motor drives and audio paths all rest on this pair.",
+ "prereq": "You need: the 8255 port interface from <a href=\"#programmable-peripheral-interface-8255\">chapter 5.1</a> and 8086 I/O instructions from Unit 2.",
+ "sections": [
+  {
+   "h3": "DAC0808: a code becomes a current",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A DAC takes a binary code D and gives an output proportional to it. The DAC0808 does this with an R-2R ladder: a resistor network of only two values, R and 2R, that splits a reference current in binary ratios. Eight input pins D7–D0, one output."
+    },
+    {
+     "type": "formula",
+     "text": "Iout = (Vref / R) × (D / 256)",
+     "where": "Iout is the output current in amperes; Vref is the reference voltage in volts; R is the resistor that sets the reference current, in ohms; D is the input code, 0 to 255."
+    },
+    {
+     "type": "p",
+     "text": "The output is a current, not a voltage. The usual circuit feeds it into an op-amp wired as a current-to-voltage converter with feedback resistor Rf. The op-amp holds its inverting input at virtual ground, so the whole current flows through Rf."
+    },
+    {
+     "type": "formula",
+     "text": "Vout = Iout × Rf = Vref × (Rf / R) × (D / 256)",
+     "where": "Vout is the output voltage in volts; Rf is the feedback resistor in ohms. When Rf = R the formula collapses to Vout = Vref × D / 256."
+    },
+    {
+     "type": "p",
+     "text": "Two numbers describe any DAC when Rf = R. The step size, also called the resolution in volts, is Vref/256, the change for one count, and full scale is Vref × 255/256, one step below Vref, because 255 is the highest code, not a 256th step. In general the step is Vref × (Rf/R)/256. With Vref = 5 V and Rf = R a step is 19.53 mV and full scale is 4.98 V."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "A staircase wave comes free: output D, add one, output, delay, repeat, wrap from 255 back to 0.",
+      "The delay comes from the 8253 timer (<a href=\"#programmable-interval-timer-8253-8254\">chapter 5.2</a>) or a software loop."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "ADC0808: trial codes until the comparator agrees",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The ADC0808 converts the other way. It holds an internal DAC, a comparator and a successive-approximation register (SAR). The SAR guesses a code, the DAC turns the guess into a voltage, the comparator reports whether the guess is too high or too low, and the SAR adjusts. It settles one bit per clock, MSB first, so eight clocks decide eight bits."
+    },
+    {
+     "type": "p",
+     "text": "An 8-channel multiplexer sits at the front: inputs IN0–IN7, chosen by address pins C, B, A with C as the most significant. ALE latches that address. The falling edge of START begins conversion and pulls EOC low; EOC returns high when the result sits in the output latch. OE enables the tri-state buffers so the CPU can read D0–D7."
+    },
+    {
+     "type": "p",
+     "text": "With a 640 kHz clock, one clock period is 1.5625 µs. The chip uses eight clock periods per bit, so 64 periods give the 100 µs conversion time. The SAR still needs only eight decisions, one per bit. The ADC0809 is the same converter in the same pinout; reference and accuracy specifications differ, so check the data sheet before swapping one for the other."
+    },
+    {
+     "type": "formula",
+     "text": "step size = Vref / 2ⁿ",
+     "where": "Vref is the reference voltage in volts; n is the number of bits, 8 here, so the step is Vref/256."
+    },
+    {
+     "type": "p",
+     "text": "The input is continuous and the code is not, so the code can be wrong by at most half a step: ±Vref/512, written ±½ LSB. With Vref = 5 V that is ±9.77 mV. Resolution in percent is 100/256 = 0.39 percent of full scale."
+    },
+    {
+     "type": "p",
+     "text": "Three other architectures, named only. Flash uses 2ⁿ−1 comparators in parallel and converts in one clock. Dual-slope integrates the input over a fixed time: slow, very accurate, the type inside bench multimeters. Tracking keeps a counter that follows the input up and down."
+    }
+   ]
+  },
+  {
+   "h3": "Reading an ADC on the 8086 through an 8255",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The ADC data pins do not touch the 8086 bus directly. The 8255 (<a href=\"#programmable-peripheral-interface-8255\">chapter 5.1</a>) supplies three ports: port A input for D0–D7, port B output for the channel select and the START/ALE pulses, port C input carrying EOC on PC0. Mode 0 with control word 91H gives port A input, port C upper output, port B output, port C lower input."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write 91H to the 8255 control register.",
+      "Write the channel number 0–7 on port B, then pulse ALE high and low to latch it.",
+      "Pulse START high for at least 100 ns, then low. EOC falls.",
+      "Poll port C bit 0 until it reads 1. Each pass is one IN and one test; at 100 µs a conversion, the loop runs a few dozen times.",
+      "Set OE through port B, read port A into AL, clear OE.",
+      "Convert the code: V = code × Vref / 256."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "This is programmed I/O, so the CPU waits. An interrupt moves the wait out of the loop: EOC drives an 8259 input (<a href=\"#programmable-interrupt-controller-8259\">chapter 5.3</a>). For fast repeated sampling, DMA (<a href=\"#dma-controller-8257-8237\">chapter 5.4</a>) moves the bytes instead."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The SAR register sends each trial code to the DAC, which makes a trial voltage for the comparator; the comparator's decision returns to the SAR. Bits settle MSB first, and the final code waits in the output latch until OE opens the tri-state buffer.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "ADC0808 conversion path",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "Analog input",
+     "note": "0 to 5 V",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "8-channel mux",
+     "note": "A, B, C select",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Comparator",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "SAR register",
+     "note": "trial code",
+     "style": "accent"
+    },
+    {
+     "id": "h",
+     "label": "DAC",
+     "note": "trial voltage",
+     "style": "normal"
+    },
+    {
+     "id": "e",
+     "label": "Output latch",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "Tri-state buffer",
+     "note": "enabled by OE",
+     "style": "normal"
+    },
+    {
+     "id": "g",
+     "label": "CPU data bus",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "h",
+     "style": "solid",
+     "label": "trial code"
+    },
+    {
+     "from": "h",
+     "to": "c",
+     "style": "solid",
+     "label": "trial voltage"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid",
+     "label": "decision (too high / too low)"
+    },
+    {
+     "from": "d",
+     "to": "e",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "g",
+     "style": "solid"
+    }
+   ],
+   "aria": "Block diagram of an 8-bit successive-approximation ADC: the selected analog input is compared against a trial voltage made by a DAC from the SAR register; the comparator's decision returns to the SAR until the closest code is found, then the code is latched and read by the CPU."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8-bit ADC has Vref = 5 V and an input of 2.5 V. Find the step size in mV, the output code in hex, the resolution in percent and the quantisation error. Then feed that code to a DAC0808 with Rf = R and the same 5 V reference and find its output.",
+   "steps": [
+    "Step size = Vref / 256 = 5 V / 256 = 0.01953125 V = 19.53125 mV.",
+    "Code = Vin / step = 2.5 V / 0.01953125 V = 128, which is 80H.",
+    "Resolution in percent = 100 / 256 = 0.390625 percent, about 0.39 percent of full scale.",
+    "Quantisation error = half a step = 0.009765625 V = 9.765625 mV, so the reading is 2.5 V ± 9.77 mV.",
+    "DAC output = Vref × D / 256 = 5 × 128 / 256 = 2.5 V, which returns the original input."
+   ],
+   "answer": "Step size 19.53125 mV, code 80H, resolution 0.390625 percent, error ±9.765625 mV, and the DAC0808 returns 2.5 V.",
+   "check": "step = 5 / 256\nprint(step * 1000)\nprint(2.5 / step)\nprint(100 / 256)\nprint(step / 2 * 1000)\nprint(5 * 128 / 256)\n",
+   "values": [
+    19.53125,
+    128.0,
+    0.390625,
+    9.765625,
+    2.5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Step size is Vref/256, not Vref/255. Code 255 is the top step, one step below Vref; dividing by 255 shifts every answer.",
+  "The DAC0808 output is a current. Without the op-amp and Rf there is no usable voltage, and Vout = Vref × D/256 holds only when Rf = R.",
+  "EOC is active high on these parts: low at START, high when conversion ends. Polling for the wrong level hangs the program forever.",
+  "Quantisation error is ±½ LSB, not ±1 LSB. Writing ±1 LSB loses marks in a numerical answer.",
+  "ALE and START may be pulsed separately: latch the channel address with ALE first, then start the conversion with START. They may also be tied together and driven from one port line, because the rising edge of ALE latches the address and the falling edge of START starts the conversion."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does the ALE pin do on the ADC0808?",
+   "marks": 2,
+   "a": "It latches the channel address C, B, A into the multiplexer so the selected input stays fixed for the whole conversion."
+  },
+  {
+   "level": "remember",
+   "q": "How many comparison clocks does an 8-bit SAR ADC need in principle?",
+   "marks": 2,
+   "a": "Eight, one bit settled per clock, MSB first."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the full-scale output of an 8-bit DAC Vref × 255/256 and not Vref?",
+   "marks": 3,
+   "a": "Code 255 is the largest count, and each count is one step of Vref/256, so the top output sits exactly one step below the reference."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit ADC has Vref = 4 V and an input of 1 V. Find the step size and the output code.",
+   "marks": 4,
+   "a": "Step = 4/256 = 15.625 mV. Code = 1/0.015625 = 64 = 40H."
+  },
+  {
+   "level": "apply",
+   "q": "A DAC0808 has Vref = 5 V, Rf = R, and receives code C0H. Find Vout.",
+   "marks": 4,
+   "a": "C0H = 192. Vout = 5 × 192/256 = 3.75 V."
+  },
+  {
+   "level": "analyze",
+   "q": "A polling loop waiting on EOC never exits. Give two likely causes.",
+   "marks": 5,
+   "a": "It waits for the wrong level, since EOC is active high and returns high at the end; or PC0 is not configured as an input by the 8255 control word, or START was never pulsed so conversion never began."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a flash ADC need 255 comparators for 8 bits while a SAR ADC needs one?",
+   "marks": 5,
+   "a": "Flash compares the input against every threshold at once, so it needs 2ⁿ−1 comparators and finishes in one clock. SAR reuses a single comparator over eight clocks, trading time for hardware."
+  }
+ ],
+ "beyond": "Not for the exam. Inside a modern microcontroller the SAR ADC is one block on the die, with multiplexer, sample-and-hold and reference integrated; an 8086 with an 0808 and an 8255 is the same idea spread over three chips. Audio and precision measurement moved to sigma-delta converters, which oversample to reach 16 to 24 bits. External ADCs now speak I²C or SPI, so an 8-pin part gives eight channels on two wires. Search for ENOB, SAR ADC timing, MCP3008 and sigma-delta modulator."
+}

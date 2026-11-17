@@ -1,0 +1,248 @@
+{
+ "lead": "The 8259A programmable interrupt controller sits between up to eight interrupting devices and one CPU interrupt pin. It latches each request, masks the ones software disables, ranks the rest by priority, and raises a single INT. When the CPU answers with INTA, the 8259 supplies the interrupt vector, so the CPU jumps straight to the correct service routine. Without it, a CPU with one INTR pin would have to poll every device. It is used in 8085 and 8086 boards, in old PC AT systems, and in many industrial controllers.",
+ "prereq": "You need: the 8086 INTR and INTA pins and the interrupt vector table from Unit 2, and the interrupt ideas in Unit 4.",
+ "sections": [
+  {
+   "h3": "Pins, bus and vector formation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 8259A is a 28-pin chip. IR0 to IR7 are eight interrupt request inputs, active high. A device pulls its IR line high when it needs service. INT is the single output to the CPU. INTA is the input from the CPU acknowledging the interrupt. CS, WR, RD and A0 connect to the bus. A0=0 selects the even address for ICW1, OCW2 and OCW3. A0=1 selects the odd address for ICW2, ICW3, ICW4 and OCW1. D0 to D7 carry commands and the vector. CAS0 to CAS2 carry the slave identity in a cascade. SP/EN is either the slave-program input or the enable output for a bus buffer."
+    },
+    {
+     "type": "p",
+     "text": "On an 8086, ICW2 supplies the upper five bits of the interrupt type. The lower three bits come from the winning IR line. ICW2=40H therefore gives types 40H to 47H, one type per input. Each type has a 4-byte entry in the interrupt vector table. On an 8085, the 8259 supplies a CALL instruction and a 16-bit address; ICW1 bit D2 sets the call address interval to 4 or 8 bytes."
+    },
+    {
+     "type": "p",
+     "text": "A0 also matters during normal running. Writing OCW1 to the odd address changes the mask. Writing OCW2 to the even address sends an end-of-interrupt command. Reading the even address after OCW3 returns the register selected by OCW3."
+    }
+   ]
+  },
+  {
+   "h3": "Inside: three registers and a resolver",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The interrupt request register (IRR) latches every request. The interrupt mask register (IMR) holds one mask bit per line; a 1 masks that line and a 0 enables it. The in-service register (ISR) holds the line currently being served. The priority resolver compares unmasked IRR bits with the ISR. In fully nested mode, a new request is sent to the CPU only if its priority is higher than the highest ISR bit. IR0 is highest by default and IR7 is lowest. ICW1 bit D3 selects edge triggering (0) or level triggering (1)."
+    },
+    {
+     "type": "p",
+     "text": "Initialization command words (ICW1 to ICW4) are written at start-up. Operation command words (OCW1 to OCW3) are written while the system runs."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "ICW1: D4=1 marks ICW1, D3 sets edge or level, D2 sets the 8085 call interval, D1 SNGL=1 for a single chip, D0 IC4=1 when ICW4 follows.",
+      "ICW2: vector base; on the 8086 it supplies the upper five type bits.",
+      "ICW3: cascade wiring; on a master, one bit per IR that has a slave; on a slave, its identity.",
+      "ICW4: 8086 mode, end-of-interrupt mode, buffered mode and special fully nested mode.",
+      "OCW1: the mask byte; 1 masks, 0 enables.",
+      "OCW2: non-specific, specific or automatic end of interrupt, and rotation of priorities.",
+      "OCW3: read IRR or ISR, set special mask mode, and issue the polling command."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The polling command makes the 8259 report the highest pending request as a status byte. The CPU reads that byte instead of taking an interrupt. This is useful when interrupts are disabled for a short critical section."
+    }
+   ]
+  },
+  {
+   "h3": "Cascading and two requests at once",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "One master can drive up to eight slaves. Each slave's INT output connects to one master IR input, giving 64 request inputs in total. The master's ICW3 says which IR lines have slaves. Each slave's ICW3 gives its 3-bit identity. During acknowledge, the master places that identity on CAS0 to CAS2, and only the selected slave returns its vector. In non-buffered mode, SP/EN is an input: high selects master, low selects slave."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "IR3 and IR6 go high together. Both bits set in the IRR.",
+      "Both lines are unmasked. The priority resolver compares IR3 and IR6; IR3 has higher priority.",
+      "The resolver sets ISR bit 3 and raises INT. IR6 stays pending in the IRR.",
+      "The CPU sends the first INTA. The 8259 sets the in-service bit and, for a master with slaves, puts the slave identity on CAS0 to CAS2.",
+      "The CPU sends the second INTA. The 8259 puts the vector byte on D0 to D7: ICW2 base plus 3.",
+      "The CPU jumps to the service routine. When it writes EOI, ISR bit 3 clears. The resolver then sees IR6 and raises INT again."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An 8085 needs three INTA pulses because the 8259 supplies a CALL opcode and a 16-bit address. If IR6 were higher priority than IR3, it could interrupt IR3's routine in fully nested mode, provided both lines are unmasked and IR6 is not blocked by a lower-priority ISR bit."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Eight request inputs are latched, then filtered by the mask and in-service registers before the resolver picks one. The winner raises INT and returns a vector byte during INTA.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "8259 priority path",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "IR0-IR7",
+     "note": "8 request lines",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Request register",
+     "note": "latches IR inputs",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Mask register",
+     "note": "written by OCW1",
+     "style": "muted"
+    },
+    {
+     "id": "c",
+     "label": "Priority resolver",
+     "style": "accent"
+    },
+    {
+     "id": "e",
+     "label": "In-service register",
+     "note": "currently served",
+     "style": "normal"
+    },
+    {
+     "id": "f",
+     "label": "INT to CPU",
+     "style": "live"
+    },
+    {
+     "id": "g",
+     "label": "INTA cycles",
+     "note": "from CPU",
+     "style": "normal"
+    },
+    {
+     "id": "h",
+     "label": "Vector byte",
+     "note": "built from ICW2",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "c",
+     "style": "dashed",
+     "label": "masks"
+    },
+    {
+     "from": "e",
+     "to": "c",
+     "style": "dashed",
+     "label": "blocks lower"
+    },
+    {
+     "from": "c",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "g",
+     "to": "c",
+     "style": "dashed"
+    },
+    {
+     "from": "c",
+     "to": "h",
+     "style": "solid",
+     "label": "during INTA"
+    }
+   ],
+   "aria": "Block diagram of the 8259: eight request lines feed a request register, a priority resolver compares it with the mask and in-service registers, and the winner raises INT and puts its vector on the bus during INTA."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8259A in an 8086 system is at addresses 20H and 21H. It is a single chip, edge triggered, with IR0 to IR7 taking vectors 40H to 47H. Only IR0 and IR1 are to be allowed. Write ICW1, ICW2, ICW4, OCW1, and the non-specific EOI byte. Give all values in hex and decimal.",
+   "steps": [
+    "ICW1 = 0001 0011 = 13H = 19. D4=1 marks ICW1, D3=0 selects edge triggering, D2=0 (not used on 8086), D1=1 means SNGL (single chip), D0=1 means IC4 follows. Write to even address 20H.",
+    "ICW2 = 0100 0000 = 40H = 64. The upper five bits are 01000, so the eight vectors are 40H to 47H. Write to odd address 21H.",
+    "ICW4 = 0000 0001 = 01H = 1. Bit 0=1 selects 8086 mode, bit 1=0 selects normal EOI, bits 2-3=00 select non-buffered mode, bit 4=0 means not special fully nested. Write to odd address 21H.",
+    "OCW1 = 1111 1100 = FCH = 252. Bits 0 and 1 are 0, so IR0 and IR1 are enabled. Bits 2 to 7 are 1, so IR2 to IR7 are masked. Write to odd address 21H.",
+    "Non-specific EOI = 0010 0000 = 20H = 32. Write to even address 20H. This clears the highest ISR bit."
+   ],
+   "answer": "ICW1=13H (19), ICW2=40H (64), ICW4=01H (1), OCW1=FCH (252), and non-specific EOI=20H (32).",
+   "check": "icw1 = (1 << 4) | (0 << 3) | (0 << 2) | (1 << 1) | 1\nicw2 = 0x40\nicw4 = 0x01\nocw1 = 0xFC\neoi = 0x20\nprint(icw1)\nprint(icw2)\nprint(icw4)\nprint(ocw1)\nprint(eoi)",
+   "values": [
+    19,
+    64,
+    1,
+    252,
+    32
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Skipping the end-of-interrupt in non-automatic mode leaves the ISR bit set. That line and every lower-priority line stay blocked for ever.",
+  "A 1 in OCW1 masks a line; it does not enable it. Writing FFH masks all eight inputs, while 00H enables all eight.",
+  "On the 8086, the lower three bits of ICW2 are ignored because the IR line supplies them. Do not expect ICW2=43H to shift the vector by 3.",
+  "ICW1 bit D3=0 means edge triggered and D3=1 means level triggered. A level-triggered request must stay high until the acknowledge; an edge must be a transition.",
+  "OCW2 rotation changes priority order. It is not a mask operation. Use OCW1 to enable or disable a line."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What do the IRR, ISR and IMR hold in the 8259?",
+   "marks": 2,
+   "a": "IRR holds latched requests, ISR holds the line being served, and IMR holds the mask bits (1 = masked)."
+  },
+  {
+   "level": "remember",
+   "q": "Which ICW1 bit says single or cascade, and which bit says ICW4 follows?",
+   "marks": 2,
+   "a": "D1 is SNGL: 1 means single, 0 means cascade. D0 is IC4: 1 means ICW4 follows."
+  },
+  {
+   "level": "understand",
+   "q": "Why is an end-of-interrupt command needed in non-automatic mode?",
+   "marks": 3,
+   "a": "The ISR bit stays set after the routine starts. Without EOI, the resolver thinks that line is still being served and blocks it and all lower-priority lines."
+  },
+  {
+   "level": "apply",
+   "q": "An 8086 system uses ICW2=70H. What interrupt types do IR0 to IR7 produce?",
+   "marks": 3,
+   "a": "The upper five bits are 01110, so the types are 70H to 77H, one per IR line."
+  },
+  {
+   "level": "apply",
+   "q": "OCW1=0FH is written. Which IR lines are enabled?",
+   "marks": 3,
+   "a": "A 1 masks. Bits 0 to 3 are 1, so IR0 to IR3 are masked. Bits 4 to 7 are 0, so IR4 to IR7 are enabled."
+  },
+  {
+   "level": "analyze",
+   "q": "IR2 and IR5 arrive together, both unmasked. Describe the sequence and what happens to IR5.",
+   "marks": 4,
+   "a": "Both set in IRR. IR2 is higher priority, so ISR bit 2 is set and INT is raised. IR5 stays pending. After the IR2 routine writes EOI, ISR bit 2 clears and IR5 can raise INT."
+  },
+  {
+   "level": "analyze",
+   "q": "Why are CAS0 to CAS2 needed when slaves are connected?",
+   "marks": 4,
+   "a": "The master must tell the CPU which slave won. During the acknowledge, the master puts the winning slave's identity on CAS0 to CAS2, and only that slave returns its vector byte."
+  }
+ ],
+ "beyond": "Not for the exam. Modern x86 systems use the local APIC and I/O APIC, and ARM Cortex-M uses the NVIC; both keep the same ideas of latching, masking and priority but add more lines and per-core delivery. Virtual machines emulate the 8259 for old guest operating systems. Search for IOAPIC, NVIC priority grouping and interrupt affinity to see how the idea scales."
+}

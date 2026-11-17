@@ -1,0 +1,808 @@
+{
+ "lead": "Peripheral interfacing is where the CPU meets the outside world: keys, displays, motors, sensors and the support chips that serve them. After this unit you can build control words for the 8255, 8253, 8259, 8257 and 8251 from a written specification, and connect an ADC, a keypad, an LCD, a stepper motor and a real-time clock to a microprocessor or microcontroller.",
+ "about": "Unit 5 covers the chips and circuits that sit between the processor bus and real devices. Chapter 5.1 starts with the 8255, the general-purpose parallel port that most later examples use to reach hardware. Chapters 5.2 and 5.3 add the timer and the interrupt controller, which take over counting and priority. Chapter 5.4 shows DMA moving bytes without the CPU, and 5.5 does the same job for serial bits through the 8251. The last four chapters are the devices themselves: 5.6 keys and displays, 5.7 analog input and output, 5.8 motors and relays, and 5.9 sensors, the RTC and PWM. Every chapter gives the control word or register, one worked calculation, and the wiring.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Three 8-bit ports whose direction and handshake mode are fixed by one control word, so slow peripherals can sit on a fast bus without slowing it down.",
+   "depth": "Internal block: data bus buffer, read/write control logic, group A control, group B control, ports A, B and C (C split into upper and lower nibbles). Pins CS, RD, WR, A0, A1, RESET, and the 40-pin supply. Port addresses from A1A0: base+0, +1, +2 and the control register at base+3. Mode 0 simple input/output, mode 1 strobed input/output with port C handshake lines, mode 2 bidirectional on port A only. Bit set/reset (BSR) mode for single port C bits. Both directions of control-word work: build the byte from a specification, and decode a given byte into port directions. Port fan-out and sink current limits. One address-decoding example with the 8086. Some syllabi write the part as 8255A. Stop before gate-level internal timing.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Inside the 8255",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "CPU data bus",
+      "note": "D0-D7",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Data bus buffer",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Read/write logic",
+      "note": "CS, RD, WR, A0, A1",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Group A control",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Group B control",
+      "style": "accent"
+     },
+     {
+      "id": "f",
+      "label": "Port A",
+      "note": "8 bits",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "Port B",
+      "note": "8 bits",
+      "style": "normal"
+     },
+     {
+      "id": "h",
+      "label": "Port C",
+      "note": "upper and lower",
+      "style": "normal"
+     },
+     {
+      "id": "i",
+      "label": "Peripheral",
+      "note": "keypad, display, printer",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "h",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "g",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "h",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "i",
+      "style": "solid"
+     },
+     {
+      "from": "g",
+      "to": "i",
+      "style": "solid"
+     },
+     {
+      "from": "h",
+      "to": "i",
+      "style": "solid"
+     }
+    ],
+    "aria": "Block diagram of the 8255: the data bus buffer and read/write logic on the CPU side, group A and group B control registers, and ports A, B and C driving a peripheral."
+   },
+   "example": "A 8255 is wired with base address 80H, so A1A0 give ports at 80H, 81H, 82H and the control register at 83H. Port A must be an input in mode 0, port B an output in mode 0, the upper half of port C an input and the lower half an output. Find the control word and write the initialisation. Solution: D7 = 1 selects I/O mode, D6D5 = 00 for group A mode 0, D4 = 1 makes port A input, D3 = 0 makes PC7-PC4 input, D2 = 0 for group B mode 0, D1 = 0 makes port B output, D0 = 0 makes PC3-PC0 output. The control word is 1001 0000 = 90H, written to port 83H.",
+   "trap": "D7 of the control word chooses between I/O mode (1) and bit set/reset mode (0). A student who copies an 80H-family BSR byte into the control register silently changes one port C pin instead of setting the port directions. The second trap is the split port C: its upper nibble direction sits in D3 and its lower nibble in D0, two different places in the same byte.",
+   "prereq": "Unit 2 address decoding and memory-mapped I/O; Unit 1 buses.",
+   "leave": "IN and OUT instruction encoding to Unit 3; the detailed AC timing diagram to the data sheet."
+  },
+  {
+   "k": 2,
+   "idea": "A counter that divides a known clock by a programmed number, so delays, frequencies and waveforms appear at a pin while the CPU does other work.",
+   "depth": "Only a few universities teach this chapter, so keep it short. Three independent 16-bit down counters, each with clock, gate and out pins. The six modes in one line each: mode 0 interrupt on terminal count, mode 1 hardware-retriggerable one-shot, mode 2 rate generator, mode 3 square wave, mode 4 software-triggered strobe, mode 5 hardware-triggered strobe. Control word fields SC1 SC0 (counter select), RW1 RW0 (LSB only, MSB only, LSB then MSB), M2 M1 M0 (mode) and the BCD bit. Count 0 means 65536. Reading a counter on the fly with the latch command. The 8254 adds a read-back command and a status byte; the 8253 does not. Control-word problems and one delay calculation are enough.",
+   "figure": {
+    "type": "gantt",
+    "unit": "clock periods",
+    "lanes": [
+     {
+      "label": "CLK",
+      "bars": [
+       {
+        "label": "1",
+        "start": 0,
+        "end": 1,
+        "style": "muted"
+       },
+       {
+        "label": "2",
+        "start": 1,
+        "end": 2,
+        "style": "muted"
+       },
+       {
+        "label": "3",
+        "start": 2,
+        "end": 3,
+        "style": "muted"
+       },
+       {
+        "label": "4",
+        "start": 3,
+        "end": 4,
+        "style": "muted"
+       },
+       {
+        "label": "5",
+        "start": 4,
+        "end": 5,
+        "style": "muted"
+       },
+       {
+        "label": "6",
+        "start": 5,
+        "end": 6,
+        "style": "muted"
+       }
+      ]
+     },
+     {
+      "label": "OUT mode 2, count 3",
+      "bars": [
+       {
+        "label": "H",
+        "start": 0,
+        "end": 2,
+        "style": "accent"
+       },
+       {
+        "label": "L",
+        "start": 2,
+        "end": 3,
+        "style": "accent"
+       },
+       {
+        "label": "H",
+        "start": 3,
+        "end": 5,
+        "style": "accent"
+       },
+       {
+        "label": "L",
+        "start": 5,
+        "end": 6,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "OUT mode 3, count 4",
+      "bars": [
+       {
+        "label": "H",
+        "start": 0,
+        "end": 2,
+        "style": "live"
+       },
+       {
+        "label": "L",
+        "start": 2,
+        "end": 4,
+        "style": "live"
+       },
+       {
+        "label": "H",
+        "start": 4,
+        "end": 6,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "Timing diagram: with a count of 3, mode 2 output goes low for one clock in every three, while mode 3 with a count of 4 makes a square wave of period four clocks."
+   },
+   "example": "A 1 MHz clock drives counter 0. Produce a 1 ms delay using mode 2, binary counting, LSB written first. Solution: count = 1 ms / 1 microsecond = 1000 = 03E8H. Control word = SC1 SC0 = 00, RW1 RW0 = 11, M2 M1 M0 = 010, BCD = 0, giving 0011 0100 = 34H. Write 34H to the control register, then E8H, then 03H to counter 0. The output at OUT0 is a 1 kHz pulse train, and terminal count arrives once every 1000 clocks.",
+   "trap": "Writing the count MSB first when the control word asked for LSB first loads a wrong number, and the error is invisible until the timing is measured. The second trap is reading a counter while it runs: without the latch command the low and high bytes come from two different counts.",
+   "prereq": "Unit 3 delay loops; Unit 4 timer programming for comparison.",
+   "leave": "8051 timer modes to Unit 4; do not repeat them here."
+  },
+  {
+   "k": 3,
+   "idea": "It latches eight interrupt requests, ranks them by priority, raises one interrupt to the CPU and hands over the vector, so many devices share a single INTR pin.",
+   "depth": "Pins IR0-IR7, INT, INTA, CS, WR, RD, A0, CAS0-CAS2 and SP/EN. Inside: interrupt request register, in-service register, interrupt mask register and the priority resolver. Vector formation: ICW2 supplies the upper five bits on the 8086, giving 256-byte spacing; on the 8085 the call address interval of 4 or 8 bytes applies. ICW1 to ICW4, one line each including SNGL and IC4 bits. OCW1 mask, OCW2 end of interrupt and rotation, OCW3 read a register and special mask. Fully nested mode, automatic and specific rotation, edge versus level triggering, polling command. Cascading a master with up to eight slaves for 64 inputs. What happens cycle by cycle when two requests arrive together.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "8259 priority path",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "IR0-IR7",
+      "note": "8 request lines",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Request register",
+      "note": "latches IR inputs",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Mask register",
+      "note": "written by OCW1",
+      "style": "muted"
+     },
+     {
+      "id": "c",
+      "label": "Priority resolver",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "In-service register",
+      "note": "currently served",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "INT to CPU",
+      "style": "live"
+     },
+     {
+      "id": "g",
+      "label": "INTA cycles",
+      "note": "from CPU",
+      "style": "normal"
+     },
+     {
+      "id": "h",
+      "label": "Vector byte",
+      "note": "built from ICW2",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "c",
+      "style": "dashed",
+      "label": "masks"
+     },
+     {
+      "from": "e",
+      "to": "c",
+      "style": "dashed",
+      "label": "blocks lower"
+     },
+     {
+      "from": "c",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "g",
+      "to": "c",
+      "style": "dashed"
+     },
+     {
+      "from": "c",
+      "to": "h",
+      "style": "solid",
+      "label": "during INTA"
+     }
+    ],
+    "aria": "Block diagram of the 8259: eight request lines feed a request register, a priority resolver compares it with the mask and in-service registers, and the winner raises INT and puts its vector on the bus during INTA."
+   },
+   "example": "An 8259 sits at addresses 20H and 21H in an 8086 system, single chip, edge triggered, with IR0 to IR7 taking vectors 40H to 47H. Only IR0 and IR1 are to be allowed. Write ICW1, ICW2, ICW4 and OCW1, and give the end-of-interrupt byte. Solution: ICW1 = 0001 0011 = 13H (IC4 = 1, SNGL = 1, edge triggered), ICW2 = 40H, ICW4 = 0000 0001 = 01H (8086 mode, normal EOI, non-buffered). OCW1 = 1111 1100 = FCH, because a 1 masks that line. The non-specific EOI is 20H written to the even address 20H.",
+   "trap": "Skipping the end-of-interrupt in non-automatic mode leaves the bit set in the in-service register, so that line and every line of lower priority stays blocked for ever. The mask bit polarity is the next trap: 1 means masked, not enabled.",
+   "prereq": "Unit 2 8086 INTR and INTA pins; Unit 4 interrupt structure for comparison.",
+   "leave": "Interrupt vector table layout to Unit 2; 8051 interrupt programming to Unit 4."
+  },
+  {
+   "k": 4,
+   "idea": "The DMA controller takes the bus for a few cycles and moves each byte itself, so the CPU is no longer in the data path.",
+   "depth": "Why DMA exists: transfer rate against the overhead of polling and of one interrupt per byte. 8257 with the 8085: four channels, 16-bit start address, 14-bit count field whose top two bits are terminal count and auto-reload, single, burst and demand modes, rotating priority. 8237 with the 8086: 16-bit address plus an external page register giving 64 KB per channel, current address and current count registers, mode register, command register, request and mask registers, status register, software and hardware requests, memory-to-memory using channels 0 and 1, cascade. The handshake DREQ, HRQ, HLDA, DACK, transfer, EOP. Cycle stealing against block transfer. Depth: program a channel from a specification and trace the handshake.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Peripheral",
+     "DMA",
+     "CPU",
+     "Memory"
+    ],
+    "messages": [
+     {
+      "from": "Peripheral",
+      "to": "DMA",
+      "label": "DREQ high"
+     },
+     {
+      "from": "DMA",
+      "to": "CPU",
+      "label": "HRQ high"
+     },
+     {
+      "from": "CPU",
+      "to": "DMA",
+      "label": "HLDA high"
+     },
+     {
+      "from": "DMA",
+      "to": "Peripheral",
+      "label": "DACK active"
+     },
+     {
+      "from": "DMA",
+      "to": "Memory",
+      "label": "address and MEMR"
+     },
+     {
+      "from": "Memory",
+      "to": "DMA",
+      "label": "data byte"
+     },
+     {
+      "from": "DMA",
+      "to": "Peripheral",
+      "label": "byte to IOWR"
+     },
+     {
+      "from": "DMA",
+      "to": "CPU",
+      "label": "HRQ low, bus returned"
+     }
+    ],
+    "aria": "Sequence diagram of one DMA cycle: the peripheral raises DREQ, the controller asks the CPU with HRQ and waits for HLDA, acknowledges with DACK, moves the byte between memory and the peripheral, then releases the bus."
+   },
+   "example": "An 8257 channel 0 is loaded with a start address of 2000H and the low 14 bits of its count register hold 0FFFH. How many bytes are moved, what is the last address, and what happens at the end? Solution: the 8257 count field holds the number of bytes minus one, so 0FFFH + 1 = 4096 bytes. Transfer starts at 2000H and ends at 2000H + 0FFFH = 2FFFH, which is 4 KB. On the last transfer the TC output pulses, and the top two bits of the count word decide whether the channel keeps the same count for an auto-reload or stops.",
+   "trap": "The count register holds transfers minus one, so a student who programs 1000 for 1000 bytes moves 1001. The second trap is ignoring the 64 KB page: in the 8237 the address counter wraps inside one page, so a block cannot cross a page boundary without a new page value.",
+   "prereq": "Unit 2 bus timing, HOLD and HLDA, and maximum-mode 8086 signals.",
+   "leave": "The full 8237 register map beyond the working registers can be left to the data sheet; disk controller design is out of scope."
+  },
+  {
+   "k": 5,
+   "idea": "One chip turns a byte into a framed serial stream with start, parity and stop bits and back again, so a single wire replaces eight.",
+   "depth": "Block diagram: data bus buffer, read/write control, modem control block, transmit and receive shift registers. Pins TXD, RXD, TXC, RXC, RTS, CTS, DTR, DSR, SYNDET, TXRDY, RXRDY, TXE and C/D. Asynchronous against synchronous mode. Mode word fields: baud rate factor (1, 16, 64), character length 5 to 8 bits, parity enable and even/odd, stop bits. Command word fields: transmit enable, receive enable, send break, error reset, internal reset. Status word bits and the error flags for parity, overrun and framing. The software reset sequence. RS-232 levels through a driver and receiver such as the MAX232. Depth: configure a stated frame, poll the status, send one character.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "8251 transmit and receive path",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "CPU data bus",
+      "note": "D0-D7",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Read/write control",
+      "note": "CS, RD, WR, C/D",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Transmit buffer",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Receive buffer",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Tx shift register",
+      "note": "start, data, parity, stop",
+      "style": "accent"
+     },
+     {
+      "id": "f",
+      "label": "Rx shift register",
+      "style": "accent"
+     },
+     {
+      "id": "g",
+      "label": "Modem control",
+      "note": "RTS, CTS, DTR, DSR",
+      "style": "muted"
+     },
+     {
+      "id": "h",
+      "label": "Serial line",
+      "note": "TXD and RXD",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "a",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "dashed"
+     },
+     {
+      "from": "b",
+      "to": "d",
+      "style": "dashed"
+     },
+     {
+      "from": "c",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "h",
+      "style": "solid"
+     },
+     {
+      "from": "h",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "g",
+      "to": "h",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Block diagram of the 8251: parallel bytes go from the data bus into the transmit buffer and shift register to the serial line, and received bits pass through the receive shift register into the receive buffer."
+   },
+   "example": "Program an 8251 at port 80H (data) and 81H (control) for asynchronous working at 9600 baud, 8 data bits, no parity, 1 stop bit, with a 16-times clock. Give the reset sequence, the mode word and a command word that enables both directions. Solution: write 00H three times, then 40H for internal reset. Mode word = D7D6 = 10 for 1 stop bit, D5 = 0 even parity, D4 = 0 parity disabled, D3D2 = 11 for 8 bits, D1D0 = 10 for the 16-times factor, giving 1000 1110 = 8EH. Command word = 0001 0101 = 15H for transmit enable, receive enable and error reset. The clock input must then be 16 × 9600 = 153.6 kHz.",
+   "trap": "The mode word is only accepted after the software reset sequence, and any later command word must not repeat it. Writing a control byte before the reset sequence leaves the chip in an unknown state, and the first characters vanish with no error flag set.",
+   "prereq": "Unit 4 serial communication, baud rate and RS-232 levels.",
+   "leave": "Baud rate generation from timers to Unit 4; synchronous protocol details to the data sheet."
+  },
+  {
+   "k": 6,
+   "idea": "Keys and displays are slow and numerous, so the CPU scans rows, multiplexes digits, and drives an LCD through a fixed command-and-data handshake.",
+   "depth": "LED drive: forward voltage, series resistor from R = (Vcc - Vf) / I, sourcing against sinking, the port current limit and why a buffer is used. Seven-segment displays: common cathode and common anode, the segment code table for 0 to 9, digit multiplexing with transistor drivers, refresh rate of 50 Hz or more. 4×4 matrix keypad: row scan, column read, debounce of 10 to 20 ms, key code from a look-up table. LCD 16×2 with the HD44780 controller: RS, RW and E pins, 8-bit and 4-bit modes, the start-up sequence 38H, 0CH, 01H, 06H, DDRAM address 80H plus position, busy flag check, printing a string. Depth: one scan loop and one LCD initialisation routine.",
+   "figure": {
+    "type": "array",
+    "title": "Common-cathode segment codes",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Digit 0-9",
+      "cells": [
+       "3F",
+       "06",
+       "5B",
+       "4F",
+       "66",
+       "6D",
+       "7D",
+       "07",
+       "7F",
+       "6F"
+      ],
+      "marks": {
+       "1": "accent",
+       "3": "live"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 0,
+      "cell": 1,
+      "label": "digit 1"
+     }
+    ],
+    "aria": "Table of common-cathode seven-segment codes for the digits 0 to 9; the code for digit 1 is 06 and for digit 3 is 4F."
+   },
+   "example": "A four-digit multiplexed common-cathode display shows 1234, switching one digit every 1 ms, and each segment is driven from a 5 V port pin through a resistor. The LEDs drop 2 V at 8 mA. Find the frame rate, the segment codes and the resistor value. Solution: the frame is 4 digits × 1 ms = 4 ms, so the refresh rate is 250 Hz, well above flicker. Codes: 1 = 06H, 2 = 5BH, 3 = 4FH, 4 = 66H. Resistor R = (5 - 2) / 0.008 = 375 ohm, so use the standard 390 ohm.",
+   "trap": "Common-anode displays need the bitwise complement of every code in this table, and a mixed-up set produces a display of strange letters that still looks plausible. Multiplexing without checking peak segment current, or refreshing too slowly, gives dim or flickering digits.",
+   "prereq": "Unit 4 I/O port programming; Unit 3 delay loops and look-up tables.",
+   "leave": "Graphic LCDs and touch panels are outside the syllabus; keypad encoding by dedicated chips is not needed."
+  },
+  {
+   "k": 7,
+   "idea": "An ADC maps a voltage to the nearest binary code and a DAC maps a code back to a voltage, both with a step size fixed by the reference.",
+   "depth": "DAC0808: R-2R ladder, current output, Iout = (Vref / R) × (D / 256), op-amp converts current to voltage, resolution and full-scale output, staircase waveform generation. ADC0808 and ADC0809: 8-bit successive approximation, 8-channel multiplexer with A, B, C select, sample and hold, start of conversion and address latch pulses, end of conversion output, output enable, clock around 640 kHz, conversion time near 100 microseconds. Step size, resolution in volts and in percent, quantisation error of half an LSB. Other converter types named only: flash, dual slope, tracking. The 8086 with an 8255 interface: port A data in, port B control out, port C end of conversion in, and the polling sequence.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "ADC0808 conversion path",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Analog input",
+      "note": "0 to 5 V",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "8-channel mux",
+      "note": "A, B, C select",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Comparator",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "SAR register",
+      "note": "trial code",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Output latch",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Tri-state buffer",
+      "note": "enabled by OE",
+      "style": "normal"
+     },
+     {
+      "id": "g",
+      "label": "CPU data bus",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "c",
+      "style": "dashed",
+      "label": "next trial"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "style": "solid"
+     }
+    ],
+    "aria": "Block diagram of an 8-bit successive-approximation ADC: the selected analog input is compared against the trial code in the SAR register until the closest code is found, then latched and read by the CPU."
+   },
+   "example": "An 8-bit ADC has Vref = 5 V and an input of 2.5 V. Find the step size, the output code and the resolution in percent, then check the same code on a DAC0808 with the same reference. Solution: step size = 5 / 256 = 19.53 mV, which is 0.39 percent of full scale. Code = 2.5 / 0.01953 = 128, so 80H. The quantisation error is half a step, about 9.8 mV. A DAC0808 fed 80H with the same reference gives 5 × 128 / 256 = 2.5 V back.",
+   "trap": "The step size of an 8-bit converter is Vref / 256, not Vref / 255; 255 is the code of the top step and dividing by it shifts every answer slightly. The second trap is the DAC0808 output, which is a current, so a circuit without the op-amp gives no usable voltage.",
+   "prereq": "Unit 2 I/O mapping, or chapter 5.1 for the 8255 port interface.",
+   "leave": "Converter internal circuit design and sigma-delta theory are beyond this unit."
+  },
+  {
+   "k": 8,
+   "idea": "A port pin cannot carry motor or relay current, so a driver stage does the switching while the CPU supplies only the step sequence or the PWM duty cycle.",
+   "depth": "Stepper motor: unipolar and bipolar windings, 4-phase full-step and half-step sequences, step angle = 360 degrees divided by steps per revolution, speed from the step rate, the ULN2003 driver with its built-in freewheeling diodes, coil voltage and current. DC motor: the L293D H-bridge, direction from two inputs, speed from PWM duty cycle, back-EMF diodes. Relay: NPN transistor switch, base resistor from the required base current, 1N4007 across the coil, normally open and normally closed contacts, switching a 230 V, 50 Hz lamp, opto-isolation for safety. Servo motor in one line: a 1 ms to 2 ms pulse inside a 20 ms frame sets the angle. Depth: one sequence table, one driver calculation, one speed calculation.",
+   "figure": {
+    "type": "array",
+    "title": "Coil codes on port bits 0-3",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Full step",
+      "cells": [
+       "03",
+       "06",
+       "0C",
+       "09"
+      ],
+      "marks": {
+       "0": "accent"
+      }
+     },
+     {
+      "label": "Half step",
+      "cells": [
+       "01",
+       "03",
+       "02",
+       "06",
+       "04",
+       "0C",
+       "08",
+       "09"
+      ],
+      "marks": {
+       "1": "live"
+      }
+     }
+    ],
+    "aria": "Table of stepper coil codes: four full-step codes that keep two coils on at a time, and eight half-step codes that alternate one coil and two coils."
+   },
+   "example": "A 4-phase unipolar stepper motor has a step angle of 1.8 degrees and must turn at 60 rpm. Find the steps per revolution, the step rate and the delay between steps, and give the half-step sequence. Solution: steps per revolution = 360 / 1.8 = 200. At 60 rpm the shaft makes 1 revolution per second, so the step rate is 200 steps per second and the delay is 1 / 200 = 5 ms. Half step, with coils A, B, C, D on bits 0 to 3: 01H, 03H, 02H, 06H, 04H, 0CH, 08H, 09H, then repeat.",
+   "trap": "Leaving out the freewheeling diode across a relay or motor coil destroys the driver transistor when the coil switches off. The second trap is treating the step angle as a property of the whole motor rather than of one step, which makes every speed answer 200 times wrong.",
+   "prereq": "Chapter 5.1 or Unit 4 I/O ports for the driving port; Unit 3 delay loops.",
+   "leave": "Motor construction and microstepping drives are outside this unit; closed-loop control belongs to control systems."
+  },
+  {
+   "k": 9,
+   "idea": "Sensors and clocks hand the CPU a number, analog, pulsed or serial, and PWM turns a timer count into an average voltage.",
+   "depth": "Sensors: LM35 at 10 mV per degree Celsius feeding an ADC channel, light-dependent resistor divider, infrared obstacle sensor, DHT11 single-wire 40-bit frame in one line, HC-SR04 ultrasonic with a 10 microsecond trigger and an echo pulse whose width in microseconds divided by 58 gives centimetres. DS12887 real-time clock: 128 bytes of battery-backed RAM, multiplexed address and data bus with AS, DS, RW and CS, registers 00H to 09H holding seconds to year in BCD, register B bits for binary mode and 12 or 24 hour format, register C flags and register D valid-RAM bit, and the read sequence that avoids catching a rolling time. DS1307 over I2C in one line. PWM: duty cycle D = Ton / T, average voltage = D × Vcc, generation by timer compare with auto-reload on the 8051 or MSP430, choice of frequency, and uses in lamp dimming, DC motor speed and servo position.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "PWM 25 percent",
+      "bars": [
+       {
+        "label": "H",
+        "start": 0,
+        "end": 1,
+        "style": "accent"
+       },
+       {
+        "label": "L",
+        "start": 1,
+        "end": 4,
+        "style": "muted"
+       },
+       {
+        "label": "H",
+        "start": 4,
+        "end": 5,
+        "style": "accent"
+       },
+       {
+        "label": "L",
+        "start": 5,
+        "end": 8,
+        "style": "muted"
+       }
+      ]
+     },
+     {
+      "label": "PWM 75 percent",
+      "bars": [
+       {
+        "label": "H",
+        "start": 0,
+        "end": 3,
+        "style": "live"
+       },
+       {
+        "label": "L",
+        "start": 3,
+        "end": 4,
+        "style": "muted"
+       },
+       {
+        "label": "H",
+        "start": 4,
+        "end": 7,
+        "style": "live"
+       },
+       {
+        "label": "L",
+        "start": 7,
+        "end": 8,
+        "style": "muted"
+       }
+      ]
+     }
+    ],
+    "aria": "Timing diagram of a 4 ms PWM period: the upper lane is on for 1 ms of every 4 ms, the lower lane for 3 ms, so the same period gives two different average voltages."
+   },
+   "example": "An LM35 feeds ADC channel 0 of an 8-bit converter with Vref = 5 V, and the code read is 0FH. Find the step size, the sensor voltage and the temperature. A 5 V rail then drives a lamp through a transistor switched at 250 Hz with 25 percent duty cycle. Find the average voltage. Solution: step = 5 / 256 = 19.53 mV, so the input is 15 × 19.53 mV = 293 mV and the temperature is 293 mV / 10 mV per degree = 29.3 degrees Celsius. The period is 1 / 250 Hz = 4 ms, the on-time is 1 ms, and the average voltage is 0.25 × 5 = 1.25 V.",
+   "trap": "The LM35 output is in millivolts, and mixing it with volts gives temperatures a thousand times wrong. On the RTC, the time registers are BCD until the binary bit in register B is set, so reading them as hex gives nonsense such as 45 minutes after 39 minutes.",
+   "prereq": "Chapter 5.7 for the ADC path; chapter 5.2 or Unit 4 timers for the PWM period.",
+   "leave": "I2C and SPI bus protocol details belong with serial communication; PID control of the motor is out of scope."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "both are memory-mapped chips set up by a control word"
+  ],
+  [
+   1,
+   3,
+   "port C lines can carry the handshake signals that drive 8259 inputs"
+  ],
+  [
+   1,
+   6,
+   "8255 ports scan the keypad rows and drive the display digits"
+  ],
+  [
+   3,
+   4,
+   "interrupt and DMA are the two ways to move data without polling"
+  ],
+  [
+   4,
+   5,
+   "DMA can feed the 8251 transmitter without copying through the CPU"
+  ],
+  [
+   2,
+   9,
+   "the same timer that makes a delay also sets the PWM period"
+  ],
+  [
+   7,
+   9,
+   "the LM35 voltage is read in through the ADC of chapter 5.7"
+  ],
+  [
+   8,
+   9,
+   "the duty cycle from chapter 5.9 sets the DC motor speed"
+  ]
+ ]
+}

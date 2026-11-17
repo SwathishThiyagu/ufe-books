@@ -1,0 +1,230 @@
+{
+ "lead": "A DMA controller moves bytes between memory and a peripheral while the CPU stays out of the data path. The CPU programs a start address and a byte count once; the controller then takes the bus for a few clock cycles at a time and performs each memory read and each I/O write itself. This chapter covers the 8257 with the 8085 and the 8237 with the 8086: channels, registers, transfer modes, and the DREQ–HRQ–HLDA–DACK handshake.",
+ "prereq": "You need Unit 2 bus timing, the HOLD and HLDA handshake, and maximum-mode 8086 signals (see Unit 2, 8085 and 8086 Microprocessors).",
+ "sections": [
+  {
+   "h3": "Why the CPU leaves the data path",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A disk controller hands over 512 bytes in a burst. Suppose the CPU polls: read status, test ready, read data, store to memory, increment the pointer, decrement the counter, loop. That is about ten machine cycles per byte. With one interrupt per byte it is worse: push flags and return address, fetch a vector, run the service routine, pop everything. The useful transfer is two bus cycles; the overhead is thirty."
+    },
+    {
+     "type": "p",
+     "text": "DMA removes that overhead. A separate controller holds the start address and the count. When the peripheral has a byte ready it raises DREQ. The controller asks the CPU for the bus: HOLD on the 8085, HRQ in 8086 maximum mode. The CPU finishes the current machine cycle, floats its address, data and control lines, and answers HLDA. The controller drives the bus: it puts out the memory address, asserts MEMR, latches the byte and writes it with IOWR. Then it gives the bus back."
+    },
+    {
+     "type": "p",
+     "text": "The CPU is out of the data path. It programs the channel once, does other work, and takes one interrupt when the count runs out."
+    }
+   ]
+  },
+  {
+   "h3": "The 8257 with the 8085",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 8257 has four channels, 0 to 3. Channel 0 has the highest priority; a rotating-priority mode moves a just-served channel to the bottom so no channel starves."
+    },
+    {
+     "type": "p",
+     "text": "Each channel has two 16-bit registers. The address register holds the buffer start, so the 8257 reaches 0000H–FFFFH, the full space of the 8085. The count register holds the number of bytes minus one in its low 14 bits, so the largest block is 2¹⁴ = 16384 bytes."
+    },
+    {
+     "type": "formula",
+     "text": "bytes moved = (count field) + 1,  last address = start address + (count field)",
+     "where": "count field is bits 13–0 of the 8257 count register, a 14-bit number; start address is the 16-bit value in the channel address register."
+    },
+    {
+     "type": "p",
+     "text": "Counting from zero is why the count is transfers minus one: a count field of 0000H means one byte. The top two bits of the count word are control bits. Bit 14 makes TC stop the channel. Bit 15 enables auto-reload, which copies the original address and count back so the buffer repeats without CPU help."
+    },
+    {
+     "type": "p",
+     "text": "The mode word sets rotating priority, extended write and the transfer mode: single (one byte per DREQ), demand (transfer as long as DREQ stays high) and burst or block (run continuously until the count ends). The TC pin pulses at the last transfer. Verify is an 8237 option, covered in Section 3."
+    }
+   ]
+  },
+  {
+   "h3": "The 8237 with the 8086",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 8237 is an 8-bit DMA controller like the 8257, but its 16-bit address and count registers give a 64 KB block per channel, and it adds memory-to-memory transfer, cascade mode, software request and mask registers, auto-initialise and a verify transfer type."
+    },
+    {
+     "type": "p",
+     "text": "The 8086 bus has 20 address lines. The 8237 outputs A0–A7 itself; an external latch strobed by ADSTB supplies A8–A15, and a separately programmed 4-bit page register supplies A16–A19. Together this gives a 20-bit address and a 64 KB page per channel."
+    },
+    {
+     "type": "p",
+     "text": "The page is chosen by program, not by the counter. When the 16-bit address counter overflows it wraps to the bottom of the same page, so a block must not cross a page boundary."
+    },
+    {
+     "type": "p",
+     "text": "Registers per channel: the current address and current count, changed during the transfer, and the base address and base count, loaded by software and used by auto-initialise. The mode register picks direction, auto-initialise, the address counter direction (increment or decrement), and single, demand or block mode; the count always decrements. The command register sets chip-wide options such as memory-to-memory and priority rotation. The request register raises a software request. The mask register disables a channel. The status register reports which channels reached terminal count. EOP is the end-of-process pin."
+    },
+    {
+     "type": "p",
+     "text": "Memory-to-memory uses channel 0 as source and channel 1 as destination with fixed priority, one byte per transfer. Cascade mode connects a second 8237 as a slave, so its requests appear as one channel of the master."
+    }
+   ]
+  },
+  {
+   "h3": "The handshake, cycle stealing and block transfer",
+   "blocks": [
+    {
+     "type": "steps",
+     "items": [
+      "The peripheral asserts DREQ for the channel it needs.",
+      "The controller asserts HRQ to the CPU.",
+      "The CPU finishes the current machine cycle, floats its buses and asserts HLDA.",
+      "The controller asserts DACK to the peripheral, which also selects the channel.",
+      "The controller drives the memory address and MEMR, and latches the byte on the data bus.",
+      "It drives IOWR and the byte leaves for the peripheral. A memory write runs the same steps in reverse.",
+      "The address increments (or decrements, if programmed), the count decrements. On terminal count or EOP, HRQ drops and the bus returns to the CPU."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Single mode is cycle stealing: one byte per bus grant. The CPU loses one bus cycle per byte and keeps its state, so it still services interrupts and memory refresh. Block mode holds the bus for the whole block. It is faster per byte, but the CPU is frozen: interrupt latency grows, and in older systems dynamic RAM refresh must come from somewhere else."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One DMA cycle. The controller owns the bus only between HLDA and the byte transfer; DACK selects the peripheral, and HRQ falls once the byte is moved.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Peripheral",
+    "DMA",
+    "CPU",
+    "Memory"
+   ],
+   "messages": [
+    {
+     "from": "Peripheral",
+     "to": "DMA",
+     "label": "DREQ high"
+    },
+    {
+     "from": "DMA",
+     "to": "CPU",
+     "label": "HRQ high"
+    },
+    {
+     "from": "CPU",
+     "to": "DMA",
+     "label": "HLDA high"
+    },
+    {
+     "from": "DMA",
+     "to": "Peripheral",
+     "label": "DACK active"
+    },
+    {
+     "from": "DMA",
+     "to": "Memory",
+     "label": "address and MEMR"
+    },
+    {
+     "from": "Memory",
+     "to": "DMA",
+     "label": "data byte"
+    },
+    {
+     "from": "DMA",
+     "to": "Peripheral",
+     "label": "byte to IOWR"
+    },
+    {
+     "from": "DMA",
+     "to": "CPU",
+     "label": "HRQ low, bus returned"
+    }
+   ],
+   "aria": "Sequence diagram of one DMA cycle: the peripheral raises DREQ, the controller asks the CPU with HRQ and waits for HLDA, acknowledges with DACK, moves the byte between memory and the peripheral, then releases the bus."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8257 channel 0 is loaded with a start address of 2000H. The low 14 bits of its count register hold 0FFFH. The channel runs in single mode with auto-reload disabled. How many bytes are moved, what is the last address used, and what happens on the final transfer?",
+   "steps": [
+    "The count field is the low 14 bits, 0FFFH = 4095.",
+    "The field holds transfers minus one, so bytes moved = 4095 + 1 = 4096.",
+    "Block size = 4096 ÷ 1024 = 4 KB.",
+    "Last address = start + count field = 2000H + 0FFFH = 2FFFH = 12287.",
+    "The block runs 2000H to 2FFFH, inside one 64 KB space, so no wrap occurs.",
+    "On the last transfer TC pulses. With the stop bit set the channel is disabled and the pulse is normally taken to an 8259 input as an end-of-block interrupt. With auto-reload set instead, 2000H and 0FFFH are restored and the channel waits for the next DREQ."
+   ],
+   "answer": "4096 bytes are moved, from 2000H to 2FFFH (4 KB), and TC pulses on the final transfer to stop or reload the channel.",
+   "check": "count_field = 0x0FFF\nstart = 0x2000\nnbytes = count_field + 1\nlast = start + nbytes - 1\nprint(nbytes)\nprint(last)\nprint(nbytes // 1024)\n",
+   "values": [
+    4096,
+    12287,
+    4
+   ],
+   "output": "4096 bytes, last address 2FFFH (12287), 4 KB, TC pulses to stop or reload.\n"
+  }
+ ],
+ "traps": [
+  "The count field is transfers minus one. Programming 1000 for 1000 bytes moves 1001, and the extra byte lands on an address you did not reserve.",
+  "The 8257 count field is 14 bits, so the largest block is 16384 bytes. The 8237 count is 16 bits, so it reaches 65536 bytes. Mixing the two widths loses a factor of four.",
+  "The 8237 address counter wraps inside its 64 KB page. 2 KB starting at FC00H runs to 103FFH; the 16-bit counter wraps at FFFFH to 0000H of the same page, so the second half lands on wrong addresses.",
+  "HRQ and HLDA belong to the CPU side; DREQ and DACK belong to the peripheral side. DACK is the controller's acknowledgement to a device, never the CPU's grant.",
+  "Single mode drops DREQ after each byte; demand mode expects DREQ held high for the whole run. Verify mode moves no data: the channel runs its count down and moves nothing."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How wide is the 8257 count field, and what is the largest block it can move?",
+   "marks": 2,
+   "a": "14 bits, giving 2¹⁴ = 16384 bytes per block."
+  },
+  {
+   "level": "remember",
+   "q": "Name the two signals by which a DMA controller asks the 8086 for the bus and receives it.",
+   "marks": 2,
+   "a": "HRQ to the CPU and HLDA back from the CPU."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the count register loaded with transfers minus one?",
+   "marks": 3,
+   "a": "The counter decrements and terminal count is decoded at zero. Starting from transfers minus one makes zero occur on the last byte, so no extra comparator is needed."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the 8237 need a page register when the 8257 does not?",
+   "marks": 3,
+   "a": "The 8237 outputs 16 address lines but the 8086 has 20. The upper four come from an external latch loaded by software, giving each channel a 64 KB page. The 8085 has a 16-bit address space, so the 8257 needs nothing more."
+  },
+  {
+   "level": "apply",
+   "q": "An 8257 channel 1 has start address 4000H and a count field of 1FFFH. How many bytes are moved and what is the last address?",
+   "marks": 4,
+   "a": "Count field 1FFFH = 8191, so bytes = 8192. Last address = 4000H + 1FFFH = 5FFFH."
+  },
+  {
+   "level": "apply",
+   "q": "An 8237 channel 2 has base address 3400H, count 00FFH and auto-initialise off. How many bytes move and where does the block end?",
+   "marks": 4,
+   "a": "Count 00FFH = 255, so bytes = 256. Last address = 3400H + 00FFH = 34FFH, which stays inside the same 64 KB page."
+  },
+  {
+   "level": "analyze",
+   "q": "A system must move 1 KB twice a second while also servicing a keyboard interrupt. Would you choose single mode or block mode on the 8257, and why?",
+   "marks": 5,
+   "a": "Single mode. It steals one bus cycle at a time, so the CPU returns between bytes and the keyboard interrupt is served with a small delay. Block mode would hold HOLD for all 1024 bytes, freezing the CPU and pushing latency up."
+  },
+  {
+   "level": "analyze",
+   "q": "A programmer loads an 8237 channel with base address FC00H and a count of 07FFH. Explain what goes wrong.",
+   "marks": 6,
+   "a": "The block is 2048 bytes, running FC00H to 103FFH. The 16-bit counter wraps at FFFFH to 0000H of the same page, so the last 1024 bytes land at wrong addresses. The block must be split, moved, or the page changed at the boundary."
+  }
+ ],
+ "beyond": "Not for the exam. Modern systems replace the fixed four-channel controller with a descriptor ring: the CPU writes buffer pointers and lengths in memory, and the DMA engine reads the descriptors itself, so one interrupt covers a whole ring. Peripheral buses such as PCIe and AXI treat every capable device as a potential bus master rather than using one central controller. An IOMMU sits in front of the DMA engine to translate and check addresses, because a DMA engine bypasses the CPU's memory protection. In Linux, look at the dmaengine API and streaming DMA mappings. Search next for scatter-gather DMA and IOMMU."
+}

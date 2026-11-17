@@ -1,0 +1,354 @@
+{
+ "lead": "The 8255 is a programmable peripheral interface: three 8-bit ports whose direction and handshake behaviour are set by one control byte. It exists because a fast CPU bus and a slow keypad, printer or display cannot share timing directly. The CPU writes a control word once, then reads or writes the ports as if they were memory or I/O locations. The same chip gives simple input/output, strobed handshake, and a bidirectional bus. You will find it in 8085 and 8086 trainer kits, in printer ports, and in any design where a few slow signals must meet a microprocessor.",
+ "prereq": "You need: Unit 2 address decoding and memory-mapped I/O, and Unit 1 buses.",
+ "sections": [
+  {
+   "h3": "Three ports, one control word",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Inside the 40-pin package sit a data bus buffer, read/write control logic, two control blocks and three 8-bit ports. D0-D7 connect to the CPU data bus. <code>CS</code>, <code>RD</code> and <code>WR</code> are active-low control inputs. <code>A1</code> and <code>A0</code> choose one of four internal registers. <code>RESET</code> clears the control register, so all ports come up as inputs. The supply is +5 V and ground; the other pins are the 24 port lines."
+    },
+    {
+     "type": "p",
+     "text": "Group A control owns port A and the upper half of port C, PC7-PC4. Group B control owns port B and the lower half, PC3-PC0. This split matters: one control byte can set port A as an input and port B as an output, and can set the two halves of port C in different directions."
+    },
+    {
+     "type": "table",
+     "head": [
+      "A1",
+      "A0",
+      "Register",
+      "Offset"
+     ],
+     "rows": [
+      [
+       "0",
+       "0",
+       "Port A",
+       "+0"
+      ],
+      [
+       "0",
+       "1",
+       "Port B",
+       "+1"
+      ],
+      [
+       "1",
+       "0",
+       "Port C",
+       "+2"
+      ],
+      [
+       "1",
+       "1",
+       "Control",
+       "+3"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "With base address 80H, the four addresses are 80H, 81H, 82H and 83H. The 8255 does not contain a base address; a decoder outside the chip asserts <code>CS</code> only for that four-address block."
+    }
+   ]
+  },
+  {
+   "h3": "The control word: modes, directions, and bit set/reset",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every change begins by writing one byte to the control register. Bit D7 is the master switch: D7 = 1 means I/O mode, D7 = 0 means bit set/reset (BSR) mode. In I/O mode the remaining bits have fixed jobs."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Bits",
+      "Meaning in I/O mode"
+     ],
+     "rows": [
+      [
+       "D7",
+       "1 = I/O mode"
+      ],
+      [
+       "D6 D5",
+       "Group A mode: 00 mode 0, 01 mode 1, 1x mode 2"
+      ],
+      [
+       "D4",
+       "Port A: 1 input, 0 output"
+      ],
+      [
+       "D3",
+       "PC7-PC4: 1 input, 0 output"
+      ],
+      [
+       "D2",
+       "Group B mode: 0 mode 0, 1 mode 1"
+      ],
+      [
+       "D1",
+       "Port B: 1 input, 0 output"
+      ],
+      [
+       "D0",
+       "PC3-PC0: 1 input, 0 output"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Mode 0 is simple input or output. An output pin is driven from a latch, so it holds the last byte written until the CPU writes again. An input pin is only buffered, not latched, so the CPU must read while the peripheral is still presenting the data. Mode 1 is strobed input or output: port C pins become handshake lines such as <code>STB</code>, <code>IBF</code>, <code>OBF</code>, <code>ACK</code> and <code>INTR</code>, so a slow device can say data is ready or taken. Mode 2 is a bidirectional bus on port A only; it uses five port C pins and leaves port B free for mode 0 or 1."
+    },
+    {
+     "type": "p",
+     "text": "BSR mode is a separate use of the same control register. D7 = 0; D3-D1 pick one of PC0-PC7; D0 = 1 sets that pin, D0 = 0 resets it. Bits D6-D4 are ignored. This gives single-bit control without rewriting the whole port C direction."
+    },
+    {
+     "type": "p",
+     "text": "Decoding a control byte is the reverse: read D4 and D3 for group A, D1 and D0 for group B. A common mistake is to read D3 as port B or D0 as port A; the nibble split puts group A's C-half in D3 and group B's C-half in D0."
+    }
+   ]
+  },
+  {
+   "h3": "Current limits, fan-out, and an 8086 address decode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An 8255 pin is a logic output, not a power driver. A standard port pin sinks about 1.6 mA and sources only a few hundred microamperes. An LED that needs 10 mA, a relay coil, or a motor will not run directly. Use the pin to drive a transistor base, a ULN2803 darlington array, or a buffer such as 74LS245. For input, a switch can connect to a pin with a pull-up resistor; active-low wiring is common because the pin then needs only to sink."
+    },
+    {
+     "type": "p",
+     "text": "Fan-out is also limited: one output drives one standard TTL input, or about four LS TTL inputs. For a whole board, add a buffer or driver. For a keypad matrix or a seven-segment display, add drivers and scan from software; see <a href=\"#keyboard-and-display-interfacing-led-seven-segment-lcd\">Chapter 5.6</a>."
+    },
+    {
+     "type": "p",
+     "text": "On an 8086 the 8255 is a byte-wide peripheral on one byte lane. With the 8255 on D0-D7, connect 8255 A0 to CPU A1 and 8255 A1 to CPU A2; CPU A0 is not connected to the chip (it only selects the byte lane). Base 80H then gives port A at 80H, port B at 82H, port C at 84H, control at 86H; on the upper lane D8-D15 the same registers are at 81H, 83H, 85H, 87H. The decoder compares A3-A15 with the matching bits of the base, and for I/O-mapped access it must also qualify <code>CS</code> with <code>M/IO</code> low. The CPU uses <code>OUT</code> and <code>IN</code>; Unit 3 gives the instruction encoding. The 8255's <code>RD</code> and <code>WR</code> connect to the 8086 read and write strobes, and <code>RESET</code> to the system reset."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The data bus buffer and read/write logic face the CPU; group A and group B control set the directions of ports A, B and the two halves of port C, which drive the peripheral.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Inside the 8255",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "CPU data bus",
+     "note": "D0-D7",
+     "style": "normal"
+    },
+    {
+     "id": "b",
+     "label": "Data bus buffer",
+     "style": "normal"
+    },
+    {
+     "id": "c",
+     "label": "Read/write logic",
+     "note": "CS, RD, WR, A0, A1",
+     "style": "normal"
+    },
+    {
+     "id": "d",
+     "label": "Group A control",
+     "style": "accent"
+    },
+    {
+     "id": "e",
+     "label": "Group B control",
+     "style": "accent"
+    },
+    {
+     "id": "f",
+     "label": "Port A",
+     "note": "8 bits",
+     "style": "normal"
+    },
+    {
+     "id": "g",
+     "label": "Port B",
+     "note": "8 bits",
+     "style": "normal"
+    },
+    {
+     "id": "h",
+     "label": "Port C",
+     "note": "upper and lower",
+     "style": "normal"
+    },
+    {
+     "id": "i",
+     "label": "Peripheral",
+     "note": "keypad, display, printer",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "d",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "e",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "f",
+     "style": "solid"
+    },
+    {
+     "from": "d",
+     "to": "h",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "g",
+     "style": "solid"
+    },
+    {
+     "from": "e",
+     "to": "h",
+     "style": "solid"
+    },
+    {
+     "from": "f",
+     "to": "i",
+     "style": "solid"
+    },
+    {
+     "from": "g",
+     "to": "i",
+     "style": "solid"
+    },
+    {
+     "from": "h",
+     "to": "i",
+     "style": "solid"
+    },
+    {
+     "from": "b",
+     "to": "d",
+     "style": "solid",
+     "label": "internal data bus"
+    },
+    {
+     "from": "b",
+     "to": "e",
+     "style": "solid",
+     "label": "internal data bus"
+    },
+    {
+     "from": "b",
+     "to": "f",
+     "style": "solid",
+     "label": "internal data bus"
+    },
+    {
+     "from": "b",
+     "to": "g",
+     "style": "solid",
+     "label": "internal data bus"
+    },
+    {
+     "from": "b",
+     "to": "h",
+     "style": "solid",
+     "label": "internal data bus"
+    }
+   ],
+   "aria": "Block diagram of the 8255: the data bus buffer and read/write logic on the CPU side, group A and group B control registers, and ports A, B and C driving a peripheral."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8255 is decoded at base address 80H. Port A must be an input in mode 0, port B an output in mode 0, PC7-PC4 an input and PC3-PC0 an output. Find the control word in binary and hex, and state the address to which it is written.",
+   "steps": [
+    "Base 80H gives port A = 80H, port B = 81H, port C = 82H and the control register = 83H.",
+    "D7 = 1 selects I/O mode.",
+    "D6 D5 = 00 selects group A mode 0.",
+    "D4 = 1 makes port A an input.",
+    "D3 = 1 makes PC7-PC4 an input.",
+    "D2 = 0 selects group B mode 0.",
+    "D1 = 0 makes port B an output.",
+    "D0 = 0 makes PC3-PC0 an output.",
+    "The byte is 1 0 0 1 1 0 0 0 = 98H = 152 in decimal.",
+    "Write 98H to the control register at 83H."
+   ],
+   "answer": "The control word is 98H (152 decimal), written to address 83H.",
+   "check": "base = 0x80\nd7 = 1\nd6 = 0\nd5 = 0\nd4 = 1\nd3 = 1\nd2 = 0\nd1 = 0\nd0 = 0\ncw = d7*128 + d6*64 + d5*32 + d4*16 + d3*8 + d2*4 + d1*2 + d0\nctrl_addr = base + 3\nprint(cw)\nprint(ctrl_addr)\n",
+   "values": [
+    152,
+    131
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "D7 = 0 enters BSR mode, not I/O mode. A BSR byte written where an I/O control word is expected changes one port C pin and leaves all port directions unchanged.",
+  "Port C is split: D3 sets PC7-PC4, D0 sets PC3-PC0. Do not expect one direction bit to cover all eight port C pins.",
+  "A direction bit of 1 means input, not enable. Writing 1 to D4 makes port A an input; writing 0 makes it an output.",
+  "Mode 2 is available on port A only. Port B can be mode 0 or mode 1, never mode 2.",
+  "In mode 1, port C pins are taken for handshake signals. The remaining C pins keep their direction bits, so not all eight are free for general I/O."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does D7 = 0 in the 8255 control register select?",
+   "marks": 2,
+   "a": "Bit set/reset (BSR) mode, which sets or resets one port C pin."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the 8255 split port C into an upper and a lower nibble?",
+   "marks": 3,
+   "a": "Group A needs a control half for port A and group B needs one for port B. The upper nibble PC7-PC4 belongs to group A, the lower nibble PC3-PC0 to group B, so the two groups can set directions independently in one control byte."
+  },
+  {
+   "level": "apply",
+   "q": "Decode the control word 92H into port directions. State each port and each port C half.",
+   "marks": 4,
+   "a": "92H = 1001 0010. D7 = 1: I/O mode. D6 D5 = 00: group A mode 0. D4 = 1: port A input. D3 = 0: PC7-PC4 output. D2 = 0: group B mode 0. D1 = 1: port B input. D0 = 0: PC3-PC0 output."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a standard 8255 port pin not drive an LED that needs 10 mA directly?",
+   "marks": 3,
+   "a": "The pin sinks only about 1.6 mA and sources a few hundred microamperes. 10 mA would exceed the output rating, so the voltage may not reach a valid logic level and the chip can be damaged. Use a transistor, a buffer, or a darlington driver."
+  },
+  {
+   "level": "apply",
+   "q": "An 8255 has base address 90H. Which address does the control register occupy?",
+   "marks": 2,
+   "a": "93H, because the control register is at base + 3 and 90H + 3H = 93H."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between mode 0 and mode 1.",
+   "marks": 3,
+   "a": "Mode 0 is simple input or output with no handshake. Mode 1 uses port C pins as handshake lines such as STB, IBF, OBF, ACK and INTR, so the transfer waits for the peripheral."
+  },
+  {
+   "level": "analyze",
+   "q": "A program writes 0AH to the 8255 control register. What happens? Name the pin and the action.",
+   "marks": 4,
+   "a": "0AH = 0000 1010. D7 = 0 selects BSR mode. D3-D1 = 101 selects PC5. D0 = 0 resets the pin. So PC5 is reset to 0; the port directions do not change."
+  }
+ ],
+ "beyond": "Not for the exam. The CMOS 82C55 is pin-compatible with the 8255; register-based GPIO expanders such as the MCP23017 (over I2C) do the same job in a different package and bus. In FPGA designs, the 8255 is replaced by a soft GPIO core, but the control-word idea survives: one register sets direction, another reads or writes the pins. Industrial PLC digital modules use the same grouping of inputs and outputs with optocoupler isolation. Search for 82C55 datasheet, GPIO expander, and 8255 Verilog core to see where this interface went."
+}

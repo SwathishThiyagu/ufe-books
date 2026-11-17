@@ -1,0 +1,203 @@
+{
+ "lead": "A port pin gives a few milliamps at 5 V. A motor winding or relay coil wants hundreds of milliamps, often at 12 V, and throws back a voltage spike when it switches off. The CPU never touches the load. It drives a driver stage — a ULN2003 for a stepper, an L293D for a DC motor, one NPN transistor for a relay — and the driver switches. The CPU's job is timing: a step sequence, a PWM duty cycle, or one bit.",
+ "prereq": "You need: <a href=\"#programmable-peripheral-interface-8255\">Chapter 5.1</a> for the port that sends the coil codes, and delay loops from Unit 3, Assembly programs: loops, delays and look-up tables.",
+ "sections": [
+  {
+   "h3": "Stepper motor: coils, step angle and coil codes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A stepper motor moves in fixed jumps called steps. Four coils, called phases, sit around the stator and are labelled A, B, C, D. Energising one coil pulls the rotor forward by one step. Nothing is fed back, so counting steps gives shaft position."
+    },
+    {
+     "type": "p",
+     "text": "In a unipolar motor each coil has a centre tap tied to +12 V and the far end is pulled to ground to energise it. Current flows one way only, so four open-collector outputs are enough. In a bipolar motor there is no centre tap; current must reverse, so each coil needs an H-bridge."
+    },
+    {
+     "type": "formula",
+     "text": "θ = 360° / N",
+     "where": "θ is the step angle in degrees per step; N is the number of full steps in one revolution. A common motor has θ = 1.8° and N = 200."
+    },
+    {
+     "type": "formula",
+     "text": "f = n × N / 60,  T = 1 / f",
+     "where": "n is shaft speed in rpm; f is step rate in steps per second; T is delay between steps in seconds."
+    },
+    {
+     "type": "p",
+     "text": "Port bits P0.0 to P0.3 carry coils A to D. Port 0 has open-drain outputs, so it needs external 10 kΩ pull-ups before driving ULN2003 inputs. Full-step code keeps two coils on: 03H, 06H, 0CH, 09H — A+B, B+C, C+D, D+A. Half-step code alternates one and two coils: 01H, 03H, 02H, 06H, 04H, 0CH, 08H, 09H. Half step doubles resolution and runs smoother, but at the same step rate the shaft turns at half speed."
+    },
+    {
+     "type": "p",
+     "text": "The ULN2003 is a seven-channel Darlington sink driver. Each channel takes a 5 V logic input and pulls its output to ground while carrying up to 500 mA at 50 V. A high on the port bit switches that coil on. A COM pin ties all seven internal freewheeling diodes to the motor supply, so each coil's turn-off spike is clamped there instead of destroying the chip."
+    }
+   ]
+  },
+  {
+   "h3": "DC motor: H-bridge, direction and PWM",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A DC motor spins continuously. Its direction follows the polarity of the voltage and its speed follows the average voltage. The L293D is a dual H-bridge in a 16-pin package: two channels, 600 mA each, 4.5 V to 36 V, with internal flyback diodes."
+    },
+    {
+     "type": "p",
+     "text": "Each channel has inputs IN1, IN2 and an enable pin EN. IN1 high with IN2 low turns the motor one way; swap them and it turns the other way; both low brakes the motor to a fast stop. To coast, hold EN low so both outputs float. PWM on EN controls speed while the two inputs hold direction."
+    },
+    {
+     "type": "formula",
+     "text": "V_avg = (D / 100) × V_s,  D = (t_on / T) × 100%",
+     "where": "D is duty cycle in percent; t_on is high time within one period T in seconds; V_s is motor supply voltage in volts; V_avg is average motor voltage. Speed is roughly proportional to V_avg."
+    },
+    {
+     "type": "p",
+     "text": "Keep PWM frequency between 1 kHz and 20 kHz. Below that the motor jerks and whines; above it switching losses climb. The winding is an inductor, so when the bridge turns off, L·di/dt raises a spike; the internal diodes conduct it back to the supply. Any discrete transistor switch needs the same diode. The 8051 has no PWM hardware, so a timer interrupt produces it in software — see <a href=\"#sensor-and-rtc-interfacing-pwm-generation\">Chapter 5.9</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Relay: one transistor, one diode, mains on the contacts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A relay is an electromagnetic switch. Current in a coil pulls an armature, and the armature moves contacts. COM is the common terminal. NO (normally open) is open with the coil off and closes when it is on; NC (normally closed) does the opposite. Coil and contact circuits are electrically separate — a 5 V logic board can switch a 230 V, 50 Hz lamp."
+    },
+    {
+     "type": "p",
+     "text": "The coil current is too big for a port pin. A 12 V relay coil rated 360 mW draws 30 mA, while a port pin handles about 1.6 mA safely. Use an NPN transistor such as the BC547: base through R_B to the port pin, emitter to ground, collector to the low end of the coil, and the top of the coil to +12 V. A high on the port saturates the transistor and the relay pulls in."
+    },
+    {
+     "type": "formula",
+     "text": "R_B = (V_port − V_BE) / (3 × I_C / h_FE(min))",
+     "where": "V_port is logic output voltage (5 V); V_BE is base-emitter drop (0.7 V); I_C is coil current in amperes; h_FE(min) is worst-case current gain; factor 3 is saturation overdrive. For I_C = 30 mA and h_FE = 100, design base current is 0.9 mA, giving R_B ≈ 4.8 kΩ, so use 4.7 kΩ."
+    },
+    {
+     "type": "p",
+     "text": "An 8051 pin sinks about 1.6 mA but sources only about 60 µA, less than the base current needed, so a buffer such as a 74HC gate sits between the pin and R_B."
+    },
+    {
+     "type": "p",
+     "text": "A 1N4007 sits across the coil with its cathode to +12 V. It is reverse biased while the coil is on. At switch-off the coil's lower end flies above +12 V, the diode conducts, and the spike is dumped into the coil supply. Fitted the other way round, it short-circuits the supply at power-up."
+    },
+    {
+     "type": "p",
+     "text": "For mains work, place a PC817 opto-coupler between the port pin and R_B. The 230 V side then shares no ground with the CPU, so a fault on the contact side cannot reach the microcontroller."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Coil codes written to P0.0 to P0.3, with A on bit 0. Every full-step code switches two coils; the half-step row inserts four single-coil codes and doubles resolution.",
+  "spec": {
+   "type": "array",
+   "aria": "Table of stepper coil codes: four full-step codes that keep two coils on at a time, and eight half-step codes that alternate one coil and two coils.",
+   "title": "Coil codes on port bits 0-3",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Full step",
+     "cells": [
+      "03",
+      "06",
+      "0C",
+      "09"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "Half step",
+     "cells": [
+      "01",
+      "03",
+      "02",
+      "06",
+      "04",
+      "0C",
+      "08",
+      "09"
+     ],
+     "marks": {
+      "1": "live"
+     }
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A 4-phase unipolar stepper motor has a step angle of 1.8° and must turn at 60 rpm. Find the steps per revolution, the step rate and the delay between steps, and give the half-step sequence with coils A, B, C, D on bits 0 to 3.",
+   "steps": [
+    "Steps per revolution: N = 360° / 1.8° = 200 steps.",
+    "Shaft speed: 60 rpm = 1 revolution per second.",
+    "Step rate in full step: f = 1 × 200 = 200 steps per second.",
+    "Delay between steps: T = 1 / 200 s = 5 ms.",
+    "In half step the step angle halves to 0.9°, so N = 400 steps per revolution and the step rate at 60 rpm rises to 400 steps per second, with a delay of 2.5 ms.",
+    "Half-step sequence: 01H, 03H, 02H, 06H, 04H, 0CH, 08H, 09H, then repeat."
+   ],
+   "answer": "N = 200 steps per revolution, step rate 200 steps per second, delay 5 ms in full step; half step gives a 0.9° step angle and the sequence 01H, 03H, 02H, 06H, 04H, 0CH, 08H, 09H.",
+   "check": "step_angle = 1.8\nrpm = 60\nsteps_per_rev = 360 / step_angle\nprint(round(steps_per_rev, 3))\nstep_rate = (rpm / 60) * steps_per_rev\nprint(round(step_rate, 3))\nprint(round(1000 / step_rate, 3))\n",
+   "values": [
+    200,
+    200,
+    5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "An external freewheeling diode is a must for a discrete transistor switch. The ULN2003 has internal diodes, but they work only if COM is wired to the motor supply.",
+  "Dividing the wrong way: 1.8°/360° gives N = 0.005 instead of 200, so every speed answer is wrong by that factor.",
+  "Assuming the ULN2003 sources current. It sinks: a high on the input pulls the output to ground, so the coil's other end must go to the positive supply.",
+  "Confusing the coil rating with the contact rating of a relay. A 12 V, 30 mA coil can still carry 230 V, 5 A contacts; the two numbers describe different terminals.",
+  "Fitting the 1N4007 the wrong way round across the coil, or driving a DC motor straight from a port pin."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How much current can one ULN2003 channel sink, and at what voltage?",
+   "marks": 2,
+   "a": "Up to 500 mA at 50 V per channel, with seven channels in the package and internal freewheeling diodes on the COM pin."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three terminals of a relay contact set.",
+   "marks": 2,
+   "a": "COM (common), NO (normally open, closed only when the coil is energised) and NC (normally closed, open when the coil is energised)."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a driver stage needed between a port pin and a relay coil?",
+   "marks": 3,
+   "a": "The pin handles about 1.6 mA at 5 V while the coil needs tens of milliamps at 12 V, and the coil's inductive spike at switch-off would damage the pin. The transistor carries the current and the diode clamps the spike."
+  },
+  {
+   "level": "understand",
+   "q": "Explain how the L293D gives direction, braking, coasting and speed control for a DC motor.",
+   "marks": 3,
+   "a": "IN1 high with IN2 low turns one way; swap them for the other way. Both low brakes the motor. EN low lets both outputs float, so the motor coasts. PWM on EN sets duty cycle, average voltage and speed."
+  },
+  {
+   "level": "apply",
+   "q": "A stepper motor with a 1.8° step angle is run in half step. Find the half-step angle and the number of steps per revolution.",
+   "marks": 4,
+   "a": "Half step halves the full-step angle: 1.8° / 2 = 0.9° per step. Steps per revolution = 360° / 0.9° = 400 steps."
+  },
+  {
+   "level": "apply",
+   "q": "A 12 V relay coil dissipates 240 mW. The switching transistor has h_FE(min) = 100, the port gives 5 V and V_BE = 0.7 V. Choose the base resistor with a factor of 3 overdrive.",
+   "marks": 5,
+   "a": "I_C = 0.240 W / 12 V = 20 mA. I_B(min) = 20 mA / 100 = 0.2 mA; with overdrive the design base current is 0.6 mA. R_B = (5 − 0.7) V / 0.6 mA = 7.17 kΩ, so use the standard 6.8 kΩ."
+  },
+  {
+   "level": "analyze",
+   "q": "A unipolar stepper driven through a ULN2003 vibrates in place and misses steps when the program shortens the delay. The sequence and wiring are correct. Give the cause and two fixes.",
+   "marks": 4,
+   "a": "The step rate is faster than the rotor and load can follow, so the rotor cannot settle before the next step and slips. Fixes: increase the delay to match the pull-in rate, ramp the speed up gradually, and check that the coil supply current is adequate for the winding."
+  }
+ ],
+ "beyond": "Not for the exam. Real boards replace the L293D with MOSFET H-bridges and gate drivers, because a bipolar output drops about 1.8 V and gets hot at high current. Stepper driver modules such as the A4988 and DRV8825 add current chopping and microstepping, so a 1.8° motor can be commanded to a sixteenth of a step. Solid-state relays and TRIACs switch mains with no moving contact. Search next for H-bridge shoot-through, flyback diode selection, opto-isolated relay modules and BLDC electronic speed controllers."
+}

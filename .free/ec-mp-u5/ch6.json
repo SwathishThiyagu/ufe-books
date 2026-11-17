@@ -1,0 +1,222 @@
+{
+ "lead": "Keys and displays are slow, numerous and often share one port. A keypad needs a scan to find which key is pressed. A seven-segment display needs one code per digit and fast switching so four digits look steady. An LCD needs a fixed command-and-data handshake before it shows a character. This chapter shows the current calculation, the scan loop, the multiplex timing and the HD44780 start-up sequence that make these peripherals work from an 8051-style port.",
+ "prereq": "You need: Unit 4 port programming and Unit 3 delay loops and look-up tables; see <a href=\"#programmable-peripheral-interface-8255\">5.1</a> if the port is an 8255.",
+ "sections": [
+  {
+   "h3": "LED drive and seven-segment codes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An LED is a diode. Lit, it drops a nearly fixed forward voltage V<sub>f</sub>; a series resistor sets the current."
+    },
+    {
+     "type": "formula",
+     "text": "R = (V<sub>cc</sub> − V<sub>f</sub>) / I",
+     "where": "R is the series resistor in ohms; V<sub>cc</sub> is the supply voltage; V<sub>f</sub> is the LED forward voltage; I is the wanted current in amperes."
+    },
+    {
+     "type": "p",
+     "text": "For V<sub>cc</sub> = 5 V, V<sub>f</sub> = 2 V and I = 8 mA, R = (5 − 2) / 0.008 = 375 Ω. Use the standard 390 Ω."
+    },
+    {
+     "type": "p",
+     "text": "Sourcing means the pin is high and feeds the LED to ground. Sinking means the LED is fed from V<sub>cc</sub> and the pin pulls the cathode low. Many ports sink more current than they source, so sinking is common. Check the per-pin and whole-chip limits. Eight LEDs at 8 mA can exceed a small port's total, so add a buffer such as a ULN2803."
+    },
+    {
+     "type": "p",
+     "text": "Seven-segment display: seven LEDs a to g plus a decimal point. Common cathode joins all cathodes to ground; a high bit lights a segment. Common anode joins all anodes to V<sub>cc</sub>; a low bit lights a segment, so every code is complemented. With bit 0 = a and bit 6 = g, digit 1 is 06H and digit 3 is 4FH. For common anode, 1 becomes F9H."
+    }
+   ]
+  },
+  {
+   "h3": "Digit multiplexing and keypad scanning",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Multiplexing joins all segment lines and gives each digit its own common line. Turn one digit on at a time; persistence of vision makes the four digits look steady."
+    },
+    {
+     "type": "formula",
+     "text": "f<sub>refresh</sub> = 1 / (N × T<sub>digit</sub>)",
+     "where": "f<sub>refresh</sub> is the refresh rate in hertz; N is the number of digits; T<sub>digit</sub> is the time each digit is on in seconds."
+    },
+    {
+     "type": "p",
+     "text": "Four digits at 1 ms each: frame = 4 ms, f<sub>refresh</sub> = 250 Hz. Above 50 Hz is normally flicker-free. A segment on for 1/4 of the time needs about 4× the steady current to look as bright. For 8 mA average, allow 32 mA peak. Use a transistor per digit: low-side NPN for common cathode, high-side PNP for common anode. The port drives only the base."
+    },
+    {
+     "type": "p",
+     "text": "4×4 keypad: four rows are outputs, four columns are inputs with pull-ups. Drive one row low and read the columns. A low column marks the closed key at that row and column."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set all rows high and all columns as inputs with pull-ups.",
+      "Drive row r low; leave the other rows high.",
+      "Wait 1 ms and read the four column bits.",
+      "If column c is low, wait 15 ms and read again to confirm.",
+      "Key code = 4r + c; restore the rows and return the code."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Key code = row×4 + column, used to index a look-up table. Debounce: after a change, wait 10 to 20 ms and read again. Without it, one press can count many times."
+    }
+   ]
+  },
+  {
+   "h3": "LCD 16×2 with the HD44780",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "16×2 LCD: 16 characters per line, 2 lines. HD44780 controller. RS = 0 for command, RS = 1 for data. RW = 0 for write, RW = 1 for read. E latches on its falling edge. D0-D7 carry the byte, command or busy flag."
+    },
+    {
+     "type": "p",
+     "text": "8-bit mode uses D0-D7. 4-bit mode uses D4-D7 and sends each byte as two nibbles, high nibble first. It saves four port pins."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Wait more than 15 ms after power-on.",
+      "Write 38H (8-bit, 2 lines, 5×7 font); wait 5 ms.",
+      "Write 38H again; wait 1 ms.",
+      "Write 38H again.",
+      "Write 0CH for display on, cursor off.",
+      "Write 01H to clear; wait about 1.5 ms.",
+      "Write 06H for entry mode increment."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "In 4-bit mode the function-set byte is 28H. The repeated 38H is the reset ritual. DDRAM address: 80H + position selects line 1. Line 1 position 0 is 80H, position 5 is 85H. Line 2 starts at C0H (80H + 40H). After a write, the address increments under 06H."
+    },
+    {
+     "type": "p",
+     "text": "Busy flag: read with RS=0, RW=1. Bit 7 = 1 means busy. Poll until 0 before the next command. If read-back is not wired, use delays: about 1.5 ms after clear and 40 µs for most commands."
+    },
+    {
+     "type": "p",
+     "text": "Print string: send the DDRAM address, then each character with RS=1, RW=0, pulse E."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Common-cathode codes for digits 0 to 9 with bit 0 = segment a. Digit 1 is 06H and digit 3 is 4FH; common-anode displays need the complement.",
+  "spec": {
+   "type": "array",
+   "title": "Common-cathode segment codes",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Digit 0-9",
+     "cells": [
+      "3F",
+      "06",
+      "5B",
+      "4F",
+      "66",
+      "6D",
+      "7D",
+      "07",
+      "7F",
+      "6F"
+     ],
+     "marks": {
+      "1": "accent",
+      "3": "live"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 1,
+     "label": "digit 1"
+    }
+   ],
+   "aria": "Table of common-cathode seven-segment codes for the digits 0 to 9; the code for digit 1 is 06 and for digit 3 is 4F."
+  }
+ },
+ "examples": [
+  {
+   "question": "A four-digit multiplexed common-cathode display shows 1234. One digit is switched on every 1 ms, and each segment is driven from a 5 V port pin through a resistor. The LEDs drop 2 V at 8 mA. Find the frame rate, the segment codes and the resistor value.",
+   "steps": [
+    "Frame time = number of digits × time per digit = 4 × 1 ms = 4 ms.",
+    "Refresh rate = 1 / frame time = 1 / 0.004 s = 250 Hz. This is above 50 Hz, so flicker is not expected.",
+    "From the common-cathode table: digit 1 = 06H, digit 2 = 5BH, digit 3 = 4FH, digit 4 = 66H.",
+    "Series resistor: R = (V<sub>cc</sub> − V<sub>f</sub>) / I = (5 − 2) V / 0.008 A = 375 Ω.",
+    "The nearest standard value above 375 Ω is 390 Ω."
+   ],
+   "answer": "The frame rate is 250 Hz, the codes are 06H, 5BH, 4FH, 66H, and the resistor is 375 Ω, so use 390 Ω.",
+   "check": "digits = 4\nt_digit = 1e-3\nframe = digits * t_digit\nrefresh = 1 / frame\nVcc = 5.0\nVf = 2.0\nI = 8e-3\nR = (Vcc - Vf) / I\nprint(int(refresh))\nprint(int(R))\nprint(390)",
+   "values": [
+    250,
+    375,
+    390
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Common-anode codes are the bitwise complement, not a different font. Writing 06H to a common-anode digit gives a strange but plausible pattern.",
+  "Multiplexed digits need peak current, not average. A resistor set for 8 mA steady gives a dim display at 1/4 duty.",
+  "Refresh below 50 Hz flickers; too slow a scan can also let key bounce look like several keys.",
+  "LCD RS and RW are not interchangeable: RS=0, RW=1 is a busy-flag read, not a data write.",
+  "Skipping the 15 ms power-on wait or the repeated 38H leaves the HD44780 in an unknown mode."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the common-cathode code for digit 3 when bit 0 is segment a?",
+   "marks": 2,
+   "a": "4FH: 0100 1111, so segments a, b, c, d and g are on."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a buffer used between a port and eight LEDs?",
+   "marks": 3,
+   "a": "One port pin and the whole chip have current limits. Eight LEDs at 8 mA can exceed them; a buffer sinks or sources the LED current and the port drives only its input."
+  },
+  {
+   "level": "apply",
+   "q": "V<sub>cc</sub> = 5 V, V<sub>f</sub> = 1.8 V, I = 10 mA. Find the series resistor and the nearest standard value.",
+   "marks": 3,
+   "a": "R = (5 − 1.8) / 0.010 = 320 Ω; use 330 Ω."
+  },
+  {
+   "level": "apply",
+   "q": "A four-digit display switches one digit every 2 ms. Find the frame time and refresh rate.",
+   "marks": 3,
+   "a": "Frame = 4 × 2 ms = 8 ms; refresh = 1 / 0.008 = 125 Hz."
+  },
+  {
+   "level": "analyze",
+   "q": "A multiplexed display looks dim. Give two likely causes and one fix for each.",
+   "marks": 4,
+   "a": "Peak segment current is too low because the resistor was chosen for average current; lower it within the LED and driver limit. Duty cycle or refresh is wrong; check the scan loop and transistor drivers."
+  },
+  {
+   "level": "understand",
+   "q": "What do RS, RW and E do on an HD44780 LCD?",
+   "marks": 3,
+   "a": "RS selects command (0) or data (1); RW selects write (0) or read (1); E latches the byte on its falling edge."
+  },
+  {
+   "level": "apply",
+   "q": "What command places the cursor on line 2, position 7?",
+   "marks": 2,
+   "a": "80H + 40H + 07H = C7H."
+  },
+  {
+   "level": "analyze",
+   "q": "A keypad returns several codes for one press. What is the cause and the fix?",
+   "marks": 3,
+   "a": "Contact bounce. After detecting a key, wait 10 to 20 ms and read again; accept the key only if it is still low."
+  }
+ ],
+ "beyond": "Not for the exam. In products, a small controller or an I²C port expander often scans keys and drives displays, so the main CPU keeps its pins. Character LCDs are giving way to OLED and graphic modules with their own controllers. Touch keypads replace mechanical matrices in appliances. Search for HD44780 timing diagram, I²C port expander keypad, and Charlieplexing."
+}
