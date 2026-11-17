@@ -91,6 +91,54 @@ empty. So every fix can be made in place before upload, with no re-upload.
 4. Checker layout rules (B) and the engine capbox fit.
 5. WRITE.md lines for C, and the trap and code rules; the fact-review step in the subject pipeline.
 
+## Step 6: text rules on the earlier subjects (17 Nov, script only, report only)
+
+The approved text rules (`lesson_build.py --check`, engine commit 5038bd3) run by script on every lesson source of the
+subjects built before the 17 Nov audits: 13 CSE subjects and 3 Biotech subjects, 342 lessons (Microbiology's sources were
+taken out of its built pages with lesson_extract.py). Each cell counts lessons with at least one hit. AI and DBMS are on
+YouTube: reported only, never rebuilt. Nothing was changed.
+
+subject | lessons | pass | sources line | other "book" | unit (outro) | unit (other) | Bloom said | site line | ^ or _ maths | warn: built-in icons | warn: mixed grouping | warn: filler
+--- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---
+Artificial Intelligence (on YouTube) | 22 | 0 | 22 | 8 | 5 | 5 | 5 | 2 | 4 | 2 | 0 | 1
+Algorithms | 25 | 1 | 21 | 13 | 6 | 2 | 6 | 0 | 4 | 2 | 0 | 0
+Cloud Computing | 23 | 1 | 20 | 18 | 5 | 1 | 13 | 1 | 6 | 3 | 1 | 0
+Computer Networks | 22 | 1 | 15 | 11 | 5 | 1 | 10 | 0 | 10 | 3 | 0 | 0
+Computer Organization | 22 | 0 | 22 | 12 | 5 | 1 | 2 | 0 | 6 | 4 | 0 | 0
+Compiler Design | 19 | 0 | 18 | 7 | 5 | 3 | 5 | 0 | 1 | 2 | 0 | 1
+Computer Vision | 24 | 0 | 24 | 5 | 6 | 2 | 23 | 0 | 11 | 1 | 0 | 0
+Data Science | 21 | 2 | 14 | 9 | 5 | 2 | 8 | 0 | 6 | 0 | 1 | 0
+DBMS (on YouTube) | 23 | 0 | 23 | 15 | 5 | 2 | 17 | 0 | 1 | 3 | 0 | 2
+Deep Learning | 21 | 0 | 21 | 18 | 5 | 1 | 13 | 0 | 13 | 1 | 0 | 3
+IoT | 19 | 0 | 17 | 12 | 5 | 1 | 13 | 0 | 12 | 0 | 1 | 0
+Operating Systems | 23 | 0 | 21 | 12 | 5 | 1 | 10 | 2 | 5 | 5 | 0 | 1
+Security | 22 | 0 | 22 | 17 | 5 | 1 | 16 | 1 | 7 | 2 | 1 | 1
+Biochemistry | 22 | 0 | 22 | 22 | 5 | 22 | 13 | 6 | 3 | 20 | 0 | 1
+Cell Biology | 15 | 0 | 8 | 15 | 4 | 15 | 8 | 5 | 2 | 12 | 0 | 0
+Microbiology | 19 | 0 | 12 | 19 | 5 | 19 | 11 | 6 | 5 | 12 | 0 | 0
+**All** | **342** | **5** | **302** | **213** | **81** | **79** | **173** | **23** | **96** | **72** | **4** | **10**
+
+Read with it:
+- 5 of 342 lessons pass every failing rule. The sources line ("Sources the book draws on") alone is in 302; a fix in
+  the generator and a scripted edit of each lesson's `figs` note clears it with no voice change.
+- Other "book" wording (213 lessons) is mostly the agenda star "Chapters x to y of your book" (screen only), plus spoken
+  lines such as "Your book's figure" and AI's "this book picks the rational agent".
+- Unit numbers: 81 lessons have "Next time, Unit N" and the NEXT UNIT card in the outro. In Biotech every lesson also
+  shows a "Biochemistry · Unit 4"-style label on its notes page (the "unit (other)" column).
+- Bloom levels are spoken in 173 lessons ("An understand question", "Question three, analyze."). The engine's question
+  card label and the "UNIT n · LESSON k OF K" kicker are on every built page as well; the new engine removes both on any
+  rebuild, so they are not counted above.
+- Site or finder lines: 23 lessons (AI 2, OS 2, Cloud 1, Security 1, Biotech 17).
+- Caret or underscore maths on screen: 96 lessons (worst in Deep Learning 13, Computer Vision 11, IoT 12, Networks 10).
+- Warnings: built-in recap icons in 72 lessons (44 of them Biotech, whose recaps were built on the stock set), mixed
+  number grouping in 4, filler words in 10.
+- Seen while making the notes PDFs: the PDFs carry the book's prerequisite boxes ("You need Unit 1, for where input sits
+  among the components of a VR system"), so the notes still name unit numbers. make_site.py should drop or reword them.
+
+Most of these hits are mechanical (sources line, agenda star, outro card and line, Bloom openers): the same script that
+cleared the 25 rebuilt lessons (rules_fix: no new words beyond "Question one", "Next time:" and "from your free notes")
+clears them, and `--revoice` voices only the changed lines (in the rebuild, 0 to 4 lines a lesson).
+
 ## Artificial Intelligence (17 Nov, first audit)
 
 Checked all 22 c-ai lessons (every scene, narration and frame). Facts, numbers and layout were clean. Found:
