@@ -120,3 +120,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-block-u2 | free/c-block-u2-book | 1–7 (figure text: ch 5) | OK (library added; university mention in 2.2 removed; HASH160 step in 2.7 corrected) | 17 Nov 2026 |
 | c-mobile-u2 | free/c-mobile-u2-book | 1–6 (figure text: ch 2, 5) | OK (library added; university counts removed; iOS kernel and install sentences corrected) | 17 Nov 2026 |
 | c-quantum-u3 | free/c-quantum-u3-book | 1–8 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
+| c-dist-u3 | free/c-dist-u3-book | 1–7 (figure text: ch 3) | OK (library updated) | 17 Nov 2026 |
