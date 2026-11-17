@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-mobile-u2.html: 6 chapters, 11489 words, 7 figures, 143 KB
+c-mobile-u2.html: 6 chapters, 11505 words, 7 figures, 143 KB
 OK
 ```
 
