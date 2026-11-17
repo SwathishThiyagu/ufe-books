@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-graphics-u5.html: 9 chapters, 16148 words, 10 figures, 198 KB
+c-graphics-u5.html: 9 chapters, 16153 words, 10 figures, 198 KB
 OK
 ```
 
