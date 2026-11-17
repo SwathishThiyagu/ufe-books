@@ -85,3 +85,49 @@ Not slop (checked): "just", "simply", "actually", "unlock(s)" hits are plain usa
 program"). Same patterns as AI and Data Structures (book wording, unit numbers, spoken Bloom, stock recap icons, tiny recap
 pictures); new here: facts that are dated or simplified kernel models stated as plain Linux fact (GPL date, PID hash, pipe
 bytes), and answers that skip part of their own question.
+
+## Computer Fundamentals and Programming (17 Nov)
+
+Audited 17 Nov 2026: all 16 c-fund lessons, every scene, narration and frame (sheets at 0.92; the three suspect frames
+re-rendered at 0.995 were typing animations and render whole). Checker: 0 page errors, 0 cue failures, 0 text outside the
+safe area on every sheet. Every worked example and model answer recomputed (Moore's law, laptop ad, bus bottleneck, address
+lines, disk read, base conversions, binary + − × ÷, complements, IEEE 754 encode/decode, chop/round error, BCD, Gray, UTF-8
+bytes, Full HD size, truth tables, minterms, De Morgan, NAND-only circuits, ripple-carry adder, digit sums, bill ladder,
+row/column-major addresses, struct/union sizes, endianness, SQUARE macro); all correct. The C on screen was compiled and run
+with gcc 13 (main.c + total.c and nm, the predict-the-output programs, 17 % 5 * 2 + 3 < 10 && 4, switch fall-through,
+reverse 1234, pointer arithmetic, sizeof of every struct and union shown): outputs match. All 32 exam traps checked: every
+"Write" is right and every "Don't write" is wrong, except the two lines below. No site/finder line, college name, TODO or
+placeholder, and no repeated sentence beyond the template lines. Scene = 0-based SC index (the Lnn.png number).
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-fund-u5-L2 | bookfig (3) | Figure 5.3.1 shows `char s[10] = "HELLO";` with cells 6 to 9 as "?" and the narration says they "hold leftover junk"; a string initializer zero-fills the rest of the array, so they are all '\0' (same "?" cells on names[3][8]) | wrong fact: must fix
+c-fund-u5-L3 | trap2 (7) | "Forget the ampersand or the star, and you get ten twenty": swap_r(a, b) without & passes ints as pointers, which gcc 13 warns about, gcc 14 refuses to compile, and which segfaults when run (checked). Only the missing star prints 10 20 | wrong fact: must fix
+c-fund-u4-L2 | pa (15) vs pa (19) | A1 says double keeps rounding error small "as in money totals"; A3 in the same lesson says never use float or double for money | misleading: should fix
+c-fund-u3-L1 | notebook (10) | Worked example 1 never shows or says the expression being simplified (the book's F = A·B + A·(B + C) + B·(B + C)); the board starts at "Distribute: …", so the step and the "3 AND + 3 OR" gate count can't be followed | misleading: should fix
+c-fund-u4-L1 | trap2 (12) | "A missing header gives an implicit declaration warning instead": since GCC 14, implicit function declaration is an error by default in C99 and later; true only for older compilers | misleading: should fix
+c-fund-u6-L1 | bookfig (4) | Figure 6.1.1 puts pointer parameters x and y at addresses 3000 and 3004 (4-byte pointers); the same lesson's answer 1 (pa 14) says a pointer is 8 bytes | misleading: should fix
+c-fund-u6-L1 | notebook (3) | the picture puts int a and the int array both at address 1000, and item 4 and the picture use an undeclared q while the narration talks about p | cosmetic: later
+c-fund-u1-L1, u1-L3, u2-L1, u2-L2, u4-L2, u4-L3, u5-L1, u5-L3 (8) | agenda (1) | "Chapters x to y of your book" on the title page (book2lesson.py:324 writes it) | cosmetic: later
+c-fund-u3-L1, u3-L2 (2) | agenda (1) | "Chapters 3.x to 3.y of your notes": "free" missing | cosmetic: later
+c-fund 14 of 16 (all but u2-L3, u4-L1) | figs (last but one) | on-screen note "Sources the book draws on: …" (book2lesson.py:389) | cosmetic: later
+c-fund-u1-L1, u1-L3, u2-L1, u3-L2, u4-L3, u5-L1, u6-L1, u6-L2 (8) | pq (all three) | spoken Bloom levels, 24 lines: "An understand question", "Question two, apply", "Question three, at the analyze level" | cosmetic: later
+c-fund-u1-L3, u2-L3, u3-L2, u4-L3, u5-L3 (5) | outro (last) | "Next time, Unit two: …" spoken, and "NEXT UNIT / Unit 2" shown (book2lesson.py:501) | cosmetic: later
+c-fund-u3-L1 | trap2 (6) | "Carries belong to binary addition, back in Unit two" spoken; picture label "Binary addition (Unit 2)" | cosmetic: later
+c-fund all 16 | every scene | engine header "COMPUTER FUNDAMENTALS AND PROGRAMMING · UNIT n · LESSON m OF k" shows the unit number on every frame (lesson_template.html); decide whether the unit-number rule covers it | cosmetic: later
+c-fund-u2-L2 | bookfig (10), recap (14) | caret maths on screen: "2^(129 − 127)" in Figure 2.4.1 and "1.f × 2^(e − 127)" on the recap card | cosmetic: later
+c-fund-u4-L3 | recap (19) | stock recap icons: smiley faces labelled "a+b" and "if" for Operators and Decisions, a refresh arrow for Loops; nothing drawn from the lesson (expression tree, ladder, loop shapes) | cosmetic: later
+c-fund-u1-L2 | hookArt (0) | filler: "Imagine rewiring your phone to open the calculator" | cosmetic: later
+c-fund-u4-L3 | pq (24), pa (25) | asks for "two one-token fixes", but the answer's fixes are a reorder and a (float) cast, neither one token | cosmetic: later
+c-fund-u1-L3 | bookfig (16), cfCode (19) | "seven-line C file" / "7-line C source", but the main.c shown is 8 lines; the nm listing "U total · U printf · T main" is not the order nm prints (T main, U printf, U total) | cosmetic: later
+c-fund-u4-L2 | bookfig (3) | "±1.8 × 10³⁰⁸" renders with the last digit dropped low, reading as 10³⁰₈ (fallback glyph) | cosmetic: later
+c-fund-u1-L2 | bookfig (4) | the lower crop of Figure 1.3.1 slices the control-unit, register and ALU boxes at the top edge | cosmetic: later
+c-fund-u6-L2 | pq (16), pa (17) | names the union's char array "tag" ("the six-byte tag") right after Q1 used "tag field" for the type tag | cosmetic: later
+
+Counts: 2 must fix, 4 should fix, 16 cosmetic (22 lines). Patterns shared with AI, Data Structures and Linux: "your book" /
+"the book" wording (generator), unit numbers in outros (generator), spoken Bloom levels, caret maths, stock recap icons.
+New here: C behaviour stated for one compiler era (implicit declaration as a warning; a missing & that "still prints"),
+an initializer rule got wrong in a figure, two answers in one lesson that contradict each other, and a worked example whose
+starting expression never appears on screen. Not slop (checked): "really" (u3-L1 pq 18) and "magic 18" (u4-L2, the term
+"magic number") are plain usage. YouTube: pipeline.json has live: false for all six units and upload_sheet.json holds no
+video links, so none of these 16 lessons is published.
