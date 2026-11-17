@@ -1,16 +1,14 @@
 # c-quantum-u2: free-model run
 
-- Book: `books/cse/c-quantum/c-quantum-u2.html`
-- Status: problems
-- Model calls so far: 42 (166,727 tokens in, 276,467 out), 7.6 minutes
+- Book: `work/claude_figs/c-quantum-u2/tree/books/cse/c-quantum/c-quantum-u2.html`
+- Status: ok
+- Model calls so far: 42 (166,727 tokens in, 276,467 out), 7.7 minutes
 
 ## Checker
 
 ```
-c-quantum-u2.html: 9 chapters, 14987 words, 10 figures, 173 KB
-PROBLEMS:
- - at 390px, text spills outside the svg box in figure(s) [8]: enlarge the viewBox or shorten the labels
- - at 1366px, text spills outside the svg box in figure(s) [8]: enlarge the viewBox or shorten the labels
+c-quantum-u2.html: 9 chapters, 14882 words, 10 figures, 177 KB
+OK
 ```
 
 ## For the reviewer
