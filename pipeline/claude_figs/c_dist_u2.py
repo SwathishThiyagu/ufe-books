@@ -217,6 +217,7 @@ FIG[7] = (f7, 'In round 1 every vertex picks its lightest edge at the same time:
 
 
 TEXT = {
+    4: [('Block split keeps the work near log(n/p), but its speedup', 'Block split keeps the work at O(p log(n/p)), but its speedup')],
     1: [('Only a few universities teach the blocked hypercube version. Assume n = 2<sup>k</sup>.',
          'The blocked hypercube version works on blocks. Assume n = 2<sup>k</sup>.')],
     6: [('Root finding behaves similarly: many intervals or starting points can be tested at once. Only a few universities teach this parallel numerical material.',
