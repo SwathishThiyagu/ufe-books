@@ -1,13 +1,13 @@
 # c-unix-u1: free-model run
 
-- Book: `books/cse/c-unix/c-unix-u1.html`
+- Book: `work/claude_figs/c-unix-u1/tree/books/cse/c-unix/c-unix-u1.html`
 - Status: ok
 - Model calls so far: 29 (101,024 tokens in, 159,540 out), 5.7 minutes
 
 ## Checker
 
 ```
-c-unix-u1.html: 6 chapters, 11412 words, 7 figures, 130 KB
+c-unix-u1.html: 6 chapters, 11387 words, 7 figures, 144 KB
 OK
 ```
 
