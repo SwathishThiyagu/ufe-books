@@ -252,3 +252,12 @@ def spec(k):
     d = {'caption': cap, 'spec': {'type': 'svg', 'h': h, 'body': body, 'aria': aria}}
     if k in AFTER: d['after_section'] = AFTER[k]
     return d
+
+
+TEXT = {
+    8: [('θ/π = 0.08042 and 64 × 0.08042 = 5.15', 'θ/π = 0.08043 and 64 × 0.08043 = 5.15')],
+}
+
+
+def text_fixes(k):
+    return TEXT.get(k, [])
