@@ -141,3 +141,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-nlp-u5 | free/c-nlp-u5-book | 1–7 | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
 | c-quantum-u6 | free/c-quantum-u6-book | 1–5 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
 | c-mobile-u6 | free/c-mobile-u6-book | 1–8 (figure text: ch 4) | OK (library added; university counts removed; 6.5 fare code now shows ₹92.00) | 17 Nov 2026 |
+| c-block-u6 | free/c-block-u6-book | 1–9 | OK (library added; university mentions in 6.2, 6.6–6.9 removed; MIT course page dropped) | 17 Nov 2026 |
