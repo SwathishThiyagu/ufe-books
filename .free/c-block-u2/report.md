@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/c-block-u2/tree/books/cse/c-block/c-block-u2.html`
 - Status: ok
-- Model calls so far: 29 (114,431 tokens in, 184,624 out), 4.8 minutes
+- Model calls so far: 29 (114,431 tokens in, 184,624 out), 4.9 minutes
 
 ## Checker
 
 ```
-c-block-u2.html: 7 chapters, 13594 words, 8 figures, 160 KB
+c-block-u2.html: 7 chapters, 13598 words, 8 figures, 160 KB
 OK
 ```
 
