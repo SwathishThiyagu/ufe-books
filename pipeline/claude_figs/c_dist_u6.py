@@ -240,3 +240,8 @@ def text_fixes(k):
 
 def drop_sources():
     return ['csail.mit.edu']
+
+
+def unit_fixes():
+    return [('A name plus the set of sites where that name can be resolved, so any site in the set gives the same answer',
+             'The set of nodes visited while a name is resolved, from the starting directory to the object')]

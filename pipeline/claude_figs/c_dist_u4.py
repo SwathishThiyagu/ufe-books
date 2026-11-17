@@ -243,3 +243,7 @@ def text_fixes(k):
 def drop_sources():
     # a university-hosted course page: the books name no universities
     return ['csail.mit.edu']
+
+
+def unit_fixes():
+    return [('Chapter 6 covers time and coordination, including NTP;', 'Chapters 14 and 15 cover time, global states and coordination, including NTP;')]

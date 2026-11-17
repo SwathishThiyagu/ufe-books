@@ -183,6 +183,7 @@ FIG[7] = (f7, 'The write reaches R1 and R2 only. A read of 2 replicas must overl
 
 
 TEXT = {
+    4: [('synchronous and randomised systems can still always agree.', 'synchronous systems can always agree, and randomised algorithms agree with probability 1.')],
     6: [('Together they keep a wallet or bank balance correct over an unreliable network. Only a few universities teach this advanced chapter.',
          'Together they keep a wallet or bank balance correct over an unreliable network.')],
 }
