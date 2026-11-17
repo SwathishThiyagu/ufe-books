@@ -1,0 +1,210 @@
+{
+ "lead": "An analog-to-digital converter turns a voltage into a binary code. Four circuits do this in different ways: flash compares the input with every tap of a resistor string at once; successive approximation searches one bit at a time; dual-slope measures a time ratio; sigma-delta oversamples and filters. The choice is a trade of speed, resolution and accuracy. ADCs sit in digital meters, phone charger controllers, ECG front ends and motor drives. This chapter shows how each architecture works and how to compute its code and timing.",
+ "prereq": "You need: <a href=\"#dacs-weighted-resistor-and-r-2r-ladder\">Chapter 7.8</a> for the DAC inside the SAR and dual-slope converters, and Unit 6 for the comparator and sample-and-hold.",
+ "sections": [
+  {
+   "h3": "What an ADC must do",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An ADC samples the input, holds it, and converts it to an n-bit code. The sampling rate f_s is how many conversions per second. The conversion time T_conv is the time from the sample instant to the valid code; it sets the maximum f_s. Aperture time is the small window in which the sample-and-hold must keep the input still. A changing input during that window adds an error."
+    },
+    {
+     "type": "formula",
+     "text": "Q = V_FS / 2ⁿ",
+     "where": "Q is the step size in volts; V_FS is the full-scale input range in volts; n is the number of bits."
+    },
+    {
+     "type": "p",
+     "text": "The code is D = round(V_in/Q), clipped to 0 … 2ⁿ − 1. The quantisation error is at most ±Q/2 if the input is centred. It is not the same as accuracy. Resolution is the step size or bit count; accuracy is how close the code is to the true value after offset, gain and linearity errors. A 12-bit ADC can be less accurate than a well-trimmed 8-bit ADC."
+    },
+    {
+     "type": "p",
+     "text": "Four families trade these terms against one another. Flash uses many comparators, SAR uses one comparator and a DAC, dual-slope uses an integrator and a counter, and sigma-delta uses oversampling and a digital filter. The figure compares comparator count, speed and typical resolution."
+    }
+   ]
+  },
+  {
+   "h3": "Flash and successive approximation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Flash (simultaneous) ADC has a resistor string of 2ⁿ equal resistors between V_ref and ground. It gives 2ⁿ − 1 tap voltages. Each tap drives one comparator; the other input is V_in. The comparator outputs form a thermometer code: all comparators below V_in are 1, all above are 0. A priority encoder turns that into an n-bit binary code."
+    },
+    {
+     "type": "p",
+     "text": "Conversion takes one clock, so flash is the fastest. It needs 2ⁿ − 1 comparators: 255 for 8 bits, 1023 for 10 bits. The input drives all comparators, so input capacitance and kickback are high. Flash is used for low resolution and high speed, such as video and radar front ends."
+    },
+    {
+     "type": "p",
+     "text": "Successive approximation (SAR) uses one comparator, a sample-and-hold, and an internal n-bit DAC. It performs a binary search. First it sets the MSB and compares V_in with V_ref/2. If V_in is larger it keeps the bit; otherwise it clears it. Then it tests the next bit, and so on. Each clock decides one bit, so an n-bit conversion takes n clocks plus a little overhead."
+    },
+    {
+     "type": "formula",
+     "text": "T_conv = n T_clk",
+     "where": "T_conv is the conversion time in seconds; n is the bit count; T_clk is the clock period in seconds."
+    },
+    {
+     "type": "p",
+     "text": "A 10-bit SAR at 1 MHz takes about 10 µs, which is 100 kSa/s. SAR is the workhorse for 8 to 16 bits at moderate speed: data loggers, motor control, battery monitors. It is not slow; it is just slower than flash."
+    }
+   ]
+  },
+  {
+   "h3": "Dual-slope and sigma-delta",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Dual-slope ADC integrates first, then counts back. In run-up, the integrator input is V_in for a fixed time T1 = 2ⁿ T_clk. The counter runs through 2ⁿ clocks. The integrator output at the end is V_o = −V_in T1/(RC). In de-integration, the input switches to −V_ref. The integrator returns to zero. The time T2 satisfies V_ref T2/(RC) = V_in T1/(RC)."
+    },
+    {
+     "type": "formula",
+     "text": "T2 = T1 V_in / V_ref",
+     "where": "T2 is the de-integration time in seconds; T1 is the fixed run-up time in seconds; V_in is the input voltage in volts; V_ref is the reference voltage in volts."
+    },
+    {
+     "type": "p",
+     "text": "The counter counts T2/T_clk. If V_in = V_ref, T2 = T1 and the count is 2ⁿ. The code is D = round(2ⁿ V_in/V_ref), clipped to 2ⁿ − 1. The same clock and capacitor appear in both phases, so slow drift in clock frequency or RC cancels in the ratio. That makes dual-slope accurate and immune to component drift."
+    },
+    {
+     "type": "p",
+     "text": "Dual-slope is slow: a 10-bit conversion needs up to 2 × 2ⁿ clocks, and it rejects mains hum if T1 is a multiple of 20 ms. It is used in panel meters, digital multimeters and weigh scales."
+    },
+    {
+     "type": "p",
+     "text": "Sigma-delta (Σ-Δ) ADC oversamples far above the Nyquist rate, uses a 1-bit comparator inside a feedback loop, and shapes quantisation noise to high frequency. A digital decimation filter removes the out-of-band noise and produces a high-resolution code. Resolution of 16 to 24 bits is common at low speed: audio, strain gauges, temperature and energy metering. Only a few universities teach the loop analysis; the idea is oversampling plus noise shaping plus digital filtering."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Flash uses many comparators and is fastest; sigma-delta uses one comparator but oversampling and filtering to reach high resolution. The cell 2ⁿ in the flash row stands for its 2ⁿ − 1 comparators.",
+  "spec": {
+   "type": "array",
+   "title": "ADC families compared",
+   "show_index": false,
+   "rows": [
+    {
+     "label": "Flash",
+     "cells": [
+      "2ⁿ",
+      "fast",
+      "8b"
+     ],
+     "marks": {
+      "0": "accent"
+     }
+    },
+    {
+     "label": "SAR",
+     "cells": [
+      "1",
+      "fast",
+      "16b"
+     ]
+    },
+    {
+     "label": "Dual",
+     "cells": [
+      "1",
+      "slow",
+      "4½"
+     ]
+    },
+    {
+     "label": "Σ-Δ",
+     "cells": [
+      "1",
+      "slow",
+      "24b"
+     ],
+     "marks": {
+      "2": "live"
+     }
+    }
+   ],
+   "aria": "Four rows compare flash, SAR, dual-slope and sigma-delta ADCs by comparator count, speed and typical resolution; flash has many comparators and sigma-delta has the highest resolution."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 10-bit dual-slope ADC has V_ref = 2 V and a 100 kHz clock. (a) Find T_clk. (b) Find the run-up time T1. (c) For V_in = 1.5 V find the de-integration time T2. (d) Find the output code.",
+   "steps": [
+    "T_clk = 1/f_clk = 1/(100 kHz) = 10 µs.",
+    "T1 = 2ⁿ T_clk = 2¹⁰ × 10 µs = 1024 × 10 µs = 10 240 µs = 10.24 ms.",
+    "V_in/V_ref = 1.5 V / 2 V = 0.75.",
+    "T2 = T1 × V_in/V_ref = 10.24 ms × 0.75 = 7.68 ms.",
+    "Count = T2/T_clk = 7.68 ms / 10 µs = 768.",
+    "The code is 768 out of 1024, so it fits in 10 bits."
+   ],
+   "answer": "The clock period is 10 µs, the run-up time is 10.24 ms, the de-integration time is 7.68 ms, and the output code is 768 out of 1024.",
+   "check": "f_clk = 100e3\nn = 10\nV_ref = 2.0\nV_in = 1.5\nT_clk_us = 1e6 / f_clk\nT1_ms = (2**n) * T_clk_us / 1000.0\nT2_ms = T1_ms * V_in / V_ref\ncount = T2_ms * 1000.0 / T_clk_us\nprint(f\"{T_clk_us:.1f}\")\nprint(f\"{T1_ms:.2f}\")\nprint(f\"{T2_ms:.2f}\")\nprint(f\"{count:.1f}\")",
+   "values": [
+    10.0,
+    10.24,
+    7.68,
+    768.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Counting 2ⁿ comparators in a flash ADC instead of 2ⁿ − 1; an 8-bit flash needs 255, not 256.",
+  "Calling an SAR ADC slow because it takes n clocks; it is fast, just not as fast as flash.",
+  "Inverting the dual-slope ratio, using V_ref/V_in instead of V_in/V_ref, which gives a code above full scale.",
+  "Mixing resolution with accuracy; a 12-bit converter can have larger error than a trimmed 8-bit part.",
+  "Forgetting that dual-slope cancels clock and capacitor drift only because the same clock and capacitor are used in both phases."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define quantisation error in an ADC.",
+   "marks": 2,
+   "a": "The difference between the true sampled voltage and the voltage represented by the nearest code. With rounding it is at most ±Q/2, where Q = V_FS/2ⁿ."
+  },
+  {
+   "level": "remember",
+   "q": "How many comparators does an 8-bit flash ADC need?",
+   "marks": 2,
+   "a": "2⁸ − 1 = 255 comparators, not 256."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a dual-slope ADC insensitive to slow clock-frequency drift?",
+   "marks": 3,
+   "a": "T1 and T2 are both counted with the same clock. The code is the ratio T2/T1, so a common scale factor cancels."
+  },
+  {
+   "level": "apply",
+   "q": "A 12-bit SAR ADC has a 2 MHz clock and takes n clocks plus 1 clock overhead. Find the conversion time and the maximum sampling rate.",
+   "marks": 3,
+   "a": "T_clk = 1/(2 MHz) = 0.5 µs. Clocks = 12 + 1 = 13. T_conv = 13 × 0.5 µs = 6.5 µs. f_s,max = 1/6.5 µs ≈ 153.8 kSa/s."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit flash ADC has V_ref = 2.56 V. Find Q and the code for V_in = 1.00 V.",
+   "marks": 4,
+   "a": "Q = 2.56 V / 2⁸ = 10 mV. D = round(1.00 V / 0.010 V) = 100. The code is 100."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a sigma-delta ADC reach high resolution but low speed?",
+   "marks": 4,
+   "a": "It oversamples and shapes quantisation noise to high frequency. The digital decimation filter averages many samples to produce one output, so the output rate is low while the effective resolution is high."
+  },
+  {
+   "level": "analyze",
+   "q": "Choose an ADC for a digital panel meter that reads 0–2 V to 0.1 mV and rejects 50 Hz hum. Justify.",
+   "marks": 5,
+   "a": "Use a dual-slope ADC, typically 4½ digits. Set T1 to a multiple of 20 ms to reject 50 Hz hum. The ratio measurement gives high accuracy, and the meter does not need high speed."
+  },
+  {
+   "level": "understand",
+   "q": "What is aperture time and why does it matter?",
+   "marks": 3,
+   "a": "Aperture time is the window in which the sample-and-hold must keep the input still. If the input changes by more than the step size Q during that window, the sampled value has an extra error."
+  }
+ ],
+ "beyond": "Not for the exam. Sigma-delta converters dominate audio and precision sensor interfaces; their digital decimation filters are designed with MATLAB or Python. Time-interleaved SAR and pipelined ADCs reach GS/s in wireline and radar. Search terms: noise shaping, decimation, INL and DNL, time-interleaved ADC, continuous-time sigma-delta."
+}
