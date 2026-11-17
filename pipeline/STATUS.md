@@ -55,18 +55,18 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-data-u1 | main (library only, apply_html.py) | 1–5 | OK | 10 Nov 2026 |
 | c-toc-u2 | ds/c-toc-u2-book | 1–9 | OK | 10 Nov 2026 |
 | c-data-u2 | main (library only, apply_html.py) | 1–9 | OK | 10 Nov 2026 |
-| c-graphics-u1 | free/c-graphics-u1-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u1 | free/c-graphics-u1-book | 1–9 | OK (library added; figure text: ch 2, 3, 5, 9; university counts removed) | 17 Nov 2026 |
 | c-data-u3 | main (library only, apply_html.py) | 1–8 | OK | 10 Nov 2026 |
 | c-data-u4 | main (library only, apply_html.py) | 1–7 | OK | 10 Nov 2026 |
-| c-graphics-u2 | free/c-graphics-u2-book | 1–8 | OK | 10 Nov 2026 |
+| c-graphics-u2 | free/c-graphics-u2-book | 1–8 | OK (library added; figure text: ch 1, 4; university counts removed) | 17 Nov 2026 |
 | c-data-u5 | main (library only, apply_html.py) | 1–9 | OK | 10 Nov 2026 |
 | c-data-u6 | main (library only, apply_html.py) | 1–8 | OK | 10 Nov 2026 |
-| c-graphics-u3 | free/c-graphics-u3-book | 1–8 | OK | 10 Nov 2026 |
-| c-graphics-u4 | free/c-graphics-u4-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u3 | free/c-graphics-u3-book | 1–8 | OK (library added; university counts removed; MIT OCW source dropped) | 17 Nov 2026 |
+| c-graphics-u4 | free/c-graphics-u4-book | 1–9 | OK (library added; figure text: ch 3, 7; university counts removed; Edinburgh source dropped) | 17 Nov 2026 |
 | c-cv-u1 | free/c-cv-u1-book | 1–9 | OK (library updated) | 10 Nov 2026 |
-| c-graphics-u5 | free/c-graphics-u5-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u5 | free/c-graphics-u5-book | 1–9 | OK (library added; figure text: ch 1 quiz; university counts removed; MIT and CMU sources dropped) | 17 Nov 2026 |
 | c-cv-u2 | free/c-cv-u2-book | 1–8 | OK (library updated) | 10 Nov 2026 |
-| c-graphics-u6 | free/c-graphics-u6-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u6 | free/c-graphics-u6-book | 1–9 | OK (library added; university counts removed; ch 1 quiz rounding 0.6339% → 0.6340%) | 17 Nov 2026 |
 | c-cv-u3 | free/c-cv-u3-book | 1–9 | OK (library updated) | 10 Nov 2026 |
 | c-cv-u4 | free/c-cv-u4-book | 1–9 | OK (library updated) | 10 Nov 2026 |
 | c-cv-u5 | free/c-cv-u5-book | 1–9 | OK (library updated) | 10 Nov 2026 |
