@@ -362,3 +362,18 @@ FIG[8] = (f8, 'The eye ray from the origin along (0, 0, −1) meets the sphere o
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    return {
+        3: [(' Only a few universities teach blobby objects; most stop at quadrics.', '')],
+        6: [('Only a few universities teach full BSP construction with polygon splitting; most ask for classification and drawing order.',
+             'Exam questions usually ask for classification and drawing order rather than full BSP construction with polygon splitting.')],
+        8: [('Only a few universities teach recursive ray tracing; the arithmetic here stays with spheres and planes.',
+             'The arithmetic here stays with spheres and planes.')],
+    }.get(k, [])
+
+
+def drop_sources():
+    # university-hosted pages: the books name no universities
+    return ['ocw.mit.edu']
