@@ -62,7 +62,7 @@ def f2():
     o.append(arrow(490, y[4], 530, y[3], LV, None, 'l', 'token', lx=24))
     o.append(cs(540, 640, y[3], 'P3 in CS'))
     o.append(Tb(590, y[3] + 30, 'Q empty: P3 keeps the token', 12))
-    o.append(T(20, 330, 'Entry order P2, P4, P3; LN = [0, 1, 1, 1]. 9 requests + 3 token moves = 12 = N per entry.', 14, 'start', bold=True))
+    o.append(T(20, 330, 'Order P2, P4, P3; LN = [0, 1, 1, 1]. 9 + 3 = 12 messages for 3 entries: N = 4 each.', 14, 'start', bold=True))
     return 346, ''.join(o)
 FIG[2] = (f2, 'P1 holds the token and is idle, so P2\'s request gets it at once with an empty queue. Each later request reaches the current holder while it is inside and waits in Q, so the token goes P1 → P2 → P4 → P3: 12 messages, N = 4 per entry.',
           'Four process lines. The token moves from P1 to P2, then to P4, then to P3, each running its critical section; the queue holds the next requester each time.')
