@@ -55,7 +55,7 @@ AFTER[1] = 2
 # ---- 6.2 the scalar RNN unrolled ----
 def f2():
     xs = [0.0, 1.0, 0.5, -1.0]
-    hs = [0.0, 0.762, 0.707, -0.570]
+    hs = [0.0, 0.762, 0.707, -0.569]
     sums = ['', '0.5×0 + 1 = 1', '0.5×0.762 + 0.5 = 0.881', '0.5×0.707 − 1 = −0.647']
     o = []
     bx = [30, 200, 380, 560]
@@ -81,8 +81,8 @@ def f2():
         o.append(T(fx(hs[t]), y - 14 - (12 if t == 2 else 0), f'h{"₁₂₃"[t - 1]}', 14, fill=c, bold=True))
     o.append(T(20, y + 52, 'tanh keeps every hidden state between −1 and 1; the −1 input pulls h₃ below zero.', 14, 'start', MUT))
     return y + 66, ''.join(o)
-FIG[2] = (f2, 'The same cell applied three times: each step multiplies the previous hidden state by 0.5, adds the new input and takes tanh. h₁ ≈ 0.762, h₂ ≈ 0.707, and the input −1 pulls h₃ down to about −0.570.',
-          'Three RNN boxes in a row fed by inputs 1, 0.5 and minus 1, with the hidden state passed right times 0.5; below, a line from minus 1 to 1 marking h1 0.762, h2 0.707 and h3 minus 0.570.')
+FIG[2] = (f2, 'The same cell applied three times: each step multiplies the previous hidden state by 0.5, adds the new input and takes tanh. h₁ ≈ 0.762, h₂ ≈ 0.707, and the input −1 pulls h₃ down to about −0.569.',
+          'Three RNN boxes in a row fed by inputs 1, 0.5 and minus 1, with the hidden state passed right times 0.5; below, a line from minus 1 to 1 marking h1 0.762, h2 0.707 and h3 minus 0.569.')
 
 
 # ---- 6.3 attention weights and the context vector, with and without a mask ----
@@ -232,6 +232,8 @@ def spec(k):
     d = {'caption': cap, 'spec': {'type': 'svg', 'h': h, 'body': body, 'aria': aria}}
     if k in AFTER: d['after_section'] = AFTER[k]
     return d
+TEXT[2] = [('h<sub>3</sub> = tanh(-0.6466) = -0.5695, so h<sub>3</sub> ≈ -0.570.', 'h<sub>3</sub> = tanh(-0.6466) = -0.5694, so h<sub>3</sub> ≈ -0.569.'),
+           ('h<sub>3</sub> ≈ -0.570.', 'h<sub>3</sub> ≈ -0.569.')]
 
 
 def text_fixes(k):
