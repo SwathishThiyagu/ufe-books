@@ -1,0 +1,305 @@
+{
+ "lead": "An interrupt is a hardware signal that makes the CPU stop its current code, run a short handler called an ISR, and return to the exact instruction it left. Without interrupts the CPU must poll — read a flag again and again — which wastes cycles. Interrupts give fast reaction to button presses, incoming UART bytes, timer ticks and finished ADC conversions. The price is complexity: latency, priority, and data shared with the main program. This chapter shows the mechanism, how the delay is built up, and how to choose between polling and interrupts.",
+ "prereq": "You need: <a href=\"#timers-counters-capture-and-compare\">3.2</a> for timer and compare interrupt sources, and the stack and register ideas from Unit 2 (ARM registers and modes).",
+ "sections": [
+  {
+   "h3": "Polling versus interrupt-driven design",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Polling means the program asks the peripheral again and again: read the flag, test it, loop if it is clear. The CPU spends its time asking whether anything happened, not on useful work. A keypad scanned every 10 ms costs almost nothing, but a UART receiver polled in a tight loop can eat the whole processor."
+    },
+    {
+     "type": "p",
+     "text": "An interrupt works the other way round. The peripheral raises a request line when it needs service, an interrupt controller passes the request to the CPU, and the CPU stops the main program, runs a short function called an <b>ISR</b> (interrupt service routine), then resumes. Reaction time no longer depends on how long one pass of the main loop takes."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Question",
+      "Polling",
+      "Interrupt"
+     ],
+     "rows": [
+      [
+       "Who starts the action",
+       "Software asks",
+       "Hardware signals"
+      ],
+      [
+       "CPU time when idle",
+       "Wasted in the loop",
+       "None"
+      ],
+      [
+       "Worst-case reaction",
+       "One full loop pass",
+       "Latency, a few µs"
+      ],
+      [
+       "Code complexity",
+       "Low",
+       "Higher: flags, priorities, shared data"
+      ],
+      [
+       "Good for",
+       "Slow or very frequent simple events",
+       "Many rare, fast events"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Polling still wins when the event is frequent and the cycle must stay predictable, for example reading an ADC inside a fixed control loop, where a known cycle time matters more than the cycles saved."
+    }
+   ]
+  },
+  {
+   "h3": "From event to ISR: source, flag, enable, vector",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every interrupt has four parts: a source, a flag bit, an enable bit and a vector."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Source event: a timer match, a UART receive-complete, an ADC end-of-conversion, or an edge on a GPIO pin (see <a href=\"#gpio-and-i-o-ports\">3.1</a>). The peripheral sets its flag bit in a status register.",
+      "Peripheral enable: the flag reaches the controller only if that peripheral's own interrupt-enable bit is set.",
+      "Global enable: the CPU must also have interrupts unmasked. On ARM this is the I bit in the program status register.",
+      "Detection: the CPU finishes the instruction it is executing and samples the request line at the instruction boundary.",
+      "Context save: the CPU pushes the return address and the working registers on the stack, so the ISR may overwrite them.",
+      "Vector fetch: the controller supplies an ID, and the CPU reads the ISR address from the <b>vector table</b>, a fixed array of function pointers at the start of memory.",
+      "Return: the ISR clears the peripheral flag, then a return-from-interrupt instruction restores the saved context and the main program continues."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A controller that hands over the ISR address by itself is called a <b>vectored interrupt controller</b>; some syllabi use that name. If the controller gives only one shared request, software must test flags in turn and the scheme is non-vectored."
+    },
+    {
+     "type": "p",
+     "text": "Clearing the flag is part of the job. The flag stays set until software writes to it, so a forgotten clear sends the CPU straight back into the same ISR, again and again."
+    }
+   ]
+  },
+  {
+   "h3": "Latency and its parts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Interrupt latency is the time from the flag being set to the first instruction of the ISR. Three parts add up."
+    },
+    {
+     "type": "formula",
+     "text": "t_latency = t_detect + t_arbitrate + t_save",
+     "where": "t_detect is the wait for the current instruction to finish (1 to 3 cycles); t_arbitrate is the controller deciding which pending request wins (1 to 2 cycles); t_save is pushing the context on the stack and fetching the vector (8 to 12 cycles)."
+    },
+    {
+     "type": "p",
+     "text": "A Cortex-M3 is usually quoted at 12 cycles from request to ISR entry with zero-wait-state memory. At 72 MHz that is about 0.17 µs, small compared with what software adds."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "A critical section — interrupts masked by software — delays entry for its whole length.",
+      "A higher-priority ISR already running delays a lower-priority one until it finishes.",
+      "Flash wait states and DMA traffic on the bus slow the vector fetch and the stack push.",
+      "The total response time is t_response = t_latency + t_ISR, where t_ISR is the ISR's own running time."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Priority, nesting and the NVIC on ARM",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Priority decides which pending source runs first. On ARM a lower number means higher urgency, so priority 0 beats priority 5. Priority is set once at startup and rarely changed afterwards."
+    },
+    {
+     "type": "p",
+     "text": "If a higher-priority request arrives while a low-priority ISR is running, the CPU saves the low ISR's context and runs the high one first. That is <b>nesting</b> or pre-emption. Each nesting level uses more stack, so the deepest possible nest sets a minimum stack size."
+    },
+    {
+     "type": "p",
+     "text": "On ARM Cortex-M the controller is the <b>NVIC</b> (Nested Vectored Interrupt Controller). Software reaches it through memory-mapped registers."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Register",
+      "Job"
+     ],
+     "rows": [
+      [
+       "ISER",
+       "Enable a source by number"
+      ],
+      [
+       "ICER",
+       "Disable a source"
+      ],
+      [
+       "ISPR / ICPR",
+       "Force a request pending / clear it"
+      ],
+      [
+       "IPR",
+       "Set the 8-bit priority, of which the upper bits are used"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Data shared between an ISR and the main loop must be declared <code>volatile</code>, so the compiler reloads it from memory instead of keeping a stale copy in a register. A single aligned 32-bit read or write is atomic on ARM; a multi-byte update needs a critical section with interrupts briefly masked."
+    },
+    {
+     "type": "p",
+     "text": "Keep the ISR short: set a flag, copy one byte, clear the source. Heavy maths belongs in the main loop. An ISR of 200 µs firing every 500 µs already uses 40% of the CPU, and it delays every lower-priority source by up to 200 µs. Block moves are better handed to DMA (see <a href=\"#direct-memory-access\">3.9</a>)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The request at 500 µs does not start the handler at once: 100 µs of latency pass before the first ISR instruction, then the ISR itself adds 200 µs, so main resumes at 800 µs. During both stretches the main program makes no progress.",
+  "spec": {
+   "type": "gantt",
+   "unit": "µs",
+   "lanes": [
+    {
+     "label": "Main",
+     "bars": [
+      {
+       "label": "main",
+       "start": 0,
+       "end": 500,
+       "style": "muted"
+      },
+      {
+       "label": "resume",
+       "start": 800,
+       "end": 1100,
+       "style": "normal"
+      }
+     ]
+    },
+    {
+     "label": "IRQ",
+     "bars": [
+      {
+       "label": "wait",
+       "start": 500,
+       "end": 600,
+       "style": "live"
+      }
+     ]
+    },
+    {
+     "label": "ISR",
+     "bars": [
+      {
+       "label": "ISR",
+       "start": 600,
+       "end": 800,
+       "style": "accent"
+      }
+     ]
+    }
+   ],
+   "aria": "Timeline in microseconds: main runs from 0 to 500, an interrupt request arrives at 500, 100 microseconds of latency follow, the ISR runs from 600 to 800, and main resumes at 800."
+  }
+ },
+ "examples": [
+  {
+   "question": "A motor controller uses a timer compare interrupt. The compare event occurs at t = 500 µs. The measured interrupt latency is 100 µs and the ISR body takes 200 µs. (a) At what time does the main loop resume? (b) The same interrupt fires 2000 times per second. What percentage of CPU time does this interrupt consume, counting latency and ISR?",
+   "steps": [
+    "The ISR cannot start before the compare event, so add the latency: 500 µs + 100 µs = 600 µs is the first ISR instruction.",
+    "The ISR runs for its own duration: 600 µs + 200 µs = 800 µs, where main resumes.",
+    "CPU time lost per event = latency + ISR = 100 µs + 200 µs = 300 µs = 300 × 10⁻⁶ s.",
+    "Events per second = 2000, so lost time per second = 2000 × 300 µs = 600 000 µs = 0.6 s.",
+    "Fraction of one second = 0.6 s ÷ 1 s = 0.60, that is 60%."
+   ],
+   "answer": "Main resumes at 800 µs, and the interrupt consumes 60% of the CPU time.",
+   "check": "latency = 100\nisr = 200\nt_irq = 500\nresume = t_irq + latency + isr\nprint(resume)\nper_event = latency + isr\nrate = 2000\nbusy_s = rate * per_event / 1e6\nprint(busy_s * 100)",
+   "values": [
+    800,
+    60.0
+   ],
+   "output": ""
+  },
+  {
+   "question": "A UART interrupt has a latency of 60 µs and an ISR of 140 µs. It fires 1000 times per second. Find the CPU load.",
+   "steps": [
+    "Per event = 60 + 140 = 200 µs.",
+    "Per second = 1000 × 200 µs = 200 000 µs = 0.2 s.",
+    "Load = 0.2 ÷ 1 = 20%."
+   ],
+   "answer": "The UART interrupt consumes 20% of the CPU.",
+   "check": "print((60 + 140) * 1000 / 1e6 * 100)",
+   "values": [
+    20.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Forgetting to clear the peripheral flag: the request stays pending and the ISR re-enters forever, so the main loop never runs again.",
+  "Assuming a bigger priority number means more urgent. On ARM the opposite holds: 0 is the highest priority.",
+  "Confusing latency with ISR duration. Latency ends at the first ISR instruction; response time = latency + ISR.",
+  "Sharing a flag with an ISR without <code>volatile</code>: the compiler caches it in a register and the main loop never sees the change.",
+  "Writing a long ISR. It adds its full length to the latency of every lower-priority source and can make deadlines impossible."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define interrupt latency.",
+   "marks": 2,
+   "a": "The time from the interrupt request (flag set) to the first instruction of the ISR. It covers detection, arbitration and context save."
+  },
+  {
+   "level": "remember",
+   "q": "What is a vector table?",
+   "marks": 2,
+   "a": "A fixed array in memory holding the address of each ISR, indexed by the interrupt number, so the CPU can jump straight to the right handler."
+  },
+  {
+   "level": "understand",
+   "q": "Why does polling waste CPU cycles even when no event occurs?",
+   "marks": 3,
+   "a": "The CPU keeps executing the read-and-test loop. Those instructions produce no useful output until the flag sets, so the cycles are spent only on checking."
+  },
+  {
+   "level": "understand",
+   "q": "Why must an ISR clear the peripheral flag before returning?",
+   "marks": 3,
+   "a": "The flag stays set until software writes to it. If it is left set, the controller keeps the request pending and the CPU re-enters the ISR immediately after returning, so the main program is starved."
+  },
+  {
+   "level": "apply",
+   "q": "A UART interrupt fires at t = 1000 µs with latency 60 µs and ISR length 140 µs. At what time does main resume?",
+   "marks": 4,
+   "a": "ISR starts at 1000 + 60 = 1060 µs. It ends at 1060 + 140 = 1200 µs, so main resumes at 1200 µs."
+  },
+  {
+   "level": "apply",
+   "q": "An ISR plus latency costs 400 µs per event and the event occurs 1000 times per second. What is the CPU load?",
+   "marks": 5,
+   "a": "Per second: 1000 × 400 µs = 400 000 µs = 0.4 s. Load = 0.4 ÷ 1 = 40%."
+  },
+  {
+   "level": "analyze",
+   "q": "A timer ISR fires every 1 ms and contains a 5 ms software delay. Describe what the system does.",
+   "marks": 5,
+   "a": "The ISR runs far longer than its period. Each return is immediately followed by another pending request, so the CPU stays in the ISR and the main loop never runs. All lower-priority interrupts are delayed by at least 5 ms each and their deadlines are missed."
+  },
+  {
+   "level": "analyze",
+   "q": "A 32-bit counter is read by main code while a timer ISR increments it. Why can the read return a torn value on an 8-bit MCU, and how do you fix it?",
+   "marks": 6,
+   "a": "On an 8-bit MCU the 32-bit read takes four byte loads; an interrupt in the middle updates the value, so the bytes come from two different counts. Fix it by reading inside a critical section with interrupts masked, or by reading twice and comparing, or by using a shadow copy updated in the ISR."
+  }
+ ],
+ "beyond": "Not for the exam. Real controllers go further than this model: the NVIC supports many sources with sub-priorities, tail-chaining (running the next pending ISR without a full unstack) and late arrival, which cut the gap between two handlers to a few cycles. ARMv8-M adds hardware stack-limit checking so deep nesting cannot silently corrupt memory. Larger systems split handlers into a short top half in the ISR and a longer bottom half in a thread, the way Linux does with threaded IRQs. Search for 'NVIC tail-chaining', 'ARMv7-M exception entry', or 'threaded interrupt handler' to go deeper."
+}

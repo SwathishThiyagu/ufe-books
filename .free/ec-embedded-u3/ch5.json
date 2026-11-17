@@ -1,0 +1,180 @@
+{
+ "lead": "Pulse-width modulation (PWM) keeps a digital pin at a fixed period T and changes how long it stays high. The high time t_on sets the duty cycle D = t_on / T, and the average voltage is D × V_high. A timer and compare register make this waveform in hardware, so software only writes a number. PWM dims LEDs, controls motor speed, sets a heater, and makes a rough DAC. Its fixed period suits switching circuits and avoids the heat of a linear regulator.",
+ "prereq": "You need <a href=\"#gpio-and-i-o-ports\">3.1 GPIO and I/O ports</a> for the pin and <a href=\"#timers-counters-capture-and-compare\">3.2 Timers, counters, capture and compare</a> for the counter and compare match.",
+ "sections": [
+  {
+   "h3": "Period, duty cycle and average value",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "PWM is a square wave with a fixed period T in seconds. The high time t<sub>on</sub> is the part of the period at the high voltage. Duty cycle D is the fraction of the period that is high: D = t<sub>on</sub> / T. D has no unit; write it as 0.25 or 25 %. Some syllabi call this pulse-width modulation. The average voltage across a load is V<sub>avg</sub> = D × V<sub>high</sub> when the low level is 0 V. A 5 V pin at D = 0.25 gives 1.25 V average. The load sees pulses, not a steady voltage; a motor or LED responds to the average when the period is short compared with its response time. Resolution is the smallest duty step. A timer with N counts per period has step 1/N; for N = 256 the step is 1/256 ≈ 0.0039, or 0.39 %."
+    },
+    {
+     "type": "formula",
+     "text": "T = N × t<sub>tick</sub>, f = 1 / T, D = C / N, V<sub>avg</sub> = D × V<sub>high</sub>",
+     "where": "T is the PWM period in seconds; N is the number of timer counts in one period; t<sub>tick</sub> is one timer tick in seconds; f is the PWM frequency in hertz; D is the duty cycle as a fraction; C is the compare value in timer counts; V<sub>high</sub> is the high-level voltage in volts; V<sub>avg</sub> is the average voltage in volts."
+    }
+   ]
+  },
+  {
+   "h3": "Compare register and edge-aligned counting",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The compare register holds the timer count at which the output changes. In up-count or edge-aligned mode, the counter starts at 0, the pin goes high, and the counter counts up. When the counter equals compare value C, the pin goes low. The counter continues to the top, wraps to 0, and the next period starts. High time is C timer ticks, so C = D × N. Changing C changes the pulse width; the period and frequency stay fixed."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Choose the timer clock so that one tick t<sub>tick</sub> is known.",
+      "Choose N, the number of counts in one PWM period; then T = N × t<sub>tick</sub>.",
+      "Compute C = D × N and write C to the compare register.",
+      "At count 0 set the pin high; on the compare match set it low. A polarity bit may reverse these actions.",
+      "To change the average voltage, write a new C; leave the period alone."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An 8-bit timer that counts 0 to 255 has N = 256 counts, not 255. Count 0 is a state, so the number of states is 256. If a timer loads a period register with P and counts 0 to P, the number of counts is P + 1; check the reference manual. Center-aligned mode makes the counter count up to the top and then down. The compare match can act on both slopes, so the pulse is placed around the middle of the period. Center-aligned PWM gives symmetric pulses and lower harmonic content, which helps motor drives; edge-aligned PWM is simpler and is common for LEDs and heaters."
+    }
+   ]
+  },
+  {
+   "h3": "Polarity, dead time and the CCP block",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A polarity control bit decides whether the pin is active-high or active-low. With active-low polarity, the same compare value gives the opposite high time at the pin. A setting meant to give 25 % high in active-high mode can give 75 % high at the pin. Check the polarity bit before you compute V<sub>avg</sub>."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Dead time is a short interval when both outputs of a half-bridge are off. It stops the high-side and low-side transistors from conducting at the same time.",
+      "Hardware in the PWM module inserts dead time. A software delay is too uncertain at switching times of microseconds.",
+      "CCP means capture/compare/PWM. One timer block can capture an input edge, change an output on a compare match, or generate PWM; mode bits select the function.",
+      "PWM dims LEDs, sets motor speed, drives heaters through a relay or SSR, and makes a low-cost DAC when followed by a filter."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Do not drive a motor or relay coil from the MCU pin. The pin drives a transistor, gate driver or driver IC; see <a href=\"#sensors-actuators-relays-and-motor-interfacing\">3.8 Sensors, actuators, relays and motor interfacing</a>. For a servo, the period is 20 ms and the high time is about 1 ms to 2 ms, so the duty cycle is small; the same PWM block can make it if the timer has enough range."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The waveform has period 256 µs; the high time is 64 µs and the low time is 192 µs, so the duty cycle is 25 %.",
+  "spec": {
+   "type": "gantt",
+   "unit": "µs",
+   "lanes": [
+    {
+     "label": "PWM pin",
+     "bars": [
+      {
+       "label": "high",
+       "start": 0,
+       "end": 64,
+       "style": "accent"
+      },
+      {
+       "label": "low",
+       "start": 64,
+       "end": 256,
+       "style": "muted"
+      },
+      {
+       "label": "high",
+       "start": 256,
+       "end": 320,
+       "style": "accent"
+      }
+     ]
+    }
+   ],
+   "aria": "PWM waveform with a 256 microsecond period and a 64 microsecond high time, giving a 25 percent duty cycle."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8-bit timer runs at 1 MHz and counts from 0 to 255. Find the PWM frequency, the compare value for 25 % duty, and the average voltage when the high level is 5 V and the low level is 0 V.",
+   "steps": [
+    "Timer clock is 1 MHz, so one tick is t<sub>tick</sub> = 1 / 1 MHz = 1 µs.",
+    "The counter has 256 states, 0 to 255, so N = 256 counts per PWM period.",
+    "Period T = N × t<sub>tick</sub> = 256 × 1 µs = 256 µs.",
+    "Frequency f = 1 / T = 1 / 256 µs = 1 / 0.000256 s = 3906.25 Hz.",
+    "D = 25 % = 0.25.",
+    "High time t<sub>on</sub> = D × T = 0.25 × 256 µs = 64 µs.",
+    "Compare value C = t<sub>on</sub> / t<sub>tick</sub> = 64 µs / 1 µs = 64 counts, or C = D × N = 0.25 × 256 = 64.",
+    "V<sub>avg</sub> = D × V<sub>high</sub> = 0.25 × 5 V = 1.25 V."
+   ],
+   "answer": "The PWM frequency is 3906.25 Hz, the compare value is 64 counts for 25 % duty, and the average voltage is 1.25 V with a 5 V high level.",
+   "check": "clock_hz = 1000000\nN = 256\nD = 0.25\nV_high = 5.0\nT = N / clock_hz\nf = 1 / T\nC = int(round(D * N))\nV_avg = D * V_high\nprint(f)\nprint(C)\nprint(V_avg)",
+   "values": [
+    3906.25,
+    64,
+    1.25
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Counting 0 to N−1 gives N states. Some timers count 0 to P with N = P + 1. Duty is C/N, not C/(N−1).",
+  "Polarity can invert the pin. A 25 % setting in active-high mode can be 75 % high at an active-low pin.",
+  "Compare value is in timer ticks, not microseconds or percent. Convert t<sub>on</sub> with t<sub>tick</sub>.",
+  "Center-aligned mode matches on the up and down slopes. Do not reuse the edge-aligned compare formula without checking the manual.",
+  "Hardware dead time is not a software delay. At microsecond switching, software timing is too uncertain."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is duty cycle in PWM?",
+   "marks": 2,
+   "a": "Duty cycle D is the fraction of each period that the output is high: D = t<sub>on</sub> / T. A 25 % duty means high for one quarter of the period."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a 5 V PWM pin at 25 % duty act like a 1.25 V source for a small DC motor?",
+   "marks": 3,
+   "a": "The motor's inductance and inertia respond to the average of the pulses. Average voltage is D × V<sub>high</sub> = 0.25 × 5 V = 1.25 V. The switching period must be much shorter than the motor's mechanical time constant."
+  },
+  {
+   "level": "apply",
+   "q": "A timer ticks every 0.5 µs. It uses N = 1000 counts per PWM period. Find T, f, the compare value for D = 30 %, and V<sub>avg</sub> for V<sub>high</sub> = 3.3 V.",
+   "marks": 4,
+   "a": "T = 1000 × 0.5 µs = 500 µs. f = 1/500 µs = 2000 Hz. C = 0.30 × 1000 = 300 counts. V<sub>avg</sub> = 0.30 × 3.3 V = 0.99 V."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does center-aligned PWM produce a more symmetric waveform than edge-aligned PWM?",
+   "marks": 4,
+   "a": "In edge-aligned mode the pulse starts at the period boundary and ends at one compare match. In center-aligned mode the counter goes up and down, so the compare match occurs on both slopes; the high time is placed around the middle of the period. This gives symmetric pulses and lower harmonic content, which helps motor drives."
+  },
+  {
+   "level": "understand",
+   "q": "A PWM output is active-low. What happens to the average voltage when the compare value is set for 25 % high time in active-high mode?",
+   "marks": 3,
+   "a": "The pin polarity inverts. The low time becomes the high time at the pin, so the pin is high for 75 % of the period; average voltage becomes 0.75 × V<sub>high</sub>, not 0.25 × V<sub>high</sub>."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit timer has N = 256 counts and V<sub>high</sub> = 5 V. What compare value gives V<sub>avg</sub> = 2 V?",
+   "marks": 3,
+   "a": "D = V<sub>avg</sub> / V<sub>high</sub> = 2/5 = 0.40. C = D × N = 0.40 × 256 = 102.4, so use C = 102 counts for about 1.992 V, or 103 counts for about 2.012 V. The nearest count is 102."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is dead time needed when one PWM module drives a motor half-bridge?",
+   "marks": 4,
+   "a": "The high-side and low-side transistors must not conduct at the same time. Dead time holds both off briefly during a transition. Without it, shoot-through current can damage the transistors. Hardware dead-time insertion is more reliable than software delays."
+  },
+  {
+   "level": "remember",
+   "q": "What does CCP stand for, and what three functions can it share?",
+   "marks": 2,
+   "a": "CCP means capture/compare/PWM. It can record a timer value on an input event (capture), change an output on a compare match (compare), and generate a PWM waveform."
+  }
+ ],
+ "beyond": "Not for the exam. Production PWM blocks add spread-spectrum modulation to spread switching noise and meet EMI limits. Three-phase inverters use space-vector PWM to get more voltage from the same DC bus. LED drivers use constant-current PWM and sometimes high-frequency dimming to avoid visible flicker. Audio Class-D amplifiers use PWM followed by a low-pass filter. Search for space vector PWM, spread spectrum PWM and dead-time insertion."
+}

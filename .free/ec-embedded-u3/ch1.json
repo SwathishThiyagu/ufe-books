@@ -1,0 +1,220 @@
+{
+ "lead": "A GPIO pin is a digital line that software can set high or low, or read as high or low. It exists because an MCU must talk to LEDs, switches, relays and other chips without a dedicated peripheral for each one. A port is a group of pins, usually 8, controlled by registers in the memory map. You write a direction register to choose input or output, a data register to drive outputs, and read a pin register to sense inputs. Phones, washing machines and IRCTC display boards use GPIO for buttons, lamps and buzzers.",
+ "prereq": "You need: Unit 1 hardware basics and Unit 2 register maps, especially memory-mapped I/O.",
+ "sections": [
+  {
+   "h3": "Pin, port and registers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A pin is one metal pad on the chip package. A port is a group of pins, often 8, that share register addresses. On an 8-bit port, one register bit controls or reports one pin. Bit 0 is the least significant bit, with weight 1; bit 7 has weight 128."
+    },
+    {
+     "type": "p",
+     "text": "Three registers matter. The direction register (DDR) chooses input or output for each pin. On many MCUs a 1 in DDR means output and 0 means input; some parts invert this, so check the datasheet. The output data register (PORT) holds the value to drive when a pin is an output. The input read register (PIN) reports the voltage on the pad."
+    },
+    {
+     "type": "p",
+     "text": "An input pin is high-Z, or high impedance: it does not drive the line. A pull-up resistor to supply or a pull-down resistor to ground gives a known level when nothing else drives the pin. Without one, a floating input picks up noise."
+    }
+   ]
+  },
+  {
+   "h3": "Driving, reading and masking bits",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A push-pull output uses two transistors to drive the pin actively high and actively low. An open-drain output only pulls low; it needs an external pull-up resistor to return high. Open-drain is used for shared wires such as I2C (see Unit 4, SPI and I2C buses)."
+    },
+    {
+     "type": "p",
+     "text": "Software changes one bit without disturbing others by bit masking. For pin n, mask = 1 << n. In C, <code>PORT |= mask</code> sets the bit high, <code>PORT &amp;= ~mask</code> clears it low, <code>PORT ^= mask</code> toggles it, and <code>(PIN &amp; mask)</code> tests it. Here &lt;&lt; is left shift, | is bitwise OR, &amp; is bitwise AND, ^ is bitwise XOR, and ~ is bitwise NOT."
+    },
+    {
+     "type": "formula",
+     "text": "mask = 1 << n",
+     "where": "n is the pin number, 0 for the least significant bit; mask has one bit set at position n."
+    },
+    {
+     "type": "p",
+     "text": "A read-modify-write statement reads the whole register, changes one bit, and writes the whole register back. On a mixed-direction port, the read may return pin levels for input bits. The write can copy those levels into the output latch, or enable pull-ups, depending on the MCU. Keep a shadow copy of the output value and write only the bits you own, or use set/clear registers if the MCU provides them."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Set or clear the pin's DDR bit for output or input.",
+      "For output, write the pin's PORT bit to the level you want.",
+      "For input, enable a pull-up or pull-down if needed, then read the pin's PIN bit."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Mixed-direction ports",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A port can split: low bits output, high bits input. The DDR value tells you which is which. On an 8-bit port with 1=output, DDR=0x0F makes bits 0-3 outputs and bits 4-7 inputs. 0x0F is 0b0000 1111."
+    },
+    {
+     "type": "p",
+     "text": "A write to PORT only drives pins whose DDR bit is output. Input bits have no output driver, so their PORT bits do not set the pad voltage. On some MCUs those same PORT bits enable pull-ups for inputs, which is a different function; read the datasheet before assuming a write is harmless."
+    },
+    {
+     "type": "p",
+     "text": "The safe pattern is: build the output byte from the bits you want high, AND it with the output mask from DDR, and write the result. For DDR=0x0F the output mask is 0x0F. A requested value of 0x25 (bits 0, 2 and 5) becomes 0x25 &amp; 0x0F = 0x05, so bit 5 is dropped because it is an input. The worked example below applies this rule."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The direction register enables the output driver; the data register supplies the level. The same pad feeds the input buffer, and the pull-up sets a known level when the pin is an input.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "One GPIO pin",
+   "nodes": [
+    {
+     "id": "dr",
+     "label": "Data register",
+     "style": "normal"
+    },
+    {
+     "id": "ddr",
+     "label": "Direction register",
+     "style": "live"
+    },
+    {
+     "id": "od",
+     "label": "Output driver",
+     "style": "normal"
+    },
+    {
+     "id": "pad",
+     "label": "Pad",
+     "note": "external pin",
+     "style": "accent"
+    },
+    {
+     "id": "ib",
+     "label": "Input buffer",
+     "style": "normal"
+    },
+    {
+     "id": "pr",
+     "label": "Pin register",
+     "note": "read path",
+     "style": "normal"
+    },
+    {
+     "id": "pu",
+     "label": "Pull-up",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ddr",
+     "to": "od",
+     "label": "enable"
+    },
+    {
+     "from": "dr",
+     "to": "od",
+     "label": "data"
+    },
+    {
+     "from": "od",
+     "to": "pad"
+    },
+    {
+     "from": "pad",
+     "to": "ib"
+    },
+    {
+     "from": "ib",
+     "to": "pr",
+     "label": "read"
+    },
+    {
+     "from": "pu",
+     "to": "pad"
+    }
+   ],
+   "aria": "Block diagram of one GPIO pin: the direction register enables the output driver and the data register supplies its level, so the data register feeds only the output driver; the pad feeds an input buffer that loads the pin register."
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8-bit GPIO port uses 1 in DDR to mean output. DDR = 0x0F, so bits 0-3 are outputs and bits 4-7 are inputs. The requested high bits are 0, 2 and 5. Write the PORT value that drives only the output pins, leaving input pins undriven. Give the answer in hex and decimal.",
+   "steps": [
+    "DDR = 0x0F = 0b0000 1111. With 1=output, bits 0, 1, 2 and 3 are outputs; bits 4, 5, 6 and 7 are inputs.",
+    "The output mask is 0x0F. The input mask is 0xF0.",
+    "Requested high bits are 0, 2 and 5. Their weights are bit0=1, bit2=4 and bit5=32. The sum is 1+4+32 = 37 = 0x25.",
+    "Keep only bits that are outputs: 0x25 & 0x0F = 0x05. The 0x20 part (bit 5) is removed because bit 5 is an input.",
+    "The output bit pattern is bit3=0, bit2=1, bit1=0, bit0=1: 0b0000 0101 = 0x05 = 5 decimal.",
+    "The PORT write is 0x05. Input bits 4-7 are not driven. If a datasheet says writing PORT bits for inputs enables pull-ups, use a read-modify-write or shadow copy to preserve those bits."
+   ],
+   "answer": "PORT = 0x05 (5 decimal): bits 0 and 2 are high, bits 1 and 3 are low, and input bit 5 is not driven.",
+   "check": "ddr = 0x0F\nout_mask = 0x0F\ndesired_bits = (1 << 0) | (1 << 2) | (1 << 5)\nport_write = desired_bits & out_mask\nprint(ddr)\nprint(port_write)",
+   "values": [
+    15,
+    5
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "DDR sets direction; PORT sets the output level. Writing 1 to a DDR bit makes an output, it does not make the pin high.",
+  "Bit 0 is the least significant bit (weight 1), not the leftmost bit. 0x0F is bits 0-3, not bits 4-7.",
+  "An input pin is high-Z; it does not output a value. Reading PIN gives the pin voltage; reading PORT may give the output latch.",
+  "Open-drain output cannot drive high by itself; it needs a pull-up resistor. Push-pull drives both high and low.",
+  "On some MCUs 1 in DDR means input, and writing 1 to a PORT bit for an input enables a pull-up. Check the datasheet."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does DDR stand for, and what does each bit choose?",
+   "marks": 2,
+   "a": "DDR is the direction register. Each bit chooses whether its pin is an input or an output; on many MCUs 1 means output, but check the datasheet."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a floating input a problem, and how does a pull-up fix it?",
+   "marks": 3,
+   "a": "A floating input is high-Z, so noise can set an unknown voltage. A pull-up resistor to supply gives a known high level when nothing else drives the pin; a switch to ground can then pull it low."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit port uses 1=output. DDR = 0xF0. Which pins are outputs? Write PORT to set bits 4 and 6 high and bits 5 and 7 low.",
+   "marks": 4,
+   "a": "Bits 4, 5, 6 and 7 are outputs. Bit 4 is 0x10 and bit 6 is 0x40, so PORT = 0x10 + 0x40 = 0x50."
+  },
+  {
+   "level": "analyze",
+   "q": "A program runs PORTB |= 0x01 on a port whose DDRB = 0x00. The datasheet says reading PORT returns the pin level, and writing 1 to a PORT bit for an input enables its pull-up. What is the effect?",
+   "marks": 5,
+   "a": "DDRB=0x00 makes every pin an input, so no output driver is on. The read-modify-write reads pin levels, ORs 0x01, and writes back. If PB0 read 0, the write sets PORT bit 0 to 1, enabling the pull-up on PB0; other bits may also copy pin levels into PORT and change pull-ups."
+  },
+  {
+   "level": "remember",
+   "q": "What is the difference between the PIN and PORT registers?",
+   "marks": 2,
+   "a": "PIN reports the voltage on the pad for reading inputs. PORT holds the output value driven when the pin is an output; on some MCUs its input bits also control pull-ups."
+  },
+  {
+   "level": "apply",
+   "q": "An LED is on bit 3, active high, and DDR bit 3 is 1. Write C statements to turn the LED on and off using a mask.",
+   "marks": 4,
+   "a": "mask = (1 << 3); On: <code>PORTB |= mask;</code> Off: <code>PORTB &amp;= ~mask;</code> With bit 3, mask = 0x08."
+  },
+  {
+   "level": "understand",
+   "q": "Why keep a shadow copy of the output byte for a mixed-direction port?",
+   "marks": 3,
+   "a": "A read-modify-write reads the whole register, and input bits may return pin levels rather than the last output value. A shadow copy stores only the output bits, so writing it back does not copy input levels into the output latch or change input pull-ups."
+  }
+ ],
+ "beyond": "Not for the exam. Real MCU GPIO blocks add pin multiplexing, so the same pad can be a UART TX, timer output or GPIO; a pin mux register selects the function. They also add set and clear registers to avoid read-modify-write, programmable drive strength, slew-rate control and ESD protection. Linux exposes GPIO through gpiod or sysfs for boards such as Raspberry Pi, and port expanders add pins over I2C. Search for 'GPIO pin mux', 'open-drain vs push-pull' and 'GPIO set clear register'."
+}

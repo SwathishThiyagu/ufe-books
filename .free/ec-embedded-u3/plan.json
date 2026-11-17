@@ -1,0 +1,703 @@
+{
+ "type": "json_object",
+ "lead": "The unit is about the peripherals inside a microcontroller and the circuits they connect to. You learn to configure GPIO, timers, interrupts, ADC and DAC, displays, relays and motors, and to use DMA. After it you can read a peripheral register map and write small interfacing routines with correct timing and safe drive.",
+ "about": "This unit shows how a microcontroller talks to the outside world through its on-chip peripherals. Chapter 3.1 starts with GPIO pins and ports, the raw digital connection. 3.2 adds timers and counters, and 3.3 turns their events into interrupts. 3.4 covers watchdog and real-time clock safety and timekeeping, while 3.5 uses timers for PWM. 3.6 connects analog signals through ADC and DAC. 3.7 drives LEDs, seven-segment displays, LCDs and keypads. 3.8 adds sensors, relays and motors, and 3.9 shows DMA moving data without the CPU. Each chapter builds on the pin, timer and interrupt ideas before it.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A GPIO pin is a software-controlled digital line, and a port is a group of pins configured and read through registers.",
+   "depth": "Pin, port, direction register, data register, pull-up and pull-down, high-Z input, push-pull and open-drain output, bit masking, read-modify-write. Define DDR (direction register), PORT (output data register) and PIN (input read register); on many MCUs 1 in DDR means output, but check the datasheet. Some syllabi call this parallel I/O or general-purpose I/O. Show one port with mixed input and output bits.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "One GPIO pin",
+    "nodes": [
+     {
+      "id": "dr",
+      "label": "Data register",
+      "style": "normal"
+     },
+     {
+      "id": "ddr",
+      "label": "Direction register",
+      "style": "live"
+     },
+     {
+      "id": "od",
+      "label": "Output driver",
+      "style": "normal"
+     },
+     {
+      "id": "pad",
+      "label": "Pad",
+      "note": "external pin",
+      "style": "accent"
+     },
+     {
+      "id": "ib",
+      "label": "Input buffer",
+      "style": "normal"
+     },
+     {
+      "id": "pu",
+      "label": "Pull-up",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ddr",
+      "to": "od",
+      "label": "enable"
+     },
+     {
+      "from": "dr",
+      "to": "od",
+      "label": "data"
+     },
+     {
+      "from": "od",
+      "to": "pad"
+     },
+     {
+      "from": "pad",
+      "to": "ib"
+     },
+     {
+      "from": "ib",
+      "to": "dr",
+      "label": "read"
+     },
+     {
+      "from": "pu",
+      "to": "pad"
+     }
+    ],
+    "aria": "Block diagram of one GPIO pin: data and direction registers feed an output driver to the pad, and the pad feeds an input buffer back to the data register."
+   },
+   "example": "An 8-bit port has DDR = 0x0F. Bits 0-3 are outputs and bits 4-7 are inputs when 1 means output. Write the value that makes bits 0, 2 and 5 high, with all other outputs low, and no change to inputs. Answer: output bits are 0, 1, 2, 3; set bits 0 and 2: 0000 0101 = 0x05. Bit 5 is an input, so it is not driven. The port write is 0x05.",
+   "trap": "Writing 1 to a direction register bit may make it an output, not drive it high; DDR and PORT are different registers.",
+   "prereq": "Unit 1 hardware; Unit 2 register maps.",
+   "leave": "Interrupts to 3.3; display drive to 3.7; high-power loads to 3.8."
+  },
+  {
+   "k": 2,
+   "idea": "A timer counts internal clock ticks; a counter counts external events; capture records the count on an event and compare acts when the count matches.",
+   "depth": "Prescaler, tick T = prescaler / f_clk, n-bit count range 0 to 2ⁿ − 1, overflow, auto-reload, up/down counting, capture register, compare register, output compare pin, input capture for period and frequency, CCP modules. Show programming steps: stop, set prescaler, load reload or compare, clear flag, start. Some syllabi call the capture/compare/PWM block CCP.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Timer with capture and compare",
+    "nodes": [
+     {
+      "id": "clk",
+      "label": "Clock",
+      "style": "normal"
+     },
+     {
+      "id": "pre",
+      "label": "Prescaler",
+      "style": "normal"
+     },
+     {
+      "id": "cnt",
+      "label": "Counter",
+      "style": "accent"
+     },
+     {
+      "id": "cmp",
+      "label": "Compare",
+      "style": "live"
+     },
+     {
+      "id": "out",
+      "label": "Output pin",
+      "style": "normal"
+     },
+     {
+      "id": "ev",
+      "label": "Event input",
+      "style": "normal"
+     },
+     {
+      "id": "cap",
+      "label": "Capture register",
+      "style": "next"
+     },
+     {
+      "id": "irq",
+      "label": "Interrupt flag",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "clk",
+      "to": "pre"
+     },
+     {
+      "from": "pre",
+      "to": "cnt"
+     },
+     {
+      "from": "cnt",
+      "to": "cmp"
+     },
+     {
+      "from": "cmp",
+      "to": "out",
+      "label": "match"
+     },
+     {
+      "from": "cmp",
+      "to": "irq"
+     },
+     {
+      "from": "ev",
+      "to": "cap",
+      "label": "snapshot"
+     },
+     {
+      "from": "cnt",
+      "to": "cap"
+     }
+    ],
+    "aria": "Block diagram of a timer: clock passes through a prescaler to a counter, the counter drives compare output and interrupt logic, and an event input snapshots the counter into a capture register."
+   },
+   "example": "A 16-bit up-counter runs from a 4 MHz clock with prescaler 16. Find the tick, the maximum overflow time, and the reload value for a 50 ms overflow. Tick = 16 / 4 MHz = 4 µs. Maximum = 65536 × 4 µs = 262.144 ms. Counts for 50 ms = 50 ms / 4 µs = 12500. Reload = 65536 − 12500 = 53036 = 0xCF2C.",
+   "trap": "Reload is not the delay count; the counter overflows after 2ⁿ − reload ticks. Also check whether the prescaler divides the clock or multiplies it.",
+   "prereq": "3.1 GPIO; Unit 2 timer registers.",
+   "leave": "PWM waveform to 3.5; watchdog and RTC to 3.4; RTOS timing to Unit 5."
+  },
+  {
+   "k": 3,
+   "idea": "An interrupt makes the CPU stop its main code, run a short ISR, and return; latency is the delay before the ISR starts and priority decides who runs first.",
+   "depth": "Interrupt source, enable bit, flag bit, vector table, ISR (interrupt service routine), context save and restore, latency components (detection, arbitration, save), priority, nesting, NVIC on ARM, external hardware and IO interrupts, volatile shared variables, polling versus interrupt-driven design. Some syllabi call the controller a vectored interrupt controller. Show the tradeoff: polling wastes cycles but is simple; interrupts react fast but need short ISRs.",
+   "figure": {
+    "type": "gantt",
+    "unit": "µs",
+    "lanes": [
+     {
+      "label": "Main",
+      "bars": [
+       {
+        "label": "main",
+        "start": 0,
+        "end": 2000,
+        "style": "muted"
+       },
+       {
+        "label": "main resumes",
+        "start": 2120,
+        "end": 2300,
+        "style": "normal"
+       }
+      ]
+     },
+     {
+      "label": "IRQ",
+      "bars": [
+       {
+        "label": "wait",
+        "start": 2000,
+        "end": 2020,
+        "style": "live"
+       }
+      ]
+     },
+     {
+      "label": "ISR",
+      "bars": [
+       {
+        "label": "ISR 100",
+        "start": 2020,
+        "end": 2120,
+        "style": "accent"
+       }
+      ]
+     }
+    ],
+    "aria": "Timeline: an interrupt request arrives at 2000 microseconds, 20 microseconds of latency follow, the ISR runs for 100 microseconds, and main resumes at 2120 microseconds."
+   },
+   "example": "A button raises an interrupt at t = 2000 µs. The interrupt latency is 20 µs and the ISR takes 100 µs. At what time does main code resume? Answer: 2000 + 20 + 100 = 2120 µs.",
+   "trap": "Forgetting to clear the interrupt flag causes the ISR to run again forever; a long ISR adds latency to every lower-priority source.",
+   "prereq": "3.2 timers; Unit 2 stack and registers.",
+   "leave": "RTOS scheduling to Unit 5; DMA completion to 3.9."
+  },
+  {
+   "k": 4,
+   "idea": "A watchdog timer resets the MCU when software stops kicking it; an RTC keeps wall-clock time from a low-power oscillator.",
+   "depth": "Watchdog counter, timeout, window watchdog, kick sequence, reset output, production policy. RTC 32.768 kHz crystal, divider chain, BCD time registers, alarm, backup battery, square-wave output, epoch counter. Some syllabi call watchdog WDT and real-time clock RTC. Show a safe kick from the main loop, not only from a timer ISR.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Watchdog and RTC paths",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "CPU",
+      "style": "normal"
+     },
+     {
+      "id": "kick",
+      "label": "Kick sequence",
+      "style": "normal"
+     },
+     {
+      "id": "wdt",
+      "label": "WDT counter",
+      "style": "accent"
+     },
+     {
+      "id": "reset",
+      "label": "Reset",
+      "style": "live"
+     },
+     {
+      "id": "xtal",
+      "label": "32.768 kHz",
+      "style": "normal"
+     },
+     {
+      "id": "div",
+      "label": "Divider",
+      "style": "normal"
+     },
+     {
+      "id": "rtc",
+      "label": "RTC registers",
+      "style": "next"
+     },
+     {
+      "id": "alm",
+      "label": "Alarm",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cpu",
+      "to": "kick"
+     },
+     {
+      "from": "kick",
+      "to": "wdt"
+     },
+     {
+      "from": "wdt",
+      "to": "reset",
+      "label": "timeout"
+     },
+     {
+      "from": "xtal",
+      "to": "div"
+     },
+     {
+      "from": "div",
+      "to": "rtc"
+     },
+     {
+      "from": "rtc",
+      "to": "alm"
+     }
+    ],
+    "aria": "Block diagram with two paths: CPU kicks a watchdog counter that times out to reset, while a 32.768 kilohertz crystal feeds a divider and RTC registers with an alarm output."
+   },
+   "example": "A watchdog has a 32 kHz clock, prescaler 128 and a 12-bit counter. Find the tick and the timeout. Tick = 128 / 32000 = 4 ms. Timeout = 4096 × 4 ms = 16.384 s. The main loop must kick the watchdog more often than every 16.384 s; choose 10 s. An RTC with a 32.768 kHz crystal divides by 2¹⁵ to get 1 Hz.",
+   "trap": "Kicking the watchdog inside a fast timer ISR can hide a hung main loop; the kick must prove the main loop is alive. RTC registers are often BCD, not binary.",
+   "prereq": "3.2 timers; 3.3 interrupts and reset.",
+   "leave": "Low-power modes to Unit 6; RTOS time services to Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "PWM turns a digital pin on and off at a fixed period; the average voltage depends on the duty cycle.",
+   "depth": "Period T, frequency f = 1 / T, duty D = t_on / T, average Vavg = D × Vhigh, resolution = 1 / period counts. Compare register, up-count edge-aligned, center-aligned, polarity, dead time for motor bridges, CCP. Some syllabi call this pulse-width modulation. Show the compare-value formula.",
+   "figure": {
+    "type": "gantt",
+    "unit": "µs",
+    "lanes": [
+     {
+      "label": "PWM pin",
+      "bars": [
+       {
+        "label": "high",
+        "start": 0,
+        "end": 64,
+        "style": "accent"
+       },
+       {
+        "label": "low",
+        "start": 64,
+        "end": 256,
+        "style": "muted"
+       },
+       {
+        "label": "high",
+        "start": 256,
+        "end": 320,
+        "style": "accent"
+       }
+      ]
+     }
+    ],
+    "aria": "PWM waveform with a 256 microsecond period and a 64 microsecond high time, giving a 25 percent duty cycle."
+   },
+   "example": "An 8-bit timer runs at 1 MHz and counts 0 to 255. The PWM period is 256 µs, so f = 1 / 256 µs = 3906.25 Hz. Find the compare value for 25% duty. High time = 0.25 × 256 µs = 64 µs, so compare = 64 counts. Average voltage with 5 V high = 0.25 × 5 V = 1.25 V.",
+   "trap": "Some timers count to period − 1 and some to period; duty is compare/(period+1) in one case and compare/period in another. Check polarity inversion.",
+   "prereq": "3.1 GPIO; 3.2 timers.",
+   "leave": "Motor driver and dead-time hardware to 3.8; RTOS PWM updates to Unit 5."
+  },
+  {
+   "k": 6,
+   "idea": "An ADC maps an analog voltage to a digital code; a DAC maps a code back to an analog voltage, both set by a reference.",
+   "depth": "Resolution n bits, Vref (reference voltage), quantization step q = Vref / (2ⁿ − 1), code = round(Vin / q), Vout = code × q, sampling, sample-and-hold, SAR ADC, conversion start, end-of-conversion flag or interrupt, channels, DAC R-2R. Some syllabi call these A/D and D/A converters. Show polling and interrupt read.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "ADC and DAC signal paths",
+    "nodes": [
+     {
+      "id": "vin",
+      "label": "Vin 1.0 V",
+      "style": "normal"
+     },
+     {
+      "id": "sh",
+      "label": "Sample/hold",
+      "style": "normal"
+     },
+     {
+      "id": "adc",
+      "label": "10-bit ADC",
+      "style": "accent"
+     },
+     {
+      "id": "code",
+      "label": "code 310",
+      "style": "live"
+     },
+     {
+      "id": "vref",
+      "label": "Vref 3.3 V",
+      "style": "muted"
+     },
+     {
+      "id": "dcode",
+      "label": "code 100",
+      "style": "next"
+     },
+     {
+      "id": "dac",
+      "label": "8-bit DAC",
+      "style": "accent"
+     },
+     {
+      "id": "vout",
+      "label": "1.961 V",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "vin",
+      "to": "sh"
+     },
+     {
+      "from": "sh",
+      "to": "adc"
+     },
+     {
+      "from": "vref",
+      "to": "adc"
+     },
+     {
+      "from": "adc",
+      "to": "code"
+     },
+     {
+      "from": "dcode",
+      "to": "dac"
+     },
+     {
+      "from": "dac",
+      "to": "vout"
+     }
+    ],
+    "aria": "Block diagram of ADC and DAC paths: a 1.0 volt input goes through sample and hold to a 10-bit ADC with 3.3 volt reference and gives code 310, while code 100 into an 8-bit DAC with 5 volt reference gives 1.961 volts."
+   },
+   "example": "A 10-bit ADC has Vref = 3.3 V and Vin = 1.0 V. Find the output code and the quantization step. q = 3.3 / 1023 = 3.226 mV. code = round(1.0 / 3.3 × 1023) = round(310.0) = 310. An 8-bit DAC has Vref = 5 V and input code 100. Find Vout. Vout = 100 / 255 × 5 V = 1.961 V.",
+   "trap": "Using 2ⁿ instead of 2ⁿ − 1 shifts the full-scale code; ignoring Vref makes the answer meaningless.",
+   "prereq": "3.1 GPIO; 3.2 timers; 3.3 interrupts.",
+   "leave": "Sensor conditioning to 3.8; serial data transfer to Unit 4."
+  },
+  {
+   "k": 7,
+   "idea": "LEDs, seven-segment displays and LCDs need correct current and timing; keypads are scanned as a row-column matrix.",
+   "depth": "LED series resistor R = (Vs − Vf) / If, common-anode and common-cathode seven-segment displays, multiplexing and persistence, LCD parallel interface signals RS, RW, E and data bus, initialization, busy flag, 4x4 keypad scan, pull-ups, debounce, ghosting. Some syllabi call seven-segment displays 7-seg. Show one scan step.",
+   "figure": {
+    "type": "array",
+    "title": "4x4 keypad matrix",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "R0",
+      "cells": [
+       "1",
+       "2",
+       "3",
+       "4"
+      ]
+     },
+     {
+      "label": "R1",
+      "cells": [
+       "5",
+       "6",
+       "7",
+       "8"
+      ]
+     },
+     {
+      "label": "R2",
+      "cells": [
+       "9",
+       "10",
+       "11",
+       "12"
+      ],
+      "marks": {
+       "1": "accent"
+      }
+     },
+     {
+      "label": "R3",
+      "cells": [
+       "13",
+       "14",
+       "15",
+       "16"
+      ]
+     }
+    ],
+    "pointers": [
+     {
+      "row": 2,
+      "cell": 1,
+      "label": "key 10"
+     }
+    ],
+    "aria": "A 4 by 4 keypad matrix with rows R0 to R3 and keys 1 to 16; key 10 at row R2 column C1 is marked."
+   },
+   "example": "A red LED has Vf = 2.0 V and needs If = 10 mA from a 5 V pin. R = (5 − 2) / 0.01 = 300 Ω; use the standard 330 Ω. A 4x4 keypad has rows R0-R3 as outputs and columns C0-C3 as inputs with pull-ups. R2 is driven low; the columns read C0=1, C1=0, C2=1, C3=1. Which key is pressed if labels run left to right, top to bottom from 1? Answer: row 2, column 1 gives key 10.",
+   "trap": "Common-anode and common-cathode seven-segment displays have opposite drive levels; a keypad without pull-ups reads floating, and no debounce gives multiple key events.",
+   "prereq": "3.1 GPIO; 3.2 timers for multiplexing.",
+   "leave": "LCD serial or I2C backpack to Unit 4."
+  },
+  {
+   "k": 8,
+   "idea": "Sensors and actuators connect through signal conditioning and drivers; the MCU pin drives a transistor or driver IC, not the load directly.",
+   "depth": "Switch pull-up and debounce; sensor types and conditioning (LDR, thermistor, Hall, ultrasonic); relay coil, transistor switch, base resistor, flyback diode, optocoupler; DC motor H-bridge and PWM speed; stepper motor sequence and driver; BLDC motor ESC and Hall sensors. Some syllabi call this load interfacing. Show current and voltage checks.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Sensor input and actuator drive",
+    "nodes": [
+     {
+      "id": "sen",
+      "label": "Sensor",
+      "style": "normal"
+     },
+     {
+      "id": "cond",
+      "label": "Conditioning",
+      "style": "normal"
+     },
+     {
+      "id": "adc",
+      "label": "ADC/GPIO",
+      "style": "accent"
+     },
+     {
+      "id": "mcu",
+      "label": "MCU",
+      "style": "normal"
+     },
+     {
+      "id": "rb",
+      "label": "3.3 kΩ",
+      "style": "live"
+     },
+     {
+      "id": "q",
+      "label": "Transistor",
+      "style": "accent"
+     },
+     {
+      "id": "coil",
+      "label": "Relay coil 80 mA",
+      "style": "normal"
+     },
+     {
+      "id": "load",
+      "label": "Load",
+      "style": "muted"
+     },
+     {
+      "id": "diode",
+      "label": "Flyback diode",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "sen",
+      "to": "cond"
+     },
+     {
+      "from": "cond",
+      "to": "adc"
+     },
+     {
+      "from": "mcu",
+      "to": "rb"
+     },
+     {
+      "from": "rb",
+      "to": "q",
+      "label": "base"
+     },
+     {
+      "from": "q",
+      "to": "coil"
+     },
+     {
+      "from": "coil",
+      "to": "load"
+     },
+     {
+      "from": "diode",
+      "to": "coil",
+      "label": "across coil"
+     }
+    ],
+    "aria": "Block diagram with a sensor going through conditioning to an ADC or GPIO, and an MCU driving a transistor base through a 3.3 kilo-ohm resistor to a relay coil and load, with a flyback diode across the coil."
+   },
+   "example": "A 5 V relay coil draws 80 mA. A transistor has β = 100 and VBE = 0.7 V. The GPIO high is 3.3 V. Find the base resistor. IB = 80 mA / 100 = 0.8 mA. RB = (3.3 − 0.7) / 0.0008 = 3250 Ω; use 3.3 kΩ. A flyback diode such as 1N4007 goes across the coil, cathode to +5 V.",
+   "trap": "Omitting the flyback diode causes a high voltage spike that kills the transistor; connecting a motor directly to a GPIO pin burns the pin.",
+   "prereq": "3.1 GPIO; 3.5 PWM; 3.6 ADC.",
+   "leave": "Motor control algorithms to Unit 6; wireless links to Unit 4."
+  },
+  {
+   "k": 9,
+   "idea": "DMA moves blocks of data between peripherals and memory without the CPU fetching each byte.",
+   "depth": "DMA controller, channels, source, destination, count, transfer size, single/burst/cycle-steal modes, bus arbitration, descriptor, completion interrupt, ADC-to-memory example, memory-to-memory, cache coherency on advanced MCUs. Some syllabi call this direct memory access. Show CPU setup then DMA data path.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "DMA data path",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "CPU",
+      "style": "normal"
+     },
+     {
+      "id": "dma",
+      "label": "DMA controller",
+      "style": "accent"
+     },
+     {
+      "id": "mem",
+      "label": "Memory",
+      "style": "live"
+     },
+     {
+      "id": "adc",
+      "label": "ADC peripheral",
+      "style": "normal"
+     },
+     {
+      "id": "bus",
+      "label": "Bus",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cpu",
+      "to": "dma",
+      "label": "setup"
+     },
+     {
+      "from": "adc",
+      "to": "dma",
+      "label": "samples"
+     },
+     {
+      "from": "dma",
+      "to": "mem",
+      "label": "writes"
+     },
+     {
+      "from": "dma",
+      "to": "cpu",
+      "label": "done IRQ"
+     },
+     {
+      "from": "bus",
+      "to": "dma",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Block diagram of DMA: the CPU sets up the DMA controller, the ADC sends samples to it, it writes them to memory over the bus, and it raises a completion interrupt to the CPU."
+   },
+   "example": "A 12-bit ADC samples at 10 kHz for 1 s. Each sample is stored in 2 bytes. Find the bytes moved. Samples = 10000; bytes = 10000 × 2 = 20000 bytes. Polling costs 20 CPU cycles per sample at 50 MHz: 10000 × 20 = 200000 cycles = 4 ms. DMA setup plus completion takes 100 cycles = 2 µs. Find the CPU time saved. Saved = 4 ms − 2 µs ≈ 3.998 ms.",
+   "trap": "DMA and CPU can contend for the same bus, so DMA is not free; forgetting the count or completion flag loses the last block.",
+   "prereq": "3.3 interrupts; 3.6 ADC.",
+   "leave": "Bus protocols AMBA, AHB and APB to Unit 4; cache and memory hierarchy to Unit 1."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "GPIO pins carry timer compare outputs"
+  ],
+  [
+   2,
+   3,
+   "Timer overflow raises an interrupt"
+  ],
+  [
+   3,
+   9,
+   "DMA ends with one completion interrupt"
+  ],
+  [
+   2,
+   5,
+   "Timer compare sets PWM high time"
+  ],
+  [
+   5,
+   8,
+   "PWM controls DC motor speed"
+  ],
+  [
+   6,
+   8,
+   "ADC reads sensors, DAC drives actuators"
+  ],
+  [
+   1,
+   7,
+   "GPIO scans keypads and drives LEDs"
+  ],
+  [
+   3,
+   4,
+   "Watchdog timeout and RTC alarm use interrupt and reset logic"
+  ]
+ ]
+}

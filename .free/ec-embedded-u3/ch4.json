@@ -1,0 +1,241 @@
+{
+ "lead": "A watchdog timer is a small counter that resets the microcontroller if software stops servicing it. It exists because a program can hang in an infinite loop, wait forever on a flag, or be corrupted by noise; a reset returns the system to a known state. A real-time clock (RTC) is a separate low-power counter that keeps calendar time from a 32.768 kHz crystal. Watches and RTCs appear in water meters, car dashboards, ATMs, UPI payment terminals and any device that must recover alone or timestamp events after mains power is removed.",
+ "prereq": "You need: <a href=\"#timers-counters-capture-and-compare\">3.2</a> for counters and prescalers, and <a href=\"#interrupts-isrs-latency-and-priority-polling\">3.3</a> for interrupts and reset behaviour.",
+ "sections": [
+  {
+   "h3": "Watchdog counter, kick and reset",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A watchdog timer (WDT) is an on-chip counter that resets the microcontroller if software fails to service it. It runs from its own low-speed oscillator, commonly 32 kHz, so it keeps counting even if the CPU clock or main loop stops. Software writes a service sequence, called a kick, before the counter overflows. If the counter reaches its maximum, the watchdog drives the reset line. The reset restarts the CPU from its reset vector and sets a reset-cause flag that firmware can read at boot."
+    },
+    {
+     "type": "formula",
+     "text": "t_tick = P / f_wdt,    T_timeout = 2<sup>N</sup> × t_tick",
+     "where": "t_tick is one counter step in seconds; P is the prescaler integer; f_wdt is the watchdog clock in hertz; N is the counter width in bits; T_timeout is the maximum time between kicks in seconds."
+    },
+    {
+     "type": "p",
+     "text": "A window watchdog adds a lower limit. The kick must arrive after the window opens and before the timeout. A kick that is too early also causes reset. This catches code that has run away and is kicking far too often."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Software writes the unlock key to the watchdog key register.",
+      "Software writes the service key before the timeout expires.",
+      "The counter reloads and starts again.",
+      "If the counter overflows, or a window watchdog receives an early kick, the watchdog asserts reset.",
+      "The reset stops the CPU, sets the reset-cause flag, and restarts firmware from the reset vector."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Production policy: leave the watchdog enabled in every shipped build, service it from the main loop, and log the reset cause. Choose a timeout longer than the worst-case main loop but shorter than the time in which a stuck output could cause harm. Do not hide a hung main loop by kicking inside a fast timer ISR."
+    }
+   ]
+  },
+  {
+   "h3": "RTC crystal, divider and registers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A real-time clock (RTC) keeps wall-clock time: seconds, minutes, hours, date, month and year. It uses a 32.768 kHz crystal because 32768 = 2¹⁵, so a binary divider chain reaches exactly 1 Hz. The RTC and its oscillator sit in a low-power domain, often powered from a coin cell on a VBAT pin when the main supply is off."
+    },
+    {
+     "type": "formula",
+     "text": "f_1Hz = f_xtal / 2<sup>15</sup>",
+     "where": "f_xtal is the crystal frequency in hertz (32768 Hz); f_1Hz is the divided output in hertz (1 Hz); 2<sup>15</sup> = 32768 is the divider ratio."
+    },
+    {
+     "type": "p",
+     "text": "The divider chain produces a 1 Hz tick. The RTC counts that tick into time registers. Many RTCs store these registers in BCD, not binary. In BCD, 0x23 means 23 decimal, while the same bits read as binary would mean 35. Firmware must convert BCD to binary before arithmetic and back before writing."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Alarm registers hold a target time; a match sets a flag, wakes the MCU, or toggles an output pin.",
+      "A square-wave output can send 1 Hz, 1024 Hz or another divided rate to a pin.",
+      "An epoch counter stores total seconds since 1970-01-01 00:00:00 UTC, which makes time arithmetic easy.",
+      "A backup battery keeps the oscillator and time registers alive when VDD is removed; it does not run the whole MCU."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "A safe kick and timeout choice",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A kick must prove that the main loop is alive. A timer ISR that kicks every millisecond will keep the watchdog happy even when the main loop is stuck. That is the classic mistake."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Main loop sets a flag after each major task completes.",
+      "At the end of one full pass, the main loop checks that all flags are set.",
+      "If every flag is set, clear the flags and kick the watchdog once.",
+      "If any flag is missing, do not kick; let the watchdog reset the system.",
+      "During development, halt the CPU in the debugger and confirm that reset occurs."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Pick the timeout from measurements. Measure the slowest normal pass through the main loop, including flash writes and communication waits. Set the timeout above that value with margin, and below the time that a stuck actuator, display or payment terminal becomes unsafe. Test with the real clock, not a simulator only. On boot, read and clear the reset-cause register; a watchdog reset should be recorded, not silently ignored."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The upper path is the watchdog: the CPU sends a kick sequence to the WDT counter, and a timeout drives reset. The lower path is the RTC: a 32.768 kHz crystal feeds a divider, RTC registers and an alarm.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Watchdog and RTC paths",
+   "nodes": [
+    {
+     "id": "cpu",
+     "label": "CPU",
+     "style": "normal"
+    },
+    {
+     "id": "kick",
+     "label": "Kick sequence",
+     "style": "normal"
+    },
+    {
+     "id": "wdt",
+     "label": "WDT counter",
+     "style": "accent"
+    },
+    {
+     "id": "reset",
+     "label": "Reset",
+     "style": "live"
+    },
+    {
+     "id": "xtal",
+     "label": "32.768 kHz",
+     "style": "normal"
+    },
+    {
+     "id": "div",
+     "label": "Divider",
+     "style": "normal"
+    },
+    {
+     "id": "rtc",
+     "label": "RTC registers",
+     "style": "next"
+    },
+    {
+     "id": "alm",
+     "label": "Alarm",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cpu",
+     "to": "kick"
+    },
+    {
+     "from": "kick",
+     "to": "wdt"
+    },
+    {
+     "from": "wdt",
+     "to": "reset",
+     "label": "timeout"
+    },
+    {
+     "from": "xtal",
+     "to": "div"
+    },
+    {
+     "from": "div",
+     "to": "rtc"
+    },
+    {
+     "from": "rtc",
+     "to": "alm"
+    }
+   ],
+   "aria": "Block diagram with two paths: CPU kicks a watchdog counter that times out to reset, while a 32.768 kilohertz crystal feeds a divider and RTC registers with an alarm output."
+  }
+ },
+ "examples": [
+  {
+   "question": "A watchdog timer is clocked at 32 kHz. Its prescaler is 128 and its counter is 12 bits wide. (a) Find one counter tick and the timeout. (b) Choose a safe kick period for a main loop whose worst-case pass is 6 s. (c) An RTC uses a 32.768 kHz crystal; find its 1 Hz divider ratio.",
+   "steps": [
+    "f_wdt = 32 kHz = 32000 Hz.",
+    "t_tick = P / f_wdt = 128 / 32000 = 0.004 s = 4 ms.",
+    "Counter states = 2^N = 2^12 = 4096.",
+    "T_timeout = 4096 × 0.004 s = 16.384 s.",
+    "Worst-case main loop = 6 s. A 10 s kick period is above 6 s and below 16.384 s, so it gives margin and still resets on a hang.",
+    "RTC divider ratio = f_xtal / f_1Hz = 32768 / 1 = 32768 = 2^15."
+   ],
+   "answer": "The watchdog tick is 4 ms, the timeout is 16.384 s, a 10 s kick period is safe for a 6 s main loop, and the RTC divides by 2^15 = 32768 to produce 1 Hz.",
+   "check": "f_wdt = 32000\nP = 128\nN = 12\nt_tick = P / f_wdt\nT = (2**N) * P / f_wdt\nkick = 10\nratio = 32768\nprint(round(t_tick * 1000, 1))\nprint(round(T, 3))\nprint(kick)\nprint(ratio)",
+   "values": [
+    4.0,
+    16.384,
+    10,
+    32768
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Kicking the watchdog inside a fast timer ISR proves only that the timer works. A hung main loop can still keep the system alive forever. Service from the main loop.",
+  "A watchdog timeout is the maximum time between kicks, not the period you must use. Choose a period below it with margin.",
+  "RTC time registers are often BCD. Reading 0x59 as binary gives 89; treat it as 59 before arithmetic.",
+  "A backup battery on VBAT keeps the RTC oscillator and registers, not the CPU or main RAM.",
+  "A window watchdog resets on an early kick as well as a late one; test both limits."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does a watchdog timer do when it times out?",
+   "marks": 2,
+   "a": "It asserts a reset, restarting the CPU from the reset vector and setting a reset-cause flag."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a watchdog clocked by its own oscillator?",
+   "marks": 3,
+   "a": "So it keeps counting when the CPU clock, PLL or main loop fails; a shared clock could stop with the fault."
+  },
+  {
+   "level": "apply",
+   "q": "A WDT has f_wdt = 1 MHz, P = 64 and N = 16. Find t_tick and T_timeout.",
+   "marks": 4,
+   "a": "t_tick = 64 / 1,000,000 = 64 µs. 2^16 = 65536. T_timeout = 65536 × 64 µs = 4.194304 s."
+  },
+  {
+   "level": "understand",
+   "q": "Why must firmware not kick the watchdog only from a timer ISR?",
+   "marks": 3,
+   "a": "The ISR can keep running while the main loop hangs; the kick then lies about system health."
+  },
+  {
+   "level": "analyze",
+   "q": "A window watchdog opens at 50% of timeout and closes at 100%. A kick arrives at 30%. What happens and why is this useful?",
+   "marks": 5,
+   "a": "It causes reset because it is before the window opens. This catches runaway code that kicks too often, not only too late."
+  },
+  {
+   "level": "remember",
+   "q": "Why is 32.768 kHz used for RTC crystals?",
+   "marks": 2,
+   "a": "32768 = 2^15, so a binary divider chain gives exactly 1 Hz."
+  },
+  {
+   "level": "apply",
+   "q": "An RTC reads 0x45 in its seconds register in BCD. What decimal seconds does it mean? What would a binary reading give?",
+   "marks": 4,
+   "a": "BCD: 45 s. Binary: 0x45 = 69, showing why conversion is needed."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, watchdogs are part of safety and security designs: window watchdogs catch timing faults, and reset-cause logging feeds fleet diagnostics. RTC calibration against a network time source matters for energy meters and payment terminals. Low-power modes and RTOS time services are covered in Unit 6 and Unit 5. Search next for 'independent watchdog', 'window watchdog', 'VBAT RTC' and 'RTC calibration'."
+}

@@ -1,0 +1,271 @@
+{
+ "lead": "An analog voltage varies continuously; a processor stores only whole numbers. An ADC (analog-to-digital converter) maps an input voltage to a digital code. A DAC (digital-to-analog converter) maps a code back to a voltage. Both are scaled by a reference voltage Vref and a resolution of n bits, so the same code means different volts on different chips. Sensors, audio, battery monitors and motor-current loops all cross this boundary. This chapter shows the transfer equations, sample-and-hold and SAR conversion, the start-of-conversion bit and the end-of-conversion flag, and polling versus interrupt reads.",
+ "prereq": "You need <a href=\"#gpio-and-i-o-ports\">GPIO</a> to drive the pins, <a href=\"#timers-counters-capture-and-compare\">timers</a> for sample timing, and <a href=\"#interrupts-isrs-latency-and-priority-polling\">interrupts</a> for the interrupt read.",
+ "sections": [
+  {
+   "h3": "Voltage in, code out",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An ADC answers one question: which code best represents Vin? Two numbers fix the answer. The resolution n is the number of bits in the output code. The reference Vref is the voltage that code 2ⁿ−1 represents; code 0 represents 0 V. The gap between neighbouring codes is the quantization step q. Some syllabi call these A/D and D/A converters."
+    },
+    {
+     "type": "formula",
+     "text": "q = Vref / (2ⁿ − 1)",
+     "where": "q is the quantization step in volts per code (one LSB); Vref is the reference voltage in volts; n is the resolution in bits."
+    },
+    {
+     "type": "formula",
+     "text": "code = round(Vin / q)",
+     "where": "Vin is the input voltage in volts; round means nearest integer, not truncation; code is an integer from 0 to 2ⁿ−1."
+    },
+    {
+     "type": "formula",
+     "text": "Vout = code × q",
+     "where": "Vout is the DAC output voltage in volts; code is the input code; q = Vref / (2ⁿ − 1)."
+    },
+    {
+     "type": "p",
+     "text": "For n = 10 and Vref = 3.3 V, q = 3.3/1023 = 3.226 mV. Code 310 means 310 × 3.226 mV = 1.0 V. The same code on a 12-bit converter with Vref = 3.3 V would mean 310 × 0.806 mV = 0.250 V. A code without n and Vref is meaningless. The full-scale code is 2ⁿ−1, not 2ⁿ; that one-count difference is small at 12 bits and large at 4 bits."
+    },
+    {
+     "type": "table",
+     "head": [
+      "n",
+      "codes",
+      "q at Vref = 3.3 V"
+     ],
+     "rows": [
+      [
+       "8",
+       "256",
+       "12.94 mV"
+      ],
+      [
+       "10",
+       "1024",
+       "3.226 mV"
+      ],
+      [
+       "12",
+       "4096",
+       "0.806 mV"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Sample, hold, approximate",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An ADC cannot watch a moving input while it compares. A sample-and-hold circuit closes a switch, charges a capacitor to Vin, then opens the switch. The capacitor holds Vin steady while the converter works. The sample clock decides when this happens. If the signal changes faster than half the sampling rate, the readings alias: a 900 Hz tone sampled at 1 kHz looks like 100 Hz. Keep the sample rate above twice the highest input frequency."
+    },
+    {
+     "type": "p",
+     "text": "Most microcontroller ADCs use successive approximation (SAR). The SAR register starts at mid-scale. The internal DAC produces Vref/2; the comparator says whether Vin is higher or lower. If higher, the MSB stays 1; if lower, it clears. The next trial adds Vref/4, then Vref/8, and so on. After n trials the register holds the nearest code. A 10-bit SAR conversion takes about 10 comparator steps plus sampling and settling time, typically a few microseconds."
+    },
+    {
+     "type": "p",
+     "text": "Software controls the ADC through registers. Write the channel number to select one pin of the input multiplexer. Set the start-of-conversion bit (SOC or START). The hardware sets the end-of-conversion flag (EOC) or raises an interrupt when the data register is ready."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write the channel number in the ADC control register.",
+      "Set START.",
+      "Read the status register until EOC = 1.",
+      "Copy the data register into a variable.",
+      "Clear EOC, often by reading the data register or writing 1 to the flag."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "With an interrupt, enable the ADC interrupt, set START, and return to other work. The ISR reads the data register, clears EOC and sets a software flag. Polling wastes CPU cycles but needs no ISR; interrupts free the CPU but add latency and shared-data care, as covered in <a href=\"#interrupts-isrs-latency-and-priority-polling\">interrupts</a>."
+    },
+    {
+     "type": "code",
+     "lang": "pseudo",
+     "code": "// polling\nADC_CTRL = CH3 | START\nwhile (ADC_STATUS & EOC) == 0:\n    ;                       // wait\ncode = ADC_DATA\nADC_STATUS = EOC            // clear flag\n\n// interrupt\nADC_CTRL = CH3 | START | ADC_INT_EN\n// ISR when EOC sets:\nisr_adc():\n    code = ADC_DATA\n    ADC_STATUS = EOC\n    done = 1",
+     "stdin": "",
+     "output": "code = 310, done = 1 after the ISR runs"
+    }
+   ]
+  },
+  {
+   "h3": "DAC: code back to volts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A DAC reverses the mapping. The input is a code, the output is a voltage. The common R-2R ladder uses resistors of only two values: R and 2R. Each bit steers a binary-weighted current into an op-amp summing node. The MSB (bit n−1) contributes half the total current, the next bit down (bit n−2) contributes half of that, the next half again, and so on down to the LSB (bit 0). The op-amp turns the total current into Vout = code × Vref/(2ⁿ−1)."
+    },
+    {
+     "type": "p",
+     "text": "For an 8-bit DAC with Vref = 5 V, q = 5/255 = 19.608 mV. Code 100 gives 100 × 19.608 mV = 1.961 V. Code 255 gives 5.000 V. The output moves in steps of q. Settling time is the time from a code change until Vout stays within half an LSB of the final value. Fast DACs settle in nanoseconds; slow ones in microseconds."
+    },
+    {
+     "type": "p",
+     "text": "DACs set analog references for motor drives, generate audio and produce test waveforms. When the required bandwidth is low, a PWM pin plus an RC low-pass filter is a cheap DAC: the duty cycle sets the average voltage (see <a href=\"#pwm-generation\">PWM generation</a>). Either way, Vref sets the scale, so a dirty reference adds the same percentage error to every output."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The left path turns a 1.0 V input into code 310 through a 10-bit ADC with a 3.3 V reference; the right path turns code 100 into 1.961 V through an 8-bit DAC with a 5 V reference. Notice that the code alone means nothing: the resolution and the reference set its value.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "ADC and DAC signal paths",
+   "nodes": [
+    {
+     "id": "vin",
+     "label": "Vin 1.0 V",
+     "style": "normal"
+    },
+    {
+     "id": "sh",
+     "label": "Sample/hold",
+     "style": "normal"
+    },
+    {
+     "id": "adc",
+     "label": "10-bit ADC",
+     "style": "accent"
+    },
+    {
+     "id": "code",
+     "label": "code 310",
+     "style": "live"
+    },
+    {
+     "id": "vref",
+     "label": "Vref 3.3 V",
+     "style": "muted"
+    },
+    {
+     "id": "dcode",
+     "label": "code 100",
+     "style": "next"
+    },
+    {
+     "id": "dac",
+     "label": "8-bit DAC",
+     "style": "accent"
+    },
+    {
+     "id": "vout",
+     "label": "1.961 V",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "vin",
+     "to": "sh"
+    },
+    {
+     "from": "sh",
+     "to": "adc"
+    },
+    {
+     "from": "vref",
+     "to": "adc"
+    },
+    {
+     "from": "adc",
+     "to": "code"
+    },
+    {
+     "from": "dcode",
+     "to": "dac"
+    },
+    {
+     "from": "dac",
+     "to": "vout"
+    }
+   ],
+   "aria": "Block diagram of ADC and DAC paths: a 1.0 volt input goes through sample and hold to a 10-bit ADC with 3.3 volt reference and gives code 310, while code 100 into an 8-bit DAC with 5 volt reference gives 1.961 volts."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 10-bit ADC has Vref = 3.3 V and Vin = 1.0 V. Find the quantization step and the output code. An 8-bit DAC has Vref = 5 V and input code 100. Find its output voltage.",
+   "steps": [
+    "ADC step: n = 10, so 2ⁿ − 1 = 1023.",
+    "q = 3.3 V / 1023 = 0.0032258 V = 3.226 mV.",
+    "code = round(1.0 V / 0.0032258 V) = round(310.0) = 310.",
+    "DAC step: n = 8, so 2ⁿ − 1 = 255.",
+    "q = 5 V / 255 = 0.019608 V = 19.608 mV.",
+    "Vout = 100 × 0.019608 V = 1.961 V."
+   ],
+   "answer": "The ADC gives code 310 with q = 3.226 mV; the DAC gives 1.961 V.",
+   "check": "q = 3.3/1023\ncode = round(1.0/q)\nvout = 100/255*5\nprint(round(q*1000, 3))\nprint(code)\nprint(round(vout, 3))",
+   "values": [
+    3.226,
+    310,
+    1.961
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using 2ⁿ in place of 2ⁿ−1. For 8 bits at 5 V, 5/256 = 19.53 mV, not 19.61 mV, and the top code never reaches Vref.",
+  "Dropping Vref. A code alone says nothing; 310 means 1.0 V only when Vref = 3.3 V and n = 10.",
+  "Mixing V and mV in one line. Convert q to mV only after writing all values in volts, or keep units on every number.",
+  "Treating resolution as accuracy. A 12-bit ADC can be less accurate than a good 10-bit part; offset, noise and missing codes matter.",
+  "Forgetting to wait for EOC or to clear it. Reading the data register too early returns the old code, and a stale flag starts the next read at the wrong time."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "How many output codes does an n-bit ADC have, and what is the largest code?",
+   "marks": 2,
+   "a": "It has 2ⁿ codes, from 0 to 2ⁿ−1. The largest code is 2ⁿ−1."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the quantization step Vref/(2ⁿ−1) rather than Vref/2ⁿ?",
+   "marks": 3,
+   "a": "Code 0 is 0 V and code 2ⁿ−1 is Vref, so there are 2ⁿ−1 equal steps between them. Dividing by 2ⁿ would leave the top code below Vref."
+  },
+  {
+   "level": "apply",
+   "q": "A 12-bit ADC has Vref = 5 V and Vin = 2.5 V. Find q and the output code.",
+   "marks": 4,
+   "a": "q = 5/4095 = 1.221 mV. code = round(2.5/5 × 4095) = round(2047.5) = 2048."
+  },
+  {
+   "level": "analyze",
+   "q": "A steady 1.000 V input to a 10-bit, 3.3 V ADC gives codes 309 and 310 on alternate reads. Give two likely causes and one fix.",
+   "marks": 4,
+   "a": "Likely causes: noise on Vin or Vref, or too little sample-and-hold time because the source impedance is too high. Fix: add an RC filter and decoupling, lower the source impedance, increase sampling time, or average several readings."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit DAC has Vref = 3.3 V and code 200. Find Vout.",
+   "marks": 3,
+   "a": "q = 3.3/255 = 12.941 mV. Vout = 200 × 0.012941 V = 2.588 V."
+  },
+  {
+   "level": "understand",
+   "q": "What does a sample-and-hold circuit do, and why does an ADC need it?",
+   "marks": 3,
+   "a": "It charges a capacitor to Vin and holds that value during conversion. The comparator then sees a fixed input, so a moving signal does not corrupt the code."
+  },
+  {
+   "level": "analyze",
+   "q": "Give one case where polling an ADC is better and one where an interrupt is better.",
+   "marks": 4,
+   "a": "Polling suits a short, rare conversion when the CPU has nothing else to do; it is simple and has no ISR overhead. Interrupts suit slow conversions or a busy CPU because the CPU works on other tasks and the ISR reads the result."
+  },
+  {
+   "level": "remember",
+   "q": "Name the control bit that starts a conversion and the status bit that says it is finished.",
+   "marks": 2,
+   "a": "Start-of-conversion (SOC or START) starts it; end-of-conversion (EOC) says it is finished."
+  }
+ ],
+ "beyond": "Not for the exam. Practical systems add calibration: measure two known inputs and correct offset and gain in software. Sigma-delta ADCs trade speed for resolution and are common in weigh scales and audio. R-2R DACs and resistor-string DACs appear inside audio codecs and function generators. Industrial current loops often use 4–20 mA instead of voltage because current survives long cable runs. Search for SAR ADC timing, R-2R ladder, ADC INL and DNL, and sigma-delta modulation to go deeper."
+}

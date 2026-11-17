@@ -1,0 +1,262 @@
+{
+ "lead": "A timer is a small counter built into the microcontroller that advances on clock edges. It gives the chip a sense of time without the CPU waiting in delay loops. The prescaler slows a fast clock down to a usable tick. The counter's value can be read, and two helper registers make it more useful: capture stores the count when an external event arrives, and compare fires an action when the count reaches a set value. Timers produce delays, measure pulse widths and frequencies, timestamp sensor edges, and drive the PWM blocks that dim LEDs and control motors.",
+ "prereq": "You need: <a href=\"#gpio-and-i-o-ports\">3.1 GPIO and I/O ports</a> for pin configuration, and Unit 2 for the special function registers that control an on-chip peripheral.",
+ "sections": [
+  {
+   "h3": "Clock, prescaler and the tick",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <b>timer</b> counts internal clock ticks. A <b>counter</b> counts edges on an external pin. The same hardware does both: only the clock source changes. Everything below applies to either role."
+    },
+    {
+     "type": "p",
+     "text": "The <b>prescaler</b> sits between the clock and the counter and divides the clock by a whole number P. It lets a fast oscillator produce long delays without building a very wide counter."
+    },
+    {
+     "type": "formula",
+     "text": "T = P / f_clk",
+     "where": "T is the tick, the time for one count, in seconds; P is the prescaler divide factor (1, 2, 4, 8, ...); f_clk is the clock feeding the timer in hertz."
+    },
+    {
+     "type": "p",
+     "text": "A prescaler of 16 on a 4 MHz clock gives T = 16 / 4 000 000 Hz = 4 µs. An n-bit counter holds values 0 to 2ⁿ − 1. It wraps from the top value to 0, sets the overflow flag, and continues. A free-running timer therefore overflows every 2ⁿ × T seconds. An auto-reload timer copies a stored reload value into the counter at each overflow, so its period is (2ⁿ − reload) × T. Some timers count down, or up and then down, which suits centre-aligned PWM (see <a href=\"#pwm-generation\">3.5</a>)."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Prescaler P",
+      "Tick at 4 MHz"
+     ],
+     "rows": [
+      [
+       "1",
+       "0.25 µs"
+      ],
+      [
+       "16",
+       "4 µs"
+      ],
+      [
+       "64",
+       "16 µs"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Capture and compare",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>Input capture.</b> An edge on a capture pin copies the counter into a capture register in hardware, at the instant the edge arrives. Software reads that stored copy later, so interrupt latency and instruction timing do not spoil the measurement. Two captures of the same kind of edge give the period: period = (capture2 − capture1) × T, and frequency = 1 / period. If the counter wrapped between the two captures, add 2ⁿ to the difference before multiplying. Capturing on both edges of one pulse gives its width the same way."
+    },
+    {
+     "type": "p",
+     "text": "<b>Output compare.</b> A compare register holds a target value. When the counter reaches it, hardware sets a match flag, can toggle, set or clear an output pin, and can raise an interrupt. That gives exact pin edges and exact delays without software loops. Repeating the match every period produces a square wave; changing the duty cycle of that square wave is PWM."
+    },
+    {
+     "type": "p",
+     "text": "Many microcontrollers group capture, compare and PWM into one block. Some syllabi call it the <b>CCP</b> module (capture/compare/PWM). A compare match reaches the CPU through the interrupt system described in <a href=\"#interrupts-isrs-latency-and-priority-polling\">3.3</a>."
+    }
+   ]
+  },
+  {
+   "h3": "Programming a timer",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Configure a timer in a fixed order, so that no half-set register fires early."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Stop the timer by clearing its enable bit.",
+      "Select the clock source and write the prescaler P.",
+      "Select the mode: 8-bit or 16-bit, up or up/down, free-running or auto-reload.",
+      "Write the reload register for a period, or the compare register for a match time.",
+      "Clear the overflow or match flag.",
+      "Enable the interrupt if the flag should wake the CPU.",
+      "Set the enable bit to start counting."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "counts = d / T        reload = 2ⁿ − counts",
+     "where": "d is the wanted delay in seconds; T is the tick in seconds; n is the counter width in bits; counts is the number of ticks in the delay; reload is the value written to the reload register."
+    },
+    {
+     "type": "p",
+     "text": "If counts is larger than 2ⁿ, the delay cannot fit: raise the prescaler or use a wider timer. The reload value is never the delay count itself."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The 4 MHz clock is divided by 16 to make a 4 µs tick; the counter feeds both the compare match, which drives the pin and the flag, and the capture register, which snapshots the count on an event edge.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Timer with capture and compare",
+   "nodes": [
+    {
+     "id": "clk",
+     "label": "Clock",
+     "note": "4 MHz",
+     "style": "normal"
+    },
+    {
+     "id": "pre",
+     "label": "Prescaler",
+     "note": "divide by 16",
+     "style": "normal"
+    },
+    {
+     "id": "cnt",
+     "label": "Counter",
+     "note": "16-bit up",
+     "style": "accent"
+    },
+    {
+     "id": "cmp",
+     "label": "Compare",
+     "note": "reload 0xCF2C",
+     "style": "live"
+    },
+    {
+     "id": "out",
+     "label": "Output pin",
+     "note": "set on match",
+     "style": "normal"
+    },
+    {
+     "id": "irq",
+     "label": "Interrupt flag",
+     "note": "match or overflow",
+     "style": "muted"
+    },
+    {
+     "id": "ev",
+     "label": "Event input",
+     "note": "edge on pin",
+     "style": "normal"
+    },
+    {
+     "id": "cap",
+     "label": "Capture register",
+     "note": "holds the count",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "clk",
+     "to": "pre"
+    },
+    {
+     "from": "pre",
+     "to": "cnt",
+     "label": "tick 4 µs"
+    },
+    {
+     "from": "cnt",
+     "to": "cmp"
+    },
+    {
+     "from": "cmp",
+     "to": "out",
+     "label": "match"
+    },
+    {
+     "from": "cmp",
+     "to": "irq"
+    },
+    {
+     "from": "ev",
+     "to": "cap",
+     "label": "snapshot"
+    },
+    {
+     "from": "cnt",
+     "to": "cap"
+    }
+   ],
+   "aria": "Block diagram of a timer: a 4 MHz clock passes through a divide-by-16 prescaler to a 16-bit counter, the counter drives compare logic that sets an output pin and an interrupt flag, and an event input snapshots the counter into a capture register."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 16-bit up-counter runs from a 4 MHz clock with a prescaler of 16. (a) Find the tick. (b) Find the maximum time before overflow. (c) Find the reload value that gives an overflow every 50 ms.",
+   "steps": [
+    "Tick: T = P / f_clk = 16 / (4 × 10⁶ Hz) = 4 × 10⁻⁶ s = 4 µs.",
+    "Range: a 16-bit counter holds 2¹⁶ = 65536 counts, from 0 to 65535.",
+    "Maximum overflow time: 65536 × 4 µs = 262144 µs = 262.144 ms.",
+    "Counts needed for 50 ms: counts = d / T = 50 ms / 4 µs = 0.050 s / 4 × 10⁻⁶ s = 12500.",
+    "Reload: reload = 2ⁿ − counts = 65536 − 12500 = 53036, which is 0xCF2C in hex."
+   ],
+   "answer": "Tick = 4 µs, maximum overflow time = 262.144 ms, and the reload value for a 50 ms overflow is 53036 (0xCF2C).",
+   "check": "f_clk = 4e6\nP = 16\nn = 16\nd = 50e-3\nT = P / f_clk\nprint(T * 1e6)\nprint(2**n * T * 1e3)\nprint(d / T)\nprint(int(2**n - d / T))\n",
+   "values": [
+    4.0,
+    262.144,
+    12500.0,
+    53036
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Reload is not the delay count. A 16-bit timer overflows after 2ⁿ − reload ticks, so for 12500 ticks you load 53036, not 12500.",
+  "The prescaler divides the clock and never multiplies it. T = P / f_clk, so a larger P gives a longer tick, coarser resolution and a longer reachable delay.",
+  "Read the reference manual for two local conventions: whether the prescaler register holds the divide factor or that value minus one, and whether the match happens at the written compare value or one count later.",
+  "A capture difference taken across an overflow looks wrong. Add 2ⁿ to the difference before converting to time.",
+  "A stale flag fires the interrupt the moment you set the enable bit. Clear the flag after configuring and before enabling the interrupt."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the difference between a timer and a counter.",
+   "marks": 2,
+   "a": "A timer counts internal clock ticks; a counter counts external events, normally edges on a pin. The same hardware block is used; only the clock source selection changes."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a prescaler placed before the counter?",
+   "marks": 2,
+   "a": "It divides a fast clock so a small counter can still reach long delays. The cost is a coarser tick, so resolution is traded for range."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit timer runs from an 8 MHz clock with a prescaler of 64. Find the tick, the maximum overflow time, and the reload value for a 1 ms overflow.",
+   "marks": 4,
+   "a": "T = 64 / 8 MHz = 8 µs. Maximum = 256 × 8 µs = 2.048 ms. Counts = 1 ms / 8 µs = 125. Reload = 256 − 125 = 131."
+  },
+  {
+   "level": "apply",
+   "q": "Two input captures of the same edge read 1000 and 4500 on a 16-bit counter with a 4 µs tick. Find the period and the frequency.",
+   "marks": 4,
+   "a": "No wrap occurred, so difference = 4500 − 1000 = 3500 counts. Period = 3500 × 4 µs = 14000 µs = 14 ms. Frequency = 1 / 0.014 s = 71.4 Hz."
+  },
+  {
+   "level": "analyze",
+   "q": "Why must the overflow flag be cleared before the interrupt is enabled?",
+   "marks": 5,
+   "a": "If the flag is already pending, enabling the interrupt sends the request at once. The ISR runs before the first real overflow, so the first measured period is wrong and the count of periods is off by one."
+  },
+  {
+   "level": "analyze",
+   "q": "A student loads 12500 into the reload register of a 16-bit timer with a 4 µs tick, expecting a 50 ms overflow, and measures about 212 ms. Explain the mistake.",
+   "marks": 5,
+   "a": "The overflow comes after 2ⁿ − reload ticks = 65536 − 12500 = 53036 ticks. That is 53036 × 4 µs = 212.144 ms. The correct reload for 50 ms is 65536 − 12500 = 53036."
+  },
+  {
+   "level": "understand",
+   "q": "What does a compare match do to an output pin?",
+   "marks": 3,
+   "a": "Hardware sets the match flag and drives the pin to the programmed state, such as toggle, set or clear, and can request an interrupt. The pin edge therefore comes from the counter, not from software timing."
+  }
+ ],
+ "beyond": "Not for the exam. Modern timer blocks carry extra hardware for motor control: dead-time insertion, complementary outputs and centre-aligned counting, so one chip can drive a three-phase inverter. Input capture timestamps crank and cam sensor edges in engine control and decodes infrared remote frames. High-resolution timers in digital power converters place edges with sub-nanosecond steps. Next, open the timer chapter of your MCU reference manual and search for input capture and output compare example code."
+}

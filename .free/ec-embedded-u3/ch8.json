@@ -1,0 +1,246 @@
+{
+ "lead": "A sensor turns a physical quantity into an electrical signal; an actuator turns an electrical signal into motion, heat or light. The microcontroller reads sensors and commands actuators. Signal conditioning shapes a raw sensor output for an ADC or GPIO pin. A driver lets a weak pin switch a coil, lamp or motor that needs far more current.",
+ "prereq": "You need: <a href=\"#gpio-and-i-o-ports\">3.1</a> for pin current limits, <a href=\"#pwm-generation\">3.5</a> for duty cycle, and <a href=\"#adc-and-dac-interfacing\">3.6</a> for ADC input.",
+ "sections": [
+  {
+   "h3": "Input side: sensors and signal conditioning",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A sensor converts a physical quantity into an electrical one. The MCU cannot read resistance; it reads a voltage on an ADC pin (<a href=\"#adc-and-dac-interfacing\">3.6</a>) or a logic level on a GPIO pin (<a href=\"#gpio-and-i-o-ports\">3.1</a>). Signal conditioning makes the sensor output fit that input."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "LDR: resistance falls from about 1 MΩ in darkness to a few hundred ohms in bright light; a fixed series resistor forms a divider.",
+      "NTC thermistor: resistance falls as temperature rises. The curve is non-linear, so accurate readings need a lookup table or the beta formula.",
+      "Hall sensor: a logic output that flips near a magnet. Most are open-collector and need a pull-up. Used to count shaft or wheel rotations.",
+      "HC-SR04 ultrasonic: a 10 µs trigger pulse starts a sound burst; the echo pin stays high for the round trip."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "V_out = V_cc × R_fixed ÷ (R_sensor + R_fixed)",
+     "where": "V_out is the divider output in volts to the ADC pin; V_cc is the supply in volts; R_sensor is the sensor resistance in ohms from V_cc to the output node; R_fixed is the resistor in ohms from the output node to ground. Bright light lowers R_sensor, so V_out rises."
+    },
+    {
+     "type": "formula",
+     "text": "d = v × t ÷ 2",
+     "where": "d is distance in metres; v is the speed of sound, about 343 m/s at 20 °C; t is the echo pulse width in seconds. The 2 covers the outbound and return path. At 343 m/s, 1 cm costs about 58 µs."
+    },
+    {
+     "type": "p",
+     "text": "A push button is the simplest sensor: one side to the pin, the other to ground, plus a 10 kΩ pull-up to 3.3 V. Released, the pin reads 1; pressed, 0. Contacts bounce for 5–20 ms, so debounce: read, wait 10 ms, read again, and accept the value only when both reads agree."
+    }
+   ]
+  },
+  {
+   "h3": "Output side: the pin drives a transistor, not the load",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A GPIO pin sources or sinks a few milliamperes — often 4 mA guaranteed and 20 mA absolute maximum. A 5 V relay coil draws 80 mA; a small DC motor draws 500 mA. Wiring either to a pin destroys the output driver. The pin supplies a control current; a transistor supplies the load current."
+    },
+    {
+     "type": "p",
+     "text": "In a low-side switch the emitter goes to ground, the collector to the load, and the other end of the load to the supply. A logic 1 on the base turns the transistor on and pulls the load's lower end down to about 0.2 V, written V_CE(sat). A logic 0 turns it off."
+    },
+    {
+     "type": "formula",
+     "text": "I_B = I_C ÷ β,   R_B = (V_pin − V_BE) ÷ I_B",
+     "where": "I_C is the load current in amperes; β (hFE) is the transistor's DC current gain from its datasheet, a pure number; I_B is the base current in amperes; V_pin is the GPIO high voltage in volts; V_BE is the base-emitter drop, about 0.7 V for a silicon BJT; R_B is the base resistor in ohms."
+    },
+    {
+     "type": "p",
+     "text": "A relay coil is an inductor. At switch-off the coil current cannot stop instantly; the coil generates V = L·di/dt, a spike of hundreds of volts at the collector, and the transistor breaks down. A 1N4007 across the coil — cathode to the +5 V end, anode to the collector — gives that current a path and clamps the spike to about 0.7 V above the supply. Leaving it out is the most common way to kill a driver."
+    },
+    {
+     "type": "p",
+     "text": "For a mains load the relay contact already isolates the mains from the coil side. An optocoupler such as the PC817 adds a second barrier between the pin and the driver transistor. A MOC3021 with a triac switches mains with no relay at all. For several relays, a ULN2003 packs seven Darlington pairs with the flyback diodes already inside."
+    }
+   ]
+  },
+  {
+   "h3": "Motors: direction, speed and steps",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A DC motor reverses when the supply polarity reverses. Four switches in an H-bridge allow either polarity: close top-left with bottom-right for one direction, top-right with bottom-left for the other. Never close both switches on one side — that is shoot-through, a direct short from supply to ground. The L293D has protection diodes built in; a bare L298N needs external fast-recovery diodes across its outputs."
+    },
+    {
+     "type": "p",
+     "text": "Speed comes from PWM on the enable pin (<a href=\"#pwm-generation\">3.5</a>). The motor sees the average voltage, so 50% duty from a 12 V supply gives roughly 6 V across it, about half speed. A few kHz is fine where noise does not matter; push above 20 kHz and the switching is inaudible."
+    },
+    {
+     "type": "p",
+     "text": "A stepper moves in fixed steps — 1.8° per step is 200 steps per revolution — and holds position when stopped. A unipolar four-phase motor (ULN2003) cannot reverse a coil, so energise the phases in order A, B, C, D, or two at a time as AB, BC, CD, DA. A bipolar two-winding motor (A4988 or H-bridge) can reverse current: the full-step order is A+, B+, A−, B−, often written A, B, A′, B′. Energise them wrongly and the rotor only vibrates. The driver IC carries the coil currents; the MCU sends only step and direction pulses."
+    },
+    {
+     "type": "p",
+     "text": "A BLDC motor has three windings and no brushes. An electronic speed controller (ESC) switches them in the right order, using three Hall sensors or the back-EMF to find the rotor angle. Many ESCs accept a 1–2 ms pulse repeating at 50 Hz."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The upper chain conditions a sensor signal into an ADC or GPIO input. The lower chain shows the pin driving a transistor base through 2.7 kΩ, with the 80 mA relay coil and its flyback diode on the collector side.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Sensor input and actuator drive",
+   "nodes": [
+    {
+     "id": "sen",
+     "label": "Sensor",
+     "style": "normal"
+    },
+    {
+     "id": "cond",
+     "label": "Conditioning",
+     "style": "normal"
+    },
+    {
+     "id": "adc",
+     "label": "ADC/GPIO",
+     "style": "accent"
+    },
+    {
+     "id": "mcu",
+     "label": "MCU",
+     "style": "normal"
+    },
+    {
+     "id": "rb",
+     "label": "2.7 kΩ",
+     "style": "live"
+    },
+    {
+     "id": "q",
+     "label": "Transistor",
+     "style": "accent"
+    },
+    {
+     "id": "coil",
+     "label": "Relay coil 80 mA",
+     "style": "normal"
+    },
+    {
+     "id": "load",
+     "label": "Load",
+     "style": "muted"
+    },
+    {
+     "id": "diode",
+     "label": "Flyback diode",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "sen",
+     "to": "cond"
+    },
+    {
+     "from": "cond",
+     "to": "adc"
+    },
+    {
+     "from": "mcu",
+     "to": "rb"
+    },
+    {
+     "from": "rb",
+     "to": "q",
+     "label": "base"
+    },
+    {
+     "from": "q",
+     "to": "coil"
+    },
+    {
+     "from": "coil",
+     "to": "load"
+    },
+    {
+     "from": "diode",
+     "to": "coil",
+     "label": "across coil"
+    }
+   ],
+   "aria": "Block diagram with a sensor going through conditioning to an ADC or GPIO, and an MCU driving a transistor base through a 2.7 kilo-ohm resistor to a relay coil and load, with a flyback diode across the coil."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 5 V relay coil draws 80 mA. It is switched by an NPN transistor with β = 100 and V_BE = 0.7 V. The driving GPIO pin outputs 3.3 V when high and can source at most 4 mA. Find the base current, the base resistor and the nearest standard value, and state the protection component needed.",
+   "steps": [
+    "Collector current: I_C = 80 mA = 0.080 A. The coil resistance sets it (5 V ÷ 80 mA = 62.5 Ω); the transistor only carries it.",
+    "Base current: I_B = I_C ÷ β = 0.080 ÷ 100 = 0.8 mA, well inside the 4 mA the pin can source.",
+    "Base resistor: R_B = (3.3 − 0.7) ÷ 0.0008 = 3250 Ω.",
+    "3.3 kΩ gives 2.6 ÷ 3300 = 0.788 mA — the rounding goes the wrong way. The next E12 value down, 2.7 kΩ, gives 2.6 ÷ 2700 = 0.96 mA. Better still, compute I_B from hFE(min) and multiply by an overdrive factor of 2–3 so the transistor sits hard in saturation.",
+    "Protection: a 1N4007 across the coil, cathode to +5 V and anode to the collector, clamps the switch-off spike. The 80 mA flows from the 5 V supply through the coil and collector; the pin carries only the base current."
+   ],
+   "answer": "R_B = 2.7 kΩ gives I_B ≈ 0.96 mA, and a 1N4007 flyback diode across the coil protects the transistor.",
+   "check": "Vpin = 3.3\nVbe = 0.7\nIc_mA = 80.0\nbeta = 100\nIb_mA = Ic_mA / beta\nRb = (Vpin - Vbe) / (Ib_mA / 1000)\nIb_actual_mA = (Vpin - Vbe) / 2700 * 1000\nprint(Ib_mA)\nprint(Rb)\nprint(round(Ib_actual_mA, 3))",
+   "values": [
+    0.8,
+    3250.0,
+    0.963
+   ],
+   "output": ""
+  },
+  {
+   "question": "An HC-SR04 ultrasonic module sends a trigger pulse. The echo pin stays high for 580 µs. The speed of sound is 343 m/s. Find the distance to the object.",
+   "steps": [
+    "Echo time t = 580 µs = 0.00058 s.",
+    "Round-trip path = v × t = 343 × 0.00058 = 0.19894 m.",
+    "Distance = half the path = 0.19894 ÷ 2 = 0.09947 m = 9.95 cm."
+   ],
+   "answer": "The object is about 9.95 cm away, roughly 10 cm.",
+   "check": "v = 343\nt = 580e-6\nd = v * t / 2\nprint(round(d, 5))",
+   "values": [
+    0.09947
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Connecting a relay coil or motor straight to a GPIO pin. The pin is rated for a few milliamperes, the coil needs 80 mA and a motor hundreds; the output driver burns.",
+  "Leaving out the flyback diode across a coil, or fitting it the wrong way round. Anode at +5 V makes it conduct whenever the transistor is on, shorting the coil.",
+  "Confusing coil ratings with contact ratings. A relay marked 5 V, 80 mA coil and 230 V, 5 A contacts describes two separate circuits; the MCU only ever sees the first."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the purpose of a flyback diode in a relay driver?",
+   "marks": 2,
+   "a": "It gives the coil's stored current a path when the transistor turns off, clamping the inductive spike to about 0.7 V above the supply and protecting the transistor."
+  },
+  {
+   "level": "understand",
+   "q": "Explain why a microcontroller pin cannot drive a 5 V, 80 mA relay coil directly.",
+   "marks": 3,
+   "a": "The pin is rated for about 4 mA guaranteed, 20 mA absolute maximum. 80 mA exceeds that, so the small output transistor inside the pin overheats and the pin or its port is destroyed. A buffer transistor carries the 80 mA; the pin supplies only the base current."
+  },
+  {
+   "level": "apply",
+   "q": "A 12 V relay coil draws 60 mA. The switching transistor has β = 50 and V_BE = 0.7 V. The GPIO high is 3.3 V. Find the base resistor and the nearest standard value.",
+   "marks": 4,
+   "a": "I_B = 60 mA ÷ 50 = 1.2 mA = 0.0012 A. R_B = (3.3 − 0.7) ÷ 0.0012 = 2167 Ω. Nearest E12 value is 2.2 kΩ, giving I_B = 2.6 ÷ 2200 = 1.18 mA."
+  },
+  {
+   "level": "apply",
+   "q": "An HC-SR04 echo pulse lasts 580 µs and the speed of sound is 343 m/s. Find the distance.",
+   "marks": 4,
+   "a": "Path = 343 × 580 × 10⁻⁶ = 0.19894 m. Distance = path ÷ 2 = 0.09947 m ≈ 9.95 cm, close to the 58 µs-per-cm rule of thumb."
+  },
+  {
+   "level": "analyze",
+   "q": "A stepper motor buzzes and vibrates but does not rotate. Driver and supply are fine. Give two likely causes and the fix.",
+   "marks": 5,
+   "a": "The energisation sequence is wrong for the motor type: a unipolar four-phase motor needs A, B, C, D or AB, BC, CD, DA; a bipolar motor needs A+, B+, A−, B−. Correct the order. Or the step rate is faster than the motor can follow at that load, so it stalls and slips back; add a start-up ramp. A shorted coil gives the same symptom."
+  }
+ ],
+ "beyond": "Industrial sensors often use a 4–20 mA current loop, which ignores voltage drop on long cables. Gate driver ICs such as the IR2110 drive MOSFET half-bridges in inverters. Smart sensors with I2C outputs, such as the BME280, move the conditioning inside the package."
+}

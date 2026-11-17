@@ -1,0 +1,215 @@
+{
+ "lead": "Direct memory access (DMA) is a hardware method that moves a block of bytes between a peripheral and memory, or between two memory areas, without the CPU loading and storing each byte. A small DMA controller holds the source address, destination address, count and transfer size. The CPU writes these once, starts the channel, and continues with other work. DMA is used for ADC sample buffers, UART and SPI streams, display refresh and memory copies. It saves CPU cycles, but it still uses the bus, so it is not free.",
+ "prereq": "You need: <a href=\"#interrupts-isrs-latency-and-priority-polling\">interrupts and ISRs</a> and <a href=\"#adc-and-dac-interfacing\">ADC interfacing</a> (Unit 3.3 and 3.6).",
+ "sections": [
+  {
+   "h3": "CPU setup, then DMA moves the data",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Polling and per-sample interrupts both make the CPU touch every item. At 10 kHz, that is 10,000 CPU actions per second. DMA removes the CPU from the byte path. The CPU first programs the DMA controller: source address (where data comes from), destination address (where it goes), count (number of items), transfer size (bytes per item), and direction. Then it enables the channel. The peripheral raises a DMA request when it has data. The controller asks the bus arbiter for the bus, receives a grant, moves the item, updates the addresses and decrements the count. When count reaches zero, it sets a done flag and raises a completion interrupt. The CPU then reads status and starts the next block. See <a href=\"#interrupts-isrs-latency-and-priority-polling\">interrupts</a> for how the ISR runs."
+    },
+    {
+     "type": "p",
+     "text": "The figure shows the order. Setup goes CPU → DMA controller. Data goes ADC peripheral → DMA controller → memory. The CPU is not in the data path. The DMA controller is a bus master during the transfer, so it can read or write memory on its own. The bus is shared, so the arbiter decides who owns it in each cycle."
+    },
+    {
+     "type": "formula",
+     "text": "t_poll = N × C / f_CPU",
+     "where": "t_poll is polling time in seconds; N is the number of samples; C is CPU cycles per sample; f_CPU is CPU clock in hertz."
+    }
+   ]
+  },
+  {
+   "h3": "Channels, descriptors, modes and arbitration",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A channel is one independent DMA data path with its own source, destination, count and control registers. An MCU may have 8 or 16 channels; each can be tied to a peripheral request line. A descriptor is a small record in memory that holds the same fields, plus a link to the next descriptor. Descriptor-based DMA, also called scatter-gather, lets one start command move several buffers without CPU help between them."
+    },
+    {
+     "type": "p",
+     "text": "Transfer modes decide how long DMA keeps the bus. Single-transfer mode moves one item per request and releases the bus. Burst or block mode holds the bus for a run of items, which is fast but delays the CPU. Cycle-steal mode takes one bus cycle at a time, so the CPU slows but does not stop. Bus arbitration uses request and grant signals: DMA asserts request, the arbiter grants, and DMA releases when done or when its burst ends. A bus matrix on advanced MCUs gives several masters separate paths to different slaves, which reduces contention (bus protocols are in Unit 4)."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Mode",
+      "Bus held",
+      "Use"
+     ],
+     "rows": [
+      [
+       "Single",
+       "one item",
+       "slow peripheral"
+      ],
+      [
+       "Burst",
+       "whole block",
+       "block copy"
+      ],
+      [
+       "Cycle steal",
+       "one cycle",
+       "keep CPU responsive"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "ADC-to-memory, memory-to-memory and cache coherency",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ADC-to-memory is the standard use. The ADC conversion-complete signal is the DMA request. The source is the ADC data register, which stays at one address, so source increment is off. The destination is the sample buffer in RAM, so destination increment is on. Count is the buffer length. The CPU starts the ADC and DMA, then sleeps. DMA writes each 12-bit sample into 2 bytes. At half count, a half-transfer interrupt can signal that the first half is ready; at zero count, the completion interrupt signals the full buffer. This double-buffering keeps capture continuous."
+    },
+    {
+     "type": "p",
+     "text": "Memory-to-memory DMA copies a block from one RAM area to another, used for display frames, audio buffers and data logging. The CPU programs source, destination and count once. Cache coherency matters on MCUs with a data cache. DMA writes RAM directly, bypassing the CPU cache. The CPU may then read a stale cache line. Fix it by cleaning and invalidating the cache region, or by placing the DMA buffer in non-cacheable memory. Small MCUs without a data cache do not have this problem."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The CPU programs the DMA controller once; the controller then moves ADC samples into memory and raises a completion interrupt. Notice that the CPU is outside the data path.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "DMA data path",
+   "nodes": [
+    {
+     "id": "cpu",
+     "label": "CPU",
+     "style": "normal"
+    },
+    {
+     "id": "dma",
+     "label": "DMA controller",
+     "style": "accent"
+    },
+    {
+     "id": "mem",
+     "label": "Memory",
+     "style": "live"
+    },
+    {
+     "id": "adc",
+     "label": "ADC peripheral",
+     "style": "normal"
+    },
+    {
+     "id": "bus",
+     "label": "Bus",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "cpu",
+     "to": "dma",
+     "label": "setup"
+    },
+    {
+     "from": "adc",
+     "to": "dma",
+     "label": "samples"
+    },
+    {
+     "from": "dma",
+     "to": "mem",
+     "label": "writes"
+    },
+    {
+     "from": "dma",
+     "to": "cpu",
+     "label": "done IRQ"
+    },
+    {
+     "from": "bus",
+     "to": "dma",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Block diagram of DMA: the CPU sets up the DMA controller, the ADC sends samples to it, it writes them to memory over the bus, and it raises a completion interrupt to the CPU."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 12-bit ADC samples at 10 kHz for 1 s. Each sample is stored in 2 bytes. (a) How many bytes does DMA move? (b) Polling costs 20 CPU cycles per sample at 50 MHz. Find the polling time. (c) DMA setup plus completion takes 100 cycles. Find the CPU time saved by DMA over polling.",
+   "steps": [
+    "Number of samples = 10 kHz × 1 s = 10,000 samples. 1 kHz = 1000 samples/s.",
+    "Bytes moved = 10,000 samples × 2 bytes/sample = 20,000 bytes.",
+    "Polling cycles = 10,000 samples × 20 cycles/sample = 200,000 cycles.",
+    "Polling time = 200,000 cycles ÷ 50,000,000 cycles/s = 0.004 s = 4 ms.",
+    "DMA time = 100 cycles ÷ 50,000,000 cycles/s = 0.000002 s = 2 µs.",
+    "Saved time = 4 ms − 2 µs = 4 ms − 0.002 ms = 3.998 ms."
+   ],
+   "answer": "DMA moves 20,000 bytes; polling would take 4 ms, DMA overhead is 2 µs, so the CPU time saved is about 3.998 ms.",
+   "check": "fs = 10000.0\nduration = 1.0\nbytes_per_sample = 2\ncycles_per_sample = 20\ncpu_hz = 50e6\nsamples = fs * duration\ntotal_bytes = samples * bytes_per_sample\npoll_cycles = samples * cycles_per_sample\npoll_ms = poll_cycles / cpu_hz * 1000\ndma_cycles = 100\ndma_us = dma_cycles / cpu_hz * 1e6\nsaved_ms = round(poll_ms - dma_us / 1000, 3)\nprint(int(samples))\nprint(int(total_bytes))\nprint(int(poll_cycles))\nprint(poll_ms)\nprint(dma_us)\nprint(saved_ms)",
+   "values": [
+    10000,
+    20000,
+    200000,
+    4.0,
+    2.0,
+    3.998
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "DMA is not free: the controller and CPU share the bus, so a long burst stalls the CPU and adds interrupt latency.",
+  "Count is the number of items, not bytes, unless transfer size is 1 byte; a wrong count truncates the block or overruns the buffer.",
+  "For a fixed peripheral data register, source or destination increment must be off; leaving it on walks through wrong addresses.",
+  "If software never checks the done flag or completion interrupt, the last block can be lost or the next transfer can start on stale data.",
+  "On a cached MCU, DMA writes RAM directly; without cache clean/invalidate or a non-cacheable buffer, the CPU reads stale data."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is DMA, and what four values does the CPU give the DMA controller?",
+   "marks": 2,
+   "a": "DMA moves blocks between memory and peripherals without the CPU copying each byte. The CPU gives source address, destination address, count and transfer size."
+  },
+  {
+   "level": "understand",
+   "q": "Why use a completion interrupt instead of making the CPU poll the DMA count?",
+   "marks": 3,
+   "a": "Polling wastes CPU cycles and can miss the exact end. The DMA sets a done flag and raises an interrupt only when count is zero, so the CPU sleeps or does other work."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit ADC samples at 8 kHz for 0.5 s; each sample is 1 byte. How many bytes does DMA move?",
+   "marks": 4,
+   "a": "Samples = 8000 samples/s × 0.5 s = 4000 samples. Bytes = 4000 samples × 1 byte/sample = 4000 bytes."
+  },
+  {
+   "level": "apply",
+   "q": "Polling costs 16 cycles/sample at 50 MHz for 5000 samples. DMA overhead is 50 cycles. Find the CPU time saved.",
+   "marks": 4,
+   "a": "Polling cycles = 5000 × 16 = 80,000. Polling time = 80,000 ÷ 50,000,000 = 0.0016 s = 1.6 ms. DMA time = 50 ÷ 50,000,000 = 1 µs = 0.001 ms. Saved = 1.6 ms − 0.001 ms = 1.599 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A DMA burst holds the bus for 64 transfers while an interrupt routine must run. What problem appears, and which mode reduces it?",
+   "marks": 5,
+   "a": "The burst delays the CPU and increases interrupt latency. Use single-transfer or cycle-steal mode, or a shorter burst, to release the bus between items."
+  },
+  {
+   "level": "analyze",
+   "q": "An MCU with a data cache uses DMA to fill a buffer, then the CPU reads old values. Explain and give two fixes.",
+   "marks": 5,
+   "a": "DMA writes RAM, not cache; cached lines are stale. Clean/invalidate the cache for the buffer, or put the buffer in non-cacheable memory."
+  },
+  {
+   "level": "remember",
+   "q": "What is a DMA descriptor?",
+   "marks": 2,
+   "a": "A record in memory with source, destination, count, control and a link to the next descriptor; it allows scatter-gather."
+  }
+ ],
+ "beyond": "Not for the exam. Production DMA engines add scatter-gather descriptor rings, per-channel priority and protection units so peripherals cannot write outside allowed memory. Audio and display pipelines use linked descriptors to stream buffers without CPU copies. Search for 'DMA descriptor chain', 'IOMMU' and 'cache maintenance by address' to see how the same ideas scale to application processors."
+}
