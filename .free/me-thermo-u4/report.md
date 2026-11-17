@@ -1,15 +1,14 @@
 # me-thermo-u4: free-model run
 
 - Book: `books/mech/me-thermo/me-thermo-u4.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 22 (91,274 tokens in, 190,114 out), 5.9 minutes
 
 ## Checker
 
 ```
-me-thermo-u4.html: 5 chapters, 10577 words, 6 figures, 112 KB
-PROBLEMS:
- - text contains "TODO"
+me-thermo-u4.html: 5 chapters, 10565 words, 6 figures, 112 KB
+OK
 ```
 
 ## For the reviewer
