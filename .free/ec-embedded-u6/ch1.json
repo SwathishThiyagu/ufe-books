@@ -1,0 +1,218 @@
+{
+ "lead": "Embedded C is C used to control hardware directly. It keeps C syntax and relies on the standard fixed-width types from the <code>stdint.h</code> header, together with volatile register accesses, bit masks and interrupt functions. A register is a small hardware location; memory-mapped I/O places it at a fixed address. You read or write it through a pointer. This matters in every microcontroller: setting a GPIO pin, clearing a flag, starting an ADC, or handling a timer interrupt. Some syllabi call this C programming for 8051 or ARM. Hosted C on a laptop hides hardware; embedded C exposes it.",
+ "prereq": "You need: Unit 2 for 8051 and ARM registers; Unit 3 for GPIO and interrupts.",
+ "sections": [
+  {
+   "h3": "Fixed-width types and memory-mapped registers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Standard C types like int can change width between compilers. Embedded C uses <stdint.h>: uint8_t is an unsigned 8-bit integer, int16_t is signed 16-bit, uint32_t is unsigned 32-bit. The width is fixed, so register layouts stay correct."
+    },
+    {
+     "type": "p",
+     "text": "A hardware register is a memory word wired to a peripheral. Memory-mapped I/O gives it an address. In C, cast that address to a pointer and dereference: <code>volatile uint8_t *p = (volatile uint8_t *)0x40000000;</code>. Here p holds the register address, *p is the byte in the register."
+    },
+    {
+     "type": "p",
+     "text": "<code>volatile</code> tells the compiler the value may change outside normal code, so every read and write must reach memory. Without volatile, an optimiser can cache a status flag in a register and loop forever. <code>const</code> says your code will not write the object; <code>volatile const uint32_t *status</code> is common for read-only status registers."
+    },
+    {
+     "type": "p",
+     "text": "Hosted C assumes an operating system, files and printf. Embedded C often has no OS, a small standard library, and a startup file. It talks to addresses, not devices."
+    }
+   ]
+  },
+  {
+   "h3": "Bit masks and special function registers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A bit mask is a number with 1s only where you want action. For bit n, <code>(1 &lt;&lt; n)</code> has a single 1 at position n and 0 everywhere else. Bit numbering is usually 0 for least significant bit (LSB)."
+    },
+    {
+     "type": "formula",
+     "text": "PORT |= (1 << n); PORT &= ~(1 << n); PORT ^= (1 << n); test = (PORT >> n) & 1;",
+     "where": "PORT is the register byte; n is the bit number, 0 for LSB; << shifts left; ~ flips all bits; |, &, ^ are bitwise OR, AND, XOR; test is 0 or 1."
+    },
+    {
+     "type": "p",
+     "text": "In 8051 C, special function registers (SFRs) are accessed with compiler keywords: <code>sfr P1 = 0x90; sbit LED = P1^3;</code> P1 is the port register at SFR address 0x90; LED names bit 3. In ARM C, use a volatile pointer to the GPIO register. Writing the whole byte, as in <code>P1 |= 0x08</code>, is a read-modify-write: read the byte, change bits, write back. Writing one sbit, as in <code>LED = 1</code>, uses an atomic bit instruction such as SETB or CLR, not a byte read-modify-write. On ARM the pointer write is a read-modify-write of the register."
+    },
+    {
+     "type": "code",
+     "lang": "c",
+     "code": "#include <stdio.h>\n#include <stdint.h>\nint main(void) {\n    uint8_t port = 0xA5;\n    uint8_t set_mask = 0x08;\n    uint8_t clear_mask = 0xDF;\n    port |= set_mask;\n    printf(\"after set: 0x%02X\\n\", port);\n    port &= clear_mask;\n    printf(\"after clear: 0x%02X\\n\", port);\n    return 0;\n}\n",
+     "stdin": "",
+     "output": "after set: 0xAD\nafter clear: 0x8D"
+    }
+   ]
+  },
+  {
+   "h3": "Interrupts, startup and compiler extensions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An interrupt service routine (ISR) is a function the hardware calls when an event occurs. In C it is marked with a compiler extension, such as <code>__interrupt</code> or <code>__attribute__((interrupt))</code>. The ISR must be short: set a flag, copy a byte, clear the interrupt source. It must not call printf or block."
+    },
+    {
+     "type": "p",
+     "text": "Reentrancy means a function can be called again before an earlier call finishes. An ISR and main can share a variable; mark it volatile. If a 16-bit variable is changed in main and read in an ISR on an 8-bit CPU, the read can see half-updated bytes. Disable interrupts around the access or use an atomic type."
+    },
+    {
+     "type": "p",
+     "text": "Startup code runs before main. It sets the stack pointer, copies initialised data from flash to RAM, clears zeroed data, and calls main. Inline assembly uses <code>__asm volatile (\"nop\");</code> for exact instructions. Compiler extensions add SFR names, interrupt vectors and pragmas. The cross-compiler and linker are covered in <a href=\"#development-tools-ide-cross-compiler-linker-debugger\">6.2</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Cells run from bit 0 on the left to bit 7 on the right. Bit 3 is set with OR mask 0x08 and bit 5 is cleared with AND mask 0xDF; the final byte is 0x8D.",
+  "spec": {
+   "type": "array",
+   "title": "Port bit masking",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "PORT1",
+     "cells": [
+      "1",
+      "0",
+      "1",
+      "0",
+      "0",
+      "1",
+      "0",
+      "1"
+     ],
+     "marks": {}
+    },
+    {
+     "label": "Set b3",
+     "cells": [
+      "0",
+      "0",
+      "0",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0"
+     ],
+     "marks": {
+      "3": "accent"
+     }
+    },
+    {
+     "label": "Clear b5",
+     "cells": [
+      "1",
+      "1",
+      "1",
+      "1",
+      "1",
+      "0",
+      "1",
+      "1"
+     ],
+     "marks": {
+      "5": "live"
+     }
+    },
+    {
+     "label": "Result",
+     "cells": [
+      "1",
+      "0",
+      "1",
+      "1",
+      "0",
+      "0",
+      "0",
+      "1"
+     ],
+     "marks": {
+      "3": "accent",
+      "5": "live"
+     }
+    }
+   ],
+   "aria": "The cells run from bit 0 on the left to bit 7 on the right. An 8-bit port register 0xA5 (1010 0101) is ORed with 0x08 to set bit 3, then ANDed with 0xDF to clear bit 5, giving 0x8D (1000 1101)."
+  }
+ },
+ "examples": [
+  {
+   "question": "PORT1 holds 0xA5. Write C using a volatile pointer to set bit 3 and then clear bit 5. Give the two mask values and the final byte.",
+   "steps": [
+    "0xA5 in binary is 1010 0101. Bit 3 is the fourth bit from the right, value 0x08.",
+    "Set bit 3: mask = 1 << 3 = 0x08 = 8. Write *p |= 0x08. OR: 1010 0101 | 0000 1000 = 1010 1101 = 0xAD = 173.",
+    "Clear bit 5: mask = ~(1 << 5) & 0xFF = 1101 1111 = 0xDF = 223. Write *p &= 0xDF.",
+    "AND: 1010 1101 & 1101 1111 = 1000 1101 = 0x8D = 141."
+   ],
+   "answer": "Set mask is 0x08 (8), clear mask is 0xDF (223), and the final byte is 0x8D (141).",
+   "check": "a = 0xA5\nset_mask = 1 << 3\nafter = a | set_mask\nclear_mask = ~(1 << 5) & 0xFF\nfinal = after & clear_mask\nprint(a)\nprint(set_mask)\nprint(after)\nprint(clear_mask)\nprint(final)",
+   "values": [
+    165,
+    8,
+    173,
+    223,
+    141
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Forgetting volatile on a memory-mapped register: the optimiser may keep the old value in a CPU register.",
+  "*p |= 0x08 & 0x20 is wrong for two masks: bitwise AND binds before OR, so 0x08 & 0x20 is 0. Use *p |= (0x08 | 0x20).",
+  "Using = instead of |= or &= in a read-modify-write line: = overwrites the whole port.",
+  "Assuming bit 0 is the leftmost bit in a diagram: standard C numbering starts at the least significant bit.",
+  "Treating a 16-bit read-modify-write as atomic on an 8-bit CPU: an interrupt between byte accesses can corrupt the value."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does volatile tell the compiler?",
+   "marks": 2,
+   "a": "The object may change outside normal program flow, so every access must read or write memory."
+  },
+  {
+   "level": "understand",
+   "q": "Why use uint8_t instead of int for an 8-bit register?",
+   "marks": 2,
+   "a": "uint8_t has exactly 8 bits on every compiler; int may be 16 or 32 bits, so it can change register access width."
+  },
+  {
+   "level": "apply",
+   "q": "PORT1 = 0x3C. Write C to set bit 0 and clear bit 2. Give the masks and final byte.",
+   "marks": 4,
+   "a": "Set mask 1 << 0 = 0x01: 0x3C | 0x01 = 0x3D. Clear mask ~(1 << 2) & 0xFF = 0xFB: 0x3D & 0xFB = 0x39. Final byte 0x39."
+  },
+  {
+   "level": "analyze",
+   "q": "An ISR increments a 16-bit counter; main reads it on an 8-bit CPU. Why can the read be wrong? Give one fix.",
+   "marks": 4,
+   "a": "The 16-bit read takes two byte reads. An interrupt between them can change the high byte after the low byte was read. Fix: disable interrupts around the read, or use an atomic 16-bit access."
+  },
+  {
+   "level": "remember",
+   "q": "Name two stdint types and their widths.",
+   "marks": 2,
+   "a": "uint8_t is unsigned 8-bit; int16_t is signed 16-bit."
+  },
+  {
+   "level": "understand",
+   "q": "Why is *p |= 0x08 & 0x20 wrong for setting bits 3 and 5?",
+   "marks": 3,
+   "a": "Bitwise AND has higher precedence than OR. 0x08 & 0x20 is 0, so *p is ORed with 0 and no bit is set. Write *p |= (0x08 | 0x20) for the two bits."
+  },
+  {
+   "level": "apply",
+   "q": "Write one C line using volatile pointer p to toggle bit 4 of a port.",
+   "marks": 3,
+   "a": "*p ^= (1 << 4);"
+  }
+ ],
+ "beyond": "Not for the exam. Industry uses MISRA C rules, static analysers, and hardware abstraction layers to keep register code safe. Rust and C++ are gaining ground for embedded work, but C remains the register-level language. Search terms: MISRA C, volatile pointer, memory-mapped I/O, linker script, startup code."
+}

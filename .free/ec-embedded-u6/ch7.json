@@ -1,0 +1,196 @@
+{
+ "lead": "An FPGA is a chip whose digital logic you configure after manufacture. A GPU is a chip with thousands of small arithmetic lanes. Both add parallel hardware to an embedded system when a CPU cannot meet time or energy limits alone. You see them in camera pipelines, radar, motor control, medical imaging and edge machine learning. This chapter shows how each platform computes, what limits it, and how a designer splits work among FPGA, GPU and CPU.",
+ "prereq": "You need <a href=\"#hardware-software-co-design\">Chapter 6.5</a> for partitioning and Unit 1 for processor choices.",
+ "sections": [
+  {
+   "h3": "FPGA fabric and design flow",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An FPGA contains configurable logic blocks. A look-up table (LUT) is a small memory that implements a logic truth table; a k-input LUT stores 2ᵏ bits. A flip-flop (FF) stores one bit on a clock edge. A DSP slice is a hard block with a multiplier, adder and accumulator for multiply-accumulate (MAC) work. Block RAM (BRAM) is on-chip memory made of fixed RAM blocks."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Write the circuit in HDL, usually Verilog or VHDL. HDL describes concurrent hardware, not a sequential program.",
+      "Simulate the HDL to check behaviour before hardware exists.",
+      "Synthesise: map HDL to LUTs, FFs, DSP slices and BRAM.",
+      "Place-and-route: choose physical sites and wire routes.",
+      "Run timing analysis; the slowest path sets the maximum clock.",
+      "Load the bitstream, the binary file that configures LUTs, routing, BRAM and I/O."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "All configured blocks run at once. A soft CPU core is built from LUTs and FFs. A hard CPU core is fixed silicon, such as an ARM core beside the fabric. Use an FPGA when a fixed CPU misses latency or throughput, when you need custom interfaces, or when a data path repeats the same operation on streams. Costs are long compile times, high design effort and fabric power."
+    }
+   ]
+  },
+  {
+   "h3": "GPU execution model",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A GPU has many small cores. Single instruction multiple thread (SIMT) means one instruction is issued to many threads. A thread is one sequence of instructions. A warp is a group of threads, often 32, that share one instruction. Branch divergence means threads in a warp take different paths, so the paths run in turn and some lanes idle."
+    },
+    {
+     "type": "p",
+     "text": "CUDA and OpenCL express a kernel: the function each thread runs. A grid is a set of blocks; a block is a set of threads. An embedded GPU module is a small board with GPU, RAM, power conversion and cooling. It may share memory with the CPU or use local RAM."
+    },
+    {
+     "type": "formula",
+     "text": "arithmetic intensity = operations ÷ bytes moved",
+     "where": "operations is the work count; bytes moved is memory traffic between off-chip RAM and the GPU."
+    },
+    {
+     "type": "p",
+     "text": "Low arithmetic intensity makes the kernel memory-bound: cores wait on data, so adding cores does not cut latency. High clock and many active lanes raise temperature. The module then throttles, so measured time is not peak time. See <a href=\"#power-management-and-low-power-design\">Chapter 6.9</a> for power budgets."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing and combining them",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Start from the data flow. Put fixed, low-latency, per-pixel work on the FPGA: debayer, threshold, packing, FFT front end. Put dense, regular maths on the GPU: convolution, matrix multiply, image filtering. Keep control, exceptions and I/O on the CPU. The figure shows this order for a camera pipeline."
+    },
+    {
+     "type": "p",
+     "text": "Avoid extra copies. Interface bandwidth can dominate total time. Measure worst-case latency with real data and thermal throttling. Some syllabi call this embedded computing on FPGAs and embedded GPU design. Test assembled boards with <a href=\"#testing-boundary-scan-and-in-circuit-testing\">Chapter 6.8</a> methods."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Camera frames pass from FPGA pre-processing to GPU inference to a CPU decision. The FPGA reduces data with fixed low-latency operations; the GPU runs dense arithmetic; the CPU handles branches and output.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Heterogeneous path",
+   "nodes": [
+    {
+     "id": "in",
+     "label": "Frames",
+     "style": "normal"
+    },
+    {
+     "id": "fpga",
+     "label": "FPGA prep",
+     "style": "accent"
+    },
+    {
+     "id": "gpu",
+     "label": "GPU",
+     "style": "live"
+    },
+    {
+     "id": "cpu",
+     "label": "CPU",
+     "style": "normal"
+    },
+    {
+     "id": "out",
+     "label": "Output",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "in",
+     "to": "fpga",
+     "style": "solid"
+    },
+    {
+     "from": "fpga",
+     "to": "gpu",
+     "style": "solid"
+    },
+    {
+     "from": "gpu",
+     "to": "cpu",
+     "style": "solid"
+    },
+    {
+     "from": "cpu",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "Camera frames pass through FPGA pre-processing, GPU inference and a CPU decision before output."
+  }
+ },
+ "examples": [
+  {
+   "question": "A convolution layer takes a 224×224×3 input, uses 64 filters of size 3×3, and each tap is one MAC (multiply-accumulate). Find the number of MACs. At 100 GOPS (10⁹ operations/s), find the time. Take one MAC as one operation, as stated here.",
+   "steps": [
+    "Output elements = 224 × 224 × 64 = 3,211,264.",
+    "Taps per output = 3 input channels × 3 × 3 = 27 MACs.",
+    "Total MACs = 3,211,264 × 27 = 86,704,128.",
+    "Rate = 100 × 10⁹ operations/s = 10¹¹ operations/s.",
+    "Time = 86,704,128 ÷ 10¹¹ = 8.6704128 × 10⁻⁴ s.",
+    "Time in ms = 8.6704128 × 10⁻⁴ × 1000 = 0.86704128 ms, about 0.867 ms."
+   ],
+   "answer": "86,704,128 MACs; time is 0.86704128 ms, about 0.867 ms.",
+   "check": "macs = 224*224*3*9*64\ntime_s = macs / 100e9\ntime_ms = time_s * 1000\nprint(macs)\nprint(time_ms)",
+   "values": [
+    86704128,
+    0.86704128
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Treating an FPGA as software that runs line by line. HDL describes concurrent hardware; the bitstream configures LUTs, routing, BRAM and I/O.",
+  "Counting one MAC as two operations when the question says one MAC is one operation. This doubles the time.",
+  "Ignoring memory bandwidth. A GPU with low arithmetic intensity waits on RAM, so extra cores do not reduce latency.",
+  "Forgetting the FPGA flow: synthesis, place-and-route, timing analysis and bitstream are separate from simulation.",
+  "Calling a soft CPU core fixed silicon. A soft core is built from LUTs and FFs; a hard core is fixed silicon beside the fabric."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is a bitstream in an FPGA system?",
+   "marks": 2,
+   "a": "The binary file that configures LUTs, routing, BRAM and I/O on the FPGA."
+  },
+  {
+   "level": "understand",
+   "q": "Why is an FPGA design not executed sequentially like a C program?",
+   "marks": 3,
+   "a": "The LUTs, FFs, DSP slices and wires are configured as concurrent hardware. All active blocks can work in the same clock cycle."
+  },
+  {
+   "level": "apply",
+   "q": "A layer has 112×112×32 output elements. Each output uses 3×3×16 taps. Count MACs at one MAC per tap.",
+   "marks": 4,
+   "a": "Taps = 3×3×16 = 144. MACs = 112×112×32×144 = 57,802,752 MACs."
+  },
+  {
+   "level": "analyze",
+   "q": "A GPU kernel has low arithmetic intensity. Why may doubling the cores not halve the time?",
+   "marks": 4,
+   "a": "The kernel is memory-bound. Cores wait on RAM or interface transfers, so throughput is set by bytes per second, not by arithmetic lanes. Thermal throttling can also lower clock."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between a soft CPU core and a hard CPU core on an FPGA chip.",
+   "marks": 3,
+   "a": "A soft core is built from LUTs and FFs in the fabric. A hard core is fixed silicon, so it is faster and uses less fabric area."
+  },
+  {
+   "level": "apply",
+   "q": "At 250 GOPS, find the time for 50 million MACs. Take one MAC as one operation.",
+   "marks": 3,
+   "a": "Time = 50×10⁶ ÷ 250×10⁹ s = 2×10⁻⁴ s = 0.2 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "Why place FPGA pre-processing before GPU inference in a camera pipeline?",
+   "marks": 4,
+   "a": "The FPGA can reduce data size and do fixed low-latency pixel work close to the sensor. The GPU then receives clean, smaller data for dense arithmetic, so interface bandwidth and GPU time fall."
+  }
+ ],
+ "beyond": "Not for the exam. Industry uses FPGA overlays and high-level synthesis to shorten design time, and edge GPU modules for local inference. Search terms: FPGA overlay, high-level synthesis, SIMT divergence, arithmetic intensity, edge GPU thermal throttling. Newer curricula connect these platforms to tiny machine learning and safety-certified vision."
+}

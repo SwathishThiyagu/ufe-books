@@ -1,0 +1,506 @@
+{
+ "lead": "Power management keeps an embedded system within its battery and thermal budget. The idea is simple: run fast only when work exists, slow or stop the clock when it does not, and remove power from blocks that are idle. Low-power design matters in every battery device, from a UPI payment terminal to a smart water meter, and in mains-powered boxes that must stay cool. This chapter shows where power goes, the four main levers, and the software habits that turn a correct design into a long-running one.",
+ "prereq": "You need: <a href=\"#hardware-software-co-design\">Chapter 6.5</a> for hardware-software trade-offs and Unit 3 for timers and interrupts.",
+ "sections": [
+  {
+   "h3": "Where the power goes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A CMOS chip burns power in three ways. Dynamic power charges and discharges circuit capacitance every clock cycle. Short-circuit power flows briefly when both transistors in a gate conduct during a transition. Leakage power flows even with no switching, through transistors that are never fully off."
+    },
+    {
+     "type": "formula",
+     "text": "P<sub>dyn</sub> = C V<sup>2</sup> f",
+     "where": "P<sub>dyn</sub> is dynamic power in watts (W); C is the effective switched capacitance in farads (F), already including the activity factor; V is supply voltage in volts (V); f is clock frequency in hertz (Hz)."
+    },
+    {
+     "type": "p",
+     "text": "Total power is P<sub>total</sub> = P<sub>dyn</sub> + P<sub>sc</sub> + P<sub>leak</sub>. Short-circuit power is proportional to f and rises very steeply with supply voltage, roughly as (V − 2V<sub>T</sub>)<sup>3</sup> f, where V<sub>T</sub> is the transistor threshold voltage, so it is more sensitive to V than dynamic power. Leakage is P<sub>leak</sub> = V I<sub>leak</sub>, and I<sub>leak</sub> rises strongly with temperature, so a hot board can waste more than a cool one."
+    },
+    {
+     "type": "p",
+     "text": "Voltage and frequency are linked: a higher clock needs a higher supply to meet timing. When V rises with f, dynamic power grows faster than f. A common model is V ∝ f, giving P ∝ f³. The figure plots the numerical fit P(mW) = [f(MHz)]³ / 1000 for f from 10 MHz to 100 MHz: at 10 MHz, P = 1 mW; at 50 MHz, P = 125 mW; at 100 MHz, P = 1000 mW. This fit assumes V ∝ f and a particular capacitance; it is used only to show the f³ shape."
+    }
+   ]
+  },
+  {
+   "h3": "Four levers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Four mechanisms cover most low-power design. Some syllabi call the whole topic power management."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Dynamic voltage and frequency scaling (DVFS): software picks an operating point (V, f) from a table. Use high f to meet a deadline; drop to low f when the load is light. The governor must know worst-case execution time at each point.",
+      "Clock gating: stop the clock to an idle block while keeping its power on. The block holds state and wakes in a few cycles. Good for peripherals and CPU cores between short idle gaps.",
+      "Power gating: cut the supply to a block with a power switch. Leakage falls to near zero, but the block loses state and needs a wake-up sequence. The saved energy must exceed the entry and exit cost.",
+      "Sleep modes: the chip defines levels such as sleep (CPU clock stopped, peripherals alive), deep sleep (core powered off, SRAM retained) and standby (almost everything off, only the real-time clock and wake logic alive). Deeper modes save more current but lose more state and take longer to wake."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A wake source brings the system out of sleep. Common sources are an external interrupt pin, a timer or RTC alarm, a watchdog, a comparator, or a radio receive event. Choose the deepest mode whose wake sources and retained state still meet the response time. A door sensor can use standby and wake on a pin; a motor controller needs a shallow sleep because it must react in microseconds."
+    },
+    {
+     "type": "p",
+     "text": "Clock gating and power gating are often automatic in hardware. Software must enable them and must not leave unused peripherals clocked. On many microcontrollers, an unused ADC or UART clock costs more than the CPU's own sleep current."
+    }
+   ]
+  },
+  {
+   "h3": "Low-power software",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Software decides how long the hardware stays awake. The first rule is interrupt-driven I/O: polling a flag every millisecond keeps the CPU and bus clock running. An interrupt lets the CPU sleep and wake only when data arrives. See Unit 3 for interrupt latency and priorities."
+    },
+    {
+     "type": "p",
+     "text": "The second rule is sleep on idle. When the ready queue is empty, the idle task should enter the deepest safe sleep mode, not spin in a loop. In an RTOS, tickless idle removes the periodic scheduler tick so the CPU can stay asleep for long stretches; Unit 5 covers the scheduler side."
+    },
+    {
+     "type": "p",
+     "text": "The third rule is peripheral clock control. Turn on a peripheral's clock only while it is used, then gate it. Configure every unused pin to a defined level: drive it as an output at a fixed level, or make it an input with the internal pull-up or pull-down enabled (and disable the input buffer where the part allows it). Never leave a pin floating with its pull-up disabled, because a floating input can draw current. Switch off external parts too: an LED, a sensor and a radio can each dominate the budget."
+    },
+    {
+     "type": "p",
+     "text": "The fourth rule is batching and duty cycling. Measure a sensor once per minute instead of once per second, and send one burst of radio packets instead of many small ones. Compute energy per task: E<sub>task</sub> = P × t."
+    },
+    {
+     "type": "formula",
+     "text": "E<sub>task</sub> = C V<sup>2</sup> N",
+     "where": "E<sub>task</sub> is dynamic energy per task in joules (J); N is the number of clock cycles the task needs. Lowering f lowers power but the task takes longer; with V fixed, dynamic energy per task stays the same, so the real saving comes from lowering V."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Dynamic power against clock frequency when supply voltage rises with frequency. The plot uses P(mW) = [f(MHz)]³ / 1000. Notice the steep rise: from 10 MHz to 100 MHz, power goes from 1 mW to 1000 mW in this model.",
+  "spec": {
+   "type": "plot",
+   "x": {
+    "label": "f (MHz)",
+    "min": 10,
+    "max": 100
+   },
+   "y": {
+    "label": "P (mW)",
+    "min": 0,
+    "max": 1000
+   },
+   "series": [
+    {
+     "name": "P ∝ f³",
+     "expr": "x**3/1000",
+     "style": "accent",
+     "_pts": [
+      [
+       10.0,
+       1.0
+      ],
+      [
+       11.125,
+       1.376892578125
+      ],
+      [
+       12.25,
+       1.838265625
+      ],
+      [
+       13.375,
+       2.392662109375
+      ],
+      [
+       14.5,
+       3.048625
+      ],
+      [
+       15.625,
+       3.814697265625
+      ],
+      [
+       16.75,
+       4.699421875
+      ],
+      [
+       17.875,
+       5.711341796875
+      ],
+      [
+       19.0,
+       6.859
+      ],
+      [
+       20.125,
+       8.150939453125
+      ],
+      [
+       21.25,
+       9.595703125
+      ],
+      [
+       22.375,
+       11.201833984375
+      ],
+      [
+       23.5,
+       12.977875
+      ],
+      [
+       24.625,
+       14.932369140625
+      ],
+      [
+       25.75,
+       17.073859375
+      ],
+      [
+       26.875,
+       19.410888671875
+      ],
+      [
+       28.0,
+       21.952
+      ],
+      [
+       29.125,
+       24.705736328125
+      ],
+      [
+       30.25,
+       27.680640625
+      ],
+      [
+       31.375,
+       30.885255859375
+      ],
+      [
+       32.5,
+       34.328125
+      ],
+      [
+       33.625,
+       38.017791015625
+      ],
+      [
+       34.75,
+       41.962796875
+      ],
+      [
+       35.875,
+       46.171685546875
+      ],
+      [
+       37.0,
+       50.653
+      ],
+      [
+       38.125,
+       55.415283203125
+      ],
+      [
+       39.25,
+       60.467078125
+      ],
+      [
+       40.375,
+       65.816927734375
+      ],
+      [
+       41.5,
+       71.473375
+      ],
+      [
+       42.625,
+       77.444962890625
+      ],
+      [
+       43.75,
+       83.740234375
+      ],
+      [
+       44.875,
+       90.367732421875
+      ],
+      [
+       46.0,
+       97.336
+      ],
+      [
+       47.125,
+       104.653580078125
+      ],
+      [
+       48.25,
+       112.329015625
+      ],
+      [
+       49.375,
+       120.370849609375
+      ],
+      [
+       50.5,
+       128.787625
+      ],
+      [
+       51.625,
+       137.587884765625
+      ],
+      [
+       52.75,
+       146.780171875
+      ],
+      [
+       53.875,
+       156.373029296875
+      ],
+      [
+       55.0,
+       166.375
+      ],
+      [
+       56.125,
+       176.794626953125
+      ],
+      [
+       57.25,
+       187.640453125
+      ],
+      [
+       58.375,
+       198.921021484375
+      ],
+      [
+       59.5,
+       210.644875
+      ],
+      [
+       60.625,
+       222.820556640625
+      ],
+      [
+       61.75,
+       235.456609375
+      ],
+      [
+       62.875,
+       248.561576171875
+      ],
+      [
+       64.0,
+       262.144
+      ],
+      [
+       65.125,
+       276.212423828125
+      ],
+      [
+       66.25,
+       290.775390625
+      ],
+      [
+       67.375,
+       305.841443359375
+      ],
+      [
+       68.5,
+       321.419125
+      ],
+      [
+       69.625,
+       337.516978515625
+      ],
+      [
+       70.75,
+       354.143546875
+      ],
+      [
+       71.875,
+       371.307373046875
+      ],
+      [
+       73.0,
+       389.017
+      ],
+      [
+       74.125,
+       407.280970703125
+      ],
+      [
+       75.25,
+       426.107828125
+      ],
+      [
+       76.375,
+       445.506115234375
+      ],
+      [
+       77.5,
+       465.484375
+      ],
+      [
+       78.625,
+       486.051150390625
+      ],
+      [
+       79.75,
+       507.214984375
+      ],
+      [
+       80.875,
+       528.984419921875
+      ],
+      [
+       82.0,
+       551.368
+      ],
+      [
+       83.125,
+       574.374267578125
+      ],
+      [
+       84.25,
+       598.011765625
+      ],
+      [
+       85.375,
+       622.289037109375
+      ],
+      [
+       86.5,
+       647.214625
+      ],
+      [
+       87.625,
+       672.797072265625
+      ],
+      [
+       88.75,
+       699.044921875
+      ],
+      [
+       89.875,
+       725.966716796875
+      ],
+      [
+       91.0,
+       753.571
+      ],
+      [
+       92.125,
+       781.866314453125
+      ],
+      [
+       93.25,
+       810.861203125
+      ],
+      [
+       94.375,
+       840.564208984375
+      ],
+      [
+       95.5,
+       870.983875
+      ],
+      [
+       96.625,
+       902.128744140625
+      ],
+      [
+       97.75,
+       934.007359375
+      ],
+      [
+       98.875,
+       966.628263671875
+      ],
+      [
+       100.0,
+       1000.0
+      ]
+     ]
+    }
+   ],
+   "aria": "Power rises steeply with clock frequency when supply voltage is scaled with frequency."
+  }
+ },
+ "examples": [
+  {
+   "question": "A microcontroller runs at 3.3 V. It draws 10 mA in active mode and 10 µA in sleep. It is active 1% of the time and asleep 99% of the time. A 1000 mAh battery powers it. Find the average current and the battery life in hours and days. Ignore wake-up energy and regulator loss.",
+   "steps": [
+    "Convert sleep current to milliamperes: 10 µA = 10 ÷ 1000 mA = 0.01 mA.",
+    "Active share of average current: 0.01 × 10 mA = 0.1 mA.",
+    "Sleep share of average current: 0.99 × 0.01 mA = 0.0099 mA.",
+    "Average current: I<sub>avg</sub> = 0.1 mA + 0.0099 mA = 0.1099 mA.",
+    "Battery life in hours: t = 1000 mAh ÷ 0.1099 mA = 9099.18 h.",
+    "Battery life in days: 9099.18 h ÷ 24 h/day = 379.13 days."
+   ],
+   "answer": "Average current is 0.1099 mA and the battery lasts about 9099 h, or 379 days.",
+   "check": "active = 0.01 * 10\nsleep = 0.99 * (10 / 1000)\navg = active + sleep\nlife_h = 1000 / avg\nlife_d = life_h / 24\nprint(round(active, 4))\nprint(round(sleep, 4))\nprint(round(avg, 4))\nprint(round(life_h))\nprint(round(life_d))",
+   "values": [
+    0.1,
+    0.0099,
+    0.1099,
+    9099,
+    379
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Mixing mA and µA: 10 µA is 0.01 mA, not 0.1 mA. A factor of 10 changes battery life by 10.",
+  "Using average current alone: wake-up energy, radio start-up and regulator loss can dominate when the duty cycle is very small.",
+  "Treating leakage as constant: leakage rises with temperature and supply voltage, so a hot device may miss its battery target.",
+  "Confusing power with energy: halving f halves dynamic power but doubles run time; energy per task is unchanged if V is fixed.",
+  "Leaving peripherals clocked or pins floating: the CPU may sleep while an LED, pull-up or unused UART still drains current."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the dynamic power formula and define each symbol.",
+   "marks": 2,
+   "a": "P_dyn = C V² f. C is effective switched capacitance in F, V is supply voltage in V, f is clock frequency in Hz."
+  },
+  {
+   "level": "understand",
+   "q": "Why can dynamic power scale as f³ when supply voltage tracks frequency?",
+   "marks": 3,
+   "a": "P_dyn = C V² f. If V rises in proportion to f, then V² scales as f², and P scales as f² × f = f³."
+  },
+  {
+   "level": "apply",
+   "q": "An MCU draws 20 mA active and 5 µA asleep. It is active 2% of the time. Find the average current.",
+   "marks": 4,
+   "a": "Sleep current = 5 µA = 0.005 mA. Active part = 0.02 × 20 = 0.4 mA. Sleep part = 0.98 × 0.005 = 0.0049 mA. Average = 0.4049 mA."
+  },
+  {
+   "level": "analyze",
+   "q": "A design halves f but keeps V fixed. State the effect on dynamic power, dynamic energy per task, and leakage energy per task.",
+   "marks": 5,
+   "a": "Dynamic power halves. Dynamic energy per task C V² N stays the same. Task time doubles, so leakage energy per task doubles."
+  },
+  {
+   "level": "remember",
+   "q": "Name three sleep modes and one wake source.",
+   "marks": 2,
+   "a": "Sleep, deep sleep and standby; a timer alarm, external pin interrupt or RTC alarm can wake the system."
+  },
+  {
+   "level": "understand",
+   "q": "Contrast clock gating and power gating.",
+   "marks": 3,
+   "a": "Clock gating stops the clock but keeps supply on, so state is retained and wake is fast. Power gating cuts supply, removes leakage, loses state and costs a wake-up sequence."
+  },
+  {
+   "level": "apply",
+   "q": "A 2000 mAh battery feeds a 0.5 mA average load. Find the life in hours and days.",
+   "marks": 4,
+   "a": "Life = 2000 mAh ÷ 0.5 mA = 4000 h. In days, 4000 ÷ 24 = 166.7 days."
+  }
+ ],
+ "beyond": "Not for the exam. Production systems combine DVFS governors, clock and power gating, and wake-up sources inside a power management IC. Mobile SoCs use big.LITTLE-style core switching to keep energy per task low. Research looks at near-threshold computing, energy harvesting and fine-grained power domains. Search for tickless idle, DVFS governors, ARM big.LITTLE and RISC-V low-power design to go further."
+}

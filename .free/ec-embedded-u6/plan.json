@@ -1,0 +1,633 @@
+{
+ "lead": "This unit turns embedded system ideas into working software and hardware: C for microcontrollers, the toolchain, debugging, the development life cycle, co-design, applications, FPGA and GPU computing, board testing and low-power design. After it you can write and cross-compile embedded C, choose debugging and testing methods, partition a design between hardware and software, and estimate power and performance.",
+ "about": "Unit 6 connects software practice to system design. Chapter 6.1 starts with embedded C: registers, volatile, bit masks and interrupts. Chapter 6.2 follows the source through IDE, cross-compiler, linker and debugger. Chapter 6.3 compares simulators, emulators and in-circuit debugging. Chapter 6.4 sets the EDLC stages and quality checks. Chapter 6.5 uses those stages to partition functions between hardware and software. Chapter 6.6 applies the flow to automotive ECUs, smart sensors and driver assistance. Chapter 6.7 adds FPGA and GPU computing for parallel work. Chapter 6.8 tests assembled boards with boundary scan and in-circuit test. Chapter 6.9 closes with power management. Each chapter assumes the earlier one and points back to Units 1-5 for device and RTOS details.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Embedded C controls hardware through fixed-width types, volatile register accesses, bit masks and interrupt functions.",
+   "depth": "C for microcontrollers: stdint types, volatile and const, memory-mapped I/O through pointers, bitwise set, clear, toggle and test, shift masks, special function register (SFR) access, interrupt service routines, startup code, reentrancy, inline assembly and compiler extensions. Compare with hosted C; show 8051 sbit and ARM register examples. Some syllabi call this C programming for 8051 or ARM; keep instruction-set detail in Unit 2.",
+   "figure": {
+    "type": "array",
+    "title": "Port bit masking",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "PORT1",
+      "cells": [
+       "1",
+       "0",
+       "1",
+       "0",
+       "0",
+       "1",
+       "0",
+       "1"
+      ],
+      "marks": {}
+     },
+     {
+      "label": "Set b3",
+      "cells": [
+       "0",
+       "0",
+       "0",
+       "0",
+       "1",
+       "0",
+       "0",
+       "0"
+      ],
+      "marks": {
+       "3": "accent"
+      }
+     },
+     {
+      "label": "Clear b5",
+      "cells": [
+       "1",
+       "1",
+       "1",
+       "1",
+       "1",
+       "0",
+       "1",
+       "1"
+      ],
+      "marks": {
+       "5": "live"
+      }
+     },
+     {
+      "label": "Result",
+      "cells": [
+       "1",
+       "0",
+       "1",
+       "1",
+       "0",
+       "0",
+       "0",
+       "1"
+      ],
+      "marks": {
+       "3": "accent",
+       "5": "live"
+      }
+     }
+    ],
+    "aria": "An 8-bit port register is changed by setting bit 3 with an OR mask and clearing bit 5 with an AND mask."
+   },
+   "example": "PORT1 holds 0xA5. Write C using a volatile pointer to set bit 3 and then clear bit 5. Give the two mask values and the final byte. Answer: set mask 0x08 gives 0xAD; clear mask uses AND with 0xDF, giving 0x8D.",
+   "trap": "Forgetting volatile on a memory-mapped register, or writing p |= 0x08 & 0x20 and losing the intended mask through operator precedence.",
+   "prereq": "Unit 2 for 8051 and ARM registers; Unit 3 for GPIO and interrupts.",
+   "leave": "Instruction-set details and addressing modes to Unit 2; interrupt priority to Unit 3."
+  },
+  {
+   "k": 2,
+   "idea": "A cross-toolchain converts host-side C into a target executable and keeps symbols for debugging.",
+   "depth": "Host and target, cross-compiler, assembler, linker, linker scripts, memory regions, startup code, map file, ELF, HEX and BIN output, libraries, make and IDE use, in-system programming (ISP) and debugger connection. Some syllabi call this ARM development tools or software development tools; use one generic MCU and mention LPC4088-style ISP only as an example.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Cross-toolchain flow",
+    "nodes": [
+     {
+      "id": "c",
+      "label": "C source",
+      "style": "normal"
+     },
+     {
+      "id": "cc",
+      "label": "Cross-compiler",
+      "style": "normal"
+     },
+     {
+      "id": "as",
+      "label": "Assembler",
+      "style": "normal"
+     },
+     {
+      "id": "ld",
+      "label": "Linker",
+      "note": "linker script",
+      "style": "accent"
+     },
+     {
+      "id": "out",
+      "label": "ELF/HEX",
+      "style": "normal"
+     },
+     {
+      "id": "dbg",
+      "label": "Debugger",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c",
+      "to": "cc",
+      "style": "solid"
+     },
+     {
+      "from": "cc",
+      "to": "as",
+      "style": "solid"
+     },
+     {
+      "from": "as",
+      "to": "ld",
+      "style": "solid"
+     },
+     {
+      "from": "ld",
+      "to": "out",
+      "style": "solid"
+     },
+     {
+      "from": "out",
+      "to": "dbg",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A C source file passes through a cross-compiler, assembler and linker into an ELF or HEX file that the debugger loads."
+   },
+   "example": "A chip has 256 KB flash at 0x00000000 and 64 KB RAM at 0x20000000. A program has .text 40 KB, .data 8 KB and .bss 12 KB. Does it fit, and what goes in flash and RAM? Answer: flash holds .text plus .data initial values = 48 KB; RAM holds .data plus .bss = 20 KB; it fits.",
+   "trap": "Putting .data only in RAM and forgetting that its initial values occupy flash; or ignoring stack and heap space in the RAM budget.",
+   "prereq": "Chapter 6.1 for C source; Unit 1 for memory types.",
+   "leave": "Bootloaders and OS build to Unit 5; detailed ARM instruction set to Unit 2."
+  },
+  {
+   "k": 3,
+   "idea": "Simulators, emulators and in-circuit debuggers trade realism for visibility and cost when testing target code.",
+   "depth": "Simulator models CPU and peripherals on a host; emulator replaces or mimics the MCU; in-circuit emulator and on-chip debug use JTAG or SWD; breakpoints, watchpoints, single-step, trace, memory access and real-time limits. Some syllabi say MCU internals; only a few universities teach trace hardware in detail.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Debug options",
+     "style": "normal",
+     "children": [
+      {
+       "label": "Simulator",
+       "note": "no target board",
+       "style": "normal",
+       "edge": "host model"
+      },
+      {
+       "label": "Emulator",
+       "note": "replaces MCU",
+       "style": "accent",
+       "edge": "pods"
+      },
+      {
+       "label": "In-circuit debug",
+       "note": "JTAG or SWD",
+       "style": "live",
+       "edge": "on-chip"
+      }
+     ]
+    },
+    "aria": "A tree divides debugging choices into a simulator with no target board, an emulator that replaces the MCU, and in-circuit debug over JTAG or SWD."
+   },
+   "example": "A loop runs 1000 times; each iteration executes 8 instructions. The target runs at 16 MHz with CPI (cycles per instruction) 1.5. Find the time from loop start to a breakpoint after the loop. Answer: cycles = 1000 × 8 × 1.5 = 12000; time = 12000 ÷ 16 000 000 = 0.75 ms.",
+   "trap": "Assuming simulator time equals target time; or setting a breakpoint in flash when the debugger only supports RAM breakpoints.",
+   "prereq": "Chapter 6.2 for executable and symbols; Unit 3 for on-chip peripherals.",
+   "leave": "JTAG boundary-scan testing to Chapter 6.8; RTOS-aware debugging to Unit 5."
+  },
+  {
+   "k": 4,
+   "idea": "The EDLC organises embedded development into requirement, design, implementation, integration, testing and maintenance stages with checks at each stage.",
+   "depth": "EDLC (embedded development life cycle) phases and deliverables, waterfall, V-model, spiral and agile variants; requirement and specification, architecture, component design, implementation, integration, verification and validation, quality assurance, configuration management, documentation, maintenance. Some syllabi call this design, development and case studies; keep case detail for Chapter 6.6.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "EDLC stages",
+    "nodes": [
+     {
+      "id": "req",
+      "label": "Requirements",
+      "style": "normal"
+     },
+     {
+      "id": "spec",
+      "label": "Specification",
+      "style": "normal"
+     },
+     {
+      "id": "arch",
+      "label": "Architecture",
+      "style": "accent"
+     },
+     {
+      "id": "impl",
+      "label": "Implementation",
+      "style": "normal"
+     },
+     {
+      "id": "test",
+      "label": "Integration & test",
+      "style": "live"
+     },
+     {
+      "id": "maint",
+      "label": "Maintenance",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "req",
+      "to": "spec",
+      "style": "solid"
+     },
+     {
+      "from": "spec",
+      "to": "arch",
+      "style": "solid"
+     },
+     {
+      "from": "arch",
+      "to": "impl",
+      "style": "solid"
+     },
+     {
+      "from": "impl",
+      "to": "test",
+      "style": "solid"
+     },
+     {
+      "from": "test",
+      "to": "maint",
+      "style": "solid"
+     },
+     {
+      "from": "maint",
+      "to": "req",
+      "label": "change",
+      "style": "dashed"
+     }
+    ],
+    "aria": "A development flow goes from requirements through specification, architecture, implementation, integration and test to maintenance, with a change edge back to requirements."
+   },
+   "example": "A project has requirements 2 weeks, design 3 weeks, coding 6 weeks, integration 3 weeks and system test 2 weeks. Find the total in a waterfall. If coding and integration overlap by 1 week, what is the new total? Answer: total = 16 weeks; with overlap = 15 weeks.",
+   "trap": "Treating testing as one final phase; or forgetting maintenance and documentation in the life cycle.",
+   "prereq": "Chapters 6.1-6.3 for code and debug tools; Unit 1 for design metrics.",
+   "leave": "Quality standards detail to Chapter 6.8; RTOS scheduling to Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "Hardware-software co-design partitions system functions between custom hardware and programmable software early to meet performance, power and cost targets.",
+   "depth": "Co-design flow: specification, partitioning, interface design, hardware synthesis or software compilation, co-simulation and integration. Trade-offs: speed, power, area, flexibility and time-to-market; platform-based design, IP cores, application-specific instruction set processors (ASIPs) and hardware accelerators. Some syllabi call this HW/SW co-design; only a few universities teach formal partitioning algorithms.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Co-design split",
+    "nodes": [
+     {
+      "id": "spec",
+      "label": "Specification",
+      "style": "normal"
+     },
+     {
+      "id": "part",
+      "label": "Partition",
+      "style": "accent"
+     },
+     {
+      "id": "hw",
+      "label": "Hardware design",
+      "style": "normal"
+     },
+     {
+      "id": "sw",
+      "label": "Software design",
+      "style": "normal"
+     },
+     {
+      "id": "cosim",
+      "label": "Co-simulation",
+      "style": "live"
+     },
+     {
+      "id": "sys",
+      "label": "Integrated system",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "spec",
+      "to": "part",
+      "style": "solid"
+     },
+     {
+      "from": "part",
+      "to": "hw",
+      "style": "solid"
+     },
+     {
+      "from": "part",
+      "to": "sw",
+      "style": "solid"
+     },
+     {
+      "from": "hw",
+      "to": "cosim",
+      "style": "solid"
+     },
+     {
+      "from": "sw",
+      "to": "cosim",
+      "style": "solid"
+     },
+     {
+      "from": "cosim",
+      "to": "sys",
+      "style": "solid"
+     }
+    ],
+    "aria": "A specification is partitioned into hardware and software designs, which are co-simulated and then integrated into one system."
+   },
+   "example": "A 640×480 camera runs at 30 frames/s. Each pixel needs 20 operations. A 200 MIPS CPU runs the filter in software. Find the operation rate and CPU load. If an FPGA accelerator does 1 operation per cycle at 100 MHz, how many parallel units are needed? Answer: ops = 640 × 480 × 20 × 30 = 184 320 000 ops/s; load = 92.16%; FPGA capacity = 100 Mops/s per unit, so ceil(184.32 ÷ 100) = 2 units.",
+   "trap": "Choosing hardware only for speed while ignoring interface cost, verification effort and loss of flexibility.",
+   "prereq": "Chapter 6.4 for design stages; Unit 1 for processor choices.",
+   "leave": "FPGA details to Chapter 6.7; CAN and sensor buses to Unit 4."
+  },
+  {
+   "k": 6,
+   "idea": "Automotive, smart-sensor and driver-assistance systems show embedded software working under real-time, safety and communication constraints.",
+   "depth": "Electronic control units (ECUs), CAN and LIN networks, sensor signal conditioning, smart sensor calibration, advanced driver assistance system (ADAS) pipeline: radar, camera and lidar, sensor fusion, perception, decision and actuation; functional safety ideas; case-study format. Some syllabi call this automotive driver assistance and mobile agents for embedded system; keep mobile-agent detail brief and only if the syllabus lists it.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "ADAS pipeline",
+    "nodes": [
+     {
+      "id": "sen",
+      "label": "Sensors",
+      "style": "normal"
+     },
+     {
+      "id": "cond",
+      "label": "Conditioning",
+      "style": "normal"
+     },
+     {
+      "id": "fuse",
+      "label": "Fusion",
+      "style": "accent"
+     },
+     {
+      "id": "perc",
+      "label": "Perception",
+      "style": "live"
+     },
+     {
+      "id": "dec",
+      "label": "Decision",
+      "style": "normal"
+     },
+     {
+      "id": "act",
+      "label": "Actuator",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "sen",
+      "to": "cond",
+      "style": "solid"
+     },
+     {
+      "from": "cond",
+      "to": "fuse",
+      "style": "solid"
+     },
+     {
+      "from": "fuse",
+      "to": "perc",
+      "style": "solid"
+     },
+     {
+      "from": "perc",
+      "to": "dec",
+      "style": "solid"
+     },
+     {
+      "from": "dec",
+      "to": "act",
+      "style": "solid"
+     }
+    ],
+    "aria": "Sensor data is conditioned, fused, perceived, decided and sent to an actuator in a driver-assistance pipeline."
+   },
+   "example": "Adaptive cruise control: radar measures a car 40 m ahead. Host speed is 25 m/s; target speed is 20 m/s. Find the time gap and the time to collision. At a desired 2 s gap, what distance should be kept? Answer: time gap = 40 ÷ 25 = 1.6 s; relative speed = 5 m/s; time to collision = 40 ÷ 5 = 8 s; desired gap = 25 × 2 = 50 m.",
+   "trap": "Confusing time gap with time to collision; or ignoring sensor latency and CAN bus delay.",
+   "prereq": "Chapter 6.5 for partitioning; Unit 4 for CAN, LIN and wireless; Unit 3 for sensors.",
+   "leave": "Full vehicle safety standards to specialised texts; RTOS scheduling to Unit 5."
+  },
+  {
+   "k": 7,
+   "idea": "FPGA and GPU platforms add parallel hardware to embedded systems for compute-heavy tasks at controlled power.",
+   "depth": "FPGA: look-up tables (LUTs), flip-flops, DSP slices, block RAM (BRAM), HDL, synthesis, place-and-route, bitstream, soft and hard CPU cores, when to use. GPU: single instruction multiple thread (SIMT), many cores, embedded GPU modules, CUDA and OpenCL ideas, memory bandwidth, power and thermal limits. Some syllabi call this embedded computing system on FPGAs and embedded GPU design; only a few universities teach the GPU programming model in detail.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Heterogeneous path",
+    "nodes": [
+     {
+      "id": "in",
+      "label": "Frames",
+      "style": "normal"
+     },
+     {
+      "id": "fpga",
+      "label": "FPGA pre-process",
+      "style": "accent"
+     },
+     {
+      "id": "gpu",
+      "label": "GPU inference",
+      "style": "live"
+     },
+     {
+      "id": "cpu",
+      "label": "CPU decision",
+      "style": "normal"
+     },
+     {
+      "id": "out",
+      "label": "Output",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "in",
+      "to": "fpga",
+      "style": "solid"
+     },
+     {
+      "from": "fpga",
+      "to": "gpu",
+      "style": "solid"
+     },
+     {
+      "from": "gpu",
+      "to": "cpu",
+      "style": "solid"
+     },
+     {
+      "from": "cpu",
+      "to": "out",
+      "style": "solid"
+     }
+    ],
+    "aria": "Camera frames pass through FPGA pre-processing, GPU inference and a CPU decision before output."
+   },
+   "example": "A convolution layer takes 224×224×3 input, uses 64 filters of size 3×3, and each tap is one MAC (multiply-accumulate). Find the number of MACs. At 100 GOPS (10^9 operations/s), find the time. Answer: MACs = 224 × 224 × 3 × 9 × 64 = 86 704 128; time = 86.7e6 ÷ 100e9 = 0.867 ms.",
+   "trap": "Treating an FPGA as software that runs sequentially; or ignoring GPU memory bandwidth and thermal power.",
+   "prereq": "Chapter 6.5 for partitioning; Unit 1 for processor choices.",
+   "leave": "Detailed HDL and CUDA syntax to specialised courses; communication buses to Unit 4."
+  },
+  {
+   "k": 8,
+   "idea": "Boundary scan and in-circuit testing check solder joints, nets and device pins on assembled boards.",
+   "depth": "IEEE 1149.1 JTAG boundary scan: test access port (TAP), TDI, TDO, TCK, TMS and TRST, instruction register, boundary-scan register, BYPASS, IDCODE, SAMPLE and EXTEST; scan chain and test vectors. In-circuit test (ICT): bed-of-nails, flying probe, test points, design for test (DFT), coverage and built-in self-test (BIST). Only a few universities teach the full TAP state machine; keep that short.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Boundary scan path",
+    "nodes": [
+     {
+      "id": "tap",
+      "label": "TAP controller",
+      "style": "accent"
+     },
+     {
+      "id": "ir",
+      "label": "Instruction register",
+      "style": "normal"
+     },
+     {
+      "id": "bsr",
+      "label": "Boundary register",
+      "style": "live"
+     },
+     {
+      "id": "pin",
+      "label": "Device pins",
+      "style": "normal"
+     },
+     {
+      "id": "net",
+      "label": "Board nets",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "tap",
+      "to": "ir",
+      "style": "solid"
+     },
+     {
+      "from": "ir",
+      "to": "bsr",
+      "style": "solid"
+     },
+     {
+      "from": "bsr",
+      "to": "pin",
+      "style": "solid"
+     },
+     {
+      "from": "pin",
+      "to": "net",
+      "style": "solid"
+     }
+    ],
+    "aria": "A TAP controller selects an instruction, which connects the boundary register to device pins and board nets."
+   },
+   "example": "A scan chain has 4 devices with 32 boundary-scan cells each. TCK (test clock) is 1 MHz. How long does one vector take to shift in? For 1000 vectors, what is the test time? Answer: bits = 4 × 32 = 128; shift time = 128 ÷ 1 000 000 = 128 µs; test time = 1000 × 128 µs = 128 ms.",
+   "trap": "Saying boundary scan tests full functional speed; it mainly tests interconnect and pin behaviour.",
+   "prereq": "Chapter 6.2 for debug interfaces; Unit 3 for digital I/O.",
+   "leave": "Software unit testing to Chapter 6.4; power-on self-test to Chapter 6.9."
+  },
+  {
+   "k": 9,
+   "idea": "Low-power design reduces dynamic and static power with voltage and frequency scaling, clock gating, power gating and sleep modes.",
+   "depth": "Dynamic power P = C V² f, where C is switched capacitance, V is supply voltage and f is clock frequency; short-circuit and leakage power; energy per task; dynamic voltage and frequency scaling (DVFS), clock gating, power gating, sleep, deep-sleep and standby modes, wake sources, battery life, low-power software: interrupt-driven I/O, sleep on idle and peripheral clocks. Some syllabi call this power management; keep battery chemistry out.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "f (MHz)",
+     "min": 10,
+     "max": 100
+    },
+    "y": {
+     "label": "P (mW)",
+     "min": 0,
+     "max": 1000
+    },
+    "series": [
+     {
+      "name": "P ∝ f³",
+      "expr": "x**3/1000",
+      "style": "accent"
+     }
+    ],
+    "aria": "Power rises steeply with clock frequency when supply voltage is scaled with frequency."
+   },
+   "example": "An MCU draws 10 mA active at 3.3 V and 10 µA in sleep. It is active 1% of the time. Find average current and battery life from a 1000 mAh battery. Answer: active part = 0.01 × 10 mA = 0.1 mA; sleep part = 0.99 × 0.01 mA = 0.0099 mA; average = 0.1099 mA; life = 1000 ÷ 0.1099 ≈ 9099 h ≈ 379 days.",
+   "trap": "Using average current without wake-up energy; or forgetting that leakage rises with temperature.",
+   "prereq": "Chapter 6.5 for hardware and software trade-offs; Unit 3 for timers and interrupts.",
+   "leave": "Battery charging and power electronics to other courses; RTOS tickless idle to Unit 5."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "C source needs the cross-toolchain"
+  ],
+  [
+   2,
+   3,
+   "debugger connects to simulator or target"
+  ],
+  [
+   3,
+   4,
+   "debugging supports EDLC testing"
+  ],
+  [
+   4,
+   5,
+   "EDLC stages frame co-design"
+  ],
+  [
+   5,
+   6,
+   "co-design appears in automotive ADAS"
+  ],
+  [
+   6,
+   7,
+   "ADAS uses FPGA and GPU acceleration"
+  ],
+  [
+   7,
+   8,
+   "complex boards need boundary scan"
+  ],
+  [
+   5,
+   9,
+   "partitioning trades power"
+  ]
+ ]
+}
