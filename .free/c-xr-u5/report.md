@@ -1,13 +1,13 @@
 # c-xr-u5: free-model run
 
-- Book: `books/cse/c-xr/c-xr-u5.html`
+- Book: `work/claude_figs/c-xr-u5/tree/books/cse/c-xr/c-xr-u5.html`
 - Status: ok
-- Model calls so far: 34 (119,224 tokens in, 190,048 out), 7.4 minutes
+- Model calls so far: 34 (119,224 tokens in, 190,048 out), 7.5 minutes
 
 ## Checker
 
 ```
-c-xr-u5.html: 8 chapters, 14441 words, 9 figures, 155 KB
+c-xr-u5.html: 8 chapters, 14383 words, 9 figures, 166 KB
 OK
 ```
 
