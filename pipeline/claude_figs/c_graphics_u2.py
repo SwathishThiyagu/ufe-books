@@ -401,3 +401,14 @@ FIG[8] = (f8, 'Seen from the side with the plane at d = 3: the ray from the eye 
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    return {
+        1: [('The order in the figure is scale, then rotate, then translate; changing the order changes the final point.',
+             'When transforms are combined, a common order is scale, then rotate, then translate; changing the order changes the final point.')],
+        3: [(' Only a few universities teach this composition step in detail.', '')],
+        4: [('The figure marks the three shift entries and the final 1.',
+             'The three shift entries sit in the last column, above the final 1.')],
+        7: [(' Only a few universities teach this algorithm in depth.', '')],
+    }.get(k, [])

@@ -323,3 +323,20 @@ FIG[9] = (f9, 'Keys at x = 100 px (0 s) and x = 400 px (1 s) with 24 frames at 2
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    return {
+        1: [('The figure has an equal-step line and a slow-in curve.',
+             'Picture an equal-step line and a slow-in curve on the same graph.'),
+            ('In the figure, slow-in uses y = x²/12.', 'A slow-in curve uses y = x²/12.')],
+        6: [(' Only a few universities teach this chapter separately.', '')],
+        7: [(' Only a few universities teach this chapter, so focus on the model, not menus.', ' Focus on the model, not menus.')],
+        8: [(' Only a few universities teach this chapter.', '')],
+        9: [(' Only a few universities teach this advanced topic.', '')],
+    }.get(k, [])
+
+
+def drop_sources():
+    # university-hosted pages: the books name no universities
+    return ['ocw.mit.edu', 'cs.cmu.edu']

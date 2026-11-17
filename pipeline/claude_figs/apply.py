@@ -101,6 +101,7 @@ if push and library:
     run('git', '-C', ROOT, 'pull', '-q', '--rebase', 'origin', 'main')
     os.makedirs(os.path.dirname(os.path.join(ROOT, out)), exist_ok=True)  # first book of a subject in the library
     shutil.copy(os.path.join(wt, out), os.path.join(ROOT, out))
+    q = json.load(open(os.path.join(ROOT, 'queue.json')))  # re-read after the pull: other threads edit it too
     for e in q:
         if e['unit'] == unit: e['status'] = 'ok'
     json.dump(q, open(os.path.join(ROOT, 'queue.json'), 'w'), ensure_ascii=False, indent=1)

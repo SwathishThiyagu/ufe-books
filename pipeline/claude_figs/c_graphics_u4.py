@@ -292,3 +292,18 @@ FIG[9] = (f9, 'The video frame at 120 ms may pair with audio anywhere from 40 to
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    return {
+        3: [('Only a few universities teach this chapter as a separate hardware-and-software survey. Figure 1 gives the working model.',
+             'The figure gives the working model.'),
+            ("List Figure 1's four layers.", 'List the four layers of the working model.')],
+        7: [('The figure shows the encoder path.', 'The encoder path runs as follows.')],
+        9: [(' Only a few universities teach this chapter.', '')],
+    }.get(k, [])
+
+
+def drop_sources():
+    # university-hosted pages: the books name no universities
+    return ['homepages.inf.ed.ac.uk']
