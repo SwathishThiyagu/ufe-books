@@ -1,15 +1,14 @@
 # me-fluid-u3: free-model run
 
 - Book: `books/mech/me-fluid/me-fluid-u3.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 31 (134,556 tokens in, 256,512 out), 8.3 minutes
 
 ## Checker
 
 ```
-me-fluid-u3.html: 8 chapters, 16275 words, 9 figures, 165 KB
-PROBLEMS:
- - text contains "as an AI"
+me-fluid-u3.html: 8 chapters, 16263 words, 9 figures, 165 KB
+OK
 ```
 
 ## For the reviewer
