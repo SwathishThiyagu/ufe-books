@@ -663,3 +663,75 @@ Count: 2 must fix, 18 should fix, 6 cosmetic (26 lines). Patterns: "book" wordin
 spoken or drawn "the book's …"), unit numbers in outros and one cross-reference (7 lessons), spoken Bloom levels
 (9 lines in 3 lessons), caret maths (1 lesson, 18 places), generic recap icons (3 lessons), and two lessons whose exam
 or worked example silently switches to a different grammar or corpus (u3-L1, u2-L1).
+
+## Web Technologies and Full Stack Development (18 Nov)
+
+Audited 18 Nov 2026: all 23 c-web lessons (04_Lessons/cse/c-web/_work/uN/out; this subject has no B.Tech/CSE folder yet),
+every scene, narration and the rendered last frame of each scene (dumped at 0.995), plus lesson_sheet.py sheets at 0.92 for
+all 23 (the 3 lines that looked cut on a sheet render whole at 0.995: u1-L2 (5), u6-L4 (4), u4-L3 (12)). Checker: 0 page
+errors, 0 cue failures, 0 text outside the safe area on every sheet. Recomputed every worked example, model answer and trap
+(DNS chain and TTL, request-rate and server counts, status-code classes, box model and border-box, hex/rgb/HSL of #FF6347,
+flex grow shares with gaps, Bootstrap 80 px columns, auto-fit grid 4 × 210 px, specificity, element counts, colspan totals,
+GET URLs, JS outputs ('5' == 5, x += '5', sort [1,10,9], splice/slice, var/let loops, f(5)/f(5,3), event-loop orders),
+readyState/status, PHP 885 bill, "Pay: " . 885 vs + (TypeError in PHP 8), 0 == "" in PHP 8, fact(5), regex with and
+without anchors, cookie 1800 s, servlet init/service/destroy counts, 405 from default doGet, JSX call counts, setCount
+batching, login-form length 16, router matches, TS2322/TS2345, Angular totals, PWA cache 132 KB, Redux counts, debounce
+700 ms, caret/tilde ranges, 64 KB chunks 16,384 and 8,192, mysql2 insertId/affectedRows/changedRows, Mongo
+matched/modified, JWT lateness 600 s and 100 s, CI 110 s vs 1200 s). Ran the disputed snippets: jQuery 3.7.1 in Chromium
+($('li').text() on Pen/Book/Bag gives "PenBookBag"; .html() gives "Pen"), the nested-p parse in Chromium (body becomes
+`<p>one</p><p>two</p><p></p>`), and fs.readFile on a 2 GiB file in Node 22 (ERR_FS_FILE_TOO_LARGE). Scene = 0-based SC index
+(the Lnn.png number). Sheets: no stock recap icons, no tiny or faint pictures, no overflow or overlap; every hook and recap
+picture is the lesson's own. No filler word, college name, TODO, placeholder or caret maths outside code found.
+No pipeline.json or videos.json exists for c-web, so none of these lessons is on YouTube.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-web-u3-L4 | notebook (9) item 3, trap2 (12) | ".text() reads the first; .text('x') sets them all" and the trap "Write: .text() returns the first element's text only; use .each() to collect every text". Backwards: the jQuery .text() getter returns the combined text of every matched element ("PenBookBag", run in Chromium with jQuery 3.7.1); the struck-out "Don't write" line is the true one. .html(), .val() and .attr() are the getters that read only the first | wrong fact: must fix
+c-web-u3-L2 | pa (23) | event-delegation model answer: "row = event.target.closest('tr'); if not null, delete that row" deletes a row on any click anywhere in the row, not only on its delete button. The check must be on the button (e.target.closest('button.delete')), then remove that button's tr | wrong fact: must fix
+c-web-u5-L3 | hookArt (0), bookfig (3), calc (7), figs (22) | `Total: {{ price * qty \| currency }}` shown as "₹7,497.00". With no currency code the pipe uses DEFAULT_CURRENCY_CODE, which is USD, so it prints "$7,497.00"; needs `currency:'INR'` like the price line. The template also says price while the class field is product.price | wrong fact: must fix
+c-web-u6-L3 | trap2 (12) | trap "Write: a plain object replaces the document; updateOne(filter, {marks: 88}) leaves only _id and marks". In the Node driver and mongosh, updateOne without update operators throws "Update document requires atomic operators"; replacing a document is replaceOne (only the old update() replaced) | wrong fact: must fix
+c-web-u5-L4 | trap2 (8) | the rule (return a new object) is right but the picture's case is wrong: a mutating reducer doing count++ and a badge reading useSelector(s => s.count) does re-render, because the number changed. The stale case is a selector that returns the mutated object or array (s.items) | misleading: should fix
+c-web-u6-L1 | bookfig (11), figs (20) | caption "The tilde locks the minor number: only 1.2.9 is allowed" and "Allowed: 2 for ^4.18.2 … and 1 for ~1.2.3 (1.2.9)": the filled 1.2.3 end (and every 1.2.x) is allowed too. The caret count includes its own lower bound 4.18.2, the tilde count leaves it out | misleading: should fix
+c-web-u6-L2 | pa (24) | "4 × readFile of a 2 GB file = 4 × 2048 MB = 8 GB, out of memory": fs.readFile refuses any file over 2 GiB with ERR_FS_FILE_TOO_LARGE (checked on Node 22), so each call fails and no 8 GB is ever held. Use a 1.5 GB file or say "would try to hold" | misleading: should fix
+c-web-u4-L4 | notebook (17) | Student entity shown with package-private fields, no getters or setters and a package-private constructor; Jackson finds no properties, so the 200 {"id":1,…} and 201 replies on screen cannot come from this code, and JPA wants a public or protected no-arg constructor. Add getters/setters (or a record DTO) or label it a fragment | misleading: should fix
+c-web-u2-L1 | bookfig (3) | spoken "Under head: title, meta and link, dashed because they're void": title is not void (the picture is right, only meta and link are dashed) | misleading: should fix
+c-web-u2-L1 | pa (25) | nested-p model answer: "the tree has two sibling paragraphs". The stray </p> makes a third, empty p (Chromium: `<p>One</p><p>Two</p><p></p>`); the picture shows two | misleading: should fix
+c-web-u2-L2 | pa (18) | "the heading … gives it a place in the outline": the HTML outline algorithm was never implemented by browsers or screen readers and was removed from the spec in 2022 | misleading: should fix
+c-web-u5-L1 | bookfig (3, 4), recap (16), pa (18), figs (23) | "Babel turns each JSX tag into a React.createElement call" stated as how it works now; since React 17 the default automatic runtime emits jsx()/jsxs() from react/jsx-runtime. Say "classic runtime" (Q2's createElement exercise can stay) | misleading: should fix
+c-web-u5-L3 | notebook (5), pq/pa (18, 19) | *ngIf, *ngFor and trackBy taught as current Angular. Angular 17 added @if/@for (track required) and v20 (2025) deprecated *ngIf/*ngFor; name the version or teach both | misleading: should fix
+c-web-u6-L4 | outro (24) | site/finder line on the end card "Find this unit in your own syllabus" with the spoken "on the University free and easy site", plus "end of unit six" and a "COURSE COMPLETE · Units 1 to 6" card | should fix
+c-web-u3-L2 | figs (24) | writer's note on screen: "Sources the book draws on: … Jon Duckett, JavaScript and jQuery (both from memory; check)." | should fix
+c-web-u1-L3 | calc (6), bookfig (12) | spoken "Now the book's worked example" (twice) | should fix
+c-web-u2-L4 | bookfig (5, 12) | spoken "Your book's figure" | should fix
+c-web-u4-L2 | bookfig (4, 11) | spoken "fact of four from your book", "Now your book's figure" | should fix
+c-web-u5-L4 | bookfig (4, 12) | spoken "Your book's figure" | should fix
+c-web-u2-L2, u3-L1, u3-L2, u3-L3, u6-L2, u6-L3 | agenda (1) | "Chapters x to y of your book" on the agenda card (the other 17 say "of your free notes") | should fix
+c-web-u1-L3 | outro (22) | "Next time, Unit two…" spoken; "NEXT UNIT · Unit 2" card | should fix
+c-web-u2-L4 | outro (24) | "Next time, Unit three…" spoken; "NEXT UNIT · Unit 3" card | should fix
+c-web-u3-L4 | outro (21) | "Next time, Unit four…" spoken; "NEXT UNIT · Unit 4" card | should fix
+c-web-u4-L4 | outro (27) | "Next time, Unit five…" spoken; "NEXT UNIT · Unit 5" card | should fix
+c-web-u5-L4 | outro (25) | "Next time, Unit six…" spoken; "NEXT UNIT · Unit 6" card | should fix
+c-web-u1-L1, u1-L3, u3-L1, u4-L2 | pq (15/17/19; u3-L1 18/20/22; u4-L2 17/19/21) | spoken Bloom levels: "An understand question", "Question two, an apply question", "Question three, an analyze question" | should fix
+c-web-u2-L1, u6-L2, u6-L3 | pq (u2-L1 20/22/24; u6-L2 19/21/23; u6-L3 14/16/18) | spoken Bloom levels: "Question one, understand.", "Question two, apply.", "Question three, analyze." | should fix
+c-web-u3-L2, u3-L3 | pq (u3-L2 18/20/22; u3-L3 17/19/21) | spoken Bloom levels: "at the apply level", "Question one, at the understand level" | should fix
+all 23 lessons | figs (the "For your notes" scene) | "Sources the book draws on: …" on screen | cosmetic
+all 23 lessons | META, kicker, pq cards (engine) | META.subject is "biotech"; kicker "UNIT n · LESSON k OF K" and "QUESTION n · UNDERSTAND/APPLY/ANALYZE" labels on every question card | cosmetic
+c-web-u1-L1 | outro (22) | next-lesson card "Web browsers · HTTP and HTTPS" cut from "Web browsers, web servers and application servers" | cosmetic
+c-web-u1-L2 | outro (25) | next-lesson card "Front end · Developer tools" while the narration says "front end, back end and full stack roles, and the MERN stack" | cosmetic
+c-web-u1-L3 | bookfig (12) | caption "Only bytes that crossed count: 34 KB, not 46": 46 is never derived (app.css's size is not shown) | cosmetic
+c-web-u2-L1, u2-L3, u6-L1 | bookfig (u2-L1 10, 16; u2-L3 3; u6-L1 3, 10); u1-L3 bookfig (3) | spoken "your notes'" / "from your notes" without "free" | cosmetic
+c-web-u2-L3 | agenda (1), part, recap | title "Box model, colors and fonts" but "Colours and fonts", "Colour" on the part and recap cards | cosmetic
+c-web-u3-L3, u6-L1 | pq/pa (u3-L3 19, 20; u6-L1 16, 17) | the same question twice: "console.log(1); setTimeout(…2, 0); Promise.resolve().then(…3); console.log(4)", same answer 1, 4, 3, 2; the A/D/C/B worked example is also in both | cosmetic
+c-web-u1-L3, u3-L2 | hookArt (0) | same hook twice: "You tap Add to cart", cart badge 2 → 3 | cosmetic
+c-web-u4-L2 | bookfig (12), trap2 (15) | "^ and $ make the whole string count": in PCRE $ also matches before a final \n (use \z or the D modifier) | cosmetic
+c-web-u4-L3 | calc (13, 14) | Set-Cookie line "PHPSESSID=abc123; Max-Age=1800; HttpOnly" drops the SameSite=Lax that the flags step sets | cosmetic
+c-web-u5-L1 | trap2 (6) | `<div class>` / `<label for>` imply failure; React 16+ renders them with a dev warning | cosmetic
+c-web-u5-L3 | notebook (12) | "hydrateRoot adds the handlers" in an Angular lesson (React API, unnamed); "a PWA needs a service worker" to install is dated (Chrome dropped that in 2023) | cosmetic
+c-web-u6-L2 | notebook (16) | "Safe (changes nothing): GET only" vs u1-L2 "GET, HEAD, OPTIONS" (only GET is among the five methods shown) | cosmetic
+c-web-u6-L3 | notebook (4) | "createPool: 10 ready connections": mysql2 opens them lazily up to connectionLimit 10 | cosmetic
+c-web-u6-L3, u6-L4 | figs | sources "Casciaro (streams and modules); Brown (REST APIs and deployment)" copied from u6-L2; they do not match a MySQL/MongoDB or a security/Docker lesson | cosmetic
+
+Count: 4 must fix, 24 should fix, 16 cosmetic (44 lines). Patterns: four wrong technical facts (jQuery .text(), event
+delegation, Angular currency pipe, Mongo updateOne), version-dependent behaviour stated as current (JSX runtime,
+*ngIf/*ngFor, the HTML outline, PWA install), "book" wording (6 agendas, 4 lessons spoken, 23 sources lines), unit numbers
+in 6 outros plus one site/finder line, spoken Bloom levels in 9 lessons, and one writer's "from memory; check" note on screen.
