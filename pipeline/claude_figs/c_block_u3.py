@@ -19,10 +19,10 @@ def f1():
     for i, x in enumerate(xs9): o.append(L(xs3[i // 3], ys[1] + 11, x, ys[2] - 9, AC, 1.5))
     for i, x in enumerate(xs27): o.append(L(xs9[i // 3], ys[2] + 9, x, ys[3] - 7, AC, 1.2))
     o.append(node(xo, ys[0], 'O', 14, ACS, AC, 13))
-    for x in xs3: o.append(C(x, ys[1], 11, AC, ACS))
-    for x in xs9: o.append(C(x, ys[2], 9, AC, ACS))
+    for x in xs3: o.append(C(x, ys[1], 11, AC))
+    for x in xs9: o.append(C(x, ys[2], 9, AC))
     for x in xs27: o.append(C(x, ys[3], 6, LV))
-    lab = [('originator keeps 1 copy', ''), ('hop 1: 3 copies', 'sent so far 3'), ('hop 2: 3 × 3 = 9', 'sent so far 12'),
+    lab = [('originator: 1 copy', ''), ('hop 1: 3 copies', 'sent so far 3'), ('hop 2: 3 × 3 = 9', 'sent so far 12'),
            ('hop 3: 9 × 3 = 27', 'sent so far 39')]
     for i, (a, b) in enumerate(lab):
         o.append(T(560, ys[i] - 2, a, 14, 'start', LV if i == 3 else INK, True))
@@ -45,14 +45,15 @@ def f2():
         o.append(R(x, 44, w, 46, f, st, 4))
         o.append(T(x + w / 2, 64, f'{name}: {size} B', 13, bold=True))
         o.append(T(x + w / 2, 82, f'{fee:,} sat', 13, fill=MUT))
-        o.append(T(x + w / 2, 110, f'{fee:,} ÷ {size} = {rate} sat/B', 13, fill=st))
+        o.append(T(x + w / 2, 110 + (16 if name == 'T1' else 0), f'{fee:,} ÷ {size} = {rate} sat/B', 13, fill=st))
         x += w
     o.append(T(20, 152, 'Block, filled highest fee rate first', 15, 'start', bold=True))
     x = 20
     for i, (name, size, fee, rate, f, st) in enumerate((txs[1], txs[0], txs[2])):
         w = size * sc
         o.append(R(x, 168, w, 46, f, st, 4))
-        o.append(T(x + w / 2, 196, f'{i + 1}. {name}, {rate} sat/B', 14, bold=True))
+        o.append(T(x + w / 2, 188, f'{i + 1}. {name}', 14, bold=True))
+        o.append(T(x + w / 2, 206, f'{rate} sat/B', 13))
         x += w
     o.append(brace(20, 700, 226, INK))
     o.append(T(360, 252, '250 + 500 + 1000 = 1750 bytes,  5000 + 15000 + 10000 = 30000 sat', 14, bold=True))
