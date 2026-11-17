@@ -1,15 +1,14 @@
 # ec-analog-u2: free-model run
 
 - Book: `books/ece/ec-analog/ec-analog-u2.html`
-- Status: problems
-- Model calls so far: 29 (133,098 tokens in, 282,069 out), 8.3 minutes
+- Status: ok
+- Model calls so far: 29 (133,098 tokens in, 282,069 out), 8.4 minutes
 
 ## Checker
 
 ```
-ec-analog-u2.html: 8 chapters, 16034 words, 9 figures, 171 KB
-PROBLEMS:
- - chapter "cs-cg-and-cd-source-follower-amplifiers": 1909 words is too long (keep under 1900; 900-1600 is the target)
+ec-analog-u2.html: 8 chapters, 15846 words, 9 figures, 170 KB
+OK
 ```
 
 ## For the reviewer
