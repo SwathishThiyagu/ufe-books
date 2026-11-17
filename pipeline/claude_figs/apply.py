@@ -41,7 +41,7 @@ for k in range(1, 30):
     if fixes:
         raw = json.dumps(ch, ensure_ascii=False)
         for a, b in fixes:
-            if raw.count(json.dumps(a, ensure_ascii=False)[1:-1]) == 0 and raw.count(json.dumps(b, ensure_ascii=False)[1:-1]) == 1:
+            if raw.count(json.dumps(a, ensure_ascii=False)[1:-1]) == 0 and (b == '' or raw.count(json.dumps(b, ensure_ascii=False)[1:-1]) >= 1):
                 continue  # already rewritten by an earlier run on this branch
             if raw.count(json.dumps(a, ensure_ascii=False)[1:-1]) != 1:
                 sys.exit(f'chapter {k}: text to replace not found exactly once: {a[:80]!r}')
@@ -54,6 +54,17 @@ for k in range(1, 30):
     if fixes: fixed.append(k)
 for fn in os.listdir(st):
     if re.match(r'(chfix|resize|spill|figfix)\d+', fn): os.remove(os.path.join(st, fn))
+# unit-level text (summary, glossary, question bank) the module corrects: (old, new) pairs applied to unit.json
+ufix = getattr(F, 'unit_fixes', lambda: [])() or []
+up = os.path.join(st, 'unit.json')
+if ufix and os.path.exists(up):
+    raw = open(up, encoding='utf-8').read()
+    for a, b in ufix:
+        ea, eb = json.dumps(a, ensure_ascii=False)[1:-1], json.dumps(b, ensure_ascii=False)[1:-1]
+        if raw.count(ea) == 0 and raw.count(eb) >= 1: continue
+        if raw.count(ea) != 1: sys.exit(f'unit.json: text to replace not found exactly once: {a[:80]!r}')
+        raw = raw.replace(ea, eb)
+    json.loads(raw); open(up, 'w', encoding='utf-8').write(raw)
 # web sources to leave out of the book (e.g. university-hosted pages): the drawing module may list URL fragments
 drops = getattr(F, 'drop_sources', lambda: [])() or []
 wp = os.path.join(st, 'web.json')
@@ -99,8 +110,13 @@ if push:
 if push and library:
     # the book is also the library copy on main: update it there too
     run('git', '-C', ROOT, 'pull', '-q', '--rebase', 'origin', 'main')
+    os.makedirs(os.path.dirname(os.path.join(ROOT, out)), exist_ok=True)  # first book of a subject in the library
     shutil.copy(os.path.join(wt, out), os.path.join(ROOT, out))
-    run('git', '-C', ROOT, 'add', out)
+    q = json.load(open(os.path.join(ROOT, 'queue.json')))  # re-read after the pull: other threads edit it too
+    for e in q:
+        if e['unit'] == unit: e['status'] = 'ok'
+    json.dump(q, open(os.path.join(ROOT, 'queue.json'), 'w'), ensure_ascii=False, indent=1)
+    run('git', '-C', ROOT, 'add', out, 'queue.json')
     run('git', '-C', ROOT, 'commit', '-q', '-m', f'Library: {unit} with figures redrawn by Claude' + (f'\n\n{trailer}' if trailer else ''))
     run('git', '-C', ROOT, 'push', '-q', 'origin', 'main')
     print('library copy on main updated')
