@@ -113,20 +113,20 @@ def f4():
         for i in range(50):
             r, c = divmod(i, 10)
             x, y = x0 + c * 30, y0 + r * 30
-            if i in fixed: f, s = LVS, LV
-            elif i in broke or i in wrong: f, s = NXS, NX
+            if i in fixed: f, s = NXS, NX
+            elif i in broke or i in wrong: f, s = LVS, LV
             else: f, s = ACS, AC
             g.append(R(x, y, 26, 26, f, s, 4, 1.5))
-            if i in fixed: g.append(T(x + 13, y + 18, '✓', 14, fill=LV, bold=True))
-            elif i in broke or i in wrong: g.append(T(x + 13, y + 18, '✗', 14, fill=NX, bold=True))
+            if i in fixed: g.append(T(x + 13, y + 18, '✓', 14, fill=NX, bold=True))
+            elif i in broke or i in wrong: g.append(T(x + 13, y + 18, '✗', 14, fill=LV, bold=True))
         return ''.join(g)
     wrong = set(range(42, 50))
     o.append(grid(20, 130, 'Baseline: 42 of 50 right = 84.0%', wrong))
     o.append(grid(380, 130, 'After the rule: 44 of 50 = 88.0%', wrong - {42, 43, 44} | {5}, fixed={42, 43, 44}, broke={5}))
     o.append(L(332, 200, 368, 200, AC, 2.5, arrow='n'))
     y = 300
-    o.append(R(380, y, 18, 16, LVS, LV, 3, 1.5)); o.append(T(404, y + 13, 'fixed by the rule: 3', 13, 'start'))
-    o.append(R(560, y, 18, 16, NXS, NX, 3, 1.5)); o.append(T(584, y + 13, 'wrong', 13, 'start'))
+    o.append(R(380, y, 18, 16, NXS, NX, 3, 1.5)); o.append(T(404, y + 13, 'fixed by the rule: 3', 13, 'start'))
+    o.append(R(560, y, 18, 16, LVS, LV, 3, 1.5)); o.append(T(584, y + 13, 'wrong', 13, 'start'))
     o.append(T(20, y + 13, 'net gain = 3 fixed − 1 broken = +2', 14, 'start', INK, True))
     return y + 26, ''.join(o)
 FIG[4] = (f4, 'fly is NN 7 times and VB 3 times, so the baseline tags it NN; the TO rule gives VB. On the 50-token development set the Brill rule fixes 3 and breaks 1, so 42 right (84.0%) becomes 44 right (88.0%).',
