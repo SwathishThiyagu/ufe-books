@@ -1,15 +1,14 @@
 # ec-circuits-u4: free-model run
 
 - Book: `books/ece/ec-circuits/ec-circuits-u4.html`
-- Status: problems
-- Model calls so far: 20 (88,139 tokens in, 215,180 out), 4.8 minutes
+- Status: ok
+- Model calls so far: 20 (88,139 tokens in, 215,180 out), 4.9 minutes
 
 ## Checker
 
 ```
-ec-circuits-u4.html: 8 chapters, 14703 words, 9 figures, 160 KB
-PROBLEMS:
- - text contains "as an AI"
+ec-circuits-u4.html: 8 chapters, 14691 words, 9 figures, 160 KB
+OK
 ```
 
 ## For the reviewer
