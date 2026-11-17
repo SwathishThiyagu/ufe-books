@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/c-nlp-u3/tree/books/cse/c-nlp/c-nlp-u3.html`
 - Status: ok
-- Model calls so far: 40 (165,567 tokens in, 318,085 out), 8.4 minutes
+- Model calls so far: 40 (165,567 tokens in, 318,085 out), 8.5 minutes
 
 ## Checker
 
 ```
-c-nlp-u3.html: 8 chapters, 16482 words, 9 figures, 182 KB
+c-nlp-u3.html: 8 chapters, 16486 words, 9 figures, 182 KB
 OK
 ```
 
