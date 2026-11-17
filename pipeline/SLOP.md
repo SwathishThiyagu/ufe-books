@@ -223,3 +223,48 @@ Recap pictures otherwise come from each lesson's own content (towers, hexes, tun
 refresh arrow or up-arrow stock icon. No picture contradicts its narration except Figure 4.5.1's colours above (the colour
 cues spoken in u1-L3, u2-L2, u5-L1 and u6-L4 match their figures). YouTube: pipeline.json has live: false for all six units
 and videos.json has an empty video link for all 17 lessons, so none is published.
+
+## AR/VR (17 Nov)
+
+Audited 17 Nov 2026: all 21 c-xr lessons (6 units, built 17 Nov), every scene, narration and frame. SC arrays dumped with
+Playwright; sheets at 0.92, every overlap re-rendered at 0.995. Checker: 0 page errors, 0 cue failures, 0 text outside the
+safe area on any lesson. Scene numbers below are the 0-based SC index (the Lnn.png number).
+Facts: every worked example and model answer recomputed (frame budgets, latency sums, samples per frame, ultrasonic d = vt,
+mocap counts, tilt from gravity, gyro drift, lighthouse angle, lens 1/f = 1/v − 1/u, pixel arcmin, shutter rates, stereo
+disparity, ITD and samples, spring and saturation, pin counts, b > kT/2, mesh bytes, Rz(90°) placement, sphere penalty
+force, record counts, projection, culling chain, quaternion rotation and m00, ray–sphere t and d, Go-Go, route length,
+weighted success, scene-graph positions, draw calls, impulse, A/B rates, overlay slip, marker depth, precision/recall,
+normalised gain, round-trip distance); all arithmetic is right. The PushCube C# script compiles as shown (legacy Input).
+Recap icons: the stopwatch (u1-L2, u4-L4, u5-L4) and refresh arrow (u1-L2) each sit on a timing or loop card, so not flagged.
+YouTube: pipeline.json has live: false for all six units and upload_sheet.json has no video link, so none is published.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-xr-u2-L2 | bookfig (10, 11), calc (13), recap (15) | hysteresis "enter 145°, leave 135° → one fist, one event", but the held fist reads 137–143° (the figure draws it never reaching the 145° line), so it never fires: zero events, not one. The band must sit around a reading that crosses it (e.g. enter 140°, leave 130° for a fist held at 140 ± 3°). Same error in the unit book's Figure 2.4.1 | wrong fact: must fix
+c-xr-u5-L1 | trap2 (8) | "Don't write: ray selection picks the object nearest along the ray (small t)" marks a true statement wrong: ray casting does take the first hit along the ray (u2-L2 trap (7) and u5-L1 notebook (5) say so; the book says "selects the first object it hits"). The wrong-side picture also shows an off-ray sphere labelled "nearest along the ray". Trap is writer-made, not in the book | wrong fact: must fix
+c-xr-u2-L2 | bookfig (4), calc (5, 6), pa (19) | linear "virtual = D + k(d − D)" taught as Go-Go; the book says this is a simplified linear form and the original Go-Go gain grows with d (quadratic); the lesson drops that caveat | misleading: should fix
+c-xr-u4-L3 | calc (12) | "54 million triangles a second" drops "per eye" (book and figure 4.6.1 say per eye); both eyes need 108 million, and the hook says the city is drawn twice | misleading: should fix
+c-xr-u6-L1 | bookfig (12), calc (13, 14) | "video view is 3.4 times worse" drops the book's "until the camera frame is delayed to match the render" (video can delay the real view to match); and "the difference is the camera capture" while 68 − 20 = 48 ms, not 33 | misleading: should fix
+c-xr-u3-L4 | bookfig (4) | "the rule: pin pitch ≈ the two-point threshold" but the narration gives the palm threshold as 10 mm and the palm array uses a 5 mm pitch (book has the same) | misleading: should fix
+c-xr-u2-L3 | bookfig (13), calc (15) | lighthouse timing (four 4.17 ms sweeps per 16.67 ms frame, a 120° fan, 28,777°/s) is the book's toy model, stated as how lighthouse works; real v1 rotors turn at 60 rev/s (21,600°/s). Say "a simplified model" | misleading: should fix
+c-xr-u1-L2, u2-L1, u2-L2, u3-L1, u3-L3, u4-L1, u4-L2, u4-L3, u4-L4, u5-L1, u5-L2, u5-L3, u5-L4, u6-L2, u6-L3 (15) | pq (all three) | spoken Bloom levels, 45 lines: "Exam practice! An understand question.", "Question two, apply.", "Question three, analyze." (u4-L3: "Question one, understand.") | should fix
+c-xr-u1-L3, u2-L3, u3-L4, u4-L4, u5-L4 (5) | outro (21, 25, 22, 23, 24) | "Next time, Unit two/three/four/five/six: …" spoken, and "NEXT UNIT / Unit N" shown (book2lesson.py:501) | should fix
+c-xr-u4-L3, u5-L3, u5-L4, u6-L3 (4) | bookfig (3, 8); codeBoard (14, 15); bookfig (5, 7, 14); bookfig (4, 10) | "the book's figure / chart / script / safe first session", 9 spoken lines; u5-L3 also shows "The book's script: PushCube" as the title of two scenes | should fix
+c-xr-u2-L2 | calc (12, 13) | caret maths on the formula board: "resolution = range ÷ 2^bits" (the hint on the same board writes 2⁸ correctly) | should fix
+c-xr all 21 | figs (last but one) | on-screen red note "Sources the book draws on: …" (book2lesson.py:389) | cosmetic: later
+c-xr-u6-L3 | outro (21) | "THAT'S A WRAP / All six units" card (unit count shown) | cosmetic: later
+c-xr all 21 | META | META.subject is "biotech" on CSE lessons (book2lesson.py:485 defaults --subject to biotech); not drawn, but anything reading META gets the wrong subject | cosmetic: later
+c-xr-u3-L1 | hookArt (0) | filler "A walk-in CAVE looks amazing" | cosmetic: later
+c-xr-u1-L3 | calc (11) | narration says "metres" (WRITE.md: US spelling in say) | cosmetic: later
+c-xr-u1-L1 | bookfig (9) | "Here are four landmarks on one time line" names three; the fourth dot (1968) has no label until the next scene | cosmetic: later
+c-xr-u1-L1 | trap2 (12) | "CAVE, 1992: about two decades later" for a 24-year gap (the lesson's own worked example) | cosmetic: later
+c-xr-u5-L3 | codeBoard (15) | "OnTriggerEnter checks the Wall tag and calls haptics" while the body is only a comment | cosmetic: later
+c-xr-u4-L3, u4-L4, u5-L3, u5-L4, u6-L1, u6-L2 (6) | bookfig (8, 9); (4); (11); (5, 7); (5, 12); (15) | small figure in a mostly empty panel: one thin strip or a few text lines in the top third of the stage | cosmetic: later
+c-xr-u3-L1, u4-L4, u5-L3, u4-L2 (4) | bookfig (11); (4); (11); (5) | overlaps still there at 0.995: sight lines run through the "L img / R img" labels; the 11.1 ms budget line cuts "show"; "AddForce 1.6 N·s, Impulse" fills its box edge to edge; the two spheres are cut off at the bottom by the zoom | cosmetic: later
+c-xr-u1-L1, u1-L2, u6-L3 (3) | recap (14, 13, 13) | small recap pictures: icons about a fifth of the card (u1-L1's "Three waves" is four dots on a line) | cosmetic: later
+
+Counts: 2 must fix, 9 should fix, 11 cosmetic (22 lines). Patterns shared with other subjects: spoken Bloom levels (15 of 21
+lessons, the most of any pattern here), "the book" wording (generator note on all 21 notes pages plus 9 spoken lines),
+unit numbers in outros (generator), caret maths, small figures and recap pictures. New here: META.subject defaults to
+biotech for every non-biotech subject; a writer-made exam trap that marks a true statement wrong; lessons that drop the
+book's own caveat ("simplified linear form", "per eye", "until the camera frame is delayed") and so overstate the fact.
