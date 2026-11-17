@@ -137,7 +137,13 @@ Read with it:
 
 Most of these hits are mechanical (sources line, agenda star, outro card and line, Bloom openers): the same script that
 cleared the 25 rebuilt lessons (rules_fix: no new words beyond "Question one", "Next time:" and "from your free notes")
-clears them, and `--revoice` voices only the changed lines (in the rebuild, 0 to 4 lines a lesson).
+clears them, and `--revoice` voices only the changed lines (in the rebuild, 0 to 7 lines a lesson).
+
+Rebuild of the 25 lessons not on YouTube (17 Nov): built with `--revoice`, then once more with `--reuse` for the final
+header fit. All 25 pass `--check`; every sheet has 0 page errors, 0 cue failures, nothing outside the safe area, and the
+play-through check passes. Re-voiced lines per lesson: 0 to 7 (68 in all). Layout warnings left are older design, not
+rebuild damage: small recap pictures, book figures under half the stage, and text-over-text hits on hidden layers
+(c-oop-u6-L1 scenes 13 and 17).
 
 ## Artificial Intelligence (17 Nov, first audit)
 
