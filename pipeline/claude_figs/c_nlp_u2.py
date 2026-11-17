@@ -283,6 +283,13 @@ def spec(k):
     return d
 TEXT[1] = [('The reverse is P(the | cat)=c(the cat)/c(cat)=2/2=1.00. They are not equal, so the direction matters.',
             'Reading the same count the other way round gives c(the cat)/c(cat)=2/2=1.00, but that is not a probability the model defines: the real P(the | cat)=c(cat the)/c(cat)=0/2=0. The numbers differ, so the direction matters.')]
+TEXT[8] += [
+    ("'Rao, Iyer and Bose' are three people. With only I-PER the three names merge into one span. B-PER restarts the span, so the boundary survives.",
+     "In 'Delhi Mumbai flights', Delhi and Mumbai are two places with no word between them. With only I-LOC the two names merge into one span. B-LOC restarts the span, so the boundary survives."),
+    ("as in 'Rao, Iyer and Bose'. With only I-PER the three names merge into one span; B-PER restarts it.",
+     "as in 'Delhi Mumbai flights'. With only I-LOC the two names merge into one span; B-LOC restarts it."),
+    ("misses the gold boundary and type target, so", "has the right type but the wrong boundary, so"),
+]
 
 
 def text_fixes(k):
