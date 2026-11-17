@@ -295,6 +295,10 @@ TEXT[6] = [
     ('cats runs q2→q1 by reversing ε:s to s:ε, then q1→q0 by reversing cat:cat to cat:cat; the result is cat plus plural.',
      'For cats the labels are read lower : upper from q0: cat:cat takes q0→q1, then s:ε takes q1→q2, the final state; the result is cat plus plural.'),
 ]
+TEXT[7] = [
+    ('The correct word their is distance 1 away, but distance alone prefers the wrong word.',
+     'The correct word their is distance 2 away, but distance alone prefers the wrong word.'),
+]
 
 
 def text_fixes(k):
