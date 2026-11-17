@@ -109,7 +109,7 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-se-u6 | free/c-se-u6-book | 1–9 (figure text: ch 8, 9) | OK (library updated; university colour codes and university-hosted sources removed) | 11 Nov 2026 |
 | c-quantum-u1 | free/c-quantum-u1-book | 1–7 | OK (library updated; 4 wrong statements fixed; 2 university sources dropped) | 17 Nov 2026 |
 | c-nlp-u1 | free/c-nlp-u1-book | 1–8 (figure text: ch 5, 6 wrong step reasons fixed) | OK (library updated; Porter step and FST analysis reasons corrected; university-hosted sources dropped) | 17 Nov 2026 |
-| c-mobile-u1 | free/c-mobile-u1-book | 1–8 (figure text: ch 2) | OK (library added; university counts removed; NPTEL source dropped) | 17 Nov 2026 |
+| c-mobile-u1 | free/c-mobile-u1-book | 1–8 (figure text: ch 2) | OK (library added; university counts removed; NPTEL source dropped; 1.3 frame bracket spans slots 0 to 7) | 17 Nov 2026 |
 | c-dist-u1 | free/c-dist-u1-book | 1–8 | OK (library updated; university mention in 1.4 removed; butterfly link rule in 1.5 corrected; 1.2 SIMD/MIMD wording and 1.4 priority-CRCW winner fixed) | 17 Nov 2026 |
 | c-block-u1 | free/c-block-u1-book | 1–7 (figure text: ch 3) | OK (library added; MIT and Princeton course pages dropped) | 17 Nov 2026 |
 | c-quantum-u2 | free/c-quantum-u2-book | 1–9 | OK (library updated; university mention removed; 2 university sources dropped) | 17 Nov 2026 |
@@ -122,7 +122,7 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-nlp-u2 | free/c-nlp-u2-book | 1–9 (figure text: ch 3) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
 | c-dist-u2 | free/c-dist-u2-book | 1–7 | OK (library updated; three university mentions removed (2.1, 2.6, 2.7); 2.4 block-split work fixed to O(p log(n/p))) | 17 Nov 2026 |
 | c-block-u2 | free/c-block-u2-book | 1–7 (figure text: ch 5) | OK (library added; university mention in 2.2 removed; HASH160 step in 2.7 corrected) | 17 Nov 2026 |
-| c-mobile-u2 | free/c-mobile-u2-book | 1–6 (figure text: ch 2, 5) | OK (library added; university counts removed; iOS kernel and install sentences corrected) | 17 Nov 2026 |
+| c-mobile-u2 | free/c-mobile-u2-book | 1–6 (figure text: ch 2, 5) | OK (library added; university counts removed; iOS kernel and install sentences, 2.4 onSaveInstanceState timing and the WebView line in the question bank corrected) | 17 Nov 2026 |
 | c-quantum-u3 | free/c-quantum-u3-book | 1–8 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
 | c-dist-u3 | free/c-dist-u3-book | 1–7 (figure text: ch 3) | OK (library updated; 3.4 out-of-bounds count fixed: 24 writes) | 17 Nov 2026 |
 | c-block-u3 | free/c-block-u3-book | 1–7 | OK (library added; 51% threshold wording in 3.3 corrected to more than half) | 17 Nov 2026 |
