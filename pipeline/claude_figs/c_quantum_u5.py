@@ -219,6 +219,8 @@ TEXT = {
     1: [('Only a few universities teach this as a full topic; in quantum computing it is the classical baseline.',
          'In quantum computing it is the classical baseline.')],
     5: [('Only a few universities teach this topic. Some syllabi call it', 'Some syllabi call it')],
+    4: [("d is the dimension of ρ's Hilbert space (2ⁿ for a qubit).", "d is the dimension of ρ's Hilbert space (d = 2 for a qubit, so dⁿ = 2ⁿ).")],
+    6: [("positions 3, 5, 6 and 7 in Section 3's layout.", 'positions 3, 5, 6 and 7 in the Hamming(7,4) layout below.')],
     7: [('Its redundancy is eight physical qubits per logical qubit.', 'It uses nine physical qubits per logical qubit, eight more than the bare qubit.')],
 }
 
