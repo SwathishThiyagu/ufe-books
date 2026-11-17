@@ -1,0 +1,704 @@
+{
+ "lead": "This unit explains how three common embedded processors are built and programmed: the 8051, a PIC16F877A-class microcontroller, and an ARM7-class core. After it you can read a block diagram, trace registers and memory banks, follow the ARM pipeline, choose an addressing mode, write a short assembly delay loop, and decide whether a Raspberry Pi or an Arduino fits a job.",
+ "about": "This unit compares the three processor families an embedded engineer meets first. Chapter 2.1 opens the 8051: its block diagram, register banks and special function registers. Chapter 2.2 moves to the PIC16F877A, where Harvard memory and a two-stage pipeline change how instructions and data are fetched. Chapter 2.3 covers ARM registers, processor modes and the three-stage pipeline; Chapter 2.4 turns those registers into ARM and Thumb instructions. Chapter 2.5 compares addressing modes and memory maps, so the same load or move can be read in each family. Chapter 2.6 puts the pieces into short assembly programs and delay loops. Chapter 2.7 places two ready-made boards, Raspberry Pi and Arduino, on top of these ideas.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "The 8051 is an 8-bit microcontroller whose CPU talks to program memory, data RAM, ports and memory-mapped special function registers.",
+   "depth": "Classic 8051 block diagram: 8-bit CPU, 4 KB on-chip program memory, 128 B data RAM, 32 I/O lines, two timers, UART and five interrupt sources; derivatives vary, so read the part number. SFR space 80H-FFH: ACC, B, PSW, SP, DPL, DPH, P0-P3, TMOD, TCON, SCON, IE, IP. Register banks 00H-1FH selected by PSW bits RS1:RS0; bit-addressable RAM 20H-2FH; reset vector 0000H. Mention that DPTR is used as DPL and DPH, and PC is not an SFR.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "8051 core and SFR space",
+    "nodes": [
+     {
+      "id": "cpu",
+      "label": "8-bit CPU",
+      "note": "ACC and PSW",
+      "style": "accent"
+     },
+     {
+      "id": "rom",
+      "label": "Program ROM",
+      "note": "reset at 0000H",
+      "style": "normal"
+     },
+     {
+      "id": "ram",
+      "label": "Data RAM",
+      "note": "banks 0-3",
+      "style": "normal"
+     },
+     {
+      "id": "sfr",
+      "label": "SFRs 80H-FFH",
+      "note": "memory-mapped registers",
+      "style": "accent"
+     },
+     {
+      "id": "psw",
+      "label": "PSW = 08H",
+      "note": "bank 1; R0 at 08H",
+      "style": "live"
+     },
+     {
+      "id": "ports",
+      "label": "Ports P0-P3",
+      "style": "normal"
+     },
+     {
+      "id": "timers",
+      "label": "Timers and UART",
+      "note": "details in Unit 3",
+      "style": "muted"
+     },
+     {
+      "id": "int",
+      "label": "Interrupts",
+      "note": "five sources",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "rom",
+      "to": "cpu",
+      "label": "instructions"
+     },
+     {
+      "from": "ram",
+      "to": "cpu",
+      "label": "data"
+     },
+     {
+      "from": "sfr",
+      "to": "cpu",
+      "label": "control"
+     },
+     {
+      "from": "psw",
+      "to": "cpu",
+      "label": "bank select"
+     },
+     {
+      "from": "cpu",
+      "to": "ports",
+      "label": "I/O"
+     },
+     {
+      "from": "cpu",
+      "to": "timers",
+      "label": "control"
+     },
+     {
+      "from": "int",
+      "to": "cpu",
+      "label": "request"
+     }
+    ],
+    "aria": "The 8051 CPU fetches from program ROM, uses data RAM and SFRs, and PSW 08H selects register bank 1."
+   },
+   "example": "PSW = 08H. Which register bank is selected, and at what address does R0 sit? If R0 holds 2AH, where is that value stored? Answer: RS1:RS0 = 01 selects bank 1; R0 is at 08H, so 2AH is stored in internal RAM address 08H.",
+   "trap": "PSW bank bits change which physical RAM addresses R0-R7 use; DPTR is two SFRs DPL and DPH, and PC is not in SFR space.",
+   "prereq": "Unit 1: microcontroller versus microprocessor, Harvard and von Neumann ideas.",
+   "leave": "Timer, interrupt and serial-port programming go to Unit 3 and Unit 4; 8051 assembly goes to Chapter 2.6."
+  },
+  {
+   "k": 2,
+   "idea": "The PIC16F877A is an 8-bit Harvard microcontroller with 14-bit instructions, banked data memory and a two-stage pipeline.",
+   "depth": "PIC16F877A architecture: 8-bit data path, 14-bit instruction words, 35 instructions, 8K×14 flash program memory, 368 B RAM, 256 B EEPROM, 8-level hardware stack, reset vector 0000H and interrupt vector 0004H. Registers: W, STATUS, FSR and INDF, PCL and PCLATH. Data memory has four banks selected by STATUS bits RP1:RP0; indirect addressing uses IRP and FSR through INDF. Two-stage fetch/execute pipeline. Block-level coverage of Timer0/1/2, CCP, MSSP, USART, 10-bit ADC and ports A-E. Some syllabi call this a mid-range PIC; use the exact device datasheet.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "PIC16F877A core and memory",
+    "nodes": [
+     {
+      "id": "prog",
+      "label": "Program memory 8K×14",
+      "note": "reset 0000H",
+      "style": "normal"
+     },
+     {
+      "id": "ir",
+      "label": "Instruction register",
+      "note": "14-bit instruction",
+      "style": "normal"
+     },
+     {
+      "id": "dec",
+      "label": "Decode and control",
+      "style": "normal"
+     },
+     {
+      "id": "alu",
+      "label": "ALU and W",
+      "note": "8-bit data",
+      "style": "accent"
+     },
+     {
+      "id": "stat",
+      "label": "STATUS = 21H",
+      "note": "RP0 = 1",
+      "style": "live"
+     },
+     {
+      "id": "fsr",
+      "label": "FSR and INDF",
+      "note": "indirect pointer",
+      "style": "normal"
+     },
+     {
+      "id": "bank1",
+      "label": "Data bank 1",
+      "note": "direct addresses 80H-FFH",
+      "style": "next"
+     },
+     {
+      "id": "periph",
+      "label": "I/O and timers",
+      "note": "details in Unit 3",
+      "style": "muted"
+     },
+     {
+      "id": "pipe",
+      "label": "2-stage pipeline",
+      "note": "fetch and execute overlap",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "prog",
+      "to": "ir",
+      "label": "fetch"
+     },
+     {
+      "from": "ir",
+      "to": "dec",
+      "label": "decode"
+     },
+     {
+      "from": "dec",
+      "to": "alu",
+      "label": "execute"
+     },
+     {
+      "from": "alu",
+      "to": "bank1",
+      "label": "load/store"
+     },
+     {
+      "from": "stat",
+      "to": "bank1",
+      "label": "selects"
+     },
+     {
+      "from": "fsr",
+      "to": "bank1",
+      "label": "pointer"
+     },
+     {
+      "from": "alu",
+      "to": "periph",
+      "label": "I/O"
+     },
+     {
+      "from": "pipe",
+      "to": "ir",
+      "label": "overlap"
+     }
+    ],
+    "aria": "PIC16F877A fetches 14-bit instructions from 8K×14 program memory through a two-stage pipeline, and STATUS 21H selects data bank 1."
+   },
+   "example": "STATUS = 21H. Which data-memory bank is selected for direct addressing, and which flag is set? Answer: RP1:RP0 = 01 selects bank 1; the carry flag C = 1.",
+   "trap": "W is not in data memory; FSR/INDF is the indirect pointer; RP bits choose the bank; the pipeline overlaps fetch and execute but does not double the instruction rate.",
+   "prereq": "Chapter 2.1 and Unit 1 Harvard memory and RISC ideas.",
+   "leave": "Timer, interrupt and serial-port details go to Unit 3 and Unit 4; PIC instruction programming goes to Chapter 2.6."
+  },
+  {
+   "k": 3,
+   "idea": "An ARM7-class core has 16 visible registers, banked registers for processor modes, and a three-stage pipeline that makes PC read ahead.",
+   "depth": "ARM background and naming: ARM7TDMI, 32-bit ARM state, 16-bit Thumb state, architecture versions. Registers R0-R15, CPSR, SPSR; R13 stack pointer, R14 link register, R15 PC. Modes: User, FIQ, IRQ, Supervisor, Abort, Undefined, System; banked R13/R14 and FIQ banked R8-R12. CPSR flags N,Z,C,V and I,F,T bits. Three-stage fetch-decode-execute pipeline; PC reads as current instruction + 8 in ARM state and + 4 in Thumb state. One line on the Cortex series; only a few universities teach it at this depth here.",
+   "figure": {
+    "type": "gantt",
+    "unit": "cycle",
+    "title": "3-stage pipeline, I1 at 0x2000",
+    "lanes": [
+     {
+      "label": "Fetch",
+      "bars": [
+       {
+        "label": "I1",
+        "start": 0,
+        "end": 1,
+        "style": "accent"
+       },
+       {
+        "label": "I2",
+        "start": 1,
+        "end": 2,
+        "style": "accent"
+       },
+       {
+        "label": "I3",
+        "start": 2,
+        "end": 3,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "Decode",
+      "bars": [
+       {
+        "label": "I1",
+        "start": 1,
+        "end": 2,
+        "style": "live"
+       },
+       {
+        "label": "I2",
+        "start": 2,
+        "end": 3,
+        "style": "live"
+       },
+       {
+        "label": "I3",
+        "start": 3,
+        "end": 4,
+        "style": "live"
+       }
+      ]
+     },
+     {
+      "label": "Execute",
+      "bars": [
+       {
+        "label": "I1",
+        "start": 2,
+        "end": 3,
+        "style": "next"
+       },
+       {
+        "label": "I2",
+        "start": 3,
+        "end": 4,
+        "style": "next"
+       },
+       {
+        "label": "I3",
+        "start": 4,
+        "end": 5,
+        "style": "next"
+       }
+      ]
+     }
+    ],
+    "aria": "Three instructions I1-I3 overlap by one cycle in the fetch, decode and execute stages of the ARM7 pipeline."
+   },
+   "example": "An ARM7TDMI in ARM state executes an instruction at address 0x00002000. Give the PC value and the addresses in the decode and fetch stages. Answer: PC = 0x00002008; decode stage = 0x00002004; fetch stage = 0x00002008.",
+   "trap": "PC is not the address of the executing instruction; SPSR exists only in exception modes; FIQ has extra banked registers R8-R12.",
+   "prereq": "Chapter 2.2 pipeline idea and Unit 1 RISC versus CISC.",
+   "leave": "Instruction encodings go to Chapter 2.4; interrupt latency and priorities go to Unit 3."
+  },
+  {
+   "k": 4,
+   "idea": "ARM instructions are 32-bit and Thumb instructions are a 16-bit subset, with a condition field and an S suffix that controls flag update.",
+   "depth": "ARM instruction classes: data processing (AND, EOR, SUB, RSB, ADD, ADC, SBC, RSC, TST, TEQ, CMP, CMN, ORR, MOV, BIC, MVN), load/store (LDR, STR, LDRB, STRB, LDM, STM), branch (B, BL, BX), multiply (MUL, MLA, UMULL, SMULL), status (MRS, MSR), software interrupt. Operand forms: immediate, register, shifted register; barrel shifter. S suffix sets N,Z,C,V; condition codes. Thumb: 16-bit compressed forms; Thumb-2 mixes 16-bit and 32-bit instructions. Keil-style assembler directives AREA, ENTRY, EXPORT, DCD, EQU.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "ARM instructions",
+     "style": "accent",
+     "note": "Thumb is 16-bit subset",
+     "children": [
+      {
+       "label": "Data processing",
+       "children": [
+        {
+         "label": "ADD"
+        },
+        {
+         "label": "ADDS",
+         "style": "live"
+        },
+        {
+         "label": "SUB"
+        },
+        {
+         "label": "AND"
+        },
+        {
+         "label": "MOV"
+        }
+       ]
+      },
+      {
+       "label": "Load/store",
+       "children": [
+        {
+         "label": "LDR"
+        },
+        {
+         "label": "STR"
+        },
+        {
+         "label": "LDM"
+        },
+        {
+         "label": "STM"
+        }
+       ]
+      },
+      {
+       "label": "Branch",
+       "children": [
+        {
+         "label": "B"
+        },
+        {
+         "label": "BL"
+        },
+        {
+         "label": "BX"
+        }
+       ]
+      },
+      {
+       "label": "Multiply",
+       "children": [
+        {
+         "label": "MUL"
+        },
+        {
+         "label": "MLA"
+        }
+       ]
+      },
+      {
+       "label": "Status",
+       "children": [
+        {
+         "label": "MRS"
+        },
+        {
+         "label": "MSR"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "The tree groups ARM instructions into data processing, load/store, branch, multiply and status classes, with ADDS in data processing."
+   },
+   "example": "R1 = 0x7FFFFFFF and R2 = 0x00000001. After ADDS R0,R1,R2, give R0 and the N,Z,C,V flags. Answer: R0 = 0x80000000; N = 1, Z = 0, C = 0, V = 1.",
+   "trap": "Flags change only when the S suffix is present; Thumb does not support every ARM instruction or every conditional form; LDM/STM writeback order matters.",
+   "prereq": "Chapter 2.3 registers, modes and CPSR flags.",
+   "leave": "Pipeline timing stays in Chapter 2.3; load/store addressing modes go to Chapter 2.5; peripheral programming goes to Unit 3."
+  },
+  {
+   "k": 5,
+   "idea": "An addressing mode is the rule for finding an operand, and a memory map is the address plan that tells code, data, stack and registers where to live.",
+   "depth": "8051 modes: immediate, register, direct, indirect @Ri, indexed @A+DPTR and @A+PC, bit, relative. PIC modes: immediate, direct, indirect through FSR/INDF, relative. ARM modes: immediate, register, shifted register, PC-relative, pre- and post-indexed load/store, stack forms. Memory maps: 8051 separate code and data spaces; PIC Harvard program and data spaces with banks; ARM unified 32-bit space with vector table. Some syllabi call indexed addressing based or pointer addressing.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "8051 memory map and operand paths",
+    "nodes": [
+     {
+      "id": "code",
+      "label": "Code memory",
+      "note": "0000H-0FFFH",
+      "style": "normal"
+     },
+     {
+      "id": "reset",
+      "label": "Reset vector",
+      "note": "0000H",
+      "style": "accent"
+     },
+     {
+      "id": "ram",
+      "label": "Internal RAM",
+      "note": "00H-7FH",
+      "style": "normal"
+     },
+     {
+      "id": "r0",
+      "label": "R0 = 30H",
+      "note": "indirect pointer",
+      "style": "accent"
+     },
+     {
+      "id": "cell",
+      "label": "RAM 30H = 5AH",
+      "note": "example cell",
+      "style": "live"
+     },
+     {
+      "id": "sfr",
+      "label": "SFRs 80H-FFH",
+      "note": "ACC, PSW, DPTR",
+      "style": "normal"
+     },
+     {
+      "id": "dptr",
+      "label": "DPTR = 1000H",
+      "note": "code pointer",
+      "style": "next"
+     },
+     {
+      "id": "byte",
+      "label": "Code 1000H = 7BH",
+      "note": "example byte",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "reset",
+      "to": "code",
+      "label": "starts"
+     },
+     {
+      "from": "ram",
+      "to": "cell",
+      "label": "contains"
+     },
+     {
+      "from": "r0",
+      "to": "cell",
+      "label": "@R0"
+     },
+     {
+      "from": "sfr",
+      "to": "dptr",
+      "label": "holds"
+     },
+     {
+      "from": "dptr",
+      "to": "byte",
+      "label": "@A+DPTR"
+     },
+     {
+      "from": "code",
+      "to": "byte",
+      "label": "contains"
+     }
+    ],
+    "aria": "The block map shows 8051 code, data RAM and SFR space, with R0=30H pointing to RAM 30H=5AH and DPTR=1000H pointing to code 1000H=7BH."
+   },
+   "example": "Before each instruction A = 00H, R0 = 30H, internal RAM 30H = 5AH, DPTR = 1000H, and code memory 1000H = 7BH. Find A after (a) MOV A,@R0 and (b) MOVC A,@A+DPTR. Answer: (a) A = 5AH; (b) A = 7BH.",
+   "trap": "Direct address is not immediate data; @R0 uses the contents of R0; MOVC reads code memory, not data RAM; PIC bank bits and ARM writeback change the effective address.",
+   "prereq": "Chapters 2.1-2.3 for register names in each family.",
+   "leave": "Full instruction programming goes to Chapter 2.6; cache and MMU details go to Unit 5."
+  },
+  {
+   "k": 6,
+   "idea": "Assembly language gives one source line per machine instruction, so the programmer controls registers, flags, stack and exact delay.",
+   "depth": "Assembly source layout: label, mnemonic, operands, comment; directives ORG, DB, DW, EQU, END. 8051, PIC and ARM examples for data movement, arithmetic, logic, branching, loops, subroutines and CALL/RET. Stack use for return addresses and parameter passing. Time-delay loop calculation from crystal frequency and machine cycle. Outline of assembler, cross-compiler, linker, startup code and in-circuit emulator; details go to Unit 6. Embedded C equivalent of a short routine, with inline assembly only as an outline.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "8051 delay loop",
+    "nodes": [
+     {
+      "id": "start",
+      "label": "MOV R2,#250",
+      "note": "1 machine cycle",
+      "style": "normal"
+     },
+     {
+      "id": "loop",
+      "label": "DJNZ R2,loop",
+      "note": "2 machine cycles",
+      "style": "accent"
+     },
+     {
+      "id": "test",
+      "label": "R2 = 0?",
+      "style": "live"
+     },
+     {
+      "id": "done",
+      "label": "Done",
+      "note": "501 μs total",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "start",
+      "to": "loop",
+      "label": "setup"
+     },
+     {
+      "from": "loop",
+      "to": "test",
+      "label": "decrement"
+     },
+     {
+      "from": "test",
+      "to": "loop",
+      "label": "No",
+      "style": "dashed"
+     },
+     {
+      "from": "test",
+      "to": "done",
+      "label": "Yes"
+     }
+    ],
+    "aria": "The flowchart shows MOV R2,#250 followed by 250 passes of DJNZ, giving 501 μs at 12 MHz."
+   },
+   "example": "An 8051 runs from a 12 MHz crystal, so one machine cycle is 1 μs. Find the delay of: MOV R2,#250; AGAIN: DJNZ R2,AGAIN. Answer: MOV takes 1 cycle; DJNZ takes 2 cycles and runs 250 times; total = 1 + 250×2 = 501 machine cycles = 501 μs.",
+   "trap": "Count the setup instruction and the final DJNZ pass; machine cycle is not the crystal period; CALL pushes a return address and changes stack use.",
+   "prereq": "Chapters 2.1-2.5 and simple binary arithmetic.",
+   "leave": "Toolchain, linker-script, startup and debugger detail goes to Unit 6; peripheral drivers go to Unit 3."
+  },
+  {
+   "k": 7,
+   "idea": "Raspberry Pi and Arduino are ready-made platforms: one is a Linux computer, the other is a microcontroller board, and each hides different hardware details.",
+   "depth": "Raspberry Pi: single-board computer with Broadcom SoC, Linux, 40-pin GPIO header, 3.3 V logic, no built-in ADC, HDMI/USB/network, Python or C programming; not hard real-time. Arduino Uno: ATmega328P, 5 V logic, 14 digital pins, 6 analog inputs, 10-bit ADC, bootloader, C++ sketch with setup() and loop(); bare-metal timing is more predictable. Compare cost, power, real-time behaviour, analog input and use cases. Show blink and ADC-read examples; keep Linux internals and RTOS scheduling for Unit 5.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Two platform stacks",
+    "nodes": [
+     {
+      "id": "ardApp",
+      "label": "Arduino sketch",
+      "note": "C++ setup and loop",
+      "style": "normal"
+     },
+     {
+      "id": "ardCore",
+      "label": "Arduino core",
+      "note": "pin and ADC functions",
+      "style": "normal"
+     },
+     {
+      "id": "mcu",
+      "label": "ATmega328P",
+      "note": "8-bit MCU, 5 V",
+      "style": "normal"
+     },
+     {
+      "id": "ardPins",
+      "label": "Arduino pins",
+      "note": "5 V, 10-bit ADC",
+      "style": "live"
+     },
+     {
+      "id": "sensor",
+      "label": "Sensor 2.5 V",
+      "style": "live"
+     },
+     {
+      "id": "piApp",
+      "label": "Python program",
+      "note": "Linux user space",
+      "style": "normal"
+     },
+     {
+      "id": "linux",
+      "label": "Linux kernel",
+      "note": "drivers and scheduler",
+      "style": "accent"
+     },
+     {
+      "id": "soc",
+      "label": "Broadcom SoC",
+      "note": "3.3 V GPIO",
+      "style": "normal"
+     },
+     {
+      "id": "piPins",
+      "label": "Pi GPIO",
+      "note": "3.3 V, no ADC",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ardApp",
+      "to": "ardCore",
+      "label": "calls"
+     },
+     {
+      "from": "ardCore",
+      "to": "mcu",
+      "label": "runs on"
+     },
+     {
+      "from": "mcu",
+      "to": "ardPins",
+      "label": "drives"
+     },
+     {
+      "from": "sensor",
+      "to": "ardPins",
+      "label": "ADC"
+     },
+     {
+      "from": "piApp",
+      "to": "linux",
+      "label": "system calls"
+     },
+     {
+      "from": "linux",
+      "to": "soc",
+      "label": "runs on"
+     },
+     {
+      "from": "soc",
+      "to": "piPins",
+      "label": "drives"
+     }
+    ],
+    "aria": "Two software stacks run an Arduino sketch on an ATmega328P and a Python program on Linux over a Broadcom SoC, and a 2.5 V sensor reaches only the Arduino ADC."
+   },
+   "example": "An Arduino Uno has a 10-bit ADC and a 5 V reference. A sensor gives 2.5 V. Find the ADC code and the resolution. Answer: code ≈ 2.5 × 1023 ÷ 5 = 511.5, taken as 512; resolution = 5 V ÷ 1024 = 4.88 mV.",
+   "trap": "Raspberry Pi GPIO is 3.3 V and not 5 V tolerant; the Pi has no analog input; Linux does not make the Pi hard real-time; Arduino has limited compute and memory.",
+   "prereq": "Chapters 2.5-2.6 and Unit 3 GPIO basics.",
+   "leave": "Linux, bootloaders and RTOS scheduling go to Unit 5; sensor and display interfacing go to Unit 3; wireless goes to Unit 4."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "SFR control leads to PIC banked registers"
+  ],
+  [
+   2,
+   3,
+   "Harvard pipeline leads to ARM pipeline"
+  ],
+  [
+   3,
+   4,
+   "ARM registers feed instruction operands"
+  ],
+  [
+   4,
+   5,
+   "operands need addressing modes"
+  ],
+  [
+   5,
+   6,
+   "addressing modes become assembly lines"
+  ],
+  [
+   1,
+   6,
+   "8051 SFRs appear in delay loop"
+  ],
+  [
+   6,
+   7,
+   "assembly and C run on Pi and Arduino"
+  ]
+ ]
+}

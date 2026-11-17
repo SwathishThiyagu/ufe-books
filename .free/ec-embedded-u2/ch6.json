@@ -1,0 +1,274 @@
+{
+ "lead": "Assembly language writes one source line for one machine instruction. Nothing is hidden: you name the register, choose the addressing mode, set the flags and count the cycles yourself. It exists because a C compiler cannot promise a fixed number of cycles for a piece of code, and reaching a special function register from C needs a compiler-specific declaration such as Keil's <code>sfr</code>. Some jobs — startup code, interrupt entry, bootloaders, bit-banged drivers — need exactly that control. A careful reader still meets it in datasheets, in compiler output and in industrial code that has run for twenty years. The instruction sets themselves are in <a href=\"#arm-and-thumb-instruction-sets\">2.4</a>.",
+ "prereq": "You need: the 8051 registers from <a href=\"#8051-architecture-and-special-function-registers\">2.1</a>, the PIC working register from <a href=\"#pic-microcontroller-architecture\">2.2</a>, ARM registers and the pipeline from <a href=\"#arm-architecture-registers-modes-and-pipeline\">2.3</a>, and addressing modes from <a href=\"#addressing-modes-and-memory-map\">2.5</a>.",
+ "sections": [
+  {
+   "h3": "One line, four fields",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Almost every assembler uses the same four-field idea — optional label, mnemonic, operands, optional comment — even though the column order and the comment character vary between tools. A label is a name that stands for the address of that line, so a branch can jump to it. The mnemonic is the instruction or a directive. Operands are registers, constants or addresses."
+    },
+    {
+     "type": "p",
+     "text": "Take <code>AGAIN: MOV R2,#250 ; load the count</code>. AGAIN is the label, MOV is the mnemonic, R2 is the destination register, #250 is an immediate constant, and everything after the semicolon is a comment. The # matters. Without it, <code>MOV R2,50H</code> means the byte stored at internal RAM address 50H (80 decimal), not the number 50H."
+    },
+    {
+     "type": "p",
+     "text": "Directives are instructions to the assembler, not to the CPU. They place code, reserve memory and name constants."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Directive",
+      "What it does",
+      "Example"
+     ],
+     "rows": [
+      [
+       "ORG",
+       "sets the address of the next byte",
+       "ORG 0000H"
+      ],
+      [
+       "DB",
+       "places bytes in program memory",
+       "DB 12H,34H"
+      ],
+      [
+       "DW",
+       "places a 16-bit word, low byte first",
+       "DW 1234H"
+      ],
+      [
+       "EQU",
+       "names a constant, uses no memory",
+       "COUNT EQU 250"
+      ],
+      [
+       "END",
+       "stops assembly",
+       "END"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Moving, computing, deciding",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Four instruction families cover almost everything: data movement, arithmetic, logic, and control transfer. Only the names change between chips."
+    },
+    {
+     "type": "p",
+     "text": "On the 8051, <code>MOV A,#05H</code> loads the accumulator A, <code>ADD A,#03H</code> adds 3 to it, <code>ANL A,#0F0H</code> keeps only the high nibble, and <code>CJNE A,#08H,NEXT</code> compares A with 8 and jumps if they differ. The PIC has a single working register W: <code>MOVLW 0x05</code> loads it, <code>ADDLW 0x03</code> adds to it, and file-register instructions carry a destination bit, where 0 writes W and 1 writes the file register. <code>BTFSS PORTB,0</code> tests a bit and skips the next instruction when the bit is set; skipping is the PIC way of branching. ARM uses 32-bit registers: <code>MOV R0,#5</code>, then <code>ADD R0,R0,#3</code>, <code>ANDS R1,R0,#0xF0</code>, compare with <code>CMP R0,#8</code>, branch with <code>BEQ</code>."
+    },
+    {
+     "type": "p",
+     "text": "A loop is a counter, a body and a test. On the 8051 the counter update, the test and the branch are one instruction, <code>DJNZ R2,loop</code>, which decrements R2 and branches back while it is not zero; the body is the code between the label and this instruction. ARM splits the job: <code>SUBS R2,R2,#1</code> subtracts and sets the Z flag, then <code>BNE loop</code> branches while Z is 0. The S suffix is what asks for the flag update."
+    }
+   ]
+  },
+  {
+   "h3": "Subroutines, the stack and exact delay",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A call must remember where to come back to. On the 8051, LCALL pushes the 2-byte address of the next instruction onto the internal RAM stack, and the stack pointer SP tracks the top; RET pops those two bytes into the program counter. ARM uses BL, which puts the return address in the link register LR (R14) instead of memory. One ARM catch: a second BL overwrites LR, so a subroutine that calls another must push LR first."
+    },
+    {
+     "type": "p",
+     "text": "Parameters travel in registers when there are few, because registers are fast and need no memory access. They travel on the stack when there are many; the caller pushes them, the callee reads them at fixed offsets from SP, and both sides agree who removes them. Registers are quicker, but an interrupt handler that reuses the same registers destroys the values; stack slots survive such an interrupt."
+    },
+    {
+     "type": "formula",
+     "text": "T = N × t<sub>cyc</sub>,  t<sub>cyc</sub> = 12 ÷ f<sub>xtal</sub>",
+     "where": "T is the delay in seconds; N is the number of machine cycles; t<sub>cyc</sub> is the machine cycle time in seconds; f<sub>xtal</sub> is the crystal frequency in Hz. The factor 12 is the classic 8051 divide-by-12."
+    },
+    {
+     "type": "p",
+     "text": "At 12 MHz, t<sub>cyc</sub> = 12 ÷ (12 × 10<sup>6</sup> Hz) = 1 × 10<sup>−6</sup> s = 1 μs. Each instruction then costs 1, 2 or 4 μs according to its machine-cycle count given in the datasheet. That predictability is why delay routines are still written in assembly."
+    }
+   ]
+  },
+  {
+   "h3": "From source to running chip",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An assembler turns mnemonics into machine code. A cross-assembler runs on your PC yet produces code for a different CPU, which is the normal case for embedded work. Two passes are needed when a label is used before it is defined: pass one records addresses, pass two substitutes them. A linker joins object files, resolves symbols shared between them, and places sections at addresses taken from the memory map. Startup code, itself in assembly, sets SP, clears RAM, copies initialised variables from flash to RAM and calls main."
+    },
+    {
+     "type": "p",
+     "text": "An in-circuit emulator (ICE) runs the real chip under your control: breakpoints, single step, register watch. Toolchain detail is in Unit 6."
+    },
+    {
+     "type": "p",
+     "text": "The C version of the delay is <code>for (i = 0; i &lt; 250; i++);</code> — and an optimiser may delete the empty loop entirely, because C says nothing about cycles. Inline assembly drops a few exact instructions into a C function: <code>__asm</code> in Keil, <code>asm volatile</code> in GCC. Reviewers still accept it where timing must be provable."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The setup instruction runs once, then the branch spends two machine cycles on each of its 250 passes. The last pass still counts, so the total is 501 μs at a 12 MHz crystal.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "8051 delay loop",
+   "aria": "The flowchart shows MOV R2,#250 followed by 250 passes of DJNZ, giving 501 machine cycles and 501 microseconds at 12 MHz.",
+   "nodes": [
+    {
+     "id": "start",
+     "label": "MOV R2,#250",
+     "note": "1 machine cycle",
+     "style": "normal"
+    },
+    {
+     "id": "loop",
+     "label": "DJNZ R2,loop",
+     "note": "2 machine cycles",
+     "style": "accent"
+    },
+    {
+     "id": "test",
+     "label": "R2 = 0?",
+     "style": "live"
+    },
+    {
+     "id": "done",
+     "label": "Done",
+     "note": "501 μs total",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "start",
+     "to": "loop",
+     "label": "setup"
+    },
+    {
+     "from": "loop",
+     "to": "test",
+     "label": "decrement"
+    },
+    {
+     "from": "test",
+     "to": "loop",
+     "label": "No",
+     "style": "dashed"
+    },
+    {
+     "from": "test",
+     "to": "done",
+     "label": "Yes"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8051 runs from a 12 MHz crystal. Find the delay produced by the fragment MOV R2,#250 followed by AGAIN: DJNZ R2,AGAIN. Give the number of machine cycles and the time in microseconds.",
+   "steps": [
+    "Machine cycle time: t_cyc = 12 ÷ f_xtal = 12 ÷ (12 × 10⁶ Hz) = 1 × 10⁻⁶ s = 1 μs.",
+    "MOV R2,#250 loads a register, so it takes 1 machine cycle.",
+    "DJNZ R2,AGAIN takes 2 machine cycles and executes 250 times. The last pass decrements 1 to 0 and falls through, so it is counted too.",
+    "DJNZ cycles = 250 × 2 = 500 machine cycles.",
+    "Total N = 1 (setup) + 500 = 501 machine cycles.",
+    "Delay T = N × t_cyc = 501 × 1 μs = 501 μs."
+   ],
+   "answer": "The fragment takes 501 machine cycles, which is a delay of 501 μs.",
+   "check": "f = 12e6\nt_cyc = 12 / f\nN = 1 + 250 * 2\nT = N * t_cyc * 1e6\nprint(N)\nprint(T)\n",
+   "values": [
+    501,
+    501.0
+   ],
+   "code": {
+    "lang": "c",
+    "code": "",
+    "stdin": ""
+   },
+   "dry_run": {
+    "head": [
+     "instruction",
+     "machine cycles",
+     "running total"
+    ],
+    "rows": [
+     [
+      "MOV R2,#250",
+      "1",
+      "1"
+     ],
+     [
+      "DJNZ pass 1..250",
+      "2 each",
+      "501"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "You forget the setup MOV and the final DJNZ pass. The loop count is 250, so DJNZ costs 500 cycles and the total is 501, not 500 or 502.",
+  "Machine cycle is not the crystal period. At 12 MHz the oscillator period is 1/12 μs; the 8051 machine cycle is 1 μs because of the divide-by-12.",
+  "# is not decoration. MOV A,#30H loads the number 30H; MOV A,30H loads the byte stored at internal RAM address 30H.",
+  "CALL costs stack bytes. Each 8051 LCALL pushes 2 bytes of return address, so deep nesting plus an interrupt can overflow a small internal RAM stack.",
+  "EQU and DB look similar but EQU allocates no memory. DW 1234H stores 34H first, because the 8051 is little-endian."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the four fields of an assembly source line and say which are optional.",
+   "marks": 2,
+   "a": "Label (optional), mnemonic, operands (none, one or more), comment (optional)."
+  },
+  {
+   "level": "remember",
+   "q": "What does the directive ORG 0030H do?",
+   "marks": 2,
+   "a": "It sets the location counter, so the next byte is assembled at program-memory address 0030H."
+  },
+  {
+   "level": "understand",
+   "q": "Explain the difference between MOV A,#30H and MOV A,30H on the 8051.",
+   "marks": 3,
+   "a": "With # the operand is immediate, so A gets the value 30H. Without # the operand is a direct address, so A gets whatever byte is stored at internal RAM address 30H."
+  },
+  {
+   "level": "apply",
+   "q": "A 12 MHz 8051 runs MOV R3,#100 followed by L1: DJNZ R3,L1. Find the delay.",
+   "marks": 4,
+   "a": "t_cyc = 12 ÷ (12 × 10⁶) = 1 μs. N = 1 + 100 × 2 = 201 machine cycles, so T = 201 μs."
+  },
+  {
+   "level": "apply",
+   "q": "Same 12 MHz crystal. Find the delay of MOV R2,#200; L2: MOV R3,#250; L1: DJNZ R3,L1; DJNZ R2,L2.",
+   "marks": 5,
+   "a": "One outer pass costs MOV R3 (1) + inner DJNZ (250 × 2 = 500) + DJNZ R2 (2) = 503 cycles. Total N = 1 + 200 × 503 = 100601 cycles, so T = 100601 μs ≈ 0.1006 s."
+  },
+  {
+   "level": "analyze",
+   "q": "Why may the C loop for (i = 0; i < 250; i++); fail to give 501 μs, while the assembly version cannot?",
+   "marks": 5,
+   "a": "C does not bind statements to instructions, so the compiler may delete the empty loop, unroll it or keep the counter in a register. Assembly fixes the instruction sequence, and the datasheet gives each instruction's machine-cycle count, so the timing is known apart from interrupt time."
+  },
+  {
+   "level": "understand",
+   "q": "How does the stack serve an 8051 subroutine call, and what changes on a nested call?",
+   "marks": 3,
+   "a": "LCALL pushes the 2-byte return address and SP moves up; RET pops it into PC. A nested LCALL pushes another 2 bytes, so SP grows further and the stack must have room for it."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does an assembler need two passes?",
+   "marks": 4,
+   "a": "A forward reference uses a label before its address is known. Pass one assigns addresses to every line, pass two replaces the label with that address in the branch operand."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, assembly survives in startup files, RTOS context-switch code, DSP kernels and certified drivers where timing must be provable. Modern work pairs hand-written assembly with compiler-explorer tools that show the assembly a C line becomes, and with intrinsics that give exact instructions from inside C. Search next: GCC extended asm constraints, Keil startup file, ARM inline assembly, cycle-accurate simulation."
+}

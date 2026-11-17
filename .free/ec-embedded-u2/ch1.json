@@ -1,0 +1,325 @@
+{
+ "lead": "The 8051 is an 8-bit microcontroller from the early 1980s that still runs small dedicated jobs: a washing-machine timer, a lift button panel, a lab board. Its CPU has no large register file. Most of its status and control registers sit at high data-memory addresses, 80H to FFH, called special function registers (SFRs). A program reads and writes them like ordinary memory cells. Knowing this map tells you where the accumulator, the flags, the stack pointer and the port latches actually live, and why a bank switch changes what R0 means.",
+ "prereq": "You need Unit 1: what a microcontroller is, and the Harvard and von Neumann ideas about program and data memory.",
+ "sections": [
+  {
+   "h3": "What is inside the chip",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The classic 8051 and 89C51-type parts put five units on one die: an 8-bit CPU; 4 KB of on-chip program memory (ROM or flash); 128 bytes of internal data RAM; four 8-bit ports, that is 32 input/output lines; and two 16-bit timers plus one serial port (UART). Five interrupt sources feed the CPU. The AT89S52 is an 8052-type part with 8 KB flash, 256 bytes RAM, three timers and six interrupt sources."
+    },
+    {
+     "type": "p",
+     "text": "Program memory and data memory are separate address spaces. That is the Harvard idea: the same address, such as 0000H, can exist in both spaces, and the instruction tells you which space is meant. The classic core does not have two independent buses running at once; Harvard here means separate memories, not a dual-bus pipeline."
+    },
+    {
+     "type": "p",
+     "text": "After reset the program counter is 0000H, so the first instruction of the program must sit at program address 0000H. Internal RAM is only 128 bytes, at 00H–7FH. An external bus can add up to 64 KB of program memory and 64 KB of external data memory, but small programs stay inside the chip."
+    },
+    {
+     "type": "p",
+     "text": "Derivatives differ. 8052-type parts have 256 bytes of RAM, 8 KB of ROM and a third timer. Read the part number and the datasheet before you count bytes."
+    }
+   ]
+  },
+  {
+   "h3": "Internal RAM: banks, bit addresses, stack",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Internal RAM 00H–7FH has three regions."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "00H–1FH: four register banks of 8 bytes. Bank 0 is 00H–07H, with R0 at 00H and R7 at 07H. Bank 1 is 08H–0FH, bank 2 is 10H–17H, bank 3 is 18H–1FH.",
+      "20H–2FH: 16 bytes that are bit-addressable, giving 128 individually settable bits, numbered 00H–7FH in bit space.",
+      "30H–7FH: 80 bytes of plain read/write RAM, and the stack."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Only one bank is active at a time. Two bits in PSW, RS1 and RS0, choose it. So MOV R3,#5 does not name a fixed address: it writes the fourth byte of the selected bank. Switching banks is a cheap way to answer an interrupt without saving R0–R7; the handler selects an unused bank and works there."
+    },
+    {
+     "type": "p",
+     "text": "The stack sits in the same RAM and grows upward. A PUSH first increments SP, then stores. After reset SP = 07H, so the first push writes to 08H and destroys bank 1's R0. Any program with calls or interrupts must move SP first, for example to 30H."
+    }
+   ]
+  },
+  {
+   "h3": "The special function registers, 80H–FFH",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Addresses 80H–FFH hold the special function registers. They are memory-mapped: MOV P1,A writes the port latch, MOV A,P1 reads the pin state, and read-modify-write instructions read the latch. Each SFR is one byte with a fixed address."
+    },
+    {
+     "type": "table",
+     "head": [
+      "SFR",
+      "Address",
+      "What it does"
+     ],
+     "rows": [
+      [
+       "ACC",
+       "E0H",
+       "accumulator, main working register"
+      ],
+      [
+       "B",
+       "F0H",
+       "second operand for MUL and DIV"
+      ],
+      [
+       "PSW",
+       "D0H",
+       "flags and register-bank select"
+      ],
+      [
+       "SP",
+       "81H",
+       "stack pointer"
+      ],
+      [
+       "DPL / DPH",
+       "82H / 83H",
+       "low and high bytes of DPTR"
+      ],
+      [
+       "P0, P1, P2, P3",
+       "80H, 90H, A0H, B0H",
+       "port latches"
+      ],
+      [
+       "TCON / TMOD",
+       "88H / 89H",
+       "timer control and mode"
+      ],
+      [
+       "SCON",
+       "98H",
+       "serial port control"
+      ],
+      [
+       "IE / IP",
+       "A8H / B8H",
+       "interrupt enable and priority"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two rules. SFRs whose address ends in 0H or 8H are bit-addressable: ACC, B, PSW, P0–P3, TCON, SCON, IE, IP. One bit of such a register can be set or cleared on its own. DPTR is not one register: it is the 16-bit pair DPH:DPL, loaded with MOV DPTR,#1234H or changed one byte at a time."
+    },
+    {
+     "type": "p",
+     "text": "The program counter is not an SFR. You cannot read or write PC as a memory cell; it moves only by fetch, jump, call and return."
+    }
+   ]
+  },
+  {
+   "h3": "PSW and the bank select bits",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "PSW at address D0H carries the flags and the bank bits."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "bit 7 CY: carry",
+      "bit 6 AC: auxiliary carry out of bit 3, used by decimal adjust after BCD addition",
+      "bit 5 F0: general-purpose flag, free for the programmer",
+      "bit 4 RS1 and bit 3 RS0: register-bank select",
+      "bit 2 OV: overflow",
+      "bit 1: F1 user flag (reserved on some variants)",
+      "bit 0 P: parity of ACC, 1 when ACC holds an odd number of ones"
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "bank base address = 8 × (2 × RS1 + RS0)",
+     "where": "RS1 and RS0 are PSW bits 4 and 3; the result is the RAM address of R0 in the active bank, from 00H for bank 0 to 18H for bank 3."
+    },
+    {
+     "type": "p",
+     "text": "Writing 08H to PSW clears CY, AC, F0, F1 and OV and sets RS0, so the very next instruction sees bank 1 as the live bank. P is updated by hardware from ACC and is not forced by the write."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The CPU fetches from program ROM, reads data RAM and writes SFRs; the orange box shows PSW = 08H selecting bank 1, which places R0 at 08H.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "8051 core and SFR space",
+   "nodes": [
+    {
+     "id": "cpu",
+     "label": "8-bit CPU",
+     "note": "ACC and PSW",
+     "style": "accent"
+    },
+    {
+     "id": "rom",
+     "label": "Program ROM",
+     "note": "reset at 0000H",
+     "style": "normal"
+    },
+    {
+     "id": "ram",
+     "label": "Data RAM",
+     "note": "banks 0-3",
+     "style": "normal"
+    },
+    {
+     "id": "sfr",
+     "label": "SFRs 80H-FFH",
+     "note": "control registers",
+     "style": "accent"
+    },
+    {
+     "id": "psw",
+     "label": "PSW 08H",
+     "note": "bank 1, R0 at 08H",
+     "style": "live"
+    },
+    {
+     "id": "ports",
+     "label": "Ports P0-P3",
+     "style": "normal"
+    },
+    {
+     "id": "timers",
+     "label": "Timers and UART",
+     "note": "see Unit 3",
+     "style": "muted"
+    },
+    {
+     "id": "int",
+     "label": "Interrupts",
+     "note": "five sources",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "rom",
+     "to": "cpu",
+     "label": "instructions"
+    },
+    {
+     "from": "ram",
+     "to": "cpu",
+     "label": "data"
+    },
+    {
+     "from": "sfr",
+     "to": "cpu",
+     "label": "control"
+    },
+    {
+     "from": "psw",
+     "to": "cpu",
+     "label": "bank select"
+    },
+    {
+     "from": "cpu",
+     "to": "ports",
+     "label": "I/O"
+    },
+    {
+     "from": "cpu",
+     "to": "timers",
+     "label": "control"
+    },
+    {
+     "from": "int",
+     "to": "cpu",
+     "label": "request"
+    }
+   ],
+   "aria": "The 8051 CPU fetches instructions from program ROM, exchanges data with internal RAM and the SFRs at 80H to FFH, drives ports P0 to P3, controls timers and the UART, and takes requests from five interrupt sources; PSW 08H selects bank 1 so R0 sits at 08H."
+  }
+ },
+ "examples": [
+  {
+   "question": "A program starts with MOV PSW,#08H followed by MOV R0,#2AH. (a) Which register bank is selected? (b) At what internal RAM address does R0 sit? (c) At which RAM address is the value 2AH stored, and what is that value in decimal?",
+   "steps": [
+    "PSW = 08H. In binary, 08H = 0000 1000.",
+    "RS1 is bit 4 = 0. RS0 is bit 3 = 1. So RS1:RS0 = 01.",
+    "RS1:RS0 = 01 selects bank 1.",
+    "Bank base = 8 × bank number = 8 × 1 = 8 = 08H.",
+    "R0 is the first register of the bank, offset 0, so R0 is at 08H + 0 = 08H, that is decimal 8.",
+    "MOV R0,#2AH writes the byte 2AH into that address. 2AH = 2 × 16 + 10 = 42 in decimal.",
+    "So the byte 2AH sits at internal RAM address 08H, which is also bank 1's R0."
+   ],
+   "answer": "Bank 1 is selected, R0 sits at 08H (decimal 8), and the value 2AH = 42 decimal is stored at that address.",
+   "check": "psw = 0x08\nrs1 = (psw >> 4) & 1\nrs0 = (psw >> 3) & 1\nbank = (rs1 << 1) | rs0\nbase = 8 * bank\nr0_addr = base + 0\nvalue = 0x2A\nprint(bank)\nprint(base)\nprint(r0_addr)\nprint(value)",
+   "values": [
+    1,
+    8,
+    8,
+    42
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "R0 is not a fixed address. After PSW = 08H, MOV R0,#2AH stores at 08H, not at 00H.",
+  "DPTR is not one SFR: it is the pair DPH:DPL at 83H and 82H. The program counter is not in SFR space and cannot be read as a byte.",
+  "Reset SP = 07H, so the first PUSH lands on 08H and destroys bank 1's R0. Move SP to 30H or higher before using the stack.",
+  "Changing RS1:RS0 moves no data. The byte 2AH stays at 08H; it simply stops being reachable as R0.",
+  "Not every SFR is bit-addressable; only those whose address ends in 0H or 8H are."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the reset vector and the reset value of SP in the 8051.",
+   "marks": 2,
+   "a": "Program counter = 0000H, so execution starts at program address 0000H. SP = 07H."
+  },
+  {
+   "level": "remember",
+   "q": "Give the SFR addresses of ACC, PSW and SP.",
+   "marks": 2,
+   "a": "ACC = E0H, PSW = D0H, SP = 81H."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the 8051 called a Harvard machine rather than a von Neumann machine?",
+   "marks": 3,
+   "a": "Program memory and data memory are separate address spaces. Address 0000H can exist in both, and the instruction opcode decides which space is accessed. This is about separate memories, not two buses running at once; the classic core does not overlap fetch and data read."
+  },
+  {
+   "level": "apply",
+   "q": "PSW = 18H. Which bank is active, and at what RAM address is R5?",
+   "marks": 4,
+   "a": "18H = 0001 1000, so RS1 = 1 and RS0 = 1, giving bank 3. Base = 8 × 3 = 24 = 18H. R5 is at 18H + 5 = 1DH = 29 decimal."
+  },
+  {
+   "level": "apply",
+   "q": "SP = 30H before a PUSH of the byte 5AH. What is SP afterwards and where does 5AH land?",
+   "marks": 4,
+   "a": "PUSH increments SP first, so SP becomes 31H and 5AH is written to internal RAM address 31H."
+  },
+  {
+   "level": "analyze",
+   "q": "An interrupt handler must not disturb the main program's R0–R7. Explain how the PSW bank bits solve this, and the cost.",
+   "marks": 5,
+   "a": "The handler sets RS1:RS0 to an unused bank, so its R0–R7 are different physical bytes than the main program's. No PUSH and POP of eight registers is needed, which saves time in the handler. The cost is that only four banks exist, and the handler must restore the old PSW before RETI, otherwise the main program returns to the wrong bank."
+  },
+  {
+   "level": "analyze",
+   "q": "After MOV PSW,#08H and MOV R0,#2AH, a routine executes MOV PSW,#00H and then reads R0. What value does it see, and where is 2AH?",
+   "marks": 6,
+   "a": "PSW = 00H selects bank 0, so R0 now names address 00H, a different byte from the one written. 2AH is still at 08H, but it is no longer reachable as R0. It can be read by direct addressing, for example MOV A,08H, or by indirect addressing through a pointer."
+  }
+ ],
+ "beyond": "Not for the exam. The 8051 SFR map survives almost unchanged in modern parts such as Silicon Labs C8051F and many USB bridge and radio chips, so legacy code ports with little change. Soft 8051 cores are still licensed for FPGAs because the core is tiny and the toolchain is free. New designs usually pick an ARM Cortex-M or a RISC-V core instead, but 8051 assembly remains the cheapest way to teach memory-mapped I/O. Search for an 8051 SFR map, an AT89S52 datasheet, and the 8052 timer 2 difference."
+}

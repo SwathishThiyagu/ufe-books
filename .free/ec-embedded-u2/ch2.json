@@ -1,0 +1,285 @@
+{
+ "lead": "The PIC16F877A is an 8-bit microcontroller from the mid-range PIC family. It keeps program and data in separate memories (Harvard), uses 14-bit instruction words and offers only 35 instructions. The address field inside an instruction is only 7 bits, so it can name 128 locations out of the 368-byte data RAM; RP1:RP0 in STATUS supply the missing high bits and split the RAM into four banks. A two-stage pipeline fetches the next instruction while the present one executes. You find such chips in energy meters, battery chargers, washing machines and small card readers, where a cheap part must read sensors, count pulses and switch outputs.",
+ "prereq": "You need: <a href=\"#8051-architecture-and-special-function-registers\">Chapter 2.1</a> and the Harvard and RISC ideas from Unit 1.",
+ "sections": [
+  {
+   "h3": "Data path, instruction word and pipeline",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The core is 8 bits wide. All arithmetic and logic happens in the ALU, which takes one operand from the working register <b>W</b> and the other from a file register in data memory, or, for the literal instructions (MOVLW, ADDLW, ANDLW, IORLW, XORLW, SUBLW, RETLW), from the 8-bit operand field inside the 14-bit instruction word. The result goes back to W or to the file register, and the destination bit of the instruction chooses which."
+    },
+    {
+     "type": "p",
+     "text": "Harvard separation matters here. Program memory has its own 14-bit bus and data memory has an 8-bit bus, so an instruction fetch and a data read can happen together, and code can never be overwritten by a stray pointer. Every instruction is exactly one 14-bit word: a 6-bit opcode plus up to 8 bits of operand. The whole instruction set is 35 instructions."
+    },
+    {
+     "type": "p",
+     "text": "The pipeline has two stages. While an instruction executes, the next one is fetched. That is why an instruction takes one instruction cycle, written T<sub>cy</sub>, where T<sub>cy</sub> = 4 × T<sub>OSC</sub>. A 4 MHz crystal gives T<sub>OSC</sub> = 0.25 µs and T<sub>cy</sub> = 1 µs. When a jump or call is taken, the word already fetched is wrong, so it is discarded and the pipeline refills: that instruction costs 2 T<sub>cy</sub>."
+    }
+   ]
+  },
+  {
+   "h3": "Program memory, banks and the hardware stack",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Program memory is 8K × 14 flash: 8192 words of 14 bits, addressed from 0000H to 1FFFH. Two addresses are fixed by hardware. After reset the CPU starts at <b>0000H</b>; an interrupt sends it to <b>0004H</b>. Put a jump at 0000H, and your interrupt routine or a jump to it at 0004H. The 8-level hardware stack stores return addresses only; it is not for data."
+    },
+    {
+     "type": "p",
+     "text": "Data memory is 368 bytes of RAM, plus 256 bytes of EEPROM for values that must survive a power cut. The RAM is split into four banks of up to 128 bytes. A direct address inside an instruction is only 7 bits, so it can name a cell within one bank but cannot say which bank. The bits <b>RP1:RP0</b> in STATUS choose the bank."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "W: the working register. It is not in data memory and has no address.",
+      "STATUS, address 03H: holds RP1, RP0, IRP, the zero flag Z, digit carry DC and carry C.",
+      "FSR, 04H: an 8-bit pointer used for indirect addressing.",
+      "INDF, 00H: reading or writing INDF actually touches the cell that FSR points to.",
+      "PCL, 02H, and PCLATH, 0AH: PCL is the low 8 bits of the program counter; PCLATH holds the upper bits and must be written before a computed jump."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Indirect addressing ignores RP1:RP0. FSR supplies the low 7 bits and its bit 7 picks one bank of a pair, while <b>IRP</b> (bit 7 of STATUS) picks the pair: IRP = 0 means banks 0 and 1, IRP = 1 means banks 2 and 3. So FSR = A0H with IRP = 1 reaches physical address 1A0H in bank 3."
+    }
+   ]
+  },
+  {
+   "h3": "What sits on the chip",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The 16F877A is a 40-pin part. Around the core sit the blocks that make it a microcontroller rather than a CPU."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Timer0 (8-bit), Timer1 (16-bit) and Timer2 (8-bit) for timing and counting pulses.",
+      "CCP modules: capture an edge, compare against a value, or generate PWM.",
+      "MSSP: a synchronous serial port for SPI and I2C.",
+      "USART: asynchronous serial, for a PC link or a radio module.",
+      "A 10-bit ADC with 8 input channels, so an analog sensor reads as a number from 0 to 1023.",
+      "Ports A to E, 33 I/O pins in total, each pin's direction set by a TRIS register."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Timers, interrupts, PWM and the ADC are detailed in Unit 3; SPI, I2C and UART frames are in Unit 4. Here you only need this: these blocks hang off the same 8-bit data bus and appear as file registers in banks 0 and 1."
+    }
+   ]
+  },
+  {
+   "h3": "Changing banks in a real program",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Bank switching is the step where marks are lost, so do it in a fixed order. Instruction syntax is covered in <a href=\"#assembly-language-programming\">Chapter 2.6</a>."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Decide the target bank and the 7-bit address of the register inside it.",
+      "Set or clear RP1:RP0 in STATUS, for example BSF STATUS,RP0 to reach bank 1.",
+      "Access the register by its 7-bit address; hardware adds the bank bits for you.",
+      "Repeat for every other bank you touch. The RP bits stay where you left them.",
+      "Restore the original RP1:RP0 before returning, if the calling code expects that bank."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Two common bugs. A subroutine changes RP0 and returns without restoring it, so the caller's next write lands in the wrong bank. Or PCLATH is not updated before a computed jump, and the jump lands on the wrong 2K page."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The 8-bit ALU and W sit between a 14-bit program memory and banked data memory. STATUS (address 03H) holds the value 21H, i.e. RP0 = 1, and points direct accesses at data bank 1, while FSR and INDF reach the same memory as a pointer.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "PIC16F877A core and memory",
+   "nodes": [
+    {
+     "id": "prog",
+     "label": "Program memory 8K×14",
+     "note": "reset 0000H",
+     "style": "normal"
+    },
+    {
+     "id": "ir",
+     "label": "Instruction register",
+     "note": "14-bit instruction",
+     "style": "normal"
+    },
+    {
+     "id": "dec",
+     "label": "Decode and control",
+     "style": "normal"
+    },
+    {
+     "id": "alu",
+     "label": "ALU and W",
+     "note": "8-bit data",
+     "style": "accent"
+    },
+    {
+     "id": "stat",
+     "label": "STATUS value 21H",
+     "note": "address 03H; RP0 = 1",
+     "style": "live"
+    },
+    {
+     "id": "fsr",
+     "label": "FSR and INDF",
+     "note": "indirect pointer",
+     "style": "normal"
+    },
+    {
+     "id": "bank1",
+     "label": "Data bank 1",
+     "note": "direct addresses 80H-FFH",
+     "style": "next"
+    },
+    {
+     "id": "periph",
+     "label": "I/O and timers",
+     "note": "details in Unit 3",
+     "style": "muted"
+    },
+    {
+     "id": "pipe",
+     "label": "2-stage pipeline",
+     "note": "fetch and execute overlap",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "prog",
+     "to": "ir",
+     "label": "fetch"
+    },
+    {
+     "from": "ir",
+     "to": "dec",
+     "label": "decode"
+    },
+    {
+     "from": "dec",
+     "to": "alu",
+     "label": "execute"
+    },
+    {
+     "from": "alu",
+     "to": "bank1",
+     "label": "load/store"
+    },
+    {
+     "from": "stat",
+     "to": "bank1",
+     "label": "selects"
+    },
+    {
+     "from": "fsr",
+     "to": "bank1",
+     "label": "pointer"
+    },
+    {
+     "from": "alu",
+     "to": "periph",
+     "label": "I/O"
+    },
+    {
+     "from": "pipe",
+     "to": "ir",
+     "label": "overlap"
+    }
+   ],
+   "aria": "PIC16F877A fetches 14-bit instructions from 8K×14 program memory through a two-stage pipeline, and STATUS value 21H (address 03H) selects data bank 1."
+  }
+ },
+ "examples": [
+  {
+   "question": "A program on a PIC16F877A writes the value 21H into the STATUS register. (a) Which data-memory bank is selected for direct addressing? (b) Which bits of RP1:RP0 are set, and which arithmetic flag is set? (c) Give 21H in decimal.",
+   "steps": [
+    "Write 21H in 8-bit binary: 21H = 0010 0001.",
+    "The STATUS bit order is IRP(7), RP1(6), RP0(5), TO(4), PD(3), Z(2), DC(1), C(0).",
+    "Read the writable status bits from the written value: IRP = 0, RP1 = 0, RP0 = 1, Z = 0, DC = 0, C = 1. TO (bit 4) and PD (bit 3) are read-only; a write to STATUS does not change them. After power-up or a CLRWDT both are 1, so they keep TO = 1 and PD = 1 rather than taking 0 from 21H.",
+    "RP1:RP0 = 01, so the bank number is 0×2 + 1 = 1. Direct addresses in the instruction now refer to data bank 1.",
+    "C = 1, so the carry flag is set; Z = 0 and DC = 0.",
+    "Convert to decimal: 21H = 2 × 16 + 1 = 33."
+   ],
+   "answer": "RP1:RP0 = 01 selects data bank 1, the carry flag C = 1 is set, and 21H = 33 decimal.",
+   "check": "status = 0x21\nrp1 = (status >> 6) & 1\nrp0 = (status >> 5) & 1\nbank = rp1 * 2 + rp0\ncarry = status & 1\nprint(bank)\nprint(rp0)\nprint(rp1)\nprint(carry)\nprint(status)\n",
+   "values": [
+    1,
+    1,
+    0,
+    1,
+    33
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "W has no address. It is not in the data memory map, so you cannot reach it with FSR or with a bank bit; only the destination bit of an instruction names it.",
+  "RP1:RP0 select the bank for direct addressing only. Indirect addressing through INDF uses IRP plus bit 7 of FSR, and ignores RP1:RP0.",
+  "14-bit is the instruction width, 8-bit is the data width. Writing that the PIC has a 14-bit data bus is a common wrong answer.",
+  "The 8-level hardware stack holds return addresses only, pushed by CALL and by an interrupt; it is not for data. Data must be pushed by hand into RAM, not into this stack.",
+  "A taken branch costs 2 T<sub>cy</sub>, not 1. The pipeline overlaps fetch with execute but does not remove the refill cost after a jump."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "State the reset vector and the interrupt vector of the PIC16F877A.",
+   "marks": 2,
+   "a": "Reset vector 0000H; interrupt vector 0004H."
+  },
+  {
+   "level": "remember",
+   "q": "How many instructions does the PIC16F877A have, and how wide is one instruction word?",
+   "marks": 2,
+   "a": "35 instructions; each is one 14-bit word."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the PIC16F877A need bank-select bits at all?",
+   "marks": 3,
+   "a": "A direct address in an instruction is only 7 bits, so it can name 1 of 128 locations. RAM has 368 bytes, so RP1:RP0 in STATUS supply the missing high bits and select one of four banks."
+  },
+  {
+   "level": "understand",
+   "q": "W is called a register but has no address. What does that mean for instruction operands?",
+   "marks": 3,
+   "a": "W is not in the data memory map, so no address or pointer can reach it. Instructions name it through the destination bit (0 = W, 1 = file register), and to store W in RAM you must copy it with an instruction such as MOVWF."
+  },
+  {
+   "level": "apply",
+   "q": "A PIC16F877A runs from a 4 MHz crystal. Find T<sub>OSC</sub>, T<sub>cy</sub>, and the time taken by a GOTO that is taken.",
+   "marks": 4,
+   "a": "T<sub>OSC</sub> = 1/4 MHz = 0.25 µs. T<sub>cy</sub> = 4 × 0.25 µs = 1 µs. A taken GOTO takes 2 T<sub>cy</sub> = 2 µs."
+  },
+  {
+   "level": "apply",
+   "q": "FSR = A0H and IRP = 1. Which bank does INDF access, and what is the physical address?",
+   "marks": 4,
+   "a": "IRP = 1 selects the bank pair 2 and 3. Bit 7 of FSR is 1, so bank 3 is used. Physical address = 1A0H, which is offset 20H inside bank 3."
+  },
+  {
+   "level": "analyze",
+   "q": "A subroutine sets RP0 = 1, writes one byte, and returns without clearing RP0. Explain the bug for the caller.",
+   "marks": 6,
+   "a": "RP1:RP0 are global state, not saved by the call. After return the caller's direct address, say 20H, is decoded inside bank 1 as A0H instead of inside bank 0 as 20H, so the caller silently writes a different cell. The subroutine must restore the bank bits, or the caller must set them before every access."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a taken branch cost two instruction cycles when a normal instruction costs one?",
+   "marks": 5,
+   "a": "The two-stage pipeline has already fetched the next sequential instruction while the branch executes. When the branch is taken, that word is not the one needed, so it is discarded and a fresh fetch starts; execute waits one extra T<sub>cy</sub> for the refill."
+  }
+ ],
+ "beyond": "Not for the exam. Later PIC families keep the same Harvard idea but widen things: PIC18 uses 16-bit instructions and an optional priority interrupt scheme, and PIC24/dsPIC use 24-bit instructions with a 16-bit data path. Microchip's newer enhanced mid-range parts add more instructions while staying close to the 16F877A, so a lab board of this device still teaches the family. Competing 8-bit cores, such as AVR and the ARM Cortex-M0+, are worth comparing on instruction width and register file. Search for the device datasheet, then for the enhanced mid-range and PIC18 programming manuals."
+}
