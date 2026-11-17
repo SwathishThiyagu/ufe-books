@@ -236,6 +236,8 @@ FIG[8] = (f8, 'For a wall of stiffness 2000 N/m the damping must lie above the l
 TEXT = {
     4: [('One slot lasts t = 1/120 s = 0.008333 s = 8.33 ms; the figure rounds this to 8 ms and 9 ms across four slots.',
          'One slot lasts t = 1/120 s = 0.008333 s = 8.33 ms.')],
+    3: [('the viewer must accept larger pixels per degree, or use a denser panel',
+         'the viewer must accept larger pixels, meaning fewer pixels per degree, or use a denser panel')],
     8: [('Uses: surgical trainers, simulators, remote robot arms. Only a few universities teach this chapter.',
          'Uses: surgical trainers, simulators, remote robot arms.')],
 }
