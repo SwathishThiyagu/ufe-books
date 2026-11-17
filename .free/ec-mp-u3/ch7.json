@@ -1,0 +1,277 @@
+{
+ "lead": "Assembly programs rarely run straight through once. They repeat a block a fixed number of times, walk a pointer through memory, or waste exact time before the next hardware action. Counters and index registers make these loops; T-state counting turns a loop into a delay; a look-up table turns an index into a stored constant. You meet all three in keypad scanning, seven-segment displays, motor step timing and sensor linearisation.",
+ "prereq": "You need: <a href=\"#branch-jump-and-call-instructions\">3.5</a> for conditional jumps, <a href=\"#arithmetic-and-logical-instructions\">3.4</a> for DCR and the Z flag, and Unit 2 for T-states and machine cycles.",
+ "sections": [
+  {
+   "h3": "Loops with a counter or an index",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A loop repeats a block until a test says stop. In assembly the test is usually a decrement followed by a conditional jump. A counter register holds the repeat count. DCR counter reduces it by one and sets the Z flag when the result is zero. JNZ jumps back while Z = 0. This is a count-down loop: the count runs from N to zero."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Load the counter with N, the number of passes.",
+      "Run the loop body once.",
+      "Decrement the counter with DCR.",
+      "Test Z: if Z = 0, jump back to the body; if Z = 1, fall through.",
+      "Reload the counter before starting a new loop."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "An index register holds an address, not a count. Load the base address into HL. MOV A,M reads the byte at that address, and INX H moves to the next byte. Decrement the counter and jump back. The same pattern copies a block, sums an array, or sends a table of bytes to a port."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "LXI H, 2000H\nMVI C, 05H\nLOOP: MOV A,M\nINX H\nDCR C\nJNZ LOOP",
+     "stdin": "",
+     "output": ""
+    },
+    {
+     "type": "p",
+     "text": "A nested loop puts one loop inside another. The outer counter controls rows; the inner counter controls columns. Reload the inner counter on every outer pass. If the inner body repeats P times and the outer loop repeats Q times with no early exit, the body runs P × Q times. Delay loops use nesting to stretch time without a huge count."
+    }
+   ]
+  },
+  {
+   "h3": "Delay loops and timing",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A delay loop is a loop whose only job is to consume a known time. The CPU does no useful work; it counts. The delay comes from the clock, not from the number of source lines. On the 8085, one T-state is one clock period. On the classic 8051, one machine cycle is 12 oscillator periods. Some syllabi call this a time delay loop."
+    },
+    {
+     "type": "formula",
+     "text": "T_total = T_init + (N − 1) × (T_body + T_taken) + (T_body + T_not)",
+     "where": "T_total is the total clock periods, or T-states on the 8085; T_init is the setup time before the loop; N is the number of body executions; T_body is the body time without the conditional jump; T_taken is the jump time when taken; T_not is the jump time when not taken. For the 8085, delay = T_total / f_clk, where f_clk is the clock frequency."
+    },
+    {
+     "type": "p",
+     "text": "On the 8051, DJNZ Rn,rel decrements Rn and branches if the result is not zero. It takes 2 machine cycles. At a 12 MHz crystal, one machine cycle is 1 µs, so one DJNZ takes 2 µs. Two hundred passes take about 400 µs, plus the setup instructions."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Processor",
+      "Instruction",
+      "Time"
+     ],
+     "rows": [
+      [
+       "8085",
+       "MVI r,d8",
+       "7 T"
+      ],
+      [
+       "8085",
+       "DCR r",
+       "4 T"
+      ],
+      [
+       "8085",
+       "JNZ taken",
+       "10 T"
+      ],
+      [
+       "8085",
+       "JNZ not taken",
+       "7 T"
+      ],
+      [
+       "8051",
+       "DJNZ Rn,rel",
+       "2 machine cycles"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The last test fails, so the last conditional jump is not taken and is shorter. Count that final pass separately; do not multiply every pass by the taken time."
+    }
+   ]
+  },
+  {
+   "h3": "Look-up tables",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A look-up table is a block of constants in memory. The program computes an index, adds it to the table base, and reads the entry. The index is a byte offset, not the entry value. Tables replace long calculations with one memory read: seven-segment codes, sine samples, calibration points, square-root estimates."
+    },
+    {
+     "type": "p",
+     "text": "On the 8085, LXI H,TABLE loads the base into HL. MVI E,index and MVI D,00H put a zero-extended index into DE. DAD D adds DE to HL. MOV A,M reads the selected entry. On the 8051, MOV DPTR,#TABLE sets the base, MOV A,#index sets the offset, and MOVC A,@A+DPTR reads code memory. On the 8086, put the base in BX and the index in AL, then execute XLAT; AL is replaced by the byte at DS:[BX+AL]."
+    },
+    {
+     "type": "table",
+     "head": [
+      "CPU",
+      "Table base",
+      "Index",
+      "Read"
+     ],
+     "rows": [
+      [
+       "8085",
+       "HL",
+       "DE = 00H, E = index",
+       "DAD D; MOV A,M"
+      ],
+      [
+       "8051",
+       "DPTR",
+       "A",
+       "MOVC A,@A+DPTR"
+      ],
+      [
+       "8086",
+       "BX",
+       "AL",
+       "XLAT"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "MOVC reads program memory, so an 8051 table is written with DB constants in code space. Use MOVX for a table in external data memory. XLAT uses AL as both index and result, so it can select at most 256 bytes. BX is not changed."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The loop loads FFH into C, decrements C, and jumps back until C becomes zero. The final test falls through to Exit, so the last conditional jump is not taken.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Delay loop",
+   "aria": "The loop loads count FFH, decrements C, tests for zero, and jumps back until C becomes zero.",
+   "nodes": [
+    {
+     "id": "load",
+     "label": "Load C=FFH",
+     "style": "normal"
+    },
+    {
+     "id": "dcr",
+     "label": "DCR C",
+     "style": "accent"
+    },
+    {
+     "id": "zero",
+     "label": "C = 0 ?",
+     "style": "live"
+    },
+    {
+     "id": "exit",
+     "label": "Exit",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "load",
+     "to": "dcr"
+    },
+    {
+     "from": "dcr",
+     "to": "zero"
+    },
+    {
+     "from": "zero",
+     "to": "exit",
+     "label": "yes"
+    },
+    {
+     "from": "zero",
+     "to": "dcr",
+     "label": "no"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "An 8085 system runs at a 3 MHz clock. Find the delay produced by this loop: MVI C,FFH; LOOP: DCR C; JNZ LOOP. Use 7 T for MVI C,FFH, 4 T for DCR C, 10 T for JNZ when taken and 7 T when not taken.",
+   "steps": [
+    "C = FFH = 255, so DCR C executes 255 times.",
+    "JNZ is taken on 254 passes and not taken on the final pass.",
+    "Taken passes: 254 × (4 + 10) = 3556 T.",
+    "Final pass: 4 + 7 = 11 T.",
+    "Setup: 7 T.",
+    "Total T = 7 + 3556 + 11 = 3574 T.",
+    "Clock period = 1 / 3 MHz = 1/3 µs.",
+    "Delay = 3574 / 3 µs = 1191.3 µs = 1.19 ms."
+   ],
+   "answer": "The loop delays about 1.19 ms, which is 1191.3 µs, from 3574 T-states at 3 MHz.",
+   "check": "f_clk = 3e6\nT_init = 7\nT_body = 4\nT_taken = 10\nT_not = 7\nN = 255\nT = T_init + (N - 1) * (T_body + T_taken) + (T_body + T_not)\nprint(int(T))\ndelay_us = T / (f_clk / 1e6)\nprint(round(delay_us, 1))\nprint(round(delay_us / 1000, 2))",
+   "values": [
+    3574,
+    1191.3,
+    1.19
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Count T-states, not source lines. The three-line loop in the example runs thousands of T-states.",
+  "The last conditional jump is not taken. Using 10 T for every JNZ makes the delay too large.",
+  "On the 8051, one machine cycle is 12 oscillator periods. A 12 MHz crystal gives 1 µs machine cycles, not 0.083 µs.",
+  "DCR changes Z but not CY. Count-down loops test Z; do not test carry.",
+  "An 8085 table index goes into DE with D = 00H before DAD D. A non-zero D adds 256 × D to the address.",
+  "An 8051 MOVC table lives in code memory. MOVX reads external data memory, so it will not fetch a DB table in code space."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What operation does DJNZ Rn,rel perform?",
+   "marks": 2,
+   "a": "It decrements register Rn, then branches to rel if the new value is not zero; otherwise it falls through."
+  },
+  {
+   "level": "understand",
+   "q": "Why is the final JNZ in a count-down delay loop timed as not taken?",
+   "marks": 3,
+   "a": "The counter reaches zero on the last body pass, so the Z flag is set and the jump is not taken; that pass uses the shorter not-taken time."
+  },
+  {
+   "level": "apply",
+   "q": "An 8085 runs at 2 MHz. Find the delay for MVI C,64H; LOOP: DCR C; JNZ LOOP. Use 7 T, 4 T, 10 T taken, 7 T not taken.",
+   "marks": 4,
+   "a": "64H = 100, so 100 DCR passes and 99 taken JNZ. T = 7 + 99 × 14 + 11 = 1404 T. T-state = 0.5 µs, so delay = 702 µs."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the inner counter of a nested delay loop need reloading on every outer pass?",
+   "marks": 3,
+   "a": "Without reloading, the inner counter is 00H when the next outer pass begins. DCR then wraps it to FFH, so the inner loop runs 256 times instead of P; the delay is wrong. Reload the inner counter with P before every outer pass so each inner loop runs exactly P times."
+  },
+  {
+   "level": "apply",
+   "q": "An 8051 with a 12 MHz crystal runs DJNZ Rn,rel 200 times. Each DJNZ takes 2 machine cycles. Find the loop time, ignoring setup.",
+   "marks": 3,
+   "a": "Machine cycle = 1 µs. One DJNZ = 2 µs. 200 × 2 µs = 400 µs."
+  },
+  {
+   "level": "analyze",
+   "q": "In an 8085 table read, HL = 2100H and DE = 0005H. After DAD D, which address does MOV A,M read?",
+   "marks": 4,
+   "a": "DAD D adds DE to HL: 2100H + 0005H = 2105H. MOV A,M reads the byte at 2105H."
+  },
+  {
+   "level": "understand",
+   "q": "Why must an 8085 byte index be zero-extended into DE before DAD D?",
+   "marks": 3,
+   "a": "DAD D is a 16-bit add. The high byte must be 00H so the addition adds only the index, not an extra 256 × high-byte offset."
+  },
+  {
+   "level": "apply",
+   "q": "For 8086 XLAT, BX = 3000H and AL = 04H. What is in AL after XLAT, and what is BX?",
+   "marks": 3,
+   "a": "AL becomes the byte at DS:3004H. BX stays 3000H."
+  }
+ ],
+ "beyond": "Not for the exam. Modern firmware usually replaces software delay loops with hardware timers, because a loop's timing changes when the clock, compiler or interrupt load changes. Cycle-accurate simulators and debug cycle counters verify timing without an oscilloscope. Look-up tables remain common for sine-wave PWM, gamma correction and sensor calibration, often stored in flash. Search next for 'DWT cycle counter', 'timer delay 8051' and 'lookup table sine PWM'."
+}

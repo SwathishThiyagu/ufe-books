@@ -1,0 +1,233 @@
+{
+ "lead": "A subroutine is a block of code written once and used many times. To use it, the CPU must remember where to come back to, and that memory is the stack: a last-in-first-out area of RAM. PUSH saves a byte or a word, POP brings it back, CALL jumps into a subroutine after saving the return address, and RET uses that saved address to return. Every function call in C and every interrupt depends on this mechanism, so the stack is the first thing an examiner asks about in an assembly question.",
+ "prereq": "You need <a href=\"#branch-jump-and-call-instructions\">Chapter 3.5</a> for call and return instructions, and the memory addressing ideas of Unit 2.",
+ "sections": [
+  {
+   "h3": "The stack and the stack pointer",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The stack is a block of RAM used last-in-first-out: the item written last is the first one read. A canteen stack of plates behaves the same way — you lift the top plate."
+    },
+    {
+     "type": "p",
+     "text": "The CPU keeps the address of the top of the stack in the stack pointer, SP. In the 8085 and 8086, SP is 16 bits wide. In the 8051 it is 8 bits wide."
+    },
+    {
+     "type": "p",
+     "text": "PUSH saves one item and moves SP; POP reads one item and moves SP back. The 8085 and 8086 stack grows towards lower addresses: SP is decremented before the write. A 16-bit push keeps the high byte at the higher address and the low byte at the lower address."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Processor",
+      "SP width",
+      "PUSH step",
+      "POP step"
+     ],
+     "rows": [
+      [
+       "8085",
+       "16 bits",
+       "SP−1, write high byte; SP−1, write low byte",
+       "low byte out first"
+      ],
+      [
+       "8086",
+       "16 bits",
+       "SP−2, then write the word",
+       "read word at SS:SP"
+      ],
+      [
+       "8051",
+       "8 bits",
+       "SP+1, then write",
+       "read, then SP−1"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "CALL and RET",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In the 8085, <code>CALL 2100H</code> is three bytes: opcode, low byte of the target, high byte. Two things happen in order. First the CPU pushes the address of the instruction after the CALL, that is PC + 3. Then it loads PC with 2100H, so the next fetch comes from the subroutine."
+    },
+    {
+     "type": "p",
+     "text": "<code>RET</code> reverses this: it pops two bytes into PC and the caller continues. The value saved is PC + 3, so the address inside CALL itself is never stored."
+    },
+    {
+     "type": "p",
+     "text": "Conditional calls such as <code>CC</code>, <code>CNC</code>, <code>CZ</code>, <code>CNZ</code>, <code>CP</code>, <code>CM</code>, <code>CPE</code> and <code>CPO</code> test a flag before pushing. Conditional returns such as <code>RC</code>, <code>RNC</code>, <code>RZ</code> and <code>RNZ</code> test a flag before popping. An instruction that fails its test pushes (or pops) nothing at all."
+    },
+    {
+     "type": "p",
+     "text": "Nested calls work because each call pushes a fresh return address. If A calls B and B calls C, the stack holds two return addresses (three if A was itself called), and the returns unwind in reverse order. The depth is limited only by free stack memory."
+    }
+   ]
+  },
+  {
+   "h3": "Passing parameters to a subroutine",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A subroutine needs data from its caller. Three routes are common."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Registers: the caller loads values into A, B or HL and the subroutine reads them. Fast, no memory traffic, but only a few values fit and both sides must agree on the assignment.",
+      "Memory block: the caller stores the data as a table and passes the starting address in a register pair such as HL. Good for arrays and strings.",
+      "Stack: the caller pushes the arguments and then executes CALL; the subroutine reads them at fixed offsets from SP. The two sides must agree who removes them afterwards."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A well-written subroutine first pushes the registers it will destroy and pops them just before RET. This save-and-restore is the context save, and it lets the caller keep working values in registers across the call."
+    },
+    {
+     "type": "p",
+     "text": "A subroutine is re-entrant if it can be interrupted and entered again before it finishes. This works when every working value sits on the stack and the code never writes to fixed memory locations. Only a few universities teach re-entrancy in detail."
+    }
+   ]
+  },
+  {
+   "h3": "Stack limits and overflow",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The programmer reserves a stack area in RAM and points SP into it. On the 8085 and 8086, point SP at the highest address of the reserved area with <code>LXI SP, 2050H</code>; every push then moves down. On the 8051, <code>MOV SP, #50H</code> makes the stack grow upward from 51H, so reserve the space above SP."
+    },
+    {
+     "type": "p",
+     "text": "If pushes run past the reserved space, the stack overflows. It overwrites variables, or the return address itself, and RET jumps to a wrong address — the program hangs or restarts."
+    },
+    {
+     "type": "p",
+     "text": "In the 8051 everything sits in 128 bytes of internal RAM. SP resets to 07H, so about 120 bytes are free for the stack, and register banks and variables take their share. Count before you nest: on the 8085, 8086 and 8051 each call costs 2 bytes, so deep recursion on an 8051 runs out of space quickly."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "The three stack bytes under the example. After CALL the return address 2003H occupies 204EH and 204FH and SP points at 204EH; after RET those bytes are dead and SP is back at 2050H.",
+  "spec": {
+   "type": "array",
+   "title": "Stack at 204EH, 204FH, 2050H",
+   "aria": "Stack bytes at 204EH, 204FH and 2050H: after CALL the return address is stored and SP points to 204EH; after RET the pointer returns to 2050H.",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "After CALL",
+     "cells": [
+      "03",
+      "20",
+      "--"
+     ],
+     "marks": {
+      "0": "accent",
+      "1": "live"
+     }
+    },
+    {
+     "label": "After RET",
+     "cells": [
+      "--",
+      "--",
+      "--"
+     ]
+    }
+   ],
+   "pointers": [
+    {
+     "row": 0,
+     "cell": 0,
+     "label": "SP"
+    },
+    {
+     "row": 1,
+     "cell": 2,
+     "label": "SP"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "In an 8085 system the instruction CALL 2100H is stored starting at address 2000H, and SP = 2050H before the call executes. The subroutine at 2100H ends with RET. Give the stack bytes at 204EH, 204FH and 2050H, the value of SP and the value of PC (a) immediately after CALL executes and (b) after RET executes.",
+   "steps": [
+    "CALL 2100H occupies addresses 2000H, 2001H and 2002H, so it is 3 bytes long. The next instruction starts at 2000H + 3 = 2003H. That value, 2003H, is the return address the CPU must save.",
+    "Before the call: PC = 2000H and SP = 2050H.",
+    "It pushes the high byte of the return address, 20H. SP becomes 2050H − 1 = 204FH and [204FH] = 20H.",
+    "It pushes the low byte, 03H. SP becomes 204FH − 1 = 204EH and [204EH] = 03H.",
+    "It loads PC with the target: PC = 2100H, so the branch is taken.",
+    "The subroutine runs from 2100H. On reaching RET the CPU starts popping, low byte first.",
+    "The 8085 RET reads the low byte from [204EH] = 03H and SP becomes 204EH + 1 = 204FH.",
+    "It reads the high byte from [204FH] = 20H and SP becomes 204FH + 1 = 2050H.",
+    "The two bytes form the address 2003H and this is loaded into PC, so execution continues at 2003H.",
+    "Byte at 2050H was never written by the call; it keeps whatever value it had before."
+   ],
+   "answer": "After CALL: PC = 2100H, SP = 204EH (decimal 8270), [204FH] = 20H (decimal 32) and [204EH] = 03H (decimal 3), holding the return address 2003H (decimal 8195). After RET: PC = 2003H and SP = 2050H (decimal 8272).",
+   "check": "ret_addr = 0x2000 + 3\nhi = (ret_addr >> 8) & 0xFF\nlo = ret_addr & 0xFF\nsp_before = 0x2050\nsp_after_call = sp_before - 2\nprint(ret_addr)\nprint(sp_after_call)\nprint(hi)\nprint(lo)\nprint(sp_before)\n",
+   "values": [
+    8195,
+    8270,
+    32,
+    3,
+    8272
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "CALL pushes the address of the next instruction, not the address written inside CALL. In the example the saved value is 2003H, never 2000H or 2100H.",
+  "SP moves before the write on an 8085 or 8086 push. Writing first and decrementing afterwards gives wrong addresses in the answer.",
+  "On the 8085, RET pops the low byte first. Reversing the order returns to 0320H instead of 2003H.",
+  "SP holds an address, not the data on top of the stack. Examiners ask for 'the value of SP' and students write the byte stored there.",
+  "If the program never initialises SP, the stack sits in the middle of variables and quietly overwrites them. State the LXI SP or MOV SP instruction at the start of any stack answer."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does CALL do to PC and to the stack?",
+   "marks": 2,
+   "a": "It pushes the address of the instruction that follows the CALL on the stack, then loads PC with the target address of the subroutine."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the 8085 stack grow towards lower addresses instead of higher ones?",
+   "marks": 3,
+   "a": "By convention SP is decremented before each write, so the stack area reserved above the initial SP value is filled from the top downwards, away from program and variable space below it. The direction is a design choice made by the processor designer, not a law of memory; the 8085 PUSH microcode was written to decrement SP before the write."
+  },
+  {
+   "level": "apply",
+   "q": "A three-byte CALL 2500H is stored at addresses 2400H to 2402H and SP = 3000H before it executes. What are SP and the two stack bytes after the call?",
+   "marks": 4,
+   "a": "The return address is 2403H. High byte 24H goes to 2FFFH, low byte 03H goes to 2FFEH, and SP = 2FFEH."
+  },
+  {
+   "level": "apply",
+   "q": "A subroutine makes three nested calls on an 8085, starting with SP = 2050H. How many stack bytes are used and what is SP when the innermost call is entered?",
+   "marks": 4,
+   "a": "Each call pushes 2 bytes, so 3 × 2 = 6 bytes are used. SP = 2050H − 6 = 204AH at the innermost entry."
+  },
+  {
+   "level": "analyze",
+   "q": "A program returns to the wrong address after a nested call. Give two likely causes.",
+   "marks": 5,
+   "a": "Stack overflow: the pushes exceeded the reserved area and overwrote a saved return address. Or the subroutine popped more bytes than it pushed, so RET read the wrong two bytes; a mismatch in the caller/callee clean-up convention is a common reason."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does passing parameters on the stack make a subroutine re-entrant, while passing them in fixed memory does not?",
+   "marks": 5,
+   "a": "With stack arguments each entry gets its own private copy of the data at its own SP offset, so a second entry does not disturb the first. Fixed memory is shared, so a nested or interrupt-time entry overwrites the data of the call already in progress."
+  }
+ ],
+ "beyond": "Not for the exam. Real processors add a frame pointer (BP in x86, R11 or the frame record in ARM) so a subroutine can find its arguments even after SP moves, and an overflow guard page so a runaway stack faults instead of silently corrupting RAM. Overlapping register windows in SPARC and the call-return stack in some DSPs are hardware attempts to make calls cheaper. Modern compilers decide between register and stack passing from a calling convention document. Search next: 'calling convention', 'stack canary', 'ARM AAPCS register roles'."
+}
