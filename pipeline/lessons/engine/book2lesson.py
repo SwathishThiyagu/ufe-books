@@ -14,7 +14,7 @@ already holds the content in a fixed structure, so this script does that part wi
     flagged IMPROVISE (where more effort is worth spending)
   - writes videos.<sid>-u<N>.json: the unit's lessons for site/make_site.py (PDF notes, descriptions)
 
-usage: book2lesson.py book.html outdir [--split a-b,c-d] [--subject biotech] [--next-unit "Unit 3 title"]
+usage: book2lesson.py book.html outdir [--split a-b,c-d] --subject <subject id> [--next-unit "next unit's topic title"]
 """
 import html, json, os, re, sys, hashlib
 import xml.etree.ElementTree as ET
@@ -112,30 +112,38 @@ def extent(el):
 
 
 def group_steps(items, vb, n_steps=4):
-    """build order that follows the figure's parts: wide background pieces first, then the shapes in up to three
-    left-to-right clusters, each text joining the shape nearest to it"""
-    W = vb[2]
+    """build order that follows the figure's parts (10 Nov 2026: rows OR columns): wide background pieces first, then the
+    shapes in up to three groups split at the clearest gaps, top-to-bottom when the figure is laid out in rows and
+    left-to-right when it is laid out in columns; each text joins the shape nearest to it"""
+    W, H = vb[2], vb[3]
     info = []
     for it in items:
         x0, x1, y0, y1 = it['ext']
-        info.append({'cx': (x0 + x1) / 2, 'cy': (y0 + y1) / 2, 'w': x1 - x0, 'text': it['tag'] == 'text'})
+        info.append({'cx': (x0 + x1) / 2, 'cy': (y0 + y1) / 2, 'w': x1 - x0, 'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'text': it['tag'] == 'text'})
     step = [0] * len(items)
     shapes = [i for i, f in enumerate(info) if not f['text']]
-    bg = [i for i in shapes if info[i]['w'] > 0.55 * W]
+    bg = [i for i in shapes if info[i]['w'] > 0.55 * W and (info[i]['y1'] - info[i]['y0']) > 0.55 * H]
     rest = [i for i in shapes if i not in bg]
     k = max(1, min(n_steps - (1 if bg else 0), len(rest)))
-    cents = sorted(info[i]['cx'] for i in rest)
-    centers = [cents[int((j + .5) * len(cents) / k)] for j in range(k)] if cents else [W / 2]
-    for _ in range(12):
-        groups = {j: [] for j in range(len(centers))}
-        for i in rest:
-            j = min(range(len(centers)), key=lambda j: abs(info[i]['cx'] - centers[j])); groups[j].append(i)
-        centers = [sum(info[i]['cx'] for i in v) / len(v) if v else centers[j] for j, v in groups.items()]
-    order = sorted(range(len(centers)), key=lambda j: centers[j])
+    def cuts(axis):
+        lo, hi = ('x0', 'x1') if axis == 'x' else ('y0', 'y1')
+        span = W if axis == 'x' else H
+        iv = sorted((info[i][lo], info[i][hi]) for i in rest)
+        gaps, end = [], None
+        for a, b in iv:
+            if end is not None and a > end:
+                gaps.append((a - end, (a + end) / 2))
+            end = b if end is None else max(end, b)
+        gaps.sort(reverse=True)
+        g = gaps[:k - 1]
+        return sum(x[0] for x in g) / max(span, 1), sorted(x[1] for x in g)
+    sx, cx_ = cuts('x'); sy, cy_ = cuts('y')
+    axis, cs = ('y', cy_) if sy > sx else ('x', cx_)
+    key = 'cy' if axis == 'y' else 'cx'
     base = 1 if bg else 0
     for i in bg: step[i] = 1
-    for rank, j in enumerate(order):
-        for i in groups.get(j, []): step[i] = base + rank + 1
+    for i in rest:
+        step[i] = base + 1 + sum(1 for c in cs if info[i][key] > c)
     for i, f in enumerate(info):
         if f['text']:
             cand = [q for q in shapes if q not in bg] or shapes
@@ -157,7 +165,11 @@ def split_svg(svg):
     except ET.ParseError as e:
         return {'vb': vb, 'defs': '', 'items': [[0, svg, 1]], 'error': str(e), 'minfs': 14}
     defs, items = '', []
-    for ch in list(root):
+    kids = list(root)
+    real = [c for c in kids if c.tag.split('}')[-1] not in ('defs', 'style', 'title', 'desc')]
+    if len(real) == 1 and real[0].tag.split('}')[-1] == 'g' and len(list(real[0])) > 1 and not real[0].attrib:
+        kids = [c for c in kids if c is not real[0]] + list(real[0])   # one wrapping group: use its parts
+    for ch in kids:
         tag = ch.tag.split('}')[-1]
         ch.tail = None
         markup = ET.tostring(ch, encoding='unicode', short_empty_elements=True)
@@ -169,8 +181,37 @@ def split_svg(svg):
         items.append({'x': round(piece_x(ch), 1), 'svg': markup, 'tag': tag, 'ext': extent(ch)})
     steps = group_steps(items, vb) if items else []
     texts = [float(m) for m in re.findall(r'font-size="([\d.]+)"', svg)]
-    return {'vb': vb, 'defs': defs, 'items': [[it['x'], it['svg'], st] for it, st in zip(items, steps)], 'minfs': min(texts) if texts else 14}
+    return {'vb': vb, 'defs': defs, 'items': [[it['x'], it['svg'], st] for it, st in zip(items, steps)], 'ext': [it['ext'] for it in items], 'tags': [it['tag'] for it in items], 'minfs': min(texts) if texts else 14}
 
+
+
+def halves(F):
+    """split a tall figure in two at the empty horizontal band closest to the middle; each half keeps only the pieces
+    whose middle lies in it, re-grouped into steps (10 Nov 2026)"""
+    vb, ext = F['vb'], F.get('ext') or []
+    y0, H = vb[1], vb[3]
+    best = None
+    for k in range(30, 71):
+        y = y0 + H * k / 100
+        crossing = sum(1 for e in ext if e[2] < y - 2 and e[3] > y + 2 and (e[1] - e[0]) < 0.9 * vb[2])
+        score = (crossing, abs(k - 50))
+        if best is None or score < best[0]: best = (score, y)
+    cut = best[1] if best else y0 + H / 2
+    out = []
+    for half, lo, hi in (('top', y0, cut), ('bottom', cut, y0 + H)):
+        idx = [n for n, e in enumerate(ext) if lo <= (e[2] + e[3]) / 2 < hi or (e[3] - e[2]) > 0.9 * H]
+        if not ext: idx = list(range(len(F['items'])))
+        if not idx: continue          # nothing in this half: the caller keeps the figure whole
+        ys = [v for n in idx for v in (ext[n][2], ext[n][3])] if ext else [lo, hi]
+        a, b = max(y0, min(ys) - 12), min(y0 + H, max(ys) + 12)
+        items = [F['items'][n] for n in idx]
+        try:
+            st = group_steps([{'ext': ext[n], 'tag': F['tags'][n]} for n in idx], [vb[0], a, vb[2], b - a])
+            items = [[it[0], it[1], q] for it, q in zip(items, st)]
+        except Exception:
+            pass
+        out.append((half, [vb[0], round(a, 1), vb[2], round(b - a, 1)], {'vb': vb, 'defs': F['defs'], 'items': items}))
+    return out
 
 # ---------------- the book ----------------
 def parse_book(h):
@@ -313,7 +354,7 @@ def lesson_js(B, k, K, chs, meta):
     w("const P=k=>`[${k}](/${PR[k]}/)`;")
     w(f"const BOOKVARS={js(B['vars'])};")
     parts = [c['title'] for c in chs]
-    w(f"const META={{n:{k}, subject:{js(meta['subject'])}, title:'TODO short lesson title', badge:'Lesson {k}', kick:{js((B['subject'] + f' · UNIT {N} · LESSON {k} OF {K}').upper())},")
+    w(f"const META={{n:{k}, subject:{js(meta['subject'])}, title:'TODO short lesson title', badge:'Lesson {k}', kick:{js(B['subject'].upper())},   /* the engine adds ' · ' + the title: no unit or lesson number */")
     w(f"  series:'University free n easy', big:'TODO ONE WORD', star:'TODO starring line',")
     w(f"  parts:{js(parts)},   // TODO shorten each to 2-4 words")
     w(f"  chips:{js([chip(p) for p in parts])}}};   // TODO two short upper-case lines per part")
@@ -321,7 +362,7 @@ def lesson_js(B, k, K, chs, meta):
     w("const SC=[")
     w("/* ---- intro ---- IMPROVISE: the hook is the one place for a fresh idea (a daily-life or engineering moment the lesson explains) */")
     w("{s:0,k:'hookArt',term:'Hook',say:'TODO',cues:{},art:[['TODO icon','a',1110,440,1.6]],caps:[['TODO','c1'],['TODO','c2'],['TODO','c3',1]],bang:['TODO question','b']},")
-    w(f"{{s:0,k:'agenda',term:'Today',say:'TODO Today, … Three parts, one worked example, and exam practice.',cues:{{t:'TODO',r:'TODO',p1:'TODO',p2:'TODO'{',p3:' + js('TODO') if len(chs) > 2 else ''},q:'TODO'}},big:META.big,ribbon:'TODO',ribbon2:{js(ribbon2(chs))},star:{js('Chapters ' + a + ' to ' + b + ' of your book' if a != b else 'Chapter ' + a + ' of your book')}}},")
+    w(f"{{s:0,k:'agenda',term:'Today',say:'TODO Today, … Three parts, one worked example, and exam practice.',cues:{{t:'TODO',r:'TODO',p1:'TODO',p2:'TODO'{',p3:' + js('TODO') if len(chs) > 2 else ''},q:'TODO'}},big:META.big,ribbon:'TODO',ribbon2:{js(ribbon2(chs))},star:{js('Chapters ' + a + ' to ' + b + ' of your free notes' if a != b else 'Chapter ' + a + ' of your free notes')}}},")
     for i, c in enumerate(chs, 1):
         w(f"/* ---- part {i}: {c['num']} {c['title']} ({c['words']} words in the book) ---- */")
         pts = [(lambda t: t if len(t) <= 46 else t[:46].rsplit(' ', 1)[0])(re.sub(r'\s*\(.*?\)', '', x)) for x in c['h3'][:3]] or ['TODO', 'TODO', 'TODO']
@@ -333,10 +374,10 @@ def lesson_js(B, k, K, chs, meta):
             fs = round(F.get('minfs', 13) * scale)
             w(f"/* book {F['label']}: {F['caption'][:300]} */")
             fig = js({k2: F[k2] for k2 in ('vb', 'defs', 'items')})
-            if fs < 22 and vb[3] >= 260:
-                h2 = round(vb[3] / 2)
-                for half, view in (('top', [vb[0], vb[1], vb[2], h2]), ('bottom', [vb[0], vb[1] + vb[3] - h2, vb[2], h2])):
-                    w(f"{{s:{i},k:'bookfig',term:{js((F['label'] or 'Figure') + ' (' + half + ')')},title:{js(c['title'])},view:{js(view)},say:'TODO walk through this half of the figure',cues:{{s1:'TODO',s2:'TODO',s3:'TODO',cap:'TODO'}},steps:4,cap:'TODO one-line takeaway',fig:{fig}}},   // IMPROVISE: auto-zoomed (text would be ~{fs}px whole); check the halves cut cleanly, adjust view:[x,y,w,h] or merge back")
+            hv = halves(F) if fs < 22 and vb[3] >= 260 else []
+            if len(hv) == 2:
+                for half, view, sub in hv:
+                    w(f"{{s:{i},k:'bookfig',term:{js((F['label'] or 'Figure') + ' (' + half + ')')},title:{js(c['title'])},view:{js(view)},say:'TODO walk through this half of the figure',cues:{{s1:'TODO',s2:'TODO',s3:'TODO',cap:'TODO'}},steps:4,cap:'TODO one-line takeaway',fig:{js(sub)}}},   // IMPROVISE: auto-zoomed (text would be ~{fs}px whole); cut at a clean gap with only this half's pieces; adjust view:[x,y,w,h] or merge back")
             else:
                 w(f"{{s:{i},k:'bookfig',term:{js(F['label'] or 'Figure')},title:{js(c['title'])},say:'TODO walk through the figure in the order it builds',cues:{{s1:'TODO',s2:'TODO',s3:'TODO',s4:'TODO',cap:'TODO'}},steps:4,cap:'TODO one-line takeaway',fig:{fig}}},   // build steps are each item's third value (1-4): change them if the order reads wrong")
         w(f"/* book: the chapter, paragraph by paragraph (first sentences):")
@@ -366,11 +407,11 @@ def lesson_js(B, k, K, chs, meta):
     heads = [chip(c['title'])[0].title() for c in chs][:3]
     if len(heads) < 3:
         heads += ['TODO third panel (the evidence, the rule, or the key number)'] * (3 - len(heads))
-    w(f"{{s:RC,k:'recap',term:'Recap',say:'TODO',cues:{{{','.join(f'r{i}:' + js('TODO') for i in range(1, 4))}}},panels:[{','.join('[' + js(h_) + ',' + js(['BLU', 'ORG', 'GRN'][i]) + ",'TODO icon',['TODO','TODO'],'r" + str(i + 1) + "']" for i, h_ in enumerate(heads))}],live:[0,1,2]}},   // the recap always has three panels")
+    w(f"{{s:RC,k:'recap',term:'Recap',say:'TODO',cues:{{{','.join(f'r{i}:' + js('TODO') for i in range(1, 4))}}},panels:[{','.join('[' + js(h_) + ',' + js(['BLU', 'ORG', 'GRN'][i]) + ",'TODO own picture: draw it as ICON.name in EXTRA, not a built-in icon',['TODO','TODO'],'r" + str(i + 1) + "']" for i, h_ in enumerate(heads))}],live:[0,1,2]}},   // the recap always has three panels")
     w("/* ---- exam practice: the book's own questions and model answers. vis (an animated answer picture on the left) is IMPROVISE: add it where the answer can be drawn ---- */")
     for n_, q in enumerate(pick_questions(chs, B['bank']), 1):
         al = sentences(q['a'])[:4]
-        w(f"{{s:QZ,k:'pq',term:'Question {n_}',lv:'{q['lv']}',n:{n_},q:{js(q['q'])},say:'TODO ask it in your own words (no "pause" or "answer out loud" line: the thinking clock gives the time)',cues:{{k:'TODO',q:'TODO'}},pause:3.4}},   // {q['marks']}")
+        w(f"{{s:QZ,k:'pq',term:'Question {n_}',lv:'{q['lv']}',n:{n_},q:{js(q['q'])},say:'TODO ask it in your own words.',cues:{{k:'TODO',q:'TODO'}},pause:3.4}},   // {q['marks']}")
         numeric = bool(re.search(r'\d\s*(?:[×x÷/=+−-]|µm|nm|mV|kJ|atm|M\b|s\b)', q['a']))
         tip = '   // the answer is a calculation: replace al with calc:{f,hint,fk,steps,live} so the working transforms on screen' if numeric else '   // shorten each line to fit; book answer above'
         w(f"{{s:QZ,k:'pa',term:'Answer {n_}',lv:'{q['lv']}',n:{n_},q:{js(q['q'])},say:'TODO',cues:{{{','.join(f'a{j}:' + js('TODO') for j in range(1, len(al) + 1))}}},al:[{','.join('[' + js(x) + ",'a" + str(j) + "']" for j, x in enumerate(al, 1))}]}},{tip}")
@@ -386,7 +427,12 @@ def lesson_js(B, k, K, chs, meta):
         t_ = re.split(r',\s*(?:\d+(?:st|nd|rd|th) ed|[A-Z][a-z]+ (?:Press|Freeman|Science|Wiley|Pearson|Elsevier))', x)[0]
         t_ = t_.split(',')[-1].strip() if ',' in t_ else t_
         return f"{a_} ({t_})" if t_ and t_ != a_ else a_
-    note = ('Sources the book draws on: ' + '; '.join(src_short(x) for x in B['sources'][:2]))[:200] if B['sources'] else ''
+    note = ''
+    for x in (B['sources'] or [])[:3]:
+        cand = (note + '; ' if note else 'Sources your free notes draw on: ') + src_short(x)
+        if len(cand) > 200: break
+        note = cand
+    if B['sources'] and not note: note = 'Sources your free notes draw on: ' + src_short(B['sources'][0]).rsplit(' ', 1)[0][:170]
     w(f"{{s:LS,k:'figs',term:'Your notes',title:'For your notes',say:'TODO',cues:{{t:'TODO',f:'TODO'}},tags:{js(tags)},figs:{js(figs)},note:{js(note)}}},")
     nxt = meta['next']
     w(f"{{s:OUT,k:'outro',term:'Outro',say:'TODO So remember: … Next time, {nxt[1]}. See you there!',cues:{{f:'TODO',n:'TODO',s:'TODO'}},words:[['TODO','BLU','w1'],['TODO','ORG','w2'],['TODO','GRN','w3']],next:{js(nxt)},end:'See you there!'}}")
@@ -396,7 +442,7 @@ def lesson_js(B, k, K, chs, meta):
 
 # the bookfig kind: also added to lesson_template.html; kept here so a lesson file built against an older template still works
 BOOKFIG_EXTRA = r"""/* bookfig: the book's own figure, built up piece by piece (engine kind; this fallback only runs on templates without it) */
-function EXTRA(R,ICON){if(R.bookfig)return;R.bookfig=(sc,c,u)=>{let s=pageBG(u,BLU)+title(sc.title||'From your book');const F=sc.fig,V=sc.view||F.vb,top=sc.cap?170:180,bot=sc.cap?776:856,
+function EXTRA(R,ICON){if(R.bookfig)return;R.bookfig=(sc,c,u)=>{let s=pageBG(u,BLU)+title(sc.title||'From your free notes');const F=sc.fig,V=sc.view||F.vb,top=sc.cap?170:180,bot=sc.cap?776:856,
  k=Math.min(1440/V[2],(bot-top)/V[3],sc.max||2.6),w=V[2]*k,h=V[3]*k,ox=80+(1440-w)/2,oy=top+(bot-top-h)/2,n=F.items.length,N=Math.max(1,Math.min(sc.steps||4,n));
  const ord=F.items.map((it,i)=>[it[0],i]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]),st=[];ord.forEach(([,i],j)=>st[i]=Math.min(N-1,Math.floor(j*N/n)));
  const T=q=>c['s'+(q+1)]!=null?tk(c,'s'+(q+1)):.3+q*Math.max(.6,(c.end||8)*.7/N);let inner=F.defs||'';F.items.forEach((it,i)=>{inner+=sc.static?it[1]:g('fade',T(st[i]),it[1])});
@@ -482,7 +528,8 @@ def main(argv):
         sys.exit(2)
     book, out = argv[0], argv[1]
     spec = argv[argv.index('--split') + 1] if '--split' in argv else None
-    subject = argv[argv.index('--subject') + 1] if '--subject' in argv else 'biotech'
+    if '--subject' not in argv: sys.exit('--subject is required (the subject id, e.g. c-xr): META.subject has no default')
+    subject = argv[argv.index('--subject') + 1]
     next_unit = argv[argv.index('--next-unit') + 1] if '--next-unit' in argv else ''
     h = open(book, encoding='utf8').read()
     B = parse_book(h)
@@ -495,14 +542,14 @@ def main(argv):
     vids = {'lessons': []}
     for k, chs in enumerate(groups, 1):
         if k < K:
-            nx = ['NEXT TIME', f"Lesson {k + 1}", ' · '.join(re.split(r'[:;,]', c['title'])[0].strip() for c in groups[k][:2]), 'book']
-            nxs = f"Lesson {k + 1}: {groups[k][0]['title'].split(':')[0].lower()}"
+            nx = ['NEXT TIME', 'Next lesson', ' · '.join(c['title'].split(':')[0].strip() for c in groups[k]), 'book']   # whole chapter titles, no numbers
+            nxs = groups[k][0]['title'].split(':')[0].lower()
         else:
-            nx = ['NEXT UNIT', f"Unit {N + 1}", next_unit or 'TODO next unit title', 'book']
-            nxs = f"Unit {N + 1}: {(next_unit or 'TODO').lower()}"
+            nx = ['UP NEXT', 'Next topic', next_unit or 'TODO next topic title', 'book']   # the topic, never "Unit N"
+            nxs = (next_unit or 'TODO').lower()
         meta = {'sid': sid, 'subject': subject, 'book': os.path.basename(book), 'sha': sha, 'next': nx}
         meta['next'] = nx
-        src = lesson_js(B, k, K, chs, meta).replace(f"Next time, {nx[1]}.", f"Next time, {nxs}.")
+        src = lesson_js(B, k, K, chs, meta).replace(f"Next time, {nx[1]}.", f"Next time, {nxs}.".replace("'", "\\'"))
         p = os.path.join(out, f'{sid}-u{N}-L{k}.js')
         open(p, 'w', encoding='utf8').write(src)
         pp = os.path.join(out, f'{sid}-u{N}-L{k}.pron.json')

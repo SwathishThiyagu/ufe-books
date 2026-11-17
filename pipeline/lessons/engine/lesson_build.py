@@ -37,6 +37,56 @@ def bare(say): return GENERIC_MARK.sub('', say)                   # the narratio
 
 def norm(w): return re.sub(r"[^a-z0-9'-]", '', w.lower())
 
+# ---- text rules (SLOP.md, approved 17 Nov): run on every say, on the text each scene draws (code excepted), and on META.
+# A hit fails the check; WARN rules only print. META.allow lists phrases that are content, not slop ("booking site", "h_a").
+NUM = r'(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)'
+BLOOM = r'(?:remember|understand|apply|analy[sz]e|evaluate|create)'
+TEXT_RULES = [
+    ('book wording ("your free notes", never "book")', re.compile(r"\b(?:your|the|unit|this) book(?:['’]s|s)?\b|\bof your notes\b", re.I)),
+    ('a unit number or unit reference (name the topic)', re.compile(r"\bunits? " + NUM + r"\b|\b(?:this|next|previous|last) unit\b(?! (?:vector|circle|cell|test|step|price|cost|of|square|matrix))|\ball \w+ units\b|\bunits \d+ (?:to|-|–) \d+\b", re.I)),
+    ('a spoken or shown Bloom level', re.compile(r"\ban? " + BLOOM + r" question\b|\bat the \w+ level\b|\bquestion " + NUM + r"[,.:]? (?:an? |at the )?" + BLOOM + r"(?: level| question)?\s*(?:[,.:;!?·]|$)|\bquestion " + NUM + r" · " + BLOOM + r"\b", re.I)),
+    ('a site or finder line (no site yet)', re.compile(r"\bfind (?:this unit|your (?:own )?syllabus)\b|\bon (?:our|the university free (?:n|and) easy) (?:web)?site\b|\buniversity free (?:n|and) easy (?:web)?site\b", re.I)),
+]
+SCREEN_RULES = [
+    ('caret maths (use ² or a sup tspan)', re.compile(r"[\w)]\^[\w(−-]")),
+    ('underscore subscript (use ₐ or a sub tspan)', re.compile(r"(?<![\w_])[A-Za-zα-ωΑ-Ω]{1,2}_(?:\{[^}]*\}|[A-Za-z0-9]{1,6})(?![\w(])")),
+]
+WARN_RULES = [
+    ('filler word', re.compile(r"\b(?:delve|delving|journey|unlock|crucial|essentially|imagine|amazing|dive into|let['’]s take control)\b", re.I)),
+]
+CODE_LINE = re.compile(r"[;{}]|[A-Za-z_]\w*\(|\b(?:int|float|double|void|char|return|def|let|const|var|public|private|class|import)\b|==|->|=>")
+INDIAN, WESTERN = re.compile(r"(?<![\d,])\d{1,2},\d{2},\d{3}(?![\d,])"), re.compile(r"(?<![\d,])\d{3},\d{3}(?![\d,])|,\d{3},\d{3}")
+
+def text_rules(ev):
+    meta, probs, warns = ev.get('meta', {}), [], []
+    allow = [a.lower() for a in (meta.get('allow') or [])]
+    def strip(t):
+        t = GENERIC_MARK.sub(r'\1', t); low = t.lower()
+        for a in allow:
+            while a and a in low: i = low.index(a); t = t[:i] + ' ' * len(a) + t[i + len(a):]; low = t.lower()
+        return t
+    def hit(where, txt, rules, out):
+        for name, rx in rules:
+            m = rx.search(txt)
+            if m: out.append(f'{where}: {name}: "{txt[max(0, m.start() - 25):m.end() + 25].strip()}"')
+    for key in ('kick', 'title', 'series', 'star', 'big'):
+        if isinstance(meta.get(key), str): hit(f'META.{key}', strip(meta[key]), TEXT_RULES + SCREEN_RULES, probs)
+    nums = {'in': [], 'we': []}
+    for sc in ev['scenes']:
+        n = sc['i'] + 1
+        say = strip(sc.get('say', ''))
+        hit(f'scene {n} say', say, TEXT_RULES, probs); hit(f'scene {n} say', say, WARN_RULES, warns)
+        for line in sc.get('screen', []):
+            if CODE_LINE.search(line): continue
+            t = strip(line)
+            hit(f'scene {n} screen', t, TEXT_RULES + SCREEN_RULES, probs); hit(f'scene {n} screen', t, WARN_RULES, warns)
+            if INDIAN.search(t): nums['in'].append(n)
+            if WESTERN.search(t): nums['we'].append(n)
+        stock = [i for i in sc.get('icons', []) if i and i in ev.get('builtin_icons', []) and i.lower() not in allow]
+        if stock: warns.append(f'scene {n}: recap uses built-in icons {", ".join(stock)}; draw the card\'s own picture (or list the name in META.allow)')
+    if nums['in'] and nums['we']: warns.append(f'Indian (scenes {sorted(set(nums["in"]))}) and Western (scenes {sorted(set(nums["we"]))}) number grouping in one lesson; use one')
+    return probs, warns
+
 def check(ev):
     probs = list(ev['errors'])
     src = ev.get('_src', '')
@@ -82,7 +132,8 @@ def check(ev):
         if unknown: probs.append('not in the dictionary (give inline phonemes or add to EXTRA): ' + '; '.join(unknown[:12]))
     except Exception as e:
         print('dictionary check skipped:', str(e)[:80])
-    return probs, jokes
+    tp, warns = text_rules(ev); probs += tp
+    return probs, jokes, warns
 
 def estimate(scenes, gap, lead):
     lines, t = [], lead
@@ -170,7 +221,7 @@ def bumper_overlay(total, poses):
     css = ''
     # the logo group: pops in, holds, pops out (intro); pops in larger and stays (outro)
     css += kf('lgPop', [(0, f'opacity:0;transform:scale(.6) rotate(5deg)'), (POP, f'opacity:{O};transform:scale(1) rotate(0deg)'), (INTRO - POP, f'opacity:{O};transform:scale(1) rotate(0deg)'), (INTRO, 'opacity:0;transform:scale(.6) rotate(0deg)'),
-                        (o - E, 'opacity:0;transform:scale(.66) rotate(5deg)'), (o, 'opacity:0;transform:scale(.66) rotate(5deg)'), (o + POP, f'opacity:{O};transform:scale(1.11) rotate(0deg)'), (T, f'opacity:{O};transform:scale(1.11) rotate(0deg)')])
+                        (o - E, 'opacity:0;transform:scale(.6) rotate(5deg)'), (o, 'opacity:0;transform:scale(.6) rotate(5deg)'), (o + POP, f'opacity:{O};transform:scale(1) rotate(0deg)'), (T, f'opacity:{O};transform:scale(1) rotate(0deg)')])
     # the three poses, 2 s each: hold 1.2 s, crossfade 0.8 s; the same over the outro, ending asleep
     def pose(i, name):
         on, off = i * STEP, i * STEP + HOLD                       # fully on from (on) ... fade out from (off) to (off+FADE); fade in from (on-FADE) to (on)
@@ -181,6 +232,7 @@ def bumper_overlay(total, poses):
             elif i == 1: seq += [(base, 'opacity:0'), (a - FADE, 'opacity:0'), (a, 'opacity:1'), (b, 'opacity:1'), (b + FADE, 'opacity:0')]
             else: seq += [(base, 'opacity:0'), (a - FADE, 'opacity:0'), (a, 'opacity:1'), (base + INTRO if base == 0 else T, 'opacity:1')] + ([(INTRO + E, 'opacity:0')] if base == 0 else [])
             if base == 0: seq += [(o - E, seq[-1][1] if i == 2 and False else 'opacity:0')]
+        if i < 2: seq += [(T, 'opacity:0')]          # end point: the pose stays faded out to the end (10 Nov 2026)
         seq = sorted(seq, key=lambda q: q[0])
         return kf(name, seq)
     css += pose(0, 'lgP0') + pose(1, 'lgP1') + pose(2, 'lgP2')
@@ -229,11 +281,12 @@ def main(args):
     global LESSON; LESSON = lesson
     tpl = os.path.join(HERE, 'lesson_template.html')
     ev = evaluate(lesson, tpl)
-    probs, jokes = check(ev)
+    probs, jokes, warns = check(ev)
     print(f"{len(ev['scenes'])} scenes; kinds: {', '.join(sorted(set(s['k'] for s in ev['scenes'])))}")
     nw = sum(len(clean(s['say']).split()) for s in ev['scenes']); est = (nw / 2.3 + sum(0.55 + s['pause'] for s in ev['scenes'])) / 60
     print(f'{nw} narration words, about {est:.1f} min voiced (aim 5 to 7: 800 to 880 words with pauses)')
     if jokes: print('joke beats:', len(jokes)); [print('  ', j) for j in jokes]
+    if warns: print('WARNINGS (do not fail the check):'); [print(' -', w) for w in warns]
     if probs:
         print('PROBLEMS:'); [print(' -', p) for p in probs]
         if chk or ev['errors']: sys.exit(1)
