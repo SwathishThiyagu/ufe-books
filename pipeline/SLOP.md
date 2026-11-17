@@ -1,5 +1,86 @@
 # Lesson slop found in the AI lessons (17 Nov 2026), to fix later with rules and fix threads
 
+## Proposed rules (synthesis of the 17 Nov audits, waiting for Swathish's approval: no rule is changed yet)
+
+Scope: the 11 CSE subjects audited on 17 Nov (226 lessons: OOP 23, Digital Logic 22, Computer Fundamentals 16, Quantum 20,
+Parallel and Distributed 21, Mobile 17, AR/VR 21, NLP 27, Linux 16, Blockchain 20, Computer Graphics 23). Counts are the
+lessons named in each subject's rows below (recounted from the sections, not re-audited); AI and Data Structures hits are
+given in brackets where the same pattern showed up there. 21 wrong facts (must fix) were found, at least one in every
+subject. Code refs are to pipeline/lessons/engine/ as it is in this repo (book2lesson.py, lesson_build.py,
+lesson_template.html) and pipeline/lessons/sample/WRITE.md.
+
+Note on WRITE.md: it already says "your free notes", never "unit book" (WRITE.md:12), and US spellings in say (:39). Both
+were broken anyway, so every text rule below is a checker rule; WRITE.md gets a line only so writers know why a build fails.
+
+How the checker text rules should run: on every `say`, and on the rendered SVG text of each scene's last frame (the
+checker already renders every scene), not only on SC strings. NLP found on-screen text drawn by a lesson's own art code
+("the book's order", u7-L3) that an SC-only scan misses. Exempt code scenes (codeBoard, cfCode, code spans) from the maths
+and filler rules, and give each lesson an allow list (META.allow) for content words: "booking site", "Site 1",
+"unlock" in Bitcoin scripts and spinlocks, "book → back" in NLP edit distance, "university" as a stemming example.
+
+### A. Text the checker can fail automatically
+
+pattern | subjects | lessons hit | rule that prevents it | where
+--- | --- | --- | --- | ---
+"Sources the book draws on: …" on the notes page | 11 of 11 | 206 of 226 (the other 20 say "the notes" or have no such line) | generator writes "Sources your free notes draw on: …" (book2lesson.py:389); checker fails on `\b(your\|the\|unit) book('s)?\b` | generator + checker
+"book" wording elsewhere: agenda star "Chapters x to y of your book" or "of your notes" without "free"; spoken "the book's figure / example / model" | 9 (all but Mobile, Graphics) | 55 (Linux 10, CFP 10, Digital 8, PDC 6, OOP 6, AR/VR 4, Blockchain 4, NLP 4, Quantum 3) [AI 6, DS 9] | generator writes "of your free notes" (book2lesson.py:324); checker fails on the book regex above and on "your notes" not preceded by "free" | generator + checker
+Spoken Bloom levels in exam practice: "An understand question", "at the apply level", and the second form "Question two, apply." | 11 of 11 | 83 lessons, 249 lines (AR/VR 15, Mobile 12, Graphics 11, CFP 8, Quantum 7, Linux 6, PDC 6, Blockchain 6, OOP 6, Digital 3, NLP 3) [AI 4, DS 2] | checker fails a pq/pa `say` matching `\ban? (remember\|understand\|apply\|analy[sz]e\|evaluate\|create) question\b`, `\bat the \w+ level\b` or `\bquestion (one\|two\|three)[,.]? (at the )?(remember\|understand\|apply\|analy[sz]e)\b`; WRITE.md: say only "Question one / two / three" | checker
+Unit numbers in the outro: "Next time, Unit two: …" and the "NEXT UNIT / Unit N" card | 11 of 11 | 55 (5 in each subject; Linux 4, NLP 6) [DS 5] | generator puts the next unit's topic on the card and in the line, never "Unit N" (book2lesson.py:501 and the say template at :392/:505); checker fails on `\bunit (one\|two\|…\|ten\|\d+)\b` in say and on screen | generator + checker
+Other unit references: "(Unit 4)" cross-references in figures and answers, "this unit", "All six units" on the wrap card | 9 (not Linux, Graphics) | 17 (OOP 4, Digital 3, Quantum 2, PDC 2, NLP 2, CFP 1, Mobile 1, AR/VR 1, Blockchain 1) [DS 1, AI] | same checker regex plus `\bthis unit\b`, `\bnext unit\b`, `\ball \w+ units\b`; WRITE.md: name the topic ("in the lesson on phase estimation") | checker
+ASCII maths on screen: caret (`2^(e − 127)`, `e^(iθ)`) and underscore subscripts (`ρ_A`, `t_cq`) | 7 (Quantum, Digital, Graphics, CFP, Mobile, AR/VR, NLP) | 31 (caret 19 in 7 subjects; underscore 17 in Quantum and Digital) [AI 2, DS 1] | checker fails on-screen text matching `[\w)]\^[\w(−-]` or `[A-Za-zα-ω]_[A-Za-z0-9{]` outside code (keeps OOP's XOR `^` and C names); WRITE.md: Unicode ² ⁻¹ ₐ or a sup/sub tspan | checker (an engine sup/sub helper would make the fix easy)
+Filler: "Imagine …", "amazing", "Let's take control." | 6 (CFP, AR/VR, PDC, Blockchain, OOP, Digital) | 6 | checker word list on say and screen text: delve, journey, unlock, crucial, essentially, imagine, amazing, dive into, let's take control (allow list for real terms) | checker
+Repeats across one subject's lessons: the same hook story, joke or trap twice (near word for word, so the exact-sentence scan missed them) | 4 (Mobile, PDC, Blockchain, Graphics) | 15 (Blockchain 5, Mobile 4, Graphics 4, PDC 2) | new subject-level check, `lesson_build.py --check-set <html folder>`: fail when two hooks share 60% or more of their content words, two trap2 scenes share a Write line, or a joke repeats | checker
+Two number conventions in one lesson (1 KB = 1024 and 1 MB = 10⁶; 10,00,00,000 sat and 100,000,000 sat; dpi called pixels per inch) | 3 (Mobile, Blockchain, Graphics) | 3 | checker fails a lesson that shows both Indian (`\d{1,2},\d{2},\d{3}`) and Western grouping; WRITE.md: state the KB/MB convention once on screen | checker
+META.subject is "biotech" on CSE lessons | 2 flagged (Mobile, AR/VR) | 38 flagged; every lesson built without --subject has it | generator: --subject required, no default (book2lesson.py:485); checker fails when META.subject doesn't match the lesson's department | generator + checker
+Next-lesson card cut at the first comma ("Multimedia hardware and software · Image"), so the card no longer matches what the outro promises | 3 (Mobile, Graphics, Digital) | 5 (Graphics 2, Digital 2, Mobile 1; Digital's two are the same cause by the look of the titles) | generator splits titles on ":" only, not "[:;,]" (book2lesson.py:498, also :276); checker fails when the card's title is not a whole chapter title from the book | generator + checker
+
+### B. Pictures and layout (checker measures, engine prevents)
+
+pattern | subjects | lessons hit | rule that prevents it | where
+--- | --- | --- | --- | ---
+Stock or generic recap icons that don't match their card (shield, refresh arrow, stopwatch, up arrow, clock, padlock, tick, network graph, document) | 9 (not AR/VR, OOP) | 25 (Linux 5, PDC 5, Blockchain 3, Graphics 3, NLP 3, Quantum 2, Digital 2, CFP 1, Mobile 1) [AI 2, DS 2] | the generator's recap template asks for `'TODO icon'` (book2lesson.py:369), and the engine draws a name from its biotech icon set (lesson_template.html:588, icon() at :596). Generator asks for a lesson-drawn picture instead; checker fails a recap panel that uses a built-in ICON name unless META.allow lists it (AR/VR's stopwatch on a timing card was fine) | generator + checker
+Tiny or faint pictures: recap pictures a tenth to a fifth of the card; bookfig halves that are a thin strip on an empty stage; split figures with orphan arrows or missing labels | 9 (tiny recap 5: Linux, Quantum, AR/VR, Graphics, Digital; small or split bookfig 7: Quantum, Mobile, AR/VR, PDC, Blockchain, Graphics, CFP) | 32 (tiny recap 12, small or split bookfig 20) [AI 2] | checker measures the ink box of each recap picture (fail under 35% of the picture area) and of each bookfig scene (fail under half the stage, or any shape cut by the view); generator splits a figure only between steps whose halves each keep their labels | checker + generator
+Text that overflows its card or overlaps a line, still there at 0.995 (recap header pills wider than the card, labels past their card, lines through labels) | 6 (Quantum, AR/VR, PDC, Blockchain, OOP, Digital) | 14 | checker, at the last frame of every scene at 0.995: each text box inside its panel, no two text boxes intersect, warn when a stroke crosses text; engine fits the recap capbox font to the card width (fit() already does this for card lines) | checker + engine
+Picture contradicts the narration or its own numbers (stack after ADD shows three items, braces over the wrong rows, colours that don't match the RGB values, allowed actions coloured red) | 9 (not Quantum, AR/VR) | 17 | not checkable by script. WRITE.md: draw the end state the line states, in the colours the numbers give; the hand-back includes the sheet review that the audits did (step 3) | WRITE.md
+
+### C. Facts (writer brief and a fact review; a script can't catch these)
+
+pattern | subjects | lessons hit | rule that prevents it | where
+--- | --- | --- | --- | ---
+Lesson contradicts itself or hides its givens: an answer uses data the question never shows, the exam switches to a different corpus or grammar from the worked example, two scenes give different values or rules | 9 (not AR/VR, OOP) | 23 | WRITE.md: every pq shows all its givens; a pa uses only those and what the lesson showed; a question that reuses or changes the worked example's data says so | WRITE.md
+Exam traps whose "Don't write" isn't wrong, whose stated wrong result isn't what the mistake produces, or that state one convention as the only one (row vs column vectors, jitter, deductible order) | 8 (not Quantum, OOP, NLP) | 15 | WRITE.md: recompute the wrong answer from the stated mistake; the Don't write must be false under every common convention, or the card names the convention. Generator marks book traps `src:'book'` so the checker can list writer-made traps for review (AR/VR's wrong trap was writer-made) | WRITE.md + generator
+Dated or simplified facts stated as current: pre-Merge miners and uncles, GCC before 14, Android package visibility, Linux 0.01 "under the GPL", toy models stated as how a device works | 5 (Linux, CFP, Mobile, AR/VR, Blockchain) | 12 | WRITE.md: software, protocol and kernel behaviour names its version or era on screen ("since GCC 14", "before the Merge, 2022", "classic kernels"); keep the book's own caveats ("simplified", "per eye") | WRITE.md
+Errors inherited from the unit book | 2 confirmed (AR/VR 3, Digital 3) | 6, plus 9 more findings in 6 subjects that sit on the book's own figures (bookfig), so the book likely has them too | a fix thread that changes a fact or a bookfig also fixes the unit book and reruns pack/check_book.py; WRITE.md: a book error the writer spots goes in the hand-back, not into the narration | WRITE.md + the fix threads
+Code on screen that wouldn't compile or run as shown | 3 (CFP, Mobile, Blockchain) | 4 | checker compiles every code board that names its language (gcc/g++ -fsyntax-only, javac, solc, others when installed; prints "skipped" if not) and fails on an error; a fragment is marked `frag:true`; WRITE.md: code panels are complete or marked as a fragment | checker
+
+### D. Open question for Swathish (engine labels)
+
+The header kicker "UNIT n · LESSON k OF K" (written by book2lesson.py:316 as META.kick) and the question-card label
+"QUESTION n · UNDERSTAND / APPLY / ANALYZE" (lesson_template.html:916 to 927) are on all 226 lessons; 8 subjects flagged
+the header and 7 flagged the label. Recommendation: drop "UNIT n" from the kicker and the Bloom word from the card (keep
+"QUESTION n"), for the same reason as the spoken rules: the syllabus is universal, so unit numbers differ between
+universities. If approved, the unit and Bloom regexes above also run on the kicker and the card labels.
+
+### Seen in one subject only (no rule proposed)
+
+"metres" in say (AR/VR, WRITE.md:39 already covers it); a real organisation's name on screen, "IRCTC" (OOP); "the usual
+Indian text" (OOP); "Your turn" with no pause before the answer (Quantum).
+
+### On YouTube
+
+None of the 226 lessons is on YouTube. Every subject's pipeline.json has live: false for every unit, and the video link
+fields (upload_sheet.json or videos*.json) are empty; Linux's upload sheet has scheduled times only. So every fix can be
+made in place before upload, with no re-upload.
+
+### Suggested order once approved
+
+1. Checker text rules (A), run on say and rendered text, since they fail the build by themselves.
+2. Generator lines 316, 324, 369, 389, 485, 498, 501, with a rebuild of the generator's sample to confirm the checker passes.
+3. Checker layout rules (B) and the engine capbox fit.
+4. WRITE.md lines for C, and the trap and code rules.
+
+## Artificial Intelligence (17 Nov, first audit)
+
 Checked all 22 c-ai lessons (every scene, narration and frame). Facts, numbers and layout were clean. Found:
 
 1. Non-existent site: c-ai-u5-L4 and c-ai-u6-L4 outros say "Find this unit in your own syllabus on the University free n easy
