@@ -529,3 +529,56 @@ straight from the unit book (literal count, warm-day delay, R-2R figure without 
 the lesson; pictures that disagree with their own table (braces over the wrong rows, Z copied from the wrong column);
 calc boards that hide givens used later; trap answers that don't follow from the stated mistake; outro promises that
 don't match the next lesson's card; ASCII maths (^, _) on screen.
+
+## NLP (17 Nov)
+
+Audited 17 Nov 2026: all 27 c-nlp lessons (B.Tech/CSE/Natural Language Processing/html), every scene, narration and frame
+(sheets at 0.92; u6-L1 re-rendered at 0.995 where two number-line labels sat close: they render apart). Checker: 0 page
+errors, 0 cue failures, 0 text outside the safe area on every sheet. Recomputed every worked example and model answer
+(edit-distance tables cat→cart and book→back, DFA traces, token/type counts, Porter step 1a, FST counts, bigram MLE,
+add-one, interpolation, perplexity, Brill net gain, Viterbi trellis, MEMM softmax, CRF Z, NER and relation P/R/F1,
+leftmost derivations, CNF rule counts, CYK cells and split checks, PCFG tree products, UAS/LAS, chunk P/R/F1,
+shift-reduce action counts, lexicalised ratio, model checks for ∀∃/∃∀, lambda order, path and Wu-Palmer similarity,
+Lesk overlaps, MFS baseline, coreference link P/R/F1, TF-IDF matrix, Naive Bayes, spam metrics, lexicon score, cosines,
+vector analogy, k-means, CNN filter, scalar RNN, attention with and without mask, scaled dot-product, temperature and
+top-k, BLEU-2, EM/F1, TF-IDF ranking, AP, sample/byte/frame counts, mel values, MFCC rates, WER, unit-selection cost,
+accuracy/UAR, F0 declination). All 54 exam traps checked. Scene = 0-based SC index (the Lnn.png number).
+No filler word, college name, TODO, placeholder or repeated non-template sentence found. "site" hits are content
+(the e-mail rao@site.in, "site layout" of crawled pages); "university" is a stemming example. None of these lessons is
+on YouTube (pipeline.json: every lesson "draft", live false; videos.json: 0 of 27 video links).
+Checker blind spot: on-screen text drawn by each lesson's own art functions (e.g. NLt(..., 'the book’s order') in u7-L3)
+is not in SC, so an SC-only check misses it; scan the art code's string literals too.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-nlp-u3-L3 | calc (13) | UAS/LAS board: "IF ate → quickly (dobj): right head, wrong label → UAS 0.8333 · LAS 4 ÷ 6 = 0.6667". With quickly on ate every head is right, so UAS = 6/6 = 1.0 and LAS = 5/6 = 0.8333 (the narration's "change only a label, and just the labeled score falls" is right; the board is not) | wrong fact: must fix
+c-nlp-u3-L1 | pq/pa (19, 20), also (17, 18) | Q3 model answer "No PP rule, no P → in" for "G above", but the lesson shows PP → P NP twice (notebook 4 "Recursion: NP → NP PP and PP → P NP", calc 12 grammar). "G above" is never shown: the last grammar on screen (calc 12) has no "saw" and puts a PP in every S, so Q2's "the girl saw the boy" is not derivable from it either | wrong fact: must fix
+c-nlp-u6-L4 | bookfig (3), calc (5, 6) | Figure 6.7.1 and worked example: predicted "the cat" vs gold "cat" given EM = 0, F1 = 0.667. The standard SQuAD scorer strips articles before comparing, so this pair scores EM 1, F1 1. Say "no normalisation" or use an example without an article | misleading: should fix
+c-nlp-u2-L1 | bookfig (8), calc (11, 12), trap2 (13) | Part 2 counts (N = 10, V = 6, c(the) = 4; bar chart the/cat/sat/on/mat/dog) do not match Part 1's corpus "the cat sat on the mat the cat sat" (the × 3, 9 words), which Q3 (20) uses again with c(the) = 3; reads as the same corpus | misleading: should fix
+c-nlp-u4-L2 | bookfig (3) | Figure 4.3.1 (top): narration "four edges down, you reach carnivore", but the picture shows only "entity", a depth axis that stops at 3 and a "4 edges" label beside depth 2; no carnivore, no node at depth 4 | misleading: should fix
+c-nlp-u4-L3 | pa (16) | co-training views given as "the words left of the target and the words right of it"; the usual two views for WSD co-training are local collocations and wider topical context | misleading: should fix
+c-nlp-u2-L4 | bookfig (3) | spoken "Here is the book's figure" (must be "your free notes") | should fix
+c-nlp-u4-L1 | bookfig (3), notebook (6) | spoken "The book draws two models", "Work it with the book's model" | should fix
+c-nlp-u7-L4 | bookfig (4, 10) | spoken "Here is the book's picture of unit selection", "This is the book's confusion matrix" | should fix
+c-nlp-u7-L3 | trap2 (7) | on-screen label "the book’s order" under the Write card (lesson art code, not in SC) | should fix
+c-nlp-u1-L4 | outro (23) | "Next time, Unit two: n-gram models…" spoken; "NEXT UNIT · Unit 2" card | should fix
+c-nlp-u2-L4 | outro (22) | "Next time, Unit three…" spoken; "NEXT UNIT · Unit 3" card | should fix
+c-nlp-u3-L4 | outro (23) | "Next time, Unit four…" spoken; "NEXT UNIT · Unit 4" card | should fix
+c-nlp-u4-L4 | outro (23) | "Next time, Unit five…" spoken; "NEXT UNIT · Unit 5" card | should fix
+c-nlp-u5-L3 | outro (23) | "Next time, Unit six…" spoken; "NEXT UNIT · Unit 6" card | should fix
+c-nlp-u6-L4 | outro (23) | "Next time, Unit seven…" spoken; "NEXT UNIT · Unit 7" card | should fix
+c-nlp-u3-L4 | notebook (4) | cross-reference by unit number: spoken "so Unit two's taggers work unchanged"; on screen "HMM · MEMM · CRF, as in Unit 2" | should fix
+c-nlp-u2-L2 | pq (16, 18, 20) | spoken Bloom levels: "Question one, understand", "Question two, apply", "Question three, analyze" | should fix
+c-nlp-u2-L4 | pq (15, 17, 19) | spoken Bloom levels: "Question one, at the understand level", "Question two, apply", "Question three, analyze" | should fix
+c-nlp-u3-L1 | pq (15, 17, 19) | spoken Bloom levels: "An understand question", "Question two, apply", "Question three, analyze" | should fix
+26 lessons (all but u4-L1) | figs (20–26, the "For your notes" scene) | "Sources the book draws on: …" in red on screen; u4-L1 already says "Sources the notes draw on" | cosmetic
+c-nlp-u2-L2 | bookfig (3), calc (5, 6, 7), trap2 (8), recap (15), pa (17, 19), figs (22) | caret maths on screen: "PP(W) = P(W)^(−1/m)", "0.1^(−1/3)", "e^0.7675", "0.01^(1/3)", "PP = 2^H" (18 places) | cosmetic
+c-nlp-u1-L4 | recap (15) | stock shield on the "Two traps" card (a match adds 0; dedupe before the split) | cosmetic
+c-nlp-u6-L4 | recap (15) | all three cards are generic icons (a document, list blocks, a bar chart), not the lesson's own figures (EM/F1 pair, index, AP list) | cosmetic
+c-nlp-u4-L2 | recap (15) | "WordNet" card is a generic document/list icon, not a synset | cosmetic
+c-nlp-u7-L4 | outro (22) | end card "THAT'S A WRAP · All seven units" counts units | cosmetic
+
+Count: 2 must fix, 18 should fix, 6 cosmetic (26 lines). Patterns: "book" wording (26 sources lines + 4 lessons with
+spoken or drawn "the book's …"), unit numbers in outros and one cross-reference (7 lessons), spoken Bloom levels
+(9 lines in 3 lessons), caret maths (1 lesson, 18 places), generic recap icons (3 lessons), and two lessons whose exam
+or worked example silently switches to a different grammar or corpus (u3-L1, u2-L1).
