@@ -1,13 +1,13 @@
 # c-quantum-u4: free-model run
 
-- Book: `books/cse/c-quantum/c-quantum-u4.html`
+- Book: `work/claude_figs/c-quantum-u4/tree/books/cse/c-quantum/c-quantum-u4.html`
 - Status: ok
-- Model calls so far: 45 (191,401 tokens in, 344,097 out), 8.0 minutes
+- Model calls so far: 45 (191,401 tokens in, 344,097 out), 8.1 minutes
 
 ## Checker
 
 ```
-c-quantum-u4.html: 9 chapters, 16216 words, 10 figures, 187 KB
+c-quantum-u4.html: 9 chapters, 16190 words, 10 figures, 187 KB
 OK
 ```
 
