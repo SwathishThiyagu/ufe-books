@@ -261,3 +261,21 @@ def text_fixes(k):
         7: [(' Only a few universities teach priorities at this depth.', '')],
         8: [(' Only a few universities teach segues in detail.', '')],
     }.get(k, [])
+
+
+# sentences removed outright go through chapter_fix, which is idempotent, so the module can be applied again
+_tf_all = text_fixes
+_cf_prev = globals().get('chapter_fix')
+
+
+def text_fixes(k):
+    return [(a, b) for a, b in _tf_all(k) if b]
+
+
+def chapter_fix(k, ch):
+    import json
+    if _cf_prev: ch = _cf_prev(k, ch) or ch
+    raw = json.dumps(ch, ensure_ascii=False)
+    for a, b in _tf_all(k):
+        if not b: raw = raw.replace(json.dumps(a, ensure_ascii=False)[1:-1], '')
+    return json.loads(raw)
