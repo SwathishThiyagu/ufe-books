@@ -176,6 +176,7 @@ note on all 20 figs pages plus 8 spoken lines), unit numbers in outros (generato
 or tiny recap pictures. New here: underscore subscripts typed on screen (9 lessons, the subscript twin of caret maths);
 recap header pills wider than the card (engine, long upper-case labels); a matrix-order method stated backwards while the
 numbers are right; an answer whose gate order contradicts the lesson's own circuit.
+
 ## Mobile Application Development (17 Nov)
 
 Audited 17 Nov 2026: all 17 c-mobile lessons, every scene, narration and frame (sheets at 0.92; every line that looked cut off
@@ -268,3 +269,60 @@ lessons, the most of any pattern here), "the book" wording (generator note on al
 unit numbers in outros (generator), caret maths, small figures and recap pictures. New here: META.subject defaults to
 biotech for every non-biotech subject; a writer-made exam trap that marks a true statement wrong; lessons that drop the
 book's own caveat ("simplified linear form", "per eye", "until the camera frame is delayed") and so overstate the fact.
+
+## Parallel and Distributed Computing (17 Nov)
+
+Audited 17 Nov 2026: all 21 c-dist lessons, every scene, narration and frame (sheets at 0.92 and re-rendered at 0.995; every
+line cut off at 0.92 was a typing animation and renders whole at 0.995). Checker: 0 page errors, 0 cue failures, 0 text
+outside the safe area on every sheet. About 90 worked numbers and model answers recomputed (Amdahl, PRAM rounds and cost,
+mesh/tree/cube degree-diameter-bisection, block loads and imbalance, transpose pairs, 2×2 products, doubling scan, p-ary
+search, median-of-medians, bitonic depth, Gaussian elimination, Borůvka, OpenMP block sums, Scatter/Reduce, CUDA indices,
+copy timelines, NDRange ids, message cost, RPC slowdown, NTP θ/δ, Lamport and vector stamps, 12 concurrent pairs, snapshot
+totals, causal delivery, Ricart–Agrawala and Suzuki–Kasami counts, OM(1), the domino rollback, quorums, semi-join bytes,
+2PC counts, IaaS/PaaS bills, pre-copy rounds, elastic sizing, grid schedules, edge-cache latency). Both code samples build:
+the OpenMP sum compiles with gcc -fopenmp and prints S = 500000500000; the MPI sum passes a syntax check against MPI
+prototypes. All 44 exam traps checked. Scene = 0-based SC index (the Lnn.png number). No site/finder line, college name,
+TODO, placeholder, caret maths or repeated non-template sentence found ("site" hits are distributed-system sites).
+YouTube: pipeline.json has live: false for all six units and upload_sheet.json holds no video links, so none is published.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-dist-u5-L3 | pa (16) | "At-most-once sends the request once and never retries, so it may lose it": that is maybe semantics. At-most-once retries with duplicate filtering, exactly what the same lesson shows in scenes 3 to 6 | wrong fact: must fix
+c-dist-u2-L2 | pa (20) | two-level scan with n = 10⁶, p = 1000 "takes about 1000 + 10 ≈ 1010 steps": every block is passed twice (local scan, then add the offset), so ≈ 2n/p + log p ≈ 2010. The order O(n/p + log p) is right | wrong fact: must fix
+c-dist-u3-L3 | bookfig (3, 4), calc (6) | shared-memory sum step 1: thread 0 does s[0] = s[0] + s[1] while thread 1 writes s[1] = s[2] + s[3], same step, no barrier: a read-write race on s[1] in the lesson about barriers. Use s[0] += s[2], s[1] += s[3], barrier, s[0] += s[1] | wrong fact: must fix
+c-dist-u4-L1 | trap2 (10) | "Write: 8 × 5000 × 2 ms = 80 s, not 10 s" assumes every message is serialised; eight machines each sending 5000 messages in parallel add about 10 s of wall time, so the "Don't write" can be right. The serial-messages assumption is never stated | misleading: should fix
+c-dist-u5-L2 | notebook (3), trap2 (8) | "Crash faults: N ≥ 2f + 1, and f + 1 rounds" mixes two models: the synchronous f + 1-round algorithm tolerates any f < N; 2f + 1 is the asynchronous/partially synchronous (Paxos, Raft) majority bound. The trap's "Write" repeats it | misleading: should fix
+c-dist-u5-L1 | notebook (15, 16), trap2 (17) | Chandy–Misra–Haas probe written as (waiting, waited-on, initiator); textbooks write probe(initiator, sender, receiver) and detect deadlock on probe(i, j, i). In the textbook notation the lesson's first probe(P1, P2, P1) already reads as "deadlock" | misleading: should fix
+c-dist-u1-L4 | calc (13, 14) | "Data parallel ≈ 28 × faster" compares 32 images per 80 ms against a micro-batch of 1 image per 40 ms; the on-screen question never gives the micro-batch size, and with 32-image micro-batches model parallel gives 0.8 images/ms, faster than 0.711 | misleading: should fix
+c-dist-u1-L4 | pq/pa (17, 18) | "Why does data parallelism match Flynn's SIMD model?": multi-GPU data parallelism is SPMD/MIMD (each GPU runs its own instruction stream). Contradicts the u1-L1 trap "multicore is MIMD, not SIMD" | misleading: should fix
+c-dist-u3-L2 | bookfig (3), calc (5, 6) vs bookfig (9), calc (11, 12) | same add<<<2, 4>>> launch: C[5] = 11 + 3 = 14 in Figure 3.3.1 and example 1, but C[5] = 13 + 3 = 16 in Figure 3.4.1 and example 2 (there A[4] = 11) | misleading: should fix
+c-dist-u2-L2 | notebook (11), trap2 (13) | selection "with p = n: time Θ(log n)": the median-of-medians rounds shown each need a prefix-sum compaction (Θ(log n)) over Θ(log n) rounds, so Θ(log² n); Θ(log n) needs a different algorithm | misleading: should fix
+c-dist-u2-L2 | bookfig (9), notebook (11) | "p = 4 processors" but only 3 probes, and ⌈logₚ(n + 1)⌉ steps; the usual result uses all p probes: ⌈log₍ₚ₊₁₎(n + 1)⌉. Same answer (2) here, different formula in an exam | misleading: should fix
+c-dist-u6-L2 | notebook (5), pq/pa (20, 21) | "3PC: a partition still blocks it" and "neither group can decide alone": 3PC's failure under a partition is that the two sides can decide differently (unsafe), not that it blocks | misleading: should fix
+c-dist-u1-L3 | notebook (10) | picture label "idle time: E ≈ 0.588": the value is efficiency, not idle time | misleading: should fix
+c-dist-u2-L1 | pa (15) | "swapping the diagonal can cause a double write, or a race": one processor owns each diagonal cell, so there is no race; it is only wasted work | misleading: should fix
+c-dist-u1-L1, u4-L1, u4-L4 | agenda (1) | "Chapters x to y of your book" (generator default, book2lesson.py:324) | should fix
+c-dist-u2-L1 (5, 12), u3-L3 (3, 9, 14), u5-L2 (11) | calc, trap2, bookfig | spoken "the book's example", "the book's model", "Your book's figure", "Your book's timeline", "the book's run" | should fix
+c-dist-u1-L4 (24), u2-L3 (25), u3-L3 (26), u4-L4 (22), u5-L3 (22) | outro | "Next time, Unit two/three/…" spoken; "NEXT UNIT, Unit N" card (generator, book2lesson.py:501) | should fix
+c-dist-u2-L1 (21), u6-L4 (24) | outro | "two building blocks of this unit" spoken; "All six units" on the wrap card | cosmetic
+c-dist-u1-L1, u3-L1, u4-L3 | pq (17/16, 19/18, 21/20) | "An understand question", "Question two, at the apply level", "at the analyze level" spoken | should fix
+c-dist-u4-L1, u4-L2, u4-L4 | pq (19/20/15, 21/22/17, 23/24/19) | "An understand question", "Question two, apply.", "Question three, analyze." spoken (a second phrasing the old pattern misses) | should fix
+all 21 | figs | "Sources the book draws on: …" on screen (generator, book2lesson.py:389) | cosmetic
+all 21 | every page, pq | engine shows "UNIT n · LESSON n OF n" in the header and "QUESTION 1 · UNDERSTAND/APPLY/ANALYZE" on question cards: shown unit numbers and Bloom words, outside the narration rule | cosmetic (decide)
+c-dist-u1-L3 | recap (14) | stock icons: stopwatch (Performance), red X (Amdahl's ceiling); tiny cube for Networks | cosmetic
+c-dist-u4-L1 (18), u4-L4 (14) | recap | stopwatch for "Key numbers" | cosmetic
+c-dist-u4-L2 | recap (19) | stopwatch for "Models" | cosmetic
+c-dist-u4-L3 | recap (15) | green tick for "The test" | cosmetic
+c-dist-u1-L4 (10), u2-L2 (10), u4-L1 (4), u4-L2 (9) | bookfig | figure halves drawn as a thin strip or a bare time axis, two thirds of the stage empty | cosmetic
+c-dist-u6-L2 | bookfig (4) | "figure" is a text paragraph with no picture; narration says "Below the timelines" but no timeline is on screen | cosmetic
+c-dist-u6-L2 (3), u4-L4 (3), u5-L2 (11) | bookfig | overlaps: the three prepare and abort arrows run into one bundle; cut S1 runs along the message arrow through "₹30 in transit"; label C2,1 touches m4's arrowhead | cosmetic
+c-dist-u1-L2 | bookfig (12) | priority CRCW "highest index P7 wins"; the common convention is lowest index, so say it is a chosen priority | cosmetic
+c-dist-u4-L4 | pq/pa (17 to 20) | Q2 and Q3 repeat the worked example's numbers (₹100 each, ₹30, S1/S2); practice tests nothing new | cosmetic
+c-dist-u5-L3 (13), u6-L3 (13) | trap2 | the same R + W > N trap in two lessons | cosmetic
+c-dist-u6-L2 | hookArt (0) | filler "Now imagine" | cosmetic
+
+New here: a model answer that contradicts its own lesson (u5-L3 at-most-once; u1-L4 SIMD against u1-L1's trap; u3-L2's two
+values of C[5]), comparisons whose result depends on an assumption never put on screen (u1-L4 micro-batch, u4-L1 serial
+messages), and a second spoken Bloom form ("Question two, apply.") that a check for "at the … level" alone misses.
+Generator defaults (book2lesson.py:324 "of your book", :389 "Sources the book draws on", :501 "NEXT UNIT / Unit N") are
+the source of three of the text patterns.
