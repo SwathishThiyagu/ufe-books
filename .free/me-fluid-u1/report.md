@@ -1,12 +1,20 @@
 # me-fluid-u1: free-model run
 
 - Book: `books/mech/me-fluid/me-fluid-u1.html`
-- Status: error
-- Model calls so far: 33 (133,317 tokens in, 244,807 out), 5.0 minutes
+- Status: ok
+- Model calls so far: 37 (144,856 tokens in, 272,836 out), 7.4 minutes
+
+## Checker
+
+```
+me-fluid-u1.html: 9 chapters, 16230 words, 10 figures, 169 KB
+OK
+```
 
 ## For the reviewer
 
 - chapter 2: the figure cannot be drawn: note "1/K in 1/Pa" runs off the right edge; shorten it
+- chapter 2: the figure could not be drawn; a plain box diagram stands in for it
 
 ## Reviewer notes (after any revision)
 
@@ -17,6 +25,9 @@
 - ch 2 [low] Section 3 (bulk modulus and compressibility, paragraph on water and mercury): "Air has K ≈ 10⁵ Pa, five orders of magnitude softer" overstates the gap. Water's K is 2.2 × 10⁹ Pa and air's is about 1 × 10⁵ Pa, a ratio of about 2.2 × 10⁴, which is four orders of magnitude, not five.
 - ch 2 [low] Figure caption: The caption says "only specific weight carries units of force", but the same figure gives bulk modulus in Pa, and 1 Pa = 1 N/m², which also contains a force unit. The sentence contradicts the figure's own labels and can confuse a student about units.
 - ch 2 [low] Section 2 (specific gravity paragraph): "Petrol has SG about 0.72, so one litre weighs about 0.72 kg" mixes mass and weight in the same section that insists weight is a force measured in newtons. A student may copy "weighs 0.72 kg" into an answer.
+- ch 3 [low] Section 1 and Section 3, first use of the gap symbol: The gap is written as t ("Across the gap t the velocity changes from 0 to U", "du/dy = U/t") but t is never explicitly defined where it first appears, and it is missing from the list of terms under τ = μ du/dy. A student meeting the formula cannot tell what t is or its unit.
+- ch 3 [low] Section 3 assumptions and exam trap 5: The chapter says du/dy = U/t needs a thin film and fails "if the gap is wide". For steady, fully developed laminar flow between parallel plates with no pressure gradient, the profile is exactly linear for any gap: Navier–Stokes reduces to d²u/dy² = 0 whatever t is. Gap width only matters through edge effects, entry length and possible instability, so the stated criterion is technically wrong.
+- ch 3 [low] Section 2, explanation of kinematic viscosity: "Dividing by density removes the inertia of the fluid" is misleading. Dividing by density does not remove inertia; it turns viscosity into a momentum diffusivity (m²/s) and gives the viscosity-to-density ratio that appears in the Reynolds number.
 - ch 4 [high] worked example, step 6: The comparison sign is missing: the text reads 'B is shear-thinning because n  1', which is unreadable and contradicts the definition in Section 2 (B has n = 0.6).
 - ch 4 [high] exam traps, item 4: The comparison sign is missing again: 'n  1 is shear-thickening' does not state which way the inequality goes, so a student cannot tell it means n greater than 1.
 - ch 4 [low] section 2 and section 3: The same food is placed in two different classes: ketchup (tomato sauce) is given as pseudoplastic in Section 2 and as a Bingham plastic in Section 3. A student may think one of the two statements must be wrong.
