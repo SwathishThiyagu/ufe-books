@@ -1,0 +1,252 @@
+{
+ "lead": "A program sitting in flash does nothing. The unit the scheduler actually runs is the task. An operating system separates the passive program from the running process, and inside a process it separates threads that share memory from the stack each one owns. Real-time operating systems use the word task for this schedulable unit because their world is small: one address space, many small stacks, a fixed priority each. Get the vocabulary and the task control block right, and the rest of the RTOS — scheduling, switching, queues — has something concrete to act on.",
+ "prereq": "You need: <a href=\"#os-basics-kernel-kernel-space-and-user-space\">5.1</a> for the kernel boundary and privilege, and Unit 1 for memory types and sizes.",
+ "sections": [
+  {
+   "h3": "Program, process, thread, task",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A program is a file of instructions in flash. It is passive: nothing happens until something runs it."
+    },
+    {
+     "type": "p",
+     "text": "A process is a program in execution. It owns an address space — its code, global data, heap and stack — plus open files and a process ID. The kernel keeps processes apart, so one cannot read another's memory (see <a href=\"#os-basics-kernel-kernel-space-and-user-space\">5.1</a>)."
+    },
+    {
+     "type": "p",
+     "text": "A thread is a flow of control inside a process. All threads of one process share code, global data, heap and open files. Each thread privately owns a stack, a program counter and registers — its context. Some syllabi call a thread a light-weight process."
+    },
+    {
+     "type": "p",
+     "text": "A task is the unit the scheduler runs. Real-time operating system (RTOS) literature prefers this word. A small RTOS usually builds one address space and many stacks, so its tasks look like threads: private stack and context, shared data. That is why an RTOS API says 'create a task', not 'create a process'. From here, task means that schedulable unit."
+    }
+   ]
+  },
+  {
+   "h3": "The TCB and four task states",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The kernel stores one task control block (TCB) per task. Some syllabi say PCB, for process control block. The TCB is the kernel's record of everything needed to stop the task and later resume it."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Stack pointer: top of the task's saved stack.",
+      "Program counter: address of the next instruction.",
+      "Saved registers: general registers and status flags.",
+      "State: ready, running, blocked or terminated.",
+      "Priority: the scheduler's rank for this task.",
+      "Stack base and size: limits used for overflow checks.",
+      "Owner or ID: which task or process this TCB belongs to."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Ready means runnable and waiting for the CPU. Running means currently on the CPU. Blocked means waiting for an event: a timer, a queue, a semaphore. Terminated means finished or killed."
+    },
+    {
+     "type": "p",
+     "text": "Legal transitions are: dispatch (Ready → Running); preemption or time slice ends (Running → Ready); waits for event (Running → Blocked); event occurs (Blocked → Ready); exit (Running → Terminated). A blocked task never jumps straight to Running; it must rejoin the ready queue. A task waiting on a semaphore sits in Blocked (<a href=\"#inter-task-communication-semaphores-mutexes-queues\">5.6</a>)."
+    }
+   ]
+  },
+  {
+   "h3": "Threads: shared space, private stack",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Threads of one process share the address space. A switch between two of them is cheaper than a process switch: the memory map, page tables or MPU regions stay the same. It is not free — registers and stack pointer are still saved and restored (<a href=\"#multitasking-multiprocessing-and-context-switching\">5.3</a>)."
+    },
+    {
+     "type": "p",
+     "text": "Sharing is also a risk. A wild pointer in one thread corrupts the heap for every thread in that process. Process isolation gives no protection inside a process."
+    },
+    {
+     "type": "p",
+     "text": "User-level threads are scheduled by a library; the kernel sees one process. Switching is fast, but one blocking system call blocks all threads, and two threads cannot use two cores. Kernel-level threads are scheduled by the kernel: one blocking call blocks only that thread, and they run in parallel on several cores, at a higher switch cost."
+    },
+    {
+     "type": "p",
+     "text": "Stack sizing: add the deepest call chain, the largest local array, the saved context, and the worst nested interrupt frames. Too small overwrites the neighbouring task's memory. Too large wastes RAM (<a href=\"#memory-management-in-embedded-os\">5.8</a>)."
+    },
+    {
+     "type": "p",
+     "text": "Static creation at compile time needs no heap and is deterministic. Dynamic creation at run time needs heap and a checked return value. A function is reentrant if two tasks can call it at once safely: only locals and parameters, no mutable globals or statics, no non-reentrant library calls."
+    }
+   ]
+  },
+  {
+   "h3": "Task models: periodic, sporadic, aperiodic",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Real-time work describes tasks by when they are released and how long they need."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Periodic: released every period T, with worst-case execution time C and relative deadline D. Typical constraint C ≤ D ≤ T.",
+      "Sporadic: irregular releases, but a known minimum gap between them; the deadline is still hard.",
+      "Aperiodic: irregular, no minimum gap; often soft."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Release time r is the instant a task becomes ready. Its absolute deadline is r + D. The numbers r, C, D and T let a scheduler decide order; that decision is <a href=\"#task-scheduling-round-robin-priority-rate-monotonic-edf\">5.4</a>."
+    },
+    {
+     "type": "formula",
+     "text": "U = Σ (Cᵢ / Tᵢ)",
+     "where": "Cᵢ is the worst-case execution time of task i in milliseconds; Tᵢ is its period in milliseconds; U is a pure fraction. One CPU with U > 1 cannot meet every deadline."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Task state machine: dispatch moves Ready to Running, preemption sends it back, an event wait moves it to Blocked, and exit ends it. Notice that no arrow goes from Blocked straight to Running.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Task state machine",
+   "nodes": [
+    {
+     "id": "ready",
+     "label": "Ready",
+     "note": "waiting for CPU",
+     "style": "accent"
+    },
+    {
+     "id": "run",
+     "label": "Running",
+     "note": "on the CPU",
+     "style": "live"
+    },
+    {
+     "id": "block",
+     "label": "Blocked",
+     "note": "waiting for event",
+     "style": "normal"
+    },
+    {
+     "id": "end",
+     "label": "Terminated",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ready",
+     "to": "run",
+     "label": "dispatch",
+     "style": "solid"
+    },
+    {
+     "from": "run",
+     "to": "ready",
+     "label": "preempted",
+     "style": "dashed"
+    },
+    {
+     "from": "run",
+     "to": "block",
+     "label": "waits for event",
+     "style": "solid"
+    },
+    {
+     "from": "block",
+     "to": "ready",
+     "label": "event occurs",
+     "style": "solid"
+    },
+    {
+     "from": "run",
+     "to": "end",
+     "label": "exit",
+     "style": "solid"
+    }
+   ],
+   "aria": "State diagram of a task moving from Ready to Running, back to Ready when preempted, to Blocked while waiting, and finally to Terminated."
+  }
+ },
+ "examples": [
+  {
+   "question": "An RTOS keeps a 96-byte TCB per task and gives each task a 512-byte stack. Six tasks must run on a chip with 4 KB of RAM. (a) How many bytes do the tasks need in total? (b) What fraction of that is TCB overhead? (c) How much RAM is left for the kernel and heap?",
+   "steps": [
+    "Memory per task = TCB + stack = 96 B + 512 B = 608 B.",
+    "Total task memory = 6 × 608 B = 3648 B.",
+    "Total RAM = 4 KB = 4 × 1024 B = 4096 B.",
+    "TCB portion = 6 × 96 B = 576 B. Fraction = 576 ÷ 3648 = 0.1579 = 15.79%.",
+    "Same result per task: 96 ÷ 608 = 0.1579.",
+    "RAM left = 4096 B − 3648 B = 448 B."
+   ],
+   "answer": "The six tasks need 3648 bytes, TCBs are 15.79% of task memory, and 448 bytes remain for kernel and heap.",
+   "check": "tcb = 96\nstack = 512\nn = 6\nram = 4 * 1024\nper_task = tcb + stack\ntotal = n * per_task\npct = tcb / per_task * 100\nleft = ram - total\nprint(total)\nprint(round(pct, 2))\nprint(left)",
+   "values": [
+    3648,
+    15.79,
+    448
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Writing 'each thread has its own address space'. Threads share the process address space; only the stack and registers are private.",
+  "Calling a thread switch free. It is cheaper than a process switch because the address space does not change, but registers are still saved and restored.",
+  "Mixing up program and process. A program is a passive file; a process is that program in execution, with an address space and state.",
+  "Taking TCB overhead as a fraction of total RAM instead of task memory. Here it is 576 ÷ 3648, not 576 ÷ 4096."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List four items stored in a TCB.",
+   "marks": 2,
+   "a": "Any four of: stack pointer, program counter, saved registers, state, priority, stack base and size, owner or task ID."
+  },
+  {
+   "level": "remember",
+   "q": "Define a thread.",
+   "marks": 2,
+   "a": "A flow of control inside a process. It shares the process code, data and files, and privately owns a stack, program counter and registers."
+  },
+  {
+   "level": "understand",
+   "q": "Why does RTOS literature use the word task rather than process?",
+   "marks": 3,
+   "a": "A small RTOS usually has one address space and many stacks, so its schedulable units resemble threads. The word task names the unit the scheduler runs without implying a separate protected address space. Some syllabi call the same unit a light-weight process."
+  },
+  {
+   "level": "understand",
+   "q": "Why can one thread's wild pointer crash every thread of its process?",
+   "marks": 3,
+   "a": "Threads share code, global data and heap. There is no memory protection between them. A bad write into shared heap or data corrupts all threads of that process, though other processes stay isolated."
+  },
+  {
+   "level": "apply",
+   "q": "Four tasks run on an RTOS. Each TCB is 80 bytes and each stack is 256 bytes. How many bytes do the four tasks occupy?",
+   "marks": 4,
+   "a": "Memory per task = 80 + 256 = 336 B. Total = 4 × 336 = 1344 B."
+  },
+  {
+   "level": "apply",
+   "q": "A periodic task has C = 2 ms and T = 10 ms. Find its utilisation U.",
+   "marks": 4,
+   "a": "U = C/T = 2 ms ÷ 10 ms = 0.2, that is 20%."
+  },
+  {
+   "level": "analyze",
+   "q": "A system uses user-level threads. One thread calls a blocking read on a UART. What happens to the other threads, and why?",
+   "marks": 5,
+   "a": "Every thread of that process blocks. The kernel sees only one process and blocks it during the system call; the user-level library cannot run another thread while the kernel has suspended the process. Kernel-level threads would avoid this."
+  },
+  {
+   "level": "analyze",
+   "q": "A task resets the board at random after a few minutes. Its stack was sized from the call graph but ignored interrupt nesting. Explain the likely cause and one fix.",
+   "marks": 5,
+   "a": "A nested interrupt pushed its frame onto a stack already near full, overwriting adjacent memory. Fix: add the worst-case nested interrupt frames to the stack budget, enable stack overflow checking, and reduce deep local arrays."
+  }
+ ],
+ "beyond": "Not for the exam. Industry RTOS profiles such as AUTOSAR OS, FreeRTOS and Zephyr expose tasks with priorities, static or dynamic creation, and stack overflow hooks. POSIX pthreads show the same ideas on larger systems with real memory protection and scheduling policies. Modern microcontrollers with an MPU can give each task its own protected region without a full MMU. Search next for 'FreeRTOS xTaskCreate stack size', 'pthread_attr_setstacksize' and 'AUTOSAR OS task states'."
+}

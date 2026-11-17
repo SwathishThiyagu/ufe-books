@@ -1,0 +1,609 @@
+{
+ "lead": "An embedded system that must answer an event within a fixed time needs an operating system built for deadlines, not for average speed. This unit goes from the kernel boundary and task states to rate-monotonic and EDF scheduling, then to drivers, memory pools and the two workhorses you will actually meet: FreeRTOS and Embedded Linux. By the end you can size a task set, test it against its deadlines, and argue for an RTOS or a Linux build in a product review.",
+ "about": "Unit 5 covers the software layer between your application and the hardware. Chapter 5.1 draws the kernel/user boundary; 5.2 defines tasks, processes and threads; 5.3 shows how one CPU appears to run many tasks and what a context switch costs. Chapter 5.4 compares round robin, fixed priority, rate monotonic and EDF scheduling with numbers. 5.5 separates hard from soft real time, and an RTOS from a general-purpose OS. 5.6 protects shared data with semaphores, mutexes and queues; 5.7 turns peripherals into drivers and a board into a BSP. 5.8 handles memory without an MMU, and 5.9 ties it all to bootloaders, Embedded Linux and FreeRTOS.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "The kernel is the privileged core that alone touches hardware; every other program must ask it through a system call.",
+   "depth": "What the kernel does: scheduling, memory, inter-task communication, timers, drivers. Privileged and unprivileged CPU modes (the ARM modes from Unit 2), the system call path through an SVC or trap instruction, and why a small RTOS without an MMU still keeps the split. Kernel space is an address range plus a permission, not a memory chip; keep the firmware / OS / application layers distinct. Monolithic versus microkernel structure, and the difference between a kernel, an executive and a bare scheduler. Some syllabi call the kernel the supervisor or the executive.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "User task",
+      "note": "unprivileged",
+      "style": "normal"
+     },
+     {
+      "label": "C library / syscall API",
+      "note": "SVC instruction",
+      "style": "next"
+     },
+     {
+      "label": "Kernel",
+      "note": "scheduler, drivers, IPC",
+      "style": "accent"
+     },
+     {
+      "label": "Hardware",
+      "note": "registers, memory",
+      "style": "muted"
+     }
+    ],
+    "side": {
+     "top": "less privilege",
+     "bottom": "more privilege"
+    },
+    "aria": "Four stacked layers from the user task at the top down to the hardware, with privilege increasing downwards and the system call boundary marked between the library and the kernel."
+   },
+   "example": "A user task on an ARM Cortex-M RTOS runs in unprivileged thread mode on the process stack pointer and calls a library routine that writes 10 bytes to a UART. Trace the steps up to the moment the UART data register is written, and count how many times the CPU changes privilege level.",
+   "trap": "Saying kernel space is 'where the kernel is stored in flash'. It is an address range plus a privilege rule; the same physical RAM can be mapped into either space. Also do not assume every embedded OS has an MMU.",
+   "prereq": "Unit 2 (ARM modes, registers, stack pointers); Unit 1 (hardware and software architecture of an embedded system).",
+   "leave": "Interrupt latency and ISR priority to Unit 3; the choice of scheduling policy to 5.4; what lives inside a driver to 5.7."
+  },
+  {
+   "k": 2,
+   "idea": "A task is the unit the scheduler runs; a process owns an address space, while threads of one process share that space and own only a stack and a register context.",
+   "depth": "Program versus process versus thread versus task, and why RTOS literature prefers 'task'. TCB contents: stack pointer, program counter, saved registers, state, priority, stack base and size, owner. Task states and legal transitions. Threads share code, data and files, so a switch between them is cheaper but a crash hits everyone. User-level versus kernel-level threads. Stack sizing, static versus dynamic task creation, reentrancy. Task models needed later: periodic, sporadic and aperiodic, with period T, worst-case execution time C, relative deadline D and release time. Some syllabi say light-weight process for thread, and PCB for TCB.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Task state machine",
+    "nodes": [
+     {
+      "id": "ready",
+      "label": "Ready",
+      "note": "waiting for CPU",
+      "style": "accent"
+     },
+     {
+      "id": "run",
+      "label": "Running",
+      "note": "on the CPU",
+      "style": "live"
+     },
+     {
+      "id": "block",
+      "label": "Blocked",
+      "note": "waiting for event",
+      "style": "normal"
+     },
+     {
+      "id": "end",
+      "label": "Terminated",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ready",
+      "to": "run",
+      "label": "dispatch",
+      "style": "solid"
+     },
+     {
+      "from": "run",
+      "to": "ready",
+      "label": "preempted / slice ends",
+      "style": "dashed"
+     },
+     {
+      "from": "run",
+      "to": "block",
+      "label": "waits for event",
+      "style": "solid"
+     },
+     {
+      "from": "block",
+      "to": "ready",
+      "label": "event occurs",
+      "style": "solid"
+     },
+     {
+      "from": "run",
+      "to": "end",
+      "label": "exit",
+      "style": "solid"
+     }
+    ],
+    "aria": "State diagram of a task moving from Ready to Running, back to Ready when preempted, to Blocked while waiting, and finally to Terminated."
+   },
+   "example": "An RTOS keeps a 96-byte TCB per task and gives each task a 512-byte stack. Six tasks must run on a chip with 4 KB of RAM. (a) How many bytes do the tasks need in total? (b) What fraction is TCB overhead? (c) How much RAM is left for the kernel and heap?",
+   "trap": "Writing 'each thread has its own address space'. Threads share the process address space; only the stack and registers are private. Also, a thread switch is cheaper than a process switch but is not free.",
+   "prereq": "5.1 (kernel boundary and privilege), Unit 1 (memory types and sizes).",
+   "leave": "How the scheduler picks among ready tasks to 5.4; the cost of a switch to 5.3; sharing data between tasks to 5.6."
+  },
+  {
+   "k": 3,
+   "idea": "Multitasking interleaves many tasks on one CPU by saving and restoring context; multiprocessing runs them truly in parallel on several cores; the switch itself does no useful work.",
+   "depth": "Concurrency versus parallelism, pseudo-parallelism on a single core, and why it still meets deadlines. Step-by-step context switch: save PC and registers on the current stack, save the stack pointer in the TCB, load the next TCB, restore registers, return. Cost components: register save, cache and pipeline refill, TLB effects; switch latency versus interrupt latency. Preemptive versus cooperative multitasking. Interrupt handling inside an RTOS: ISR entry, minimal context save, nested interrupts, deferred work handed to a task, and the rule that ISRs stay short. Symmetric and asymmetric multiprocessing, AMP and SMP, and how tasks are assigned to cores. Synonyms some syllabi use: dispatch, task switch, save/restore.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "CPU core",
+      "bars": [
+       {
+        "label": "A",
+        "start": 0,
+        "end": 4,
+        "style": "accent"
+       },
+       {
+        "label": "SW",
+        "start": 4,
+        "end": 5,
+        "style": "muted"
+       },
+       {
+        "label": "B",
+        "start": 5,
+        "end": 9,
+        "style": "live"
+       },
+       {
+        "label": "SW",
+        "start": 9,
+        "end": 10,
+        "style": "muted"
+       },
+       {
+        "label": "A",
+        "start": 10,
+        "end": 13,
+        "style": "accent"
+       },
+       {
+        "label": "SW",
+        "start": 13,
+        "end": 14,
+        "style": "muted"
+       },
+       {
+        "label": "B",
+        "start": 14,
+        "end": 16,
+        "style": "live"
+       }
+      ]
+     }
+    ],
+    "aria": "Timeline of one CPU core showing task A and task B alternating in 4 ms slices with a 1 ms switching gap between every pair of slices."
+   },
+   "example": "A single-core CPU runs tasks A and B under preemptive round robin with a 4 ms quantum. A needs 7 ms of CPU and B needs 6 ms. Every context switch costs 1 ms and happens at each slice boundary. Draw the schedule until both tasks finish and compute the CPU time lost to switching.",
+   "trap": "Believing multitasking makes a single core faster. Total useful work is fixed; interleaving adds switching cost. Confusing concurrency (interleaved) with parallelism (simultaneous).",
+   "prereq": "5.2 (task states, TCB contents); Unit 2 (registers, pipeline).",
+   "leave": "Which task should run next to 5.4; hardware interrupt priority and latency to Unit 3; SMP cache coherence to a computer-architecture course."
+  },
+  {
+   "k": 4,
+   "idea": "The scheduler applies a fixed rule to the ready queue, and that rule decides whether every task meets its deadline.",
+   "depth": "Metrics: CPU utilisation, throughput, turnaround time, response time, waiting time, jitter. Policies in order of complexity: FIFO, round robin with a time quantum, preemptive fixed priority, deadline monotonic, rate monotonic (shorter period gets higher priority) with the utilisation bound n(2^(1/n) − 1) and the response-time test, and earliest deadline first (EDF), which is optimal on one CPU while utilisation stays at or below 1. Priority by importance versus priority by period. Show the bound is sufficient, not necessary. Numbers only, no formal proofs.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "T1 (T = 4)",
+      "bars": [
+       {
+        "label": "T1",
+        "start": 0,
+        "end": 1,
+        "style": "accent"
+       },
+       {
+        "label": "T1",
+        "start": 4,
+        "end": 5,
+        "style": "accent"
+       },
+       {
+        "label": "T1",
+        "start": 8,
+        "end": 9,
+        "style": "accent"
+       }
+      ]
+     },
+     {
+      "label": "T2 (T = 5)",
+      "bars": [
+       {
+        "label": "T2",
+        "start": 1,
+        "end": 3,
+        "style": "live"
+       },
+       {
+        "label": "T2",
+        "start": 5,
+        "end": 7,
+        "style": "live"
+       }
+      ]
+     },
+     {
+      "label": "T3 (T = 10)",
+      "bars": [
+       {
+        "label": "T3",
+        "start": 3,
+        "end": 4,
+        "style": "next"
+       },
+       {
+        "label": "T3",
+        "start": 7,
+        "end": 8,
+        "style": "next"
+       }
+      ]
+     }
+    ],
+    "aria": "Rate-monotonic schedule for the first 10 ms of a 20 ms hyperperiod, with three rows for the three tasks and idle gaps between the bars."
+   },
+   "example": "Three periodic tasks are released together at t = 0 with deadlines equal to their periods: T1 has C = 1 ms and T = 4 ms, T2 has C = 2 ms and T = 5 ms, T3 has C = 2 ms and T = 10 ms. (a) Compute the total utilisation. (b) Apply the rate-monotonic bound for n = 3. (c) Draw the rate-monotonic schedule up to t = 10 ms and state whether every deadline is met.",
+   "trap": "Treating U ≤ 0.779 as a necessary condition. It is only sufficient; the example above has U = 0.85 and still meets every deadline. The other trap is assuming EDF is always the right choice in practice: it has higher overhead and no natural way to favour a critical task.",
+   "prereq": "5.2 (period, execution time, deadline); 5.3 (context switching, preemption).",
+   "leave": "Proving the RM bound to an algorithms course; priority inversion during scheduling to 5.6; RTOS product choice to 5.9."
+  },
+  {
+   "k": 5,
+   "idea": "A hard real-time system fails if a deadline slips; an RTOS exists to bound the worst case, while a general-purpose OS optimises the average case and fairness.",
+   "depth": "Hard, firm and soft real time with one concrete example each (airbag firing, video frame drop, a receipt appearing on a phone). Deadline, worst-case execution time, slack, determinism, jitter. The latency chain: interrupt latency + scheduler latency + context switch time, added stage by stage. RTOS properties: preemptive priority scheduler, bounded latency, priority inheritance, tiny footprint, few or no page faults. GPOS properties: fairness, throughput, virtual memory, large footprint, rich file systems. A full comparison table across scheduling, latency, memory protection, file system and licence cost in rupees.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Worst-case latency budget",
+    "nodes": [
+     {
+      "id": "ev",
+      "label": "Button event",
+      "style": "normal"
+     },
+     {
+      "id": "isr",
+      "label": "ISR entry",
+      "note": "3 µs",
+      "style": "live"
+     },
+     {
+      "id": "sch",
+      "label": "Scheduler picks",
+      "note": "5 µs",
+      "style": "accent"
+     },
+     {
+      "id": "sw",
+      "label": "Context switch",
+      "note": "2 µs",
+      "style": "normal"
+     },
+     {
+      "id": "run",
+      "label": "Motor task runs",
+      "note": "4 µs",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "ev",
+      "to": "isr",
+      "style": "solid"
+     },
+     {
+      "from": "isr",
+      "to": "sch",
+      "style": "solid"
+     },
+     {
+      "from": "sch",
+      "to": "sw",
+      "style": "solid"
+     },
+     {
+      "from": "sw",
+      "to": "run",
+      "style": "solid"
+     }
+    ],
+    "aria": "Chain from a button event through ISR entry, the scheduler decision and a context switch to the motor task's first instruction, with the four stage times adding to 14 microseconds."
+   },
+   "example": "A motor must start within 20 µs of a button press. Interrupt latency is 3 µs, the scheduler takes 5 µs to select the motor task, the context switch is 2 µs, and the motor task's first instruction takes 4 µs to reach the GPIO write. Is the deadline met, and what is the slack? Which stage should you attack first if the deadline were 12 µs?",
+   "trap": "Calling any fast system real-time. Hard real time means predictable worst case, not small average time. A 1 µs average with a 50 ms worst case fails an airbag deadline.",
+   "prereq": "5.3 (switch cost); 5.4 (how the scheduler picks).",
+   "leave": "The scheduling algorithms themselves to 5.4; specific RTOS products to 5.9; interrupt latency measurement to Unit 3."
+  },
+  {
+   "k": 6,
+   "idea": "Tasks that share data or wait for an event must be synchronised; a semaphore signals, a mutex protects, and a queue carries data.",
+   "depth": "Race conditions and critical sections; protecting a section by disabling interrupts versus taking a lock. Binary and counting semaphores, give and take, who is allowed to give. Mutex with ownership, recursive mutex, priority inheritance. Priority inversion and unbounded inversion with a timing example; how inheritance bounds it. Deadlock and its four conditions, starvation. Message queues, mailboxes, event flags and pipes; producer-consumer with a bounded queue and blocking send/receive. ISR-safe variants of give and take. Some syllabi call a queue a message buffer and a mailbox a one-slot queue.",
+   "figure": {
+    "type": "sequence",
+    "actors": [
+     "Producer task",
+     "Kernel queue",
+     "Consumer task"
+    ],
+    "messages": [
+     {
+      "from": "Producer task",
+      "to": "Kernel queue",
+      "label": "queue send(item)",
+      "dashed": false
+     },
+     {
+      "from": "Kernel queue",
+      "to": "Consumer task",
+      "label": "unblock consumer",
+      "dashed": true
+     },
+     {
+      "from": "Consumer task",
+      "to": "Kernel queue",
+      "label": "queue receive()",
+      "dashed": false
+     },
+     {
+      "from": "Kernel queue",
+      "to": "Consumer task",
+      "label": "copy item, return",
+      "dashed": true
+     }
+    ],
+    "aria": "Message sequence: the producer sends an item into the kernel queue, the queue unblocks the waiting consumer, and the consumer receives the item."
+   },
+   "example": "A low-priority task L holds a mutex and has 3 ms of its critical section left. A medium-priority task M becomes ready and needs 12 ms of CPU. A high-priority task H then blocks on the same mutex. Compute H's waiting time (a) with no priority inheritance, and (b) with priority inheritance.",
+   "trap": "Using a binary semaphore as a mutex. A semaphore can be given by any task and has no owner, so priority inheritance cannot be applied to it; a mutex records its owner and can be inherited.",
+   "prereq": "5.2 (tasks); 5.3 (preemption, context switch); 5.4 (priority).",
+   "leave": "Hardware interrupt priority and the interrupt controller to Unit 3; driver-level buffers to 5.7; memory pools for queues to 5.8."
+  },
+  {
+   "k": 7,
+   "idea": "A device driver turns a peripheral's registers into a standard interface, and a board support package makes one OS boot and run on one board.",
+   "depth": "Driver skeleton: init, open, close, read, write, ioctl, ISR. Character, block and network drivers. Memory-mapped I/O and volatile pointers. Polling, interrupt-driven and DMA transfers and when each is worth it; the split into a fast top half and a deferred bottom half. Memory device drivers: flash erase blocks, wear, EEPROM page writes. On-board bus device drivers for I2C, SPI and CAN at driver level only. BSP contents: boot code, clock and PLL setup, UART console, timer tick, interrupt controller setup, memory map, linker script, board configuration. Device trees at mention level only; only a few universities teach them.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Driver data path",
+    "nodes": [
+     {
+      "id": "app",
+      "label": "Application read()",
+      "style": "normal"
+     },
+     {
+      "id": "api",
+      "label": "Driver interface",
+      "note": "open, read, write",
+      "style": "accent"
+     },
+     {
+      "id": "buf",
+      "label": "ISR and ring buffer",
+      "note": "top half fills",
+      "style": "live"
+     },
+     {
+      "id": "reg",
+      "label": "Peripheral registers",
+      "style": "normal"
+     },
+     {
+      "id": "dev",
+      "label": "ADC device",
+      "note": "on SPI bus",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "app",
+      "to": "api",
+      "style": "solid"
+     },
+     {
+      "from": "api",
+      "to": "buf",
+      "style": "solid"
+     },
+     {
+      "from": "buf",
+      "to": "reg",
+      "style": "solid"
+     },
+     {
+      "from": "reg",
+      "to": "dev",
+      "style": "solid"
+     },
+     {
+      "from": "dev",
+      "to": "buf",
+      "label": "interrupt",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Layered path from an application read call through the driver interface and ring buffer down to the ADC registers, with a dashed interrupt line returning from the device to the buffer."
+   },
+   "example": "A 12-bit ADC sits on SPI and must be sampled once every 1 ms. Each sample is sent as a 16-bit frame and the SPI clock is 1 MHz. The driver uses a 64-sample ring buffer filled by an ISR. (a) How much slack does the CPU have before the buffer overflows? (b) What fraction of CPU time does the SPI transfer take to the nearest 0.1%?",
+   "trap": "Doing long work inside the ISR, such as converting the whole buffer or printing to a UART, which blocks lower-priority interrupts and destroys the latency budget. Freeze the design: ISR copies one sample and signals a task.",
+   "prereq": "Unit 3 (interrupts, DMA, ADC, timers); Unit 4 (SPI, I2C, CAN); 5.1 (kernel space).",
+   "leave": "The bus protocols themselves to Unit 4; boot hardware and U-Boot to 5.9; kernel image building to 5.9; gcc, gdb and Makefiles to Unit 6."
+  },
+  {
+   "k": 8,
+   "idea": "An embedded OS usually runs on a fixed pool of RAM with no MMU, so allocation must be bounded, deterministic and free of surprise fragmentation.",
+   "depth": "Memory map of a microcontroller: vectors, text and rodata in flash; data, bss, heap and stack in RAM, with the heap growing up and the stack growing down towards it. Static versus dynamic allocation and why malloc is a poor fit in a hard real-time loop. Fixed-size block pools, first-fit and best-fit on a small heap, internal and external fragmentation, allocator timing. Stack sizing, stack overflow detection by canary or guard region, and ISR stack usage. MPU versus MMU, virtual memory and demand paging and their effect on the worst case. Memory leaks and reference counting. Only a few universities teach MPU region programming and two-level allocators such as TLSF.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "Flash",
+      "note": "vectors, code, constants",
+      "style": "normal"
+     },
+     {
+      "label": ".data and .bss",
+      "note": "globals, static",
+      "style": "accent"
+     },
+     {
+      "label": "Heap",
+      "note": "grows up",
+      "style": "live"
+     },
+     {
+      "label": "Free RAM",
+      "style": "muted"
+     },
+     {
+      "label": "Stack",
+      "note": "grows down",
+      "style": "next"
+     }
+    ],
+    "side": {
+     "top": "low address",
+     "bottom": "high address"
+    },
+    "aria": "Memory map from low to high address: flash holding vectors and code, then data and bss in RAM, the heap growing upwards, free RAM, and the stack growing downwards from the top."
+   },
+   "example": "A fixed-pool allocator has 8 blocks of 128 bytes. Four tasks request 100, 40, 90 and 60 bytes in that order, and each request is rounded up to a whole block. (a) How many blocks are used? (b) How many bytes are allocated in total? (c) What percentage of the allocated space is wasted?",
+   "trap": "Assuming malloc is constant-time and deterministic. A general heap may walk a free list, so its worst case is unbounded; that is why real-time code uses fixed-size pools.",
+   "prereq": "Unit 1 (ROM, flash, SRAM, DRAM); 5.1 (kernel space).",
+   "leave": "Linux virtual memory and page tables in detail to 5.9; linker script and section placement to Unit 6."
+  },
+  {
+   "k": 9,
+   "idea": "A bootloader brings the board up and loads either a full Linux kernel or a tiny RTOS kernel; which one you flash depends on the deadline and the feature list.",
+   "depth": "Linux architecture: user space, C library, system call interface, and kernel subsystems (scheduler, memory manager, virtual file system, network stack, drivers). Kernel image types such as zImage and uImage, and the root file system; flash file systems such as JFFS2 and UBIFS, and initramfs. Boot chain in order: on-chip ROM code, a small secondary loader, U-Boot, the kernel, init, then the application; what U-Boot does and its typical commands at naming level only. PREEMPT_RT mentioned in one line for soft real time. FreeRTOS: tasks, queues, semaphores, software timers, priority scheduler, config items, footprint in kB, porting to a Cortex-M board. A comparison table across FreeRTOS, ChibiOS-RT, Embedded Linux and a commercial RTOS. The GNU toolchain (gcc, gdb, gprof, Makefiles) is assumed throughout but covered in Unit 6.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Boot chain of an embedded Linux board",
+    "nodes": [
+     {
+      "id": "rom",
+      "label": "On-chip ROM code",
+      "note": "20 ms",
+      "style": "muted"
+     },
+     {
+      "id": "spl",
+      "label": "Secondary loader",
+      "note": "80 ms",
+      "style": "normal"
+     },
+     {
+      "id": "uboot",
+      "label": "U-Boot",
+      "note": "900 ms",
+      "style": "accent"
+     },
+     {
+      "id": "kernel",
+      "label": "Kernel zImage",
+      "note": "1.4 s",
+      "style": "live"
+     },
+     {
+      "id": "rootfs",
+      "label": "Rootfs and init",
+      "note": "2.5 s",
+      "style": "next"
+     },
+     {
+      "id": "app",
+      "label": "Application",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "rom",
+      "to": "spl",
+      "style": "solid"
+     },
+     {
+      "from": "spl",
+      "to": "uboot",
+      "style": "solid"
+     },
+     {
+      "from": "uboot",
+      "to": "kernel",
+      "style": "solid"
+     },
+     {
+      "from": "kernel",
+      "to": "rootfs",
+      "style": "solid"
+     },
+     {
+      "from": "rootfs",
+      "to": "app",
+      "style": "solid"
+     }
+    ],
+    "aria": "Five-stage boot chain from on-chip ROM code through the secondary loader, U-Boot and the kernel image to the root file system and the application, with the time of each stage."
+   },
+   "example": "A board boots in these stages: ROM code 20 ms, secondary loader 80 ms, U-Boot 900 ms, kernel decompression and init 1.4 s, root file system mount and application start 2.5 s. (a) What is the total boot time? (b) To reach a 2 s boot, how much time must be cut, and which stage would you attack first?",
+   "trap": "Saying Linux cannot be used in embedded systems because it is not hard real-time. Most products only need soft real time; the trap is promising a hard deadline on plain Linux. Also, U-Boot is not the operating system.",
+   "prereq": "5.1 (kernel and user space); 5.5 (hard versus soft, RTOS versus GPOS); 5.7 (drivers and BSP).",
+   "leave": "Linux commands, users and file permissions to a Linux course; C programming and the toolchain to Unit 6; file system internals beyond the names to a storage course."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "the kernel gives each task a protected context"
+  ],
+  [
+   2,
+   3,
+   "many tasks must share one CPU"
+  ],
+  [
+   3,
+   4,
+   "the switch is the action the scheduler orders"
+  ],
+  [
+   4,
+   5,
+   "the policy decides whether deadlines are met"
+  ],
+  [
+   5,
+   6,
+   "shared data between tasks must be protected"
+  ],
+  [
+   2,
+   6,
+   "tasks need to talk to each other"
+  ],
+  [
+   6,
+   7,
+   "drivers signal tasks through queues and semaphores"
+  ],
+  [
+   8,
+   9,
+   "memory limits push you to Linux or FreeRTOS"
+  ],
+  [
+   7,
+   9,
+   "the BSP and bootloader prepare the board"
+  ]
+ ]
+}

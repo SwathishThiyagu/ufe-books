@@ -1,0 +1,185 @@
+{
+ "lead": "Tasks rarely live alone. One task reads a sensor while another averages it; an interrupt hands a byte to a task; two tasks update a shared counter. Without rules, their reads and writes interleave and data is lost. Inter-task communication gives three tools: a semaphore signals an event, a mutex protects a shared resource, and a queue carries data from producer to consumer. Every RTOS uses them in drivers, control loops and logging.",
+ "prereq": "You need: <a href=\"#tasks-processes-and-threads\">5.2</a> tasks, <a href=\"#multitasking-multiprocessing-and-context-switching\">5.3</a> preemption and the context switch, and <a href=\"#task-scheduling-round-robin-priority-rate-monotonic-edf\">5.4</a> priorities.",
+ "sections": [
+  {
+   "h3": "Race conditions and critical sections",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A race condition is a result that depends on the exact interleaving of two tasks. Suppose two tasks both run <code>count = count + 1</code>. Each reads the old value, adds one in a register, and writes back. If both read before either writes, one update is lost. The operation is not atomic: it cannot be split and still give the same result. A critical section is code that touches shared data and must run as if no other task is running. The shared data may be a variable, a buffer, a peripheral register or a file."
+    },
+    {
+     "type": "p",
+     "text": "Two protections exist. First, disable interrupts around the section: mask interrupts, run the few instructions, unmask. On one core this stops the scheduler tick and every ISR, so no other task can enter. It is simple and fast, but it adds interrupt latency; keep it to microseconds. On a multicore chip it does not stop a task on another core. Second, take a lock: a kernel object. If another task holds the lock, the caller blocks and the scheduler runs other work. A lock works across cores and for longer sections."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Use one lock for one shared object; name the lock after the data.",
+      "Keep the critical section short; no slow I/O or unbounded loops inside.",
+      "Release the lock on every path, including error returns.",
+      "Do not disable interrupts for a long computation; measure the added latency."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Semaphores and mutexes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A semaphore is a kernel object with a count and a wait list. <code>take()</code> (also wait, P) checks the count: if it is greater than 0, decrement and continue; otherwise block the task. <code>give()</code> (signal, V) increments the count and unblocks one waiter. A binary semaphore has count 0 or 1; a counting semaphore starts at N and tracks N identical resources. Any task or ISR may give a semaphore; only a task may take one, because an ISR cannot block."
+    },
+    {
+     "type": "p",
+     "text": "A mutex is a lock with an owner. Only the task that took it may give it. The kernel records the owner, so it can detect a recursive take by the same task and can apply priority inheritance. A recursive mutex counts how many times the owner took it; the owner must give it the same number of times. Use a mutex for mutual exclusion and a semaphore for signalling. A binary semaphore is not a mutex because it has no owner."
+    },
+    {
+     "type": "formula",
+     "text": "W_H ≤ R_L + ε",
+     "where": "W_H is the wait of high-priority task H before it gets the mutex; R_L is the remaining time owner L needs inside its critical section; ε is kernel overhead for blocking, wake-up and a context switch. This bound holds with priority inheritance and one mutex; nested mutexes add each holder's remaining section."
+    },
+    {
+     "type": "p",
+     "text": "Priority inversion: low-priority L holds a mutex; high-priority H waits; medium-priority M preempts L. H now waits for M even though M needs no lock. If new medium tasks keep arriving, the wait grows without limit: unbounded priority inversion. With inheritance, L runs at H's priority until it releases the mutex, so M cannot preempt; H waits at most R_L plus kernel overhead."
+    },
+    {
+     "type": "p",
+     "text": "Deadlock is a cycle of tasks each waiting for a resource held by the next. Its four conditions are mutual exclusion, hold and wait, no preemption, and circular wait. Break one: acquire locks in a fixed global order, use timeouts, or use one lock. Starvation is different: a runnable task never gets the CPU or the lock because others keep winning. FIFO wait lists and priority aging reduce it."
+    }
+   ]
+  },
+  {
+   "h3": "Queues, mailboxes and event flags",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A message queue is a FIFO buffer of fixed-size items managed by the kernel. <code>send(q, item)</code> copies the item into the queue; <code>receive(q, item)</code> copies it out. A bounded queue has capacity N. A producer blocks when the queue is full, and a consumer blocks when it is empty; both calls may take a timeout. The kernel copies the item, so the sender can reuse its buffer immediately. This is the producer-consumer pattern."
+    },
+    {
+     "type": "p",
+     "text": "A mailbox is a queue with one slot. Some syllabi call a queue a message buffer and a mailbox a one-slot queue. Event flags are bits in a word; a task waits for any or all selected bits to be set. A pipe is a byte-stream queue, often used between a task and a driver. ISR-safe calls exist: <code>sendFromISR()</code> never blocks; if the queue is full it returns an error or drops the item. A semaphore give from an ISR also uses a FromISR call. A take is never called from an ISR."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The producer sends an item into the kernel queue; the queue unblocks the waiting consumer, which then receives a copy of the item. Notice that the kernel holds and copies the data, not the producer's stack.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Producer task",
+    "Kernel queue",
+    "Consumer task"
+   ],
+   "messages": [
+    {
+     "from": "Producer task",
+     "to": "Kernel queue",
+     "label": "queue send(item)",
+     "dashed": false
+    },
+    {
+     "from": "Kernel queue",
+     "to": "Consumer task",
+     "label": "unblock consumer",
+     "dashed": true
+    },
+    {
+     "from": "Consumer task",
+     "to": "Kernel queue",
+     "label": "queue receive()",
+     "dashed": false
+    },
+    {
+     "from": "Kernel queue",
+     "to": "Consumer task",
+     "label": "copy item, return",
+     "dashed": true
+    }
+   ],
+   "aria": "Message sequence: the producer sends an item into the kernel queue, the queue unblocks the waiting consumer, and the consumer receives the item."
+  }
+ },
+ "examples": [
+  {
+   "question": "A low-priority task L holds a mutex and has 3 ms of its critical section left. A medium-priority task M becomes ready and needs 12 ms of CPU; at that instant, before M runs, high-priority task H blocks on the same mutex. Ignore context-switch time. Compute H's waiting time (a) with no priority inheritance, and (b) with priority inheritance.",
+   "steps": [
+    "L holds the mutex with 3 ms of critical section remaining. H is blocked on that mutex.",
+    "Without inheritance, the scheduler sees M at medium priority and L at low priority. M preempts L and runs for its full 12 ms.",
+    "L resumes and finishes its remaining 3 ms, then releases the mutex.",
+    "H waits for M's 12 ms plus L's 3 ms: 12 + 3 = 15 ms before H can take the mutex.",
+    "With inheritance, L runs at H's priority while H waits. M, at medium priority, cannot preempt L.",
+    "L finishes its 3 ms, releases the mutex, and H takes it. H waits 3 ms. M runs later.",
+    "H's wait is 15 ms without inheritance and 3 ms with inheritance."
+   ],
+   "answer": "H waits 15 ms without priority inheritance and 3 ms with priority inheritance.",
+   "check": "crit_left = 3.0\nmedium = 12.0\nno_inh = medium + crit_left\nwith_inh = crit_left\nprint(no_inh)\nprint(with_inh)",
+   "values": [
+    15.0,
+    3.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Using a binary semaphore as a mutex. A semaphore can be given by any task and has no owner, so priority inheritance cannot be applied to it; a mutex records its owner and can be inherited.",
+  "Calling a blocking take or blocking send from an ISR. ISRs must use FromISR variants that never block; if the object is full or empty, the call returns an error or drops the item.",
+  "Thinking priority inheritance removes the wait. It only bounds the wait by the owner's remaining critical section; a long section or a chain of nested mutexes still delays the high-priority task.",
+  "Forgetting to release a mutex on an error path. The next task blocks forever, which is deadlock, not priority inversion.",
+  "Treating interrupt disable as a universal lock. On a multicore chip it does not stop another core; long masking also increases interrupt latency and can miss deadlines."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define race condition and critical section.",
+   "marks": 2,
+   "a": "A race condition is a result that depends on the interleaving of tasks. A critical section is code that touches shared data and must run as if no other task is running."
+  },
+  {
+   "level": "understand",
+   "q": "Why can a binary semaphore not replace a mutex when priority inheritance matters?",
+   "marks": 3,
+   "a": "A binary semaphore has no owner; any task or ISR may give it. The kernel cannot tell which task holds it, so it cannot raise that task's priority. A mutex records its owner and can be inherited."
+  },
+  {
+   "level": "apply",
+   "q": "A counting semaphore has count 2. Three tasks call take() one after another. Give the count and the state of each task after its call.",
+   "marks": 3,
+   "a": "First take: count becomes 1, task runs. Second take: count becomes 0, task runs. Third take: count is 0, task blocks until a give() increments the count."
+  },
+  {
+   "level": "apply",
+   "q": "A bounded queue has capacity 4 and currently holds 3 items. A producer sends 2 items with blocking send. What happens to each send?",
+   "marks": 3,
+   "a": "First send fills the queue to 4 and returns. Second send blocks because the queue is full; it completes only after a consumer receives an item and frees one slot."
+  },
+  {
+   "level": "analyze",
+   "q": "Low-priority L holds a mutex with 4 ms left; medium-priority M needs 10 ms; high-priority H blocks on the mutex. Compute H's wait without and with priority inheritance.",
+   "marks": 4,
+   "a": "Without inheritance, M preempts L: H waits 10 + 4 = 14 ms. With inheritance, L runs at H's priority and finishes 4 ms: H waits 4 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is unbounded priority inversion possible without inheritance?",
+   "marks": 3,
+   "a": "New medium-priority tasks can keep preempting the low-priority owner, so the high-priority waiter waits for all of them, not just the owner's critical section. The wait has no fixed upper bound."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between a queue and a mailbox.",
+   "marks": 2,
+   "a": "A queue holds many fixed-size items in FIFO order. A mailbox holds one item, so it is a one-slot queue."
+  },
+  {
+   "level": "remember",
+   "q": "What must an ISR use instead of a blocking send or take?",
+   "marks": 2,
+   "a": "An ISR uses the FromISR variant, such as sendFromISR() or giveFromISR(). These never block; they return an error or drop the item if the operation cannot complete."
+  }
+ ],
+ "beyond": "Not for the exam. Industry RTOSes add the priority ceiling protocol, where a task taking a lock is raised to a ceiling priority; it avoids inversion with less run-time cost than inheritance. FreeRTOS exposes queues, binary semaphores, counting semaphores, mutexes and recursive mutexes, with FromISR calls. AUTOSAR OS specifies OS applications, spinlocks for multicore and timing protection. Newer work uses lock-free ring buffers and formal verification of schedulability. Search: priority ceiling protocol, FreeRTOS queue set, AUTOSAR OS scalability class."
+}

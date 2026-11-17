@@ -1,0 +1,219 @@
+{
+ "lead": "A CPU core executes one instruction stream at a time, yet an embedded product must answer a key press, refresh a display and read a sensor without missing deadlines. Multitasking creates that illusion on one core by switching rapidly between tasks. Each switch saves the running task's context and restores another's. Multiprocessing gets true parallelism by adding cores. The switch does no useful work, and real-time designers count its cost in microseconds, because that cost is subtracted from every deadline.",
+ "prereq": "You need: task states and the contents of a TCB from <a href=\"#tasks-processes-and-threads\">5.2</a>, and the register file, pipeline and cache from Unit 2, Processor Architectures.",
+ "sections": [
+  {
+   "h3": "Concurrency is not parallelism",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two tasks are <b>concurrent</b> when their executions overlap in time; they are <b>parallel</b> when their instructions run on hardware at the same instant. One core gives concurrency only. The kernel runs task A for a slice, stops it, runs task B, and repeats. At a slice of a few milliseconds a human sees A and B as simultaneous; the CPU sees them strictly one after another. Some syllabi call this time slicing."
+    },
+    {
+     "type": "p",
+     "text": "Deadlines still get met because the interleaving is bounded. If every slice is at most <i>q</i> and every switch costs at most <i>s</i>, a ready task never waits longer than the slices of the tasks ahead of it plus one switch per slice. The scheduler computes a worst-case response time and compares it with the deadline."
+    },
+    {
+     "type": "p",
+     "text": "Two policies decide when a switch happens. <b>Preemptive</b> multitasking lets the kernel take the CPU away at a timer tick, or as soon as a higher-priority task becomes ready. <b>Cooperative</b> multitasking lets a task keep the CPU until it calls a yield function; switching is cheap because no timer is needed, but one task that never yields stalls everything. Hard real-time kernels are almost always preemptive."
+    }
+   ]
+  },
+  {
+   "h3": "The context switch, step by step",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The <b>context</b> is everything the CPU needs to resume a task exactly where it stopped: the program counter (PC, the address of the next instruction), the stack pointer (SP), the general-purpose registers, the status register, and any floating-point registers the task uses. With an MMU, the page-table base register is part of it. The kernel keeps this in the task control block (TCB). Some syllabi call the whole operation a dispatch or a task switch."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "A timer interrupt or a system call transfers control to the kernel.",
+      "The hardware, or the kernel's entry code on cores that do not do it in hardware, pushes the PC and status register on the current task's stack; the kernel then saves the remaining registers.",
+      "It writes the current SP into that task's TCB. The context is now safe: stack plus SP.",
+      "The scheduler picks the next task (the rule is in <a href=\"#task-scheduling-round-robin-priority-rate-monotonic-edf\">5.4</a>), and the kernel loads its TCB and sets SP from it.",
+      "It pops the registers from the new stack, then the status register and the PC.",
+      "The return-from-interrupt instruction jumps to the restored PC, and the new task continues."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The <b>switch latency</b> is the time from the last useful instruction of the old task to the first useful instruction of the new one. A preemptive kernel adds it to interrupt latency on the path to a woken task."
+    },
+    {
+     "type": "formula",
+     "text": "t_switch = t_reg + t_sched + t_cache + t_tlb",
+     "where": "t_reg is the register and stack save/restore time; t_sched is the scheduler's decision; t_cache is the stall while the new task's code and data come from memory; t_tlb is the flush and refill of the translation lookaside buffer, present only when tasks have separate address spaces. On a small microcontroller t_switch is a few microseconds; on a cached application processor the last two terms dominate and it grows by an order of magnitude."
+    }
+   ]
+  },
+  {
+   "h3": "Interrupts inside an RTOS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Peripheral interrupts arrive asynchronously. The hardware saves the minimum, the ISR saves the registers it uses, does a short job, and returns. In an RTOS the ISR usually does not do the real work: it clears the peripheral flag, moves data to a buffer, and signals a task, for example by giving a semaphore (see <a href=\"#inter-task-communication-semaphores-mutexes-queues\">5.6</a>)."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Short ISRs matter because an ISR may run with interrupts masked and blocks every lower-priority interrupt; a long ISR adds latency to the whole system.",
+      "Deferred work runs in a task that the ISR unblocks, so heavy processing competes for the CPU under the scheduler like any other work.",
+      "Nested interrupts let a high-priority interrupt preempt a low-priority ISR, to a bounded depth.",
+      "Many kernels switch tasks on return from interrupt, so a woken high-priority task runs before the interrupted low-priority task resumes."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Multiprocessing: AMP and SMP",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "In <b>asymmetric multiprocessing (AMP)</b> each core runs its own OS image or bare-metal program and owns a fixed job: core 0 runs the control loop, core 1 runs the communication stack. There is no shared ready queue. In <b>symmetric multiprocessing (SMP)</b> one OS manages all cores with a shared ready queue, and any task may run on any core; the scheduler balances load."
+    },
+    {
+     "type": "p",
+     "text": "AMP is simpler and more predictable, because timing analysis is done per core; it is common in a system-on-chip that pairs an application core running Linux with a small core handling real-time I/O. SMP gives throughput, but the kernel must lock its own data structures, and keeping caches coherent costs cycles. Adding cores does not by itself meet a deadline: a task that must respond in 50 µs still needs a free core and an interrupt path that is not blocked."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Task A and task B alternate on one core in 4 ms slices, and each switch costs a 1 ms gap marked SW. The schedule ends at 16 ms: A finishes at 13 ms and B at 16 ms, although together they need only 13 ms of work.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "CPU core",
+     "bars": [
+      {
+       "label": "A",
+       "start": 0,
+       "end": 4,
+       "style": "accent"
+      },
+      {
+       "label": "SW",
+       "start": 4,
+       "end": 5,
+       "style": "muted"
+      },
+      {
+       "label": "B",
+       "start": 5,
+       "end": 9,
+       "style": "live"
+      },
+      {
+       "label": "SW",
+       "start": 9,
+       "end": 10,
+       "style": "muted"
+      },
+      {
+       "label": "A",
+       "start": 10,
+       "end": 13,
+       "style": "accent"
+      },
+      {
+       "label": "SW",
+       "start": 13,
+       "end": 14,
+       "style": "muted"
+      },
+      {
+       "label": "B",
+       "start": 14,
+       "end": 16,
+       "style": "live"
+      }
+     ]
+    }
+   ],
+   "aria": "Timeline of one CPU core showing task A and task B alternating in 4 ms slices with a 1 ms switching gap between every pair of slices."
+  }
+ },
+ "examples": [
+  {
+   "question": "A single-core CPU runs two tasks under preemptive round robin with a time quantum of 4 ms. Task A needs 7 ms of CPU time and task B needs 6 ms. Both are ready at time 0 and the scheduler alternates A, B, A, B. Every context switch costs 1 ms and occurs at each slice boundary where work remains. Draw the schedule until both tasks finish, and find (i) the finishing time, (ii) the CPU time lost to switching, (iii) the switching overhead as a percentage.",
+   "steps": [
+    "t = 0 ms: A runs min(4, 7) = 4 ms, 3 ms left; clock 4 ms.",
+    "Switch 1 ms → t = 5 ms.",
+    "t = 5 ms: B runs min(4, 6) = 4 ms, 2 ms left; clock 9 ms.",
+    "Switch 1 ms → t = 10 ms.",
+    "t = 10 ms: A runs min(4, 3) = 3 ms and finishes (7 ms used); clock 13 ms. B still needs 2 ms.",
+    "Switch 1 ms → t = 14 ms.",
+    "t = 14 ms: B runs min(4, 2) = 2 ms and finishes (6 ms used); clock 16 ms. No switch after the last task.",
+    "Useful CPU time = 7 + 6 = 13 ms; elapsed = 16 ms.",
+    "Switching time = 16 - 13 = 3 ms = 3 switches x 1 ms.",
+    "Overhead = 3 / 16 x 100 = 18.75 %."
+   ],
+   "answer": "The last task finishes at 16 ms; useful CPU time is 13 ms, 3 ms is lost to three context switches, and the overhead is 18.75 %.",
+   "check": "A = 7\nB = 6\nq = 4\nsw = 1\nt = 0\nrem = {'A': A, 'B': B}\norder = ['A', 'B']\ni = 0\nswitches = 0\nwhile rem['A'] > 0 or rem['B'] > 0:\n    task = order[i % 2]\n    if rem[task] > 0:\n        run = min(q, rem[task])\n        t += run\n        rem[task] -= run\n        if rem['A'] > 0 or rem['B'] > 0:\n            t += sw\n            switches += 1\n    i += 1\nuseful = A + B\nlost = switches * sw\nprint(t)\nprint(useful)\nprint(lost)\nprint(round(100.0 * lost / t, 2))\n",
+   "values": [
+    16,
+    13,
+    3,
+    18.75
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Multitasking does not make one core faster. Useful work stays 13 ms; interleaving adds 3 ms of switching.",
+  "Concurrency is not parallelism: interleaved tasks on one core are concurrent; parallelism needs two cores at the same instant.",
+  "Do not add a switch after the final task; that gives 4 switches, 4 ms lost and 17 ms, all wrong.",
+  "Switch latency and interrupt latency are different measurements; a switch that wakes a task adds to the interrupt path.",
+  "A cooperative task that runs long is not a scheduling bug; a preemptive kernel would have interrupted it at the tick."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define the context of a task and list four items it contains.",
+   "marks": 2,
+   "a": "The saved CPU state needed to resume a task: PC, SP, general-purpose registers, status register, plus floating-point registers or the page-table base register if used."
+  },
+  {
+   "level": "understand",
+   "q": "Why does an RTOS ISR hand its real work to a task instead of doing it itself?",
+   "marks": 3,
+   "a": "An ISR may run with interrupts masked and blocks lower-priority interrupts, so a long ISR adds latency to the whole system. The ISR clears the flag, buffers data and signals a task; the heavy work then runs under the scheduler."
+  },
+  {
+   "level": "apply",
+   "q": "Tasks A and B need 5 ms and 3 ms, quantum is 2 ms and each switch costs 0.5 ms. Find the finishing time and the switching overhead.",
+   "marks": 4,
+   "a": "A 2 ms (t=2), switch (2.5), B 2 ms (4.5), switch (5), A 2 ms (7), switch (7.5), B 1 ms (8.5), switch (9), A 1 ms (10). Useful 8 ms of 10 ms, so 2 ms lost, overhead 20 %."
+  },
+  {
+   "level": "apply",
+   "q": "In the figure, state what the kernel saves at t = 13 ms and where it is saved.",
+   "marks": 3,
+   "a": "Task A has just finished, so at 13 ms the kernel saves A's context: PC, status register and registers are on A's stack from the entry, and the current SP goes into A's TCB. It loads B's TCB, sets SP from it and restores B's registers."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is switch latency much larger on a cached application processor with an MMU than on a small microcontroller?",
+   "marks": 5,
+   "a": "The register save is only tens of cycles on both, and somewhat larger on the application processor if it also saves floating-point and vector state; even so it is small compared with the cache-miss and TLB-refill terms, which dominate there."
+  },
+  {
+   "level": "analyze",
+   "q": "A dual-core board still misses a 100 µs deadline after a second core is added. Give two plausible reasons.",
+   "marks": 4,
+   "a": "The task may be pinned to a busy core, so the second core never runs it; or the interrupt path is blocked by a long masked-ISR section, so the wake-up is late whatever the core count. Cores raise throughput, not the latency of a blocked path."
+  },
+  {
+   "level": "understand",
+   "q": "Distinguish AMP from SMP in one sentence each.",
+   "marks": 2,
+   "a": "In AMP each core runs its own OS image or bare-metal program with a fixed role and no shared ready queue. In SMP one OS manages all cores with a shared ready queue, and any task may run on any core."
+  }
+ ],
+ "beyond": "Not for the exam. RTOS vendors publish measured context-switch times because buyers ask for the worst case, not the average. Modern systems-on-chip mix the models: an application cluster runs Linux under one SMP scheduler while a small core runs an RTOS, exchanging data through shared memory. Research targets predictable timing on multicore through cache partitioning, core isolation and real-time hypervisors. Useful search terms: worst-case execution time, cache-related preemption delay, PREEMPT_RT, Xenomai, Jailhouse."
+}

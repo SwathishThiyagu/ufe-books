@@ -1,0 +1,202 @@
+{
+ "lead": "Scheduling is the rule that picks the next task from the ready queue. The rule matters because a wrong pick can make a hard deadline slip even when the CPU has spare time. A real-time operating system exposes the rule as a policy: FIFO, round robin, fixed priority, rate monotonic or earliest deadline first. The same tasks can pass or fail under different policies. This chapter compares the policies and gives the numbers an examiner expects: utilisation, response time and the rate-monotonic bound. It is used in motor control, airbag controllers, robot arms and any system where late is wrong.",
+ "prereq": "You need: <a href=\"#tasks-processes-and-threads\">5.2</a> for period, execution time and deadline, and <a href=\"#multitasking-multiprocessing-and-context-switching\">5.3</a> for context switching and preemption.",
+ "sections": [
+  {
+   "h3": "Metrics and simple policies",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Every scheduler needs a rule and a way to judge it. CPU utilisation is the fraction of time spent doing useful work, U = busy time / total time. Throughput is tasks completed per second. Turnaround time is from arrival to completion. Response time is from release to completion of a job; Rᵢ stands for the worst-case response time of task i, measured in ms. Waiting time is time spent ready but not running. Jitter is the variation in a periodic task's completion time from one job to the next; control loops care about it."
+    },
+    {
+     "type": "p",
+     "text": "Naming differs between books. Some operating-systems texts call the arrival-to-first-run interval response time, because interactive programs care about how fast the first reply appears. This chapter follows the real-time convention: response time runs to completion, so it can be compared directly with the deadline."
+    },
+    {
+     "type": "p",
+     "text": "First in, first out (FIFO) runs tasks in arrival order until each finishes. It is simple but a long task blocks every short one: poor response time. Round robin gives each ready task a fixed slice called the time quantum, then moves it to the back of the queue. A small quantum improves response time but spends more time in context switches (see <a href=\"#multitasking-multiprocessing-and-context-switching\">5.3</a>). A large quantum behaves like FIFO. Both treat all tasks alike, which is wrong when one task has a hard deadline."
+    }
+   ]
+  },
+  {
+   "h3": "Fixed priority and rate monotonic",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Fixed-priority preemptive scheduling gives each task a priority and always runs the highest-priority ready task. A higher-priority task that becomes ready preempts a lower one. Priority can come from importance (an airbag task outranks a radio task) or from timing. Rate monotonic (RM) chooses timing: a shorter period T gets higher priority. Deadline monotonic (DM) is the general form: a shorter relative deadline D gets higher priority; RM is DM when D = T."
+    },
+    {
+     "type": "formula",
+     "text": "U = Σ Cᵢ / Tᵢ",
+     "where": "Cᵢ is execution time of task i in ms; Tᵢ is its period in ms; U is a dimensionless fraction."
+    },
+    {
+     "type": "p",
+     "text": "For n periodic tasks with deadlines equal to periods, the RM utilisation bound is U ≤ n(2^(1/n) − 1). Values: n = 1 gives 1.000, n = 2 gives 0.828, n = 3 gives 0.779, and the limit as n grows is ln 2 ≈ 0.693. If U is at or below the bound, every deadline is met. The bound is sufficient, not necessary: a schedule above it may still pass."
+    },
+    {
+     "type": "formula",
+     "text": "U ≤ n(2^(1/n) − 1)",
+     "where": "n is the number of periodic tasks with deadlines equal to periods; the right side is the RM utilisation bound."
+    },
+    {
+     "type": "p",
+     "text": "When the bound fails, use the response-time test. For each task i, Rᵢ = Cᵢ + Σ ⌈Rᵢ/Tⱼ⌉ Cⱼ over higher-priority tasks j. Find the smallest Rᵢ that satisfies it; the task passes if Rᵢ ≤ Dᵢ. Solve it by iteration: start at Rᵢ = Cᵢ and substitute the current value on the right until the number stops changing. For T3 in the example the equation reads R₃ = 2 + ⌈R₃/4⌉·1 + ⌈R₃/5⌉·2. Start at R₃ = 2 ms: 2 + 1·1 + 1·2 = 5 ms. Put R₃ = 5 ms: 2 + 2·1 + 1·2 = 6 ms. Put R₃ = 6 ms: 2 + 2·1 + 2·2 = 8 ms. Put R₃ = 8 ms: 2 + 2·1 + 2·2 = 8 ms. The value repeats, so R₃ = 8 ms, and 8 ms ≤ 10 ms."
+    },
+    {
+     "type": "formula",
+     "text": "Rᵢ = Cᵢ + Σ ⌈Rᵢ / Tⱼ⌉ Cⱼ",
+     "where": "Rᵢ is worst-case response time of task i in ms; j runs over higher-priority tasks; ⌈x⌉ rounds x up to an integer."
+    }
+   ]
+  },
+  {
+   "h3": "Earliest deadline first",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Earliest deadline first (EDF) is preemptive and dynamic: at every release or completion, the ready task with the earliest absolute deadline runs. No fixed priority is stored. For periodic tasks with deadlines equal to periods, EDF is optimal on one CPU: if U ≤ 1, EDF meets all deadlines. If U > 1, no scheduler can meet all deadlines because the tasks demand more CPU time than exists."
+    },
+    {
+     "type": "p",
+     "text": "EDF's rule follows the deadline, so a task that becomes urgent immediately wins. That flexibility is useful when periods vary. The cost is overhead: the scheduler must compare deadlines on every event. EDF also has no natural way to favour a critical task; a slightly earlier non-critical job will run first. Fixed priority is easier to analyse and cheaper to implement; EDF uses the CPU better near full load. The choice is a design decision, not a law. Many small RTOSs offer fixed priority; EDF appears in research and in some advanced controllers."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Rate-monotonic schedule for the example: T1 has the highest priority and runs as soon as it is released; at 4 ms it preempts T3 in the middle of its job. T2 outranks T3, so T3's 2 ms are split into 3–4 ms and 7–8 ms. The CPU is idle from 9 ms to 10 ms. Every job completes before its deadline even though U = 0.85 exceeds the three-task bound.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "T1 (T = 4)",
+     "bars": [
+      {
+       "label": "T1",
+       "start": 0,
+       "end": 1,
+       "style": "accent"
+      },
+      {
+       "label": "T1",
+       "start": 4,
+       "end": 5,
+       "style": "accent"
+      },
+      {
+       "label": "T1",
+       "start": 8,
+       "end": 9,
+       "style": "accent"
+      }
+     ]
+    },
+    {
+     "label": "T2 (T = 5)",
+     "bars": [
+      {
+       "label": "T2",
+       "start": 1,
+       "end": 3,
+       "style": "live"
+      },
+      {
+       "label": "T2",
+       "start": 5,
+       "end": 7,
+       "style": "live"
+      }
+     ]
+    },
+    {
+     "label": "T3 (T = 10)",
+     "bars": [
+      {
+       "label": "T3",
+       "start": 3,
+       "end": 4,
+       "style": "next"
+      },
+      {
+       "label": "T3",
+       "start": 7,
+       "end": 8,
+       "style": "next"
+      }
+     ]
+    }
+   ],
+   "aria": "Rate-monotonic schedule for the first 10 ms of a 20 ms hyperperiod, with three rows for the three tasks and idle gaps between the bars."
+  }
+ },
+ "examples": [
+  {
+   "question": "Three periodic tasks are released together at t = 0 with deadlines equal to their periods: T1 has C = 1 ms and T = 4 ms, T2 has C = 2 ms and T = 5 ms, T3 has C = 2 ms and T = 10 ms. (a) Compute the total utilisation. (b) Apply the rate-monotonic bound for n = 3. (c) Draw the rate-monotonic schedule up to t = 10 ms and state whether every deadline is met.",
+   "steps": [
+    "1. Utilisation: U = C1/T1 + C2/T2 + C3/T3 = 1/4 + 2/5 + 2/10 = 0.25 + 0.40 + 0.20 = 0.85.",
+    "2. Rate-monotonic bound for n = 3: n(2^(1/n) − 1) = 3(2^(1/3) − 1) = 3(1.2599 − 1) = 0.7798.",
+    "3. Rate-monotonic priority: T1 (T = 4 ms) is highest, T2 (T = 5 ms) is middle, T3 (T = 10 ms) is lowest.",
+    "4. Schedule: 0–1 ms T1; 1–3 ms T2; 3–4 ms T3; 4–5 ms T1; 5–7 ms T2; 7–8 ms T3; 8–9 ms T1; 9–10 ms idle. T3 needs 2 ms in total, so its run is split into 3–4 ms and 7–8 ms.",
+    "5. Deadline checks: T1 jobs complete at 1 ms, 5 ms and 9 ms against deadlines 4 ms, 8 ms and 12 ms. T2 jobs complete at 3 ms and 7 ms against deadlines 5 ms and 10 ms. T3 completes at 8 ms against its deadline 10 ms. All pass.",
+    "6. U = 0.85 is above the bound 0.7798, so the bound is inconclusive; the drawn schedule still meets every deadline."
+   ],
+   "answer": "U = 0.85; the RM bound for n = 3 is 0.7798; the schedule 0–1 T1, 1–3 T2, 3–4 T3, 4–5 T1, 5–7 T2, 7–8 T3, 8–9 T1, 9–10 idle meets every deadline, so the bound is sufficient but not necessary.",
+   "check": "C = [1, 2, 2]\nT = [4, 5, 10]\nU = sum(c / t for c, t in zip(C, T))\nn = len(C)\nbound = n * (2 ** (1 / n) - 1)\nprint(round(U, 4))\nprint(round(bound, 4))",
+   "values": [
+    0.85,
+    0.7798
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Treating U ≤ n(2^(1/n) − 1) as a necessary condition. It is only sufficient; the worked example has U = 0.85 and still meets every deadline.",
+  "Applying the rate-monotonic bound when D ≠ T. Use deadline monotonic priority and the response-time test instead.",
+  "Assuming EDF is always the better practical choice. EDF needs deadline comparisons on every event and has no natural way to reserve the CPU for one critical task.",
+  "Confusing response time with waiting time. Waiting time is time ready but not running; response time runs to completion.",
+  "Using period in place of execution time in U. Utilisation uses Cᵢ/Tᵢ, with both quantities in the same unit."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define CPU utilisation and jitter.",
+   "marks": 2,
+   "a": "CPU utilisation is the fraction of time the CPU does useful work, U = busy time / total time. Jitter is the variation in a periodic task's completion time from one job to the next."
+  },
+  {
+   "level": "understand",
+   "q": "Why does round robin need a time quantum?",
+   "marks": 3,
+   "a": "The quantum bounds how long one task can keep the CPU. A small quantum improves response time but adds context-switch overhead; a large quantum behaves like FIFO."
+  },
+  {
+   "level": "apply",
+   "q": "Two tasks have C1 = 1 ms, T1 = 4 ms and C2 = 2 ms, T2 = 6 ms. Compute U and the n = 2 rate-monotonic bound. Is the bound conclusive?",
+   "marks": 4,
+   "a": "U = 1/4 + 2/6 = 0.25 + 0.333 = 0.583. The n = 2 bound is 2(2^(1/2) − 1) = 0.828. U ≤ 0.828, so the bound proves that rate monotonic meets every deadline."
+  },
+  {
+   "level": "analyze",
+   "q": "A system has three periodic tasks and U = 0.95. The rate-monotonic bound is 0.779. Does rate monotonic fail? Explain.",
+   "marks": 4,
+   "a": "The bound does not decide the case. 0.95 > 0.779 makes the bound inconclusive, not a failure. Apply the response-time test task by task; the schedule may still meet every deadline."
+  },
+  {
+   "level": "apply",
+   "q": "For T1: C = 1 ms, T = 4 ms; T2: C = 2 ms, T = 5 ms; T3: C = 2 ms, T = 10 ms, compute R3 by the response-time test under rate-monotonic priority.",
+   "marks": 4,
+   "a": "The equation is R3 = 2 + ⌈R3/4⌉·1 + ⌈R3/5⌉·2. Iterate from R3 = 2 ms: 2 + 1·1 + 1·2 = 5 ms. R3 = 5 ms: 2 + 2·1 + 1·2 = 6 ms. R3 = 6 ms: 2 + 2·1 + 2·2 = 8 ms. R3 = 8 ms: 2 + 2·1 + 2·2 = 8 ms, which repeats. So R3 = 8 ms, and 8 ms ≤ 10 ms, so T3 passes."
+  },
+  {
+   "level": "understand",
+   "q": "Why is EDF called optimal on one CPU for periodic tasks with D = T?",
+   "marks": 3,
+   "a": "If U ≤ 1, EDF meets all deadlines whenever any schedule can. If U > 1, the total execution demand exceeds available CPU time, so no scheduler can meet all deadlines."
+  }
+ ],
+ "beyond": "Not for the exam. Real RTOSs mix policies: fixed priority for interrupts and control loops, EDF in research and some automotive and avionics prototypes. Search for response-time analysis, deadline monotonic scheduling and EDF scheduling overhead. Multicore scheduling adds migration and cache-sharing problems that a one-CPU rule does not cover."
+}

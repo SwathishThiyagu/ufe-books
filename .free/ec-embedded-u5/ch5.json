@@ -1,0 +1,287 @@
+{
+ "lead": "A real-time system is judged by its worst case, not its average. If a late result is a failure, the system is hard real-time; if it is useless but harmless, firm; if it only lowers quality, soft. An RTOS puts a provable upper bound on event-to-reaction time. A GPOS shares the CPU fairly for throughput and accepts occasional long delays.",
+ "prereq": "You need <a href=\"#multitasking-multiprocessing-and-context-switching\">5.3</a> for switch cost and <a href=\"#task-scheduling-round-robin-priority-rate-monotonic-edf\">5.4</a> for how a scheduler picks the next task.",
+ "sections": [
+  {
+   "h3": "Deadlines, worst case and slack",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A deadline is the latest instant by which a task's result must be ready. Each task has a worst-case execution time (WCET): the longest time its code can take on its slowest path, counting all branches and cache misses. Slack is the spare time."
+    },
+    {
+     "type": "formula",
+     "text": "slack = deadline − R",
+     "where": "R is the task's worst-case response time from event to output (defined fully in section 2). A negative slack means the deadline is missed. Use deadline − WCET only when the task starts immediately with no latency or scheduling delay."
+    },
+    {
+     "type": "p",
+     "text": "Hard real time: a missed deadline is a failure, and the damage is unbounded. An airbag controller must fire within tens of milliseconds of the crash pulse. Fire late and the occupant is already against the dashboard. There is no retry."
+    },
+    {
+     "type": "p",
+     "text": "Firm real time: a late result is worthless, but throwing it away costs nothing else. A video decoder that misses a frame deadline drops that frame. The picture stutters once and continues."
+    },
+    {
+     "type": "p",
+     "text": "Soft real time: a late result is still useful; only quality drops. A UPI receipt that appears 300 ms after the tap annoys the user, but the money has moved. A game at 45 frames per second instead of 60 is still playable."
+    },
+    {
+     "type": "p",
+     "text": "Determinism means the same event under the same load gives the same bounded response every run. Jitter is the spread between the shortest and longest response time. A system with a 1 µs average and a 50 ms worst case cannot meet a deadline shorter than 50 ms; whether it is real-time depends on the deadline. Real time means meeting the deadline, not having low jitter."
+    }
+   ]
+  },
+  {
+   "h3": "The latency chain",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Response time is a sum of stages, and each stage is taken at its worst case, never its average."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Interrupt latency L_int: hardware event to the first ISR instruction; finish the current instruction, vector fetch, register save.",
+      "ISR body L_isr: first ISR instruction to the last, including the ISR's own work.",
+      "Scheduler latency L_sch: end of ISR to choosing the highest-priority ready task.",
+      "Context switch T_sw: save the old task's registers and restore the new task's.",
+      "Time to effect T_eff: task's first instruction to the GPIO, PWM or CAN write that matters."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "R = L_int + L_isr + L_sch + T_sw + T_eff",
+     "where": "R is worst-case response time; L_int is interrupt latency; L_isr is ISR body time; L_sch is scheduler latency; T_sw is one context switch; T_eff is time to effect. All in µs here."
+    },
+    {
+     "type": "p",
+     "text": "Every stage is a budget line. If the total fits inside the deadline, the design is sound. The figure shows a chain adding to 14 µs against a 20 µs deadline."
+    }
+   ]
+  },
+  {
+   "h3": "What an RTOS gives you that a GPOS does not",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An RTOS bounds the worst case. Its scheduler is preemptive and priority-based, so a high-priority task runs as soon as it is ready. Kernel calls have documented upper bounds. Priority inheritance bounds the time a low-priority lock holder can block a high-priority task by giving the holder the higher priority for the critical section. The kernel is small, often a few KB to tens of KB, and usually has no MMU, so no page faults and memory comes from fixed pools."
+    },
+    {
+     "type": "p",
+     "text": "A GPOS favours fairness and throughput. It time-slices among users and daemons, uses demand paging, and offers rich file systems, networks and drivers. Any feature can inject millisecond delays: a page fault from flash or a file-system flush can turn a 2 µs wake-up into tens of ms. Fine for a phone, fatal for an airbag."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "RTOS",
+      "GPOS"
+     ],
+     "rows": [
+      [
+       "Scheduling",
+       "Preemptive, strict priority, bounded",
+       "Fair, time-sliced, best-effort"
+      ],
+      [
+       "Worst-case latency",
+       "Published and small (µs)",
+       "Not bounded by design; often ms to tens of ms, and can be larger"
+      ],
+      [
+       "Memory protection",
+       "Often none (no MMU), flat space",
+       "MMU with protected address spaces"
+      ],
+      [
+       "Page faults",
+       "None by design",
+       "Routine, and slow"
+      ],
+      [
+       "File system",
+       "Minimal or optional",
+       "Full, journalled, cached"
+      ],
+      [
+       "Footprint",
+       "KBs of RAM and flash",
+       "MBs to GBs"
+      ],
+      [
+       "Licence cost",
+       "FreeRTOS free (MIT); commercial RTOS charges per-product plus support",
+       "Linux free (GPL); commercial GPOS charges per-device"
+      ],
+      [
+       "Typical use",
+       "Motor control, airbag, sensor node",
+       "Phone, laptop, server, infotainment"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Neither is better in general. <a href=\"#embedded-linux-bootloaders-and-freertos\">5.9</a> is the decision: use a tiny RTOS when a deadline must be proved; use Linux when you need features and only soft timing."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Five stages add to 14 µs against a 20 µs deadline; the scheduler stage is the largest at 5 µs.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Worst-case latency budget",
+   "nodes": [
+    {
+     "id": "ev",
+     "label": "Button event",
+     "style": "normal"
+    },
+    {
+     "id": "int",
+     "label": "ISR entry",
+     "note": "2 µs",
+     "style": "live"
+    },
+    {
+     "id": "body",
+     "label": "ISR body",
+     "note": "1 µs",
+     "style": "live"
+    },
+    {
+     "id": "sch",
+     "label": "Scheduler picks",
+     "note": "5 µs",
+     "style": "accent"
+    },
+    {
+     "id": "sw",
+     "label": "Context switch",
+     "note": "2 µs",
+     "style": "normal"
+    },
+    {
+     "id": "run",
+     "label": "Task reaches GPIO write",
+     "note": "4 µs",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "ev",
+     "to": "int",
+     "style": "solid"
+    },
+    {
+     "from": "int",
+     "to": "body",
+     "style": "solid"
+    },
+    {
+     "from": "body",
+     "to": "sch",
+     "style": "solid"
+    },
+    {
+     "from": "sch",
+     "to": "sw",
+     "style": "solid"
+    },
+    {
+     "from": "sw",
+     "to": "run",
+     "style": "solid"
+    }
+   ],
+   "aria": "Chain from a button event through ISR entry, ISR body, scheduler decision and context switch to the task reaching the GPIO write, with stage times adding to 14 microseconds."
+  }
+ },
+ "examples": [
+  {
+   "question": "A motor must start within 20 µs of a button press. Interrupt latency is 2 µs, ISR body 1 µs, scheduler 5 µs, switch 2 µs and time to effect 4 µs. (a) Is the deadline met, and what is the slack? (b) Which stage should you attack first if the deadline were 12 µs?",
+   "steps": [
+    "Write the five costs: L_int = 2 µs, L_isr = 1 µs, L_sch = 5 µs, T_sw = 2 µs, T_eff = 4 µs.",
+    "Add them: R = 2 + 1 + 5 + 2 + 4 = 14 µs.",
+    "Slack = deadline − R = 20 − 14 = 6 µs. The deadline is met with 6 µs spare, 30% of the budget unused.",
+    "Part (b): with a 12 µs deadline, R = 14 µs exceeds it by 2 µs, so slack is −2 µs and the deadline is missed. At least 2 µs must go.",
+    "Find the biggest stage: scheduler at 5 µs, 5 ÷ 14 ≈ 36% of the chain. Attack it first.",
+    "A ready-queue bitmap or letting the ISR select the motor task directly can cut scheduler latency to 3 µs. New R = 2 + 1 + 3 + 2 + 4 = 12 µs, slack 0 µs — exactly met, no margin left.",
+    "For more margin, cut T_eff (4 µs) next, the largest remaining. Then cut the 3 µs scheduler or the 2 µs ISR entry, then the 2 µs switch, and last the 1 µs ISR body.",
+    "A system exactly on the deadline is risky: a temperature rise or cache miss makes it late. Keep about 20% margin."
+   ],
+   "answer": "R = 14 µs, so the 20 µs deadline is met with 6 µs slack; against 12 µs the chain is 2 µs late, and the 5 µs scheduler stage should be attacked first.",
+   "check": "isr_entry=2.0\nisr_body=1.0\nsched=5.0\nswitch=2.0\neff=4.0\ndeadline=20.0\ntotal=isr_entry+isr_body+sched+switch+eff\nslack=deadline-total\nprint(total)\nprint(slack)\nprint(total-12.0)\nprint(max(isr_entry,isr_body,sched,switch,eff))",
+   "values": [
+    14.0,
+    6.0,
+    2.0,
+    5.0
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Calling any fast system real-time. Hard real time means a bounded worst case: 1 µs typical with a 50 ms worst case still misses a 10 ms deadline.",
+  "Adding average stage times instead of worst-case times.",
+  "Confusing latency with jitter, or response time with throughput.",
+  "Thinking a soft deadline is not a deadline. A miss costs quality, not correctness.",
+  "Forgetting T_eff. Interrupt and switch are wasted if the task then takes 40 µs to reach the pin write."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define a hard real-time system.",
+   "marks": 2,
+   "a": "A system in which a result after its deadline is a total failure because damage is unbounded; every task must provably finish within its worst-case budget."
+  },
+  {
+   "level": "remember",
+   "q": "What is jitter?",
+   "marks": 2,
+   "a": "The variation between the shortest and longest response time for the same event. Low jitter means a predictable, repeatable response."
+  },
+  {
+   "level": "understand",
+   "q": "Why does demand paging make a GPOS unsuitable for a hard deadline, even if its average wake-up time is small?",
+   "marks": 3,
+   "a": "A page fault needs a flash read, which can stall the task for milliseconds. That single event sets the worst case, and the worst case is what a hard deadline is checked against."
+  },
+  {
+   "level": "understand",
+   "q": "Give one hard, one firm and one soft real-time example, each in one line.",
+   "marks": 3,
+   "a": "Hard: airbag firing. Firm: a dropped video frame. Soft: a payment receipt appearing slightly late on a phone."
+  },
+  {
+   "level": "apply",
+   "q": "A chain has interrupt latency 4 µs, ISR body 2 µs, scheduler 6 µs, context switch 3 µs and time to effect 5 µs. The deadline is 20 µs. Find the response time, the slack, and say whether it is met.",
+   "marks": 4,
+   "a": "R = 4 + 2 + 6 + 3 + 5 = 20 µs. Slack = 20 − 20 = 0 µs, so it is met only exactly, with no margin."
+  },
+  {
+   "level": "apply",
+   "q": "For the chain in the previous question, which single stage should shrink, and by how much, to leave 20% margin on a 20 µs deadline?",
+   "marks": 4,
+   "a": "A 20% margin means R ≤ 0.8 × 20 = 16 µs. Present R = 20 µs, so 4 µs must go. Cutting the scheduler from 6 µs to 2 µs alone gives R = 16 µs."
+  },
+  {
+   "level": "analyze",
+   "q": "A GPOS reports a 2 µs average wake-up latency and a 40 ms worst case. Is it suitable for a control loop with a 10 ms period? Justify with the deadline idea.",
+   "marks": 5,
+   "a": "No. The loop needs a worst case below 10 ms; 40 ms is four times the period, so one slow wake-up misses deadlines and can destabilise the loop. The 2 µs average is irrelevant because deadlines are checked against the worst case, and the jitter here is about 40 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "An RTOS kernel is ported to a board with an MMU and virtual memory is switched on for all tasks. What happens to the hard real-time guarantee?",
+   "marks": 5,
+   "a": "The guarantee is lost unless page faults are eliminated. Lock task pages in RAM and pre-fault code and stack at start-up; if any task can fault at run time, the worst-case response gains an unbounded page-fault term and the computed slack becomes invalid."
+  }
+ ],
+ "beyond": "Not for the exam. Industry often runs both kinds of OS on one chip: a small RTOS core beside a Linux core, so an infotainment screen and a motor loop coexist. The PREEMPT_RT patch pushes Linux toward bounded latency, and mixed-criticality scheduling tries to prove hard tasks safe while soft tasks share the CPU. WCET analysis tools estimate the slowest path from the compiled binary. Formally verified microkernels aim for a machine-checked timing and safety argument."
+}

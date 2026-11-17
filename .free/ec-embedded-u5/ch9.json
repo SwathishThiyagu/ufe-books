@@ -1,0 +1,270 @@
+{
+ "lead": "A bootloader is the first code that runs after reset and the last code that hands control to an operating system. On a powerful board it can load a full Linux kernel with a network stack and file system. On a small microcontroller it can start a tiny real-time kernel such as FreeRTOS in a few milliseconds. The choice follows the deadline and the feature list, not fashion. This chapter follows the boot chain from ROM code to application and compares the two families.",
+ "prereq": "You need: <a href=\"#os-basics-kernel-kernel-space-and-user-space\">Chapter 5.1</a> for kernel and user space, <a href=\"#hard-and-soft-real-time-systems-rtos-versus-gpos\">Chapter 5.5</a> for hard versus soft real time, <a href=\"#device-drivers-and-board-support-packages\">Chapter 5.7</a> for drivers and board support, and <a href=\"#memory-management-in-embedded-os\">Chapter 5.8</a> for bounded RAM.",
+ "sections": [
+  {
+   "h3": "Embedded Linux: layers and images",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Linux splits the machine into <b>user space</b> and <b>kernel space</b>. Applications and the C library run in user space. A request such as reading a file becomes a <b>system call</b>, the controlled entry into the kernel. The kernel then uses one of its subsystems: the scheduler picks the next task, the memory manager maps pages, the virtual file system (VFS) gives one interface to FAT, ext4 or flash file systems, the network stack handles TCP/IP, and device drivers talk to peripherals. See <a href=\"#os-basics-kernel-kernel-space-and-user-space\">Chapter 5.1</a> for that boundary and <a href=\"#device-drivers-and-board-support-packages\">Chapter 5.7</a> for drivers."
+    },
+    {
+     "type": "p",
+     "text": "An embedded kernel image is compressed. A <b>zImage</b> is a compressed kernel that decompresses itself in place. A <b>uImage</b> is the same kernel wrapped in an older U-Boot header that carries a load address and a checksum. The kernel needs a <b>root file system</b>: the directory tree holding <code>/bin</code>, <code>/etc</code>, device nodes and your program. It may sit on a flash file system such as <b>JFFS2</b> (journalling flash file system, version 2) or <b>UBIFS</b> (unsorted block image file system), or in a small <b>initramfs</b> packed into RAM. <a href=\"#memory-management-in-embedded-os\">Chapter 5.8</a> explains the RAM budget."
+    },
+    {
+     "type": "p",
+     "text": "Plain Linux optimises average throughput and fairness, so an interrupt may wait. <b>PREEMPT_RT</b> is a kernel patch set that makes most kernel code preemptible and shortens the worst-case latency. It gives good soft real time, not a hard guarantee; a missed deadline that fails the product still needs an RTOS, as <a href=\"#hard-and-soft-real-time-systems-rtos-versus-gpos\">Chapter 5.5</a> explains."
+    }
+   ]
+  },
+  {
+   "h3": "Boot chain: ROM code to application",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Power-on is a chain because each stage must fit in the storage the previous stage can read. The processor starts at a fixed address in <b>on-chip ROM code</b>. That code knows only a few ways to load the next stage: serial port, SD card, NAND flash or SPI flash. It loads a <b>secondary loader</b>, often called SPL (secondary program loader). The SPL sets up DRAM, because DRAM needs a trained controller before it can hold a large program."
+    },
+    {
+     "type": "p",
+     "text": "<b>U-Boot</b> is the full bootloader. It initialises clocks, DRAM, storage and sometimes the network. It reads a kernel image from flash, eMMC, SD card or a TFTP server, places it at the correct address, passes a device tree (a hardware description) and a kernel command line, and jumps to the kernel. At naming level, common commands are <code>printenv</code>, <code>setenv</code>, <code>fatload</code>, <code>tftp</code>, <code>bootz</code> and <code>bootm</code>. U-Boot is not the operating system; it exits before Linux runs."
+    },
+    {
+     "type": "p",
+     "text": "The kernel mounts the root file system and starts <code>init</code> (or systemd), the first user-space process. <code>init</code> starts services and finally your application. The figure gives a typical board: ROM code 20 ms, secondary loader 80 ms, U-Boot 900 ms, kernel decompression and init 1.4 s, root file system and application 2.5 s. Total is 4.9 s. U-Boot and the root file system dominate, so a fast-start product attacks those two first."
+    }
+   ]
+  },
+  {
+   "h3": "FreeRTOS: a small priority kernel",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "FreeRTOS is a free, open-source real-time kernel for microcontrollers. The main distribution has no memory management unit (MMU) support, so all tasks share one address space; this is normal on a Cortex-M board. A <b>task</b> is an independent thread with its own stack and priority. The scheduler runs the highest-priority ready task, and tasks of equal priority share the CPU by round robin if time slicing is enabled. A task blocks with <code>vTaskDelay</code>, waits on a queue, or waits on a semaphore; while it waits, lower-priority tasks run."
+    },
+    {
+     "type": "p",
+     "text": "<b>Queues</b> carry fixed-size items between tasks or from an interrupt. <b>Semaphores</b> signal an event, and a <b>mutex</b> protects a shared resource with priority inheritance. <b>Software timers</b> run callback functions from a timer service task, not from the hardware tick interrupt, so they are not for microsecond deadlines. <a href=\"#inter-task-communication-semaphores-mutexes-queues\">Chapter 5.6</a> gives the rules for these objects."
+    },
+    {
+     "type": "p",
+     "text": "The kernel is configured in <code>FreeRTOSConfig.h</code>. Key items are <code>configMAX_PRIORITIES</code> (number of priority levels), <code>configTICK_RATE_HZ</code> (tick frequency), <code>configMINIMAL_STACK_SIZE</code> (words on many ports), <code>configTOTAL_HEAP_SIZE</code> (bytes for <code>pvPortMalloc</code>) and <code>configUSE_PREEMPTION</code>. A Cortex-M port needs <code>port.c</code>, <code>portmacro.h</code> and the configuration header. It uses SysTick for the tick, PendSV for context switching and SVC to start the first task. A minimal build is a few kB of flash and about 1 kB of RAM plus task stacks; a typical build with queues and timers is roughly 6–12 kB of flash."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing the kernel for the deadline",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Start from the deadline, not the feature list. A motor current loop at 10 kHz needs a deterministic RTOS on a microcontroller. A payment terminal that draws a screen, uses Wi-Fi and updates over the air usually needs Linux, because the network stack, file systems and drivers already exist. Measure boot time, RAM and engineering cost."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Attribute",
+      "FreeRTOS",
+      "ChibiOS-RT",
+      "Embedded Linux",
+      "Commercial RTOS"
+     ],
+     "rows": [
+      [
+       "Typical RAM",
+       "1–10 kB",
+       "2–20 kB",
+       "MBs",
+       "4 kB–1 MB"
+      ],
+      [
+       "Scheduler",
+       "priority preemptive",
+       "priority preemptive",
+       "fair scheduler plus POSIX",
+       "priority preemptive"
+      ],
+      [
+       "Hard real time",
+       "yes",
+       "yes",
+       "no or soft",
+       "yes"
+      ],
+      [
+       "MMU",
+       "no",
+       "no",
+       "yes",
+       "optional"
+      ],
+      [
+       "Ecosystem",
+       "queues and timers",
+       "HAL and USB",
+       "network and file systems",
+       "middleware and support"
+      ],
+      [
+       "Licence",
+       "MIT",
+       "GPL or commercial",
+       "GPLv2",
+       "paid licence"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Linux fits a full network stack, USB, a display and a file system when soft real time is enough. FreeRTOS or ChibiOS-RT fits tens of kB of RAM and a hard periodic deadline. A commercial RTOS adds certification evidence, support and middleware, at a licence cost."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Each box is one boot stage and the times are the delays used in the worked example. U-Boot and the root file system take most of the 4.9 s total.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Boot chain of an embedded Linux board",
+   "nodes": [
+    {
+     "id": "rom",
+     "label": "On-chip ROM code",
+     "note": "20 ms",
+     "style": "muted"
+    },
+    {
+     "id": "spl",
+     "label": "Secondary loader",
+     "note": "80 ms",
+     "style": "normal"
+    },
+    {
+     "id": "uboot",
+     "label": "U-Boot",
+     "note": "900 ms",
+     "style": "accent"
+    },
+    {
+     "id": "kernel",
+     "label": "Kernel zImage",
+     "note": "1.4 s",
+     "style": "live"
+    },
+    {
+     "id": "rootfs",
+     "label": "Rootfs and init",
+     "note": "2.5 s",
+     "style": "next"
+    },
+    {
+     "id": "app",
+     "label": "Application",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "rom",
+     "to": "spl",
+     "style": "solid"
+    },
+    {
+     "from": "spl",
+     "to": "uboot",
+     "style": "solid"
+    },
+    {
+     "from": "uboot",
+     "to": "kernel",
+     "style": "solid"
+    },
+    {
+     "from": "kernel",
+     "to": "rootfs",
+     "style": "solid"
+    },
+    {
+     "from": "rootfs",
+     "to": "app",
+     "style": "solid"
+    }
+   ],
+   "aria": "Five-stage boot chain from on-chip ROM code through the secondary loader, U-Boot and the kernel image to the root file system and the application, with the time of each stage."
+  }
+ },
+ "examples": [
+  {
+   "question": "A board boots in these stages: ROM code 20 ms, secondary loader 80 ms, U-Boot 900 ms, kernel decompression and init 1.4 s, root file system mount and application start 2.5 s. (a) What is the total boot time? (b) To reach a 2 s boot, how much time must be cut, and which stage would you attack first?",
+   "steps": [
+    "Convert every stage to milliseconds: kernel = 1.4 s = 1400 ms; root file system = 2.5 s = 2500 ms.",
+    "Add the stages: 20 ms + 80 ms + 900 ms + 1400 ms + 2500 ms = 4900 ms.",
+    "Total boot time = 4900 ms = 4.9 s.",
+    "Target time = 2 s = 2000 ms.",
+    "Cut needed = 4900 ms − 2000 ms = 2900 ms = 2.9 s.",
+    "The largest single stage is the root file system at 2500 ms, followed by the kernel at 1400 ms and U-Boot at 900 ms. Attack the root file system first (defer non-critical services, use a smaller initramfs, start the application earlier), then U-Boot (remove wait delays, load a smaller image)."
+   ],
+   "answer": "Total boot time is 4900 ms (4.9 s); to reach 2 s you must cut 2900 ms (2.9 s), and the root file system stage is the first target.",
+   "check": "rom_ms = 20\nspl_ms = 80\nuboot_ms = 900\nkernel_ms = 1400\nrootfs_ms = 2500\ntotal_ms = rom_ms + spl_ms + uboot_ms + kernel_ms + rootfs_ms\ntarget_ms = 2000\ncut_ms = total_ms - target_ms\nprint(total_ms)\nprint(cut_ms)",
+   "values": [
+    4900,
+    2900
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Saying Linux cannot be used in embedded systems because it is not hard real-time. Most products need only soft real time; the real trap is promising a hard deadline on plain Linux.",
+  "Calling U-Boot the operating system. U-Boot is a bootloader that loads the kernel and then exits.",
+  "Treating zImage and uImage as different kernels. uImage is the same kernel plus a U-Boot header.",
+  "Forgetting that a kernel without a root file system and init cannot start the application.",
+  "Confusing initramfs with JFFS2 or UBIFS. initramfs lives in RAM; JFFS2 and UBIFS live on flash."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the five stages of the boot chain in order.",
+   "marks": 2,
+   "a": "On-chip ROM code, secondary loader (SPL), U-Boot, kernel (zImage), root file system and init, then the application."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the secondary loader run before U-Boot?",
+   "marks": 3,
+   "a": "U-Boot is too large to run before DRAM is available. The secondary loader fits in on-chip SRAM and sets up the DRAM controller so U-Boot can be loaded into DRAM."
+  },
+  {
+   "level": "apply",
+   "q": "A board takes ROM 30 ms, SPL 70 ms, U-Boot 800 ms, kernel 1200 ms and root file system 3000 ms. What is the total, and how much must be cut to reach 2.5 s?",
+   "marks": 4,
+   "a": "Total = 30 + 70 + 800 + 1200 + 3000 = 5100 ms. Target = 2500 ms. Cut = 5100 − 2500 = 2600 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A product needs a 1 ms hard deadline and 64 kB of RAM. Would you choose Embedded Linux or FreeRTOS, and why?",
+   "marks": 5,
+   "a": "Choose FreeRTOS. Linux needs megabytes of RAM and does not guarantee a 1 ms hard deadline on plain kernels. FreeRTOS gives a bounded priority scheduler on a small microcontroller."
+  },
+  {
+   "level": "remember",
+   "q": "What does configTICK_RATE_HZ set in FreeRTOS?",
+   "marks": 2,
+   "a": "It sets the tick frequency, the number of scheduler ticks per second, which is the time base for delays and timeouts."
+  },
+  {
+   "level": "understand",
+   "q": "How does a uImage differ from a zImage?",
+   "marks": 3,
+   "a": "A zImage is a compressed kernel. A uImage is that kernel wrapped in a U-Boot header with a load address and a checksum."
+  },
+  {
+   "level": "apply",
+   "q": "A root file system stage takes 3.0 s of a 5.1 s boot. Name two ways to cut that stage.",
+   "marks": 4,
+   "a": "Start the application before all services are up, and defer or remove non-critical services. A smaller initramfs or a faster storage device also helps."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, Linux products are built with Yocto or Buildroot, and the device tree is the standard way to describe board hardware to the kernel. Secure boot and A/B updates are common requirements for over-the-air firmware. Small RTOS choices now include Zephyr and NuttX as well as FreeRTOS, and certification evidence matters in medical and automotive work. Search for device tree, Yocto, secure boot and PREEMPT_RT latency."
+}

@@ -1,0 +1,175 @@
+{
+ "lead": "An embedded OS often runs on a fixed pool of RAM and no memory management unit (MMU), so memory management is less about virtual addresses and more about bounded use. The linker fixes where code and globals live; the stack and heap share the rest. A hard real-time task cannot wait while a general heap walks a long free list. The practical tools are a clear memory map, fixed-size block pools, small-heap first-fit or best-fit, and stacks that are sized and guarded. These tools appear in motor-control loops, sensor nodes, and automotive ECUs.",
+ "prereq": "You need: Unit 1 on ROM, flash, SRAM and DRAM; and <a href=\"#os-basics-kernel-kernel-space-and-user-space\">5.1</a> on kernel space.",
+ "sections": [
+  {
+   "h3": "Memory map and static allocation",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A microcontroller memory map starts at low addresses in flash. The vector table holds reset and interrupt addresses, then text (code) and rodata (constants and strings). RAM holds .data (initialised globals and static variables), .bss (zero-initialised globals), the heap, free RAM, and the stack at the top. The heap grows up; the stack grows down. The linker script fixes these regions at build time."
+    },
+    {
+     "type": "p",
+     "text": "Static allocation reserves memory when the program is linked. A global array, a task control block, or a message-queue buffer has a size known at build time. There is no allocator call at run time, no fragmentation, and the worst-case memory use is visible in the map file. The cost is fixed capacity: if a queue is full, the design must block, drop, or overwrite according to policy."
+    },
+    {
+     "type": "p",
+     "text": "Dynamic allocation takes memory from a heap at run time. It helps when message sizes vary or when objects appear and disappear. A general malloc keeps a free list, splits blocks, and coalesces neighbours. Its run time depends on the list length, and its worst case can be unbounded. In a hard real-time loop, a task that calls malloc may miss its deadline. It can also fail after long uptime because of fragmentation."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Static: size fixed at link time, allocator time zero, no fragmentation.",
+      "Dynamic: size chosen at run time, allocator time variable, fragmentation possible."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Fixed pools, first-fit and best-fit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A fixed-size block pool divides a RAM region into N blocks of B bytes. A free list or bitmap records which blocks are free. Allocation takes one free block; free returns it. Every request is rounded up to B bytes, so a 100-byte request from 128-byte blocks uses 128 bytes. The unused 28 bytes are internal fragmentation. There is no external fragmentation because all blocks are the same size."
+    },
+    {
+     "type": "p",
+     "text": "On a small variable-size heap, first-fit scans from the start and takes the first free block large enough. It is fast but may leave large blocks at the end. Best-fit scans the whole free list and takes the smallest adequate block. It reduces immediate waste but is slower and can leave tiny holes. Both can suffer external fragmentation: enough total free memory exists, but no single gap is large enough."
+    },
+    {
+     "type": "p",
+     "text": "Allocator timing matters as much as space. A fixed pool has O(1) allocation and free. First-fit is O(k) in the number of free blocks before the chosen block; best-fit is O(k) over all free blocks. A two-level allocator such as TLSF (two-level segregated fit) keeps a bitmap of size classes and gives bounded behaviour; only a few syllabi teach its bitmaps. For most exam answers, state that fixed pools are bounded and general heaps are not."
+    }
+   ]
+  },
+  {
+   "h3": "Stacks, protection and leaks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Each task owns a stack. Size it from the worst-case call chain, local arrays, saved context, and the deepest interrupt service routine (ISR) nesting. If interrupts use the current task stack, add the largest ISR frame plus any nested ISRs. If the CPU has a separate interrupt stack, size that separately. Stack painting writes a known pattern at start-up; the high-water mark shows peak use."
+    },
+    {
+     "type": "p",
+     "text": "A canary is a magic word at the stack boundary, checked by the kernel on each switch. If it changes, the task overflowed. A guard region is an unmapped or memory-protection-unit (MPU) protected area next to the stack; a write there faults immediately. Canaries are cheap but detect after the write; guard regions catch sooner and cost MPU regions."
+    },
+    {
+     "type": "p",
+     "text": "An MPU gives a few protection regions with base, size, and access permissions. It does not translate addresses and has no demand paging. An MMU translates virtual addresses to physical addresses and enables isolation and demand paging. Demand paging can trigger a page fault and a flash or disk read, so its worst-case latency is large and variable. A hard RTOS either disables paging, pins pages, or avoids an MMU. Only a few syllabi teach MPU region programming in detail."
+    },
+    {
+     "type": "p",
+     "text": "A leak is an allocation that is never freed. Reference counting frees an object when its count reaches zero; cycles need a cycle collector or manual breaking. In long-running embedded devices, leaks show as slowly falling free memory and eventual allocation failure."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The heap grows upward into free RAM while the stack grows downward from the top. Notice the free gap that both consume.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "Flash",
+     "note": "vectors, code, constants",
+     "style": "normal"
+    },
+    {
+     "label": ".data and .bss",
+     "note": "globals, static",
+     "style": "accent"
+    },
+    {
+     "label": "Heap",
+     "note": "grows up",
+     "style": "live"
+    },
+    {
+     "label": "Free RAM",
+     "style": "muted"
+    },
+    {
+     "label": "Stack",
+     "note": "grows down",
+     "style": "next"
+    }
+   ],
+   "side": {
+    "top": "low address",
+    "bottom": "high address"
+   },
+   "aria": "Memory map from low to high address: flash holding vectors and code, then data and bss in RAM, the heap growing upwards, free RAM, and the stack growing downwards from the top."
+  }
+ },
+ "examples": [
+  {
+   "question": "A fixed-pool allocator has 8 blocks of 128 bytes. Four tasks request 100, 40, 90 and 60 bytes in that order, and each request is rounded up to a whole block. (a) How many blocks are used? (b) How many bytes are allocated in total? (c) What percentage of the allocated space is wasted?",
+   "steps": [
+    "Each request is ≤ 128 bytes and > 0, so after rounding each needs exactly 1 block.",
+    "Blocks used = 4 requests × 1 block = 4 blocks (out of 8).",
+    "Allocated bytes = 4 blocks × 128 bytes/block = 512 bytes.",
+    "Requested bytes = 100 + 40 + 90 + 60 = 290 bytes.",
+    "Wasted bytes = 512 − 290 = 222 bytes (internal fragmentation).",
+    "Waste percentage = (222 ÷ 512) × 100 = 43.359375% ≈ 43.36%."
+   ],
+   "answer": "4 blocks are used, 512 bytes are allocated, 222 bytes are wasted, and 43.36% of the allocated space is wasted.",
+   "check": "requests = [100, 40, 90, 60]\nblock = 128\nblocks = len(requests)\ntotal = blocks * block\nwaste = total - sum(requests)\npct = round(waste / total * 100, 2)\nprint(blocks)\nprint(total)\nprint(waste)\nprint(pct)",
+   "values": [
+    4,
+    512,
+    222,
+    43.36
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Do not assume malloc is constant-time. A general heap may walk a free list, so its worst case is unbounded; real-time code uses fixed-size pools.",
+  "Internal fragmentation is waste inside an allocated block; external fragmentation is free gaps between allocated blocks. A pool has internal waste but no external fragmentation.",
+  "Stack sizing must include ISR frames and nested interrupts. A task stack that fits normal calls can still overflow on an interrupt.",
+  "An MPU is not an MMU. An MPU checks permissions on physical regions; an MMU translates virtual to physical addresses and can page.",
+  "A canary detects overflow only when the kernel checks it; a guard region faults on the write. Do not claim a canary prevents the overwrite."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Define internal fragmentation and external fragmentation in an embedded allocator.",
+   "marks": 2,
+   "a": "Internal: unused bytes inside an allocated block because the request is rounded up. External: free memory split into gaps between allocated blocks, so no single gap fits a request."
+  },
+  {
+   "level": "understand",
+   "q": "Why is a general malloc a poor fit for a hard real-time task?",
+   "marks": 3,
+   "a": "Its run time depends on free-list length and can be unbounded; it may split and coalesce blocks; it can fail from fragmentation. A hard task needs a bounded worst-case allocation time."
+  },
+  {
+   "level": "apply",
+   "q": "A fixed pool has 6 blocks of 64 bytes. Five requests of 50, 20, 60, 10 and 30 bytes arrive. Each uses one block. Find blocks used, total allocated bytes, wasted bytes and waste percentage.",
+   "marks": 4,
+   "a": "Each request ≤ 64 bytes, so blocks used = 5. Allocated = 5 × 64 = 320 bytes. Requested = 50+20+60+10+30 = 170 bytes. Waste = 320−170 = 150 bytes. Percentage = 150÷320×100 = 46.875% ≈ 46.88%."
+  },
+  {
+   "level": "analyze",
+   "q": "Compare a stack canary and a stack guard region for overflow detection.",
+   "marks": 4,
+   "a": "Canary: magic word checked at context switch; cheap; detects after the write. Guard: MPU-protected or unmapped page next to stack; faults on write; catches sooner; costs an MPU region or address space."
+  },
+  {
+   "level": "apply",
+   "q": "A free list has blocks of 32, 80 and 48 bytes. A 40-byte request arrives. Which block does first-fit choose, and which does best-fit choose?",
+   "marks": 4,
+   "a": "First-fit scans in order and picks the first block ≥ 40, the 80-byte block. Best-fit scans all and picks the smallest block ≥ 40, the 48-byte block."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain how demand paging affects worst-case response time in a real-time system.",
+   "marks": 5,
+   "a": "A demand-paged access can miss in the TLB/page table, trap to the kernel, and read the page from flash or disk. That latency is large and variable, so it can break a deadline. Hard RTOSes disable paging, pin pages, or use no MMU."
+  }
+ ],
+ "beyond": "Not for the exam. Production RTOSes often pair a fixed-block pool for messages with a TLSF heap for rarer variable-size requests; TLSF keeps allocation and free bounded with bitmaps. Safety standards ask for evidence of stack high-water marks and MPU region isolation. Search for TLSF, MPU region configuration, stack painting, and MISRA memory rules."
+}

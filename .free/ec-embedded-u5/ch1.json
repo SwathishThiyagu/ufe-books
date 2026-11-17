@@ -1,0 +1,259 @@
+{
+ "lead": "The kernel is the part of an operating system that is allowed to touch hardware. It decides which task runs next, hands out memory, passes messages between tasks, keeps timers and drives peripherals. Every other program, called a user task, must ask the kernel through a system call. That rule exists because one faulty task must not be able to overwrite another task's memory or reprogram a timer. The CPU enforces the rule with privilege levels. Many RTOSes offer this design. FreeRTOS's ARMv7-M MPU port lets tasks run unprivileged against a privileged kernel; Linux calls the two sides kernel space and user space.",
+ "prereq": "You need: Unit 2 (ARM modes, registers and stack pointers) and Unit 1 (hardware and software architecture of an embedded system).",
+ "sections": [
+  {
+   "h3": "What the kernel owns",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Five jobs belong to the kernel:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Scheduling: pick the next task from the ready queue (see <a href=\"#task-scheduling-round-robin-priority-rate-monotonic-edf\">5.4</a>).",
+      "Memory: hand out RAM blocks and, where the hardware allows, set protection.",
+      "Inter-task communication: semaphores, mutexes and queues (see <a href=\"#inter-task-communication-semaphores-mutexes-queues\">5.6</a>).",
+      "Time: the tick timer, software timers, delays.",
+      "Devices: drivers that write peripheral registers (see <a href=\"#device-drivers-and-board-support-packages\">5.7</a>)."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The words are not fixed. A bare scheduler does only the first job. An executive adds communication, timers and interrupt plumbing. A kernel adds memory protection and drivers. Datasheets use the names loosely, so read the feature list, not the label."
+    },
+    {
+     "type": "p",
+     "text": "Three layers sit on the board. Firmware is the code fixed to the hardware: bootloader, startup file, board support package. The OS is the kernel plus its libraries; the compiled kernel in flash, with its data, is the kernel image. The application is your tasks. In a build that enables the split, firmware and OS run privileged in kernel space and the application runs unprivileged in user space. Without that option every task runs privileged too, and the protection described in Section 3 is absent."
+    }
+   ]
+  },
+  {
+   "h3": "Privilege and the system call path",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ARM Cortex-M cores that implement the nPRIV bit, namely ARMv7-M and ARMv8-M (Cortex-M3, M4, M7, M23, M33), give the CPU two privilege levels. In thread mode, bit 0 (nPRIV) of the CONTROL register decides whether code runs privileged or unprivileged. Cores based on ARMv6-M, such as Cortex-M0 and Cortex-M0+, have no nPRIV bit: thread mode is always privileged, so they cannot run a user/kernel split. Handler mode, entered on any exception, is always privileged. A multitasking RTOS also splits the stacks: the main stack pointer (MSP) serves the kernel and handlers, the process stack pointer (PSP) serves each task (see <a href=\"#multitasking-multiprocessing-and-context-switching\">5.3</a>)."
+    },
+    {
+     "type": "p",
+     "text": "Unprivileged code cannot mask interrupts, cannot reach the interrupt controller, cannot select or write the main stack pointer, and cannot reach registers the MPU has fenced off. It can run instructions and touch its own memory."
+    },
+    {
+     "type": "p",
+     "text": "The gateway is one instruction, SVC (supervisor call; other CPUs call it a trap or a software interrupt)."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The task puts the call number and arguments in registers and executes SVC.",
+      "The CPU saves the context, switches to handler mode on the MSP, and runs the SVC handler from the vector table.",
+      "The handler reads the call number, checks the arguments, and calls the kernel function.",
+      "Exception return restores the task's context and drops back to unprivileged thread mode."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Kernel space is not a memory chip. It is a set of addresses plus a rule that only privileged code may use them. The same physical SRAM can be mapped into either space, and a user buffer can sit next to kernel data."
+    }
+   ]
+  },
+  {
+   "h3": "Monolithic, microkernel, and why small RTOSes keep the split",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A monolithic kernel puts every service in one privileged image: scheduler, drivers, file system, network stack. A call from one service to another is a plain function call, so it is fast. One bug in any service can take down the system."
+    },
+    {
+     "type": "p",
+     "text": "A microkernel keeps only scheduling, memory and message passing inside; drivers and file systems become user tasks that talk by messages. A driver crash is recoverable, and the kernel is small enough to test. The cost is two privilege changes and a message copy per service call."
+    },
+    {
+     "type": "p",
+     "text": "Most RTOSes are monolithic but tiny, so that argument rarely bites. The split still matters. An unprivileged task cannot disable interrupts or reprogram the tick timer, so a runaway loop cannot wreck the timing of other tasks. With an MPU (memory protection unit: a few region registers, no address translation) the kernel can also fence off its own RAM. Without an MMU or MPU the rule still holds for instructions, just not for memory. Only a few universities teach the MPU case in detail; it is the same idea at coarser granularity."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "A user task reaches the hardware only by crossing the boundary at the C library, where the SVC instruction hands control to the kernel; privilege rises as you go down the stack.",
+  "spec": {
+   "type": "stack",
+   "pyramid": false,
+   "items": [
+    {
+     "label": "User task",
+     "note": "unprivileged",
+     "style": "normal"
+    },
+    {
+     "label": "C library / syscall API",
+     "note": "SVC instruction",
+     "style": "next"
+    },
+    {
+     "label": "Kernel",
+     "note": "scheduler, drivers, IPC",
+     "style": "accent"
+    },
+    {
+     "label": "Hardware",
+     "note": "registers, memory",
+     "style": "muted"
+    }
+   ],
+   "side": {
+    "top": "less privilege",
+    "bottom": "more privilege"
+   },
+   "aria": "Four stacked layers from the user task at the top down to the hardware, with privilege increasing downwards and the system call boundary marked between the library and the kernel."
+  }
+ },
+ "examples": [
+  {
+   "question": "A user task on an ARM Cortex-M RTOS runs unprivileged in thread mode on the process stack pointer. It must send 10 bytes to a UART. The kernel's serial write accepts at most 4 bytes per system call, and the library splits the 10 bytes into chunks of at most 4 bytes. Trace the path up to the moment the last byte reaches the UART data register, and count the system calls, the privilege changes and the writes to the data register.",
+   "steps": [
+    "The task calls uart_write(buf, 10). This is an ordinary function call inside unprivileged thread mode: 0 privilege changes. Bytes still pending: 10.",
+    "The library cannot touch UART registers. It loads the call number and arguments into r0-r3 and executes SVC.",
+    "The CPU takes the exception, saves the context, enters handler mode on the MSP, and runs the SVC handler. Privilege change 1: up.",
+    "The handler calls the kernel serial write, which checks the buffer, copies min(10, 4) = 4 bytes into the kernel ring buffer, programs the UART control registers and returns.",
+    "Exception return restores the task on the PSP, unprivileged again. Privilege change 2: down. Bytes pending: 10 - 4 = 6.",
+    "Second system call: 4 more bytes accepted, 2 more privilege changes. Bytes pending: 6 - 4 = 2.",
+    "Third system call: 2 bytes accepted, 2 more privilege changes. Bytes pending: 0.",
+    "System calls: ceil(10 / 4) = 3. Privilege changes: 2 per call, so 2 x 3 = 6.",
+    "The kernel UART driver then writes 1 byte per transmit-empty interrupt: 4 + 4 + 2 = 10 writes to the UART data register."
+   ],
+   "answer": "3 system calls, 6 privilege changes (up and down for each call), and 10 writes to the UART data register.",
+   "check": "n = 10\nchunk = 4\ncalls = (n + chunk - 1) // chunk\nchanges = 2 * calls\nwrites = n\nprint(calls)\nprint(changes)\nprint(writes)",
+   "values": [
+    3,
+    6,
+    10
+   ],
+   "dry_run": {
+    "head": [
+     "call",
+     "bytes accepted",
+     "bytes pending",
+     "privilege changes so far"
+    ],
+    "rows": [
+     [
+      "1",
+      "4",
+      "6",
+      "2"
+     ],
+     [
+      "2",
+      "4",
+      "2",
+      "4"
+     ],
+     [
+      "3",
+      "2",
+      "0",
+      "6"
+     ]
+    ]
+   },
+   "output": ""
+  },
+  {
+   "question": "A task sends 22 bytes through the same kernel, which accepts at most 8 bytes per system call. How many system calls and how many privilege changes?",
+   "steps": [
+    "Bytes per call: 8. Total bytes: 22.",
+    "System calls: ceil(22 / 8) = ceil(2.75) = 3.",
+    "Bytes accepted: 8 + 8 + 6 = 22.",
+    "Privilege changes: 2 x 3 = 6."
+   ],
+   "answer": "3 system calls and 6 privilege changes.",
+   "check": "print((22 + 8 - 1) // 8)\nprint(2 * ((22 + 8 - 1) // 8))",
+   "values": [
+    3,
+    6
+   ],
+   "dry_run": {
+    "head": [
+     "call",
+     "bytes accepted",
+     "bytes pending"
+    ],
+    "rows": [
+     [
+      "1",
+      "8",
+      "14"
+     ],
+     [
+      "2",
+      "8",
+      "6"
+     ],
+     [
+      "3",
+      "6",
+      "0"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Saying kernel space is \"where the kernel is stored in flash\". It is an address range plus a privilege rule; the same physical RAM can be mapped into either space.",
+  "Assuming every embedded OS has an MMU. Many have only an MPU, and some have neither; the privilege split still works for instructions.",
+  "Confusing SVC (a request from a task, executed in thread mode) with an interrupt (raised by hardware, handled in handler mode). Both enter handler mode, but only SVC is a system call.",
+  "Thinking a normal function call to a driver changes mode. Only the trap instruction does; the library function on this side of it runs unprivileged.",
+  "Mixing up kernel, executive and scheduler. A bare scheduler does only the next-task choice; the other two names promise more."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the five jobs of a kernel.",
+   "marks": 2,
+   "a": "Scheduling, memory management, inter-task communication, timers, device drivers."
+  },
+  {
+   "level": "remember",
+   "q": "Which ARM Cortex-M mode is always privileged, and which register bit controls privilege in thread mode?",
+   "marks": 2,
+   "a": "Handler mode is always privileged. Bit 0 of the CONTROL register selects privileged or unprivileged thread mode."
+  },
+  {
+   "level": "understand",
+   "q": "Why must a user task use SVC instead of writing the UART data register directly?",
+   "marks": 3,
+   "a": "The UART register sits in a region the hardware marks as privileged-only. An unprivileged store would fault. SVC switches the CPU to handler mode, where the kernel checks the arguments and performs the write on the task's behalf, so a faulty task cannot corrupt the peripheral."
+  },
+  {
+   "level": "understand",
+   "q": "Give the correct definition of kernel space.",
+   "marks": 3,
+   "a": "A range of addresses together with a permission: only code running in a privileged CPU mode may access it. It is not a separate memory device, and physical RAM can be mapped into it or into user space."
+  },
+  {
+   "level": "apply",
+   "q": "A task writes 22 bytes; the kernel accepts at most 8 bytes per system call. Find the number of system calls and privilege changes.",
+   "marks": 4,
+   "a": "ceil(22/8) = 3 calls. Each call costs one privilege change up (into the kernel) and one change down (back to the task), so 2 x 3 = 6 privilege changes. Bytes: 8 + 8 + 6."
+  },
+  {
+   "level": "analyze",
+   "q": "A driver is moved out of a monolithic kernel and made a user task in a microkernel. State two costs and one benefit.",
+   "marks": 5,
+   "a": "Costs: each service request now costs two privilege changes plus a message copy, so latency and CPU load rise, and the worst case is harder to bound. Benefit: a fault in the driver kills only that task; the kernel restarts it and the rest of the system keeps running."
+  },
+  {
+   "level": "analyze",
+   "q": "An RTOS that has a user/kernel split runs on a Cortex-M3 (or M4) with no MPU and no MMU. Does the split still buy anything? Justify your answer.",
+   "marks": 4,
+   "a": "Yes, for instructions. Unprivileged code cannot mask interrupts, cannot reach the interrupt controller, cannot select or write the main stack pointer, and cannot execute privileged instructions, so PRIMASK and the MSP stay out of reach and the task cannot stall the scheduler or wreck timing. It does not buy memory protection: a wild pointer in a task can still corrupt kernel RAM, because no region checks exist."
+  }
+ ],
+ "beyond": "Not for the exam. Industry splits further: ARMv8-M TrustZone carves a secure world from a non-secure world, and AUTOSAR OS uses the MPU to isolate OS applications inside automotive ECUs. Research kernels such as seL4 are verified down to machine code, and hypervisors run several kernels side by side on one SoC. Zephyr and FreeRTOS both offer optional userspace threads backed by MPU regions. Search for \"MPU region configuration\", \"mixed-criticality partitioning\" and \"seL4 verification\"."
+}

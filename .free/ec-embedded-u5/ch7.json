@@ -1,0 +1,229 @@
+{
+ "lead": "A device driver is the small kernel layer that turns a peripheral's registers into ordinary calls such as open, read and write. A board support package (BSP) is the matching board layer that sets clocks, memory map, console and timer so one operating system can boot on one board. Drivers hide hardware detail from applications; BSPs hide board detail from the kernel. You meet both in every phone, router, car ECU and UPI terminal that runs an embedded OS.",
+ "prereq": "You need: <a href=\"#os-basics-kernel-kernel-space-and-user-space\">5.1</a> for kernel space, Unit 3 for interrupts, DMA and timers, and Unit 4 for SPI, I2C and CAN.",
+ "sections": [
+  {
+   "h3": "Driver skeleton and driver classes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A driver is kernel code. The application calls <code>read()</code>; the kernel routes the call to the driver that owns the device. The driver's init routine runs at boot: it probes the hardware, maps registers, requests the interrupt line and sets control bits. <code>open()</code> and <code>close()</code> track use, <code>read()</code> and <code>write()</code> move data, input/output control (<code>ioctl()</code>) handles odd controls, and the interrupt service routine (ISR) runs when the device signals."
+    },
+    {
+     "type": "p",
+     "text": "Registers are memory-mapped: each appears at a fixed address. A C pointer to a register must be <code>volatile</code>, so the compiler reads the hardware again instead of reusing an old value. The pointer also needs the correct width: an 8-bit register must not be read as 32 bits."
+    },
+    {
+     "type": "p",
+     "text": "Drivers fall into three classes. A character driver moves a byte stream and supports read/write, as for a UART or ADC. A block driver moves fixed-size blocks and keeps a cache, as for flash or an SD card. A network driver moves packets and does not use read/write files, as for Ethernet. Bus drivers for I2C and SPI carry addresses and data bytes, and CAN drivers carry frames; the device driver above them turns those transfers into read, write and ioctl."
+    }
+   ]
+  },
+  {
+   "h3": "Polling, interrupts, DMA and the two halves",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Three methods move data. Polling has the CPU loop on a status bit; it is simple and has no interrupt latency, but it burns cycles. An interrupt lets the device signal the CPU; the CPU is free until the event. Direct memory access (DMA) lets a controller copy a block while the CPU does other work; the CPU sets up the transfer and takes one completion interrupt."
+    },
+    {
+     "type": "p",
+     "text": "The usual driver splits work into a fast top half and a deferred bottom half. The top-half ISR copies one sample, clears the interrupt flag and wakes a task. The bottom-half task converts, filters, logs or sends the sample. A ring buffer is a circular array with a write head and a read tail; the ISR writes at the head, the task reads at the tail."
+    },
+    {
+     "type": "formula",
+     "text": "f_cpu = t_transfer ÷ T_sample",
+     "where": "f_cpu is the fraction of CPU time used by transfers; t_transfer is the time to move one sample, in seconds; T_sample is the sample period, in seconds."
+    }
+   ]
+  },
+  {
+   "h3": "Memory device drivers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Flash memory reads like RAM but cannot be overwritten like RAM. A write can only clear bits from 1 to 0. To set bits back to 1, the driver must erase a whole erase block, often 4 KB or 64 KB. So an update is read-modify-erase-write, and the driver must keep a copy of the block in RAM. Erase blocks are large: changing one byte can cost one full erase. Flash cells wear out after a limited number of erase cycles, so a flash driver uses wear levelling: it moves logical blocks to different physical blocks so no single block is erased too often."
+    },
+    {
+     "type": "p",
+     "text": "EEPROM is byte-writable but slow. A page write loads a small page buffer, then the chip runs an internal write cycle, often about 5 ms. The driver must poll the acknowledge bit or wait before the next write. Writes that cross a page boundary wrap inside the page, so the driver splits them at page edges. A memory driver also reports erase-block size and page size upward, because the file system needs them."
+    }
+   ]
+  },
+  {
+   "h3": "What a BSP contains",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A board support package (BSP) is the code that makes one OS run on one board. It contains the boot code that runs first, clock and phase-locked loop (PLL) setup for the CPU and buses, a UART console for early messages, a timer tick for the scheduler, interrupt-controller setup, the memory map, a linker script that places code and data in memory, and board configuration such as pin multiplexing and bus speeds."
+    },
+    {
+     "type": "p",
+     "text": "BSP and driver split the work. The BSP says which UART exists, at which address, with which clock. The UART driver then implements open, read, write and the ISR using those facts. A new board with the same chip usually needs a new BSP, not a new driver."
+    },
+    {
+     "type": "p",
+     "text": "Some systems describe hardware in a device tree: a data file that lists devices, addresses and interrupts, so one kernel image can boot on several boards. Only a few universities teach them; for this chapter, treat a device tree as a board description read at boot. The bootloader and kernel image build belong to <a href=\"#embedded-linux-bootloaders-and-freertos\">5.9</a>."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "An application read reaches the ADC through the driver interface and ring buffer; the dashed return line is the device interrupt that fills the buffer.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Driver data path",
+   "nodes": [
+    {
+     "id": "app",
+     "label": "Application read()",
+     "style": "normal"
+    },
+    {
+     "id": "api",
+     "label": "Driver interface",
+     "note": "open, read, write",
+     "style": "accent"
+    },
+    {
+     "id": "buf",
+     "label": "ISR and ring buffer",
+     "note": "64 samples; top half",
+     "style": "live"
+    },
+    {
+     "id": "reg",
+     "label": "Peripheral registers",
+     "style": "normal"
+    },
+    {
+     "id": "dev",
+     "label": "ADC device",
+     "note": "on SPI bus",
+     "style": "muted"
+    }
+   ],
+   "edges": [
+    {
+     "from": "app",
+     "to": "api",
+     "style": "solid"
+    },
+    {
+     "from": "api",
+     "to": "buf",
+     "style": "solid"
+    },
+    {
+     "from": "buf",
+     "to": "reg",
+     "style": "solid"
+    },
+    {
+     "from": "reg",
+     "to": "dev",
+     "style": "solid"
+    },
+    {
+     "from": "dev",
+     "to": "buf",
+     "label": "interrupt",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Layered path from an application read call through the driver interface and ring buffer down to the ADC registers, with a dashed interrupt line returning from the device to the buffer."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 12-bit ADC sits on an SPI bus and must be sampled once every 1 ms. Each sample is sent as a 16-bit SPI frame, and the SPI clock is 1 MHz. The driver uses a 64-sample ring buffer filled by the ISR, and a task drains it. (a) If the task stalls, how much slack does the CPU have before the buffer overflows? (b) What fraction of CPU time does the SPI transfer take, to the nearest 0.1%?",
+   "steps": [
+    "Sample period T_sample = 1 ms = 0.001 s. One sample arrives per period.",
+    "Ring-buffer capacity N = 64 samples. Time to fill it from empty = N × T_sample = 64 × 1 ms = 64 ms.",
+    "SPI frame size B = 16 bits. SPI clock f_SPI = 1 MHz = 1,000,000 bits/s.",
+    "Transfer time t_transfer = B ÷ f_SPI = 16 ÷ 1,000,000 s = 16 × 10⁻⁶ s = 16 µs.",
+    "CPU fraction f_cpu = t_transfer ÷ T_sample = 16 µs ÷ 1000 µs = 0.016.",
+    "Percentage = 0.016 × 100% = 1.6%. To the nearest 0.1%, this is 1.6%."
+   ],
+   "answer": "The slack is 64 ms and the SPI transfer uses 1.6% of CPU time.",
+   "check": "buffer_samples = 64\nsample_period_ms = 1.0\nslack_ms = buffer_samples * sample_period_ms\nprint(slack_ms)\nframe_bits = 16\nspi_clock_hz = 1_000_000\nsample_period_s = 0.001\ntransfer_s = frame_bits / spi_clock_hz\npercent = 100 * transfer_s / sample_period_s\nprint(round(percent, 1))",
+   "values": [
+    64.0,
+    1.6
+   ],
+   "dry_run": {
+    "head": [
+     "sample",
+     "time_ms",
+     "buffer_count"
+    ],
+    "rows": [
+     [
+      "1",
+      "1",
+      "1"
+     ],
+     [
+      "2",
+      "2",
+      "2"
+     ],
+     [
+      "64",
+      "64",
+      "64"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "A register pointer without volatile lets the compiler cache the first read; the driver then loops forever on a stale status bit.",
+  "Long work in the top half, such as printing to a UART or converting a full buffer, blocks lower-priority interrupts and breaks the latency budget.",
+  "DMA removes CPU copying, not the need for a completion interrupt or correct cache handling; a stale cache line can deliver old data.",
+  "Flash is erased in blocks, not bytes; writing without erase gives ANDed data, not new data.",
+  "A BSP is board-specific; a driver is device-specific. Replacing the board can require a new BSP while the driver stays."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the six usual file entry points of a driver and one job of each.",
+   "marks": 2,
+   "a": "init probes and maps; open tracks use; close releases; read moves data in; write moves data out; ioctl handles controls. The ISR is not a file entry point: it is the interrupt handler that the kernel calls when the device signals."
+  },
+  {
+   "level": "understand",
+   "q": "Why must a memory-mapped register pointer be volatile?",
+   "marks": 3,
+   "a": "The hardware can change the register between two C reads. Without volatile, the compiler may reuse a cached value and miss the change."
+  },
+  {
+   "level": "apply",
+   "q": "An 8-bit ADC is sampled every 500 µs into a 32-byte ring buffer by an ISR. How long before overflow if the draining task stops?",
+   "marks": 4,
+   "a": "32 samples × 0.5 ms = 16 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "An ISR prints each sample to a 115200-baud UART. Give two failures.",
+   "marks": 4,
+   "a": "The ISR runs too long and blocks lower-priority interrupts. UART printing is slow, so samples are delayed or lost and deadlines slip."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between a character driver and a block driver.",
+   "marks": 3,
+   "a": "A character driver moves a byte stream with read/write; a block driver moves fixed-size blocks and keeps a cache."
+  },
+  {
+   "level": "analyze",
+   "q": "A new board uses the same SoC and UART but a different input clock. What changes: BSP or UART driver?",
+   "marks": 4,
+   "a": "The BSP changes its clock and PLL setup and passes the new clock rate. The UART driver can stay if it is parameterised."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, BSP work is often the first task on a new board: clock trees, pin multiplexing, power rails and console. Linux uses a driver model with platform devices and device trees; Zephyr and FreeRTOS use board directories and devicetree overlays. Search for 'Linux platform driver', 'Zephyr board porting', 'flash wear levelling' and 'device tree bindings'."
+}
