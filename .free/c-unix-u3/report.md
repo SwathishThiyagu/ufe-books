@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/c-unix-u3/tree/books/cse/c-unix/c-unix-u3.html`
 - Status: ok
-- Model calls so far: 35 (130,769 tokens in, 229,075 out), 6.6 minutes
+- Model calls so far: 35 (130,769 tokens in, 229,075 out), 6.7 minutes
 
 ## Checker
 
 ```
-c-unix-u3.html: 8 chapters, 13530 words, 9 figures, 164 KB
+c-unix-u3.html: 8 chapters, 13535 words, 9 figures, 164 KB
 OK
 ```
 
