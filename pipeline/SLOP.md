@@ -858,3 +858,64 @@ Count: 3 must fix, 18 should fix, 8 cosmetic (29 lines). Patterns: three wrong f
 convention; a dropped "for every p" in a pumping proof; figures that quietly switch machines (u1-L1, u1-L2) or leave a
 complete DFA incomplete (u2-L4); "book" wording (3 agendas, 8 lessons spoken, 21 sources lines), unit numbers in 5 outros
 plus one site line, spoken Bloom levels in 2 lessons, and _ / ^ maths in 6 lessons.
+
+## Software Engineering (18 Nov)
+
+Audited 18 Nov 2026: all 23 lessons in B.Tech/CSE/Software Engineering/html (u1 L1–L3, u2–u6 L1–L4), every scene's
+narration and the rendered last frame of each scene (dumped at 0.995), plus lesson_sheet.py sheets at 0.92 for all 23, with
+re-renders at 0.995 for every sheet that looked cut (the four recap pills below stay cut at 0.995; the u6-L3 and u5-L2
+values that looked blank render at 0.995). Checker: 0 page errors, 0 cue failures, 0 text outside the safe area on every
+sheet. Recomputed every worked example, model answer and trap: basic COCOMO (10 KLOC organic E = 26.93 pm, D = 8.74 months,
+3.08 staff; 5 KLOC E = 13.0, D = 6.63), CPM (14 days, slack C and E 4) and PERT (5), cyclomatic complexity (V(G) 3 and 5,
+basis paths and their inputs), boundary values, loop tests, GST ₹180, availability (99.9 % = 8.76 h, 99.95 % = 4.38 h, 99.01 %,
+90.9 %), MTBF 625 and 500 h, DRE, leakage and defect density, break-even 15 runs, test-plan cycles 15.8/23.8/17.9 days,
+release report rates, pipeline 41/26/22 min, merge to 26 lines, incremental build 9.23×, Ansible 36/0 changes, risk
+exposures, inspection rate 200 lines/h and 83.33 %, re-engineering payback 0.9375 years, QFD 60/44, DFD 12/19, feasibility
+(₹3,60,000, ₹1,52,000, ₹2,08,000, 2.88 years), workshop 1080 and 77.78 %, communication paths 10/28/15/45, velocity
+4 sprints, semantic versions, and UML notation (composition's filled diamond at Account, multiplicities, aggregation vs
+composition): all correct except the lines below. Not slop: "book" as a verb ("book a ticket") or library books in
+examples, "ticket site", "the developer's site" / "the user's site" (alpha and beta testing), "a standards book"
+(Pressman's myth). No site/finder line and no college names. None of the 23 is on YouTube (pipeline.json live: false,
+upload_sheet publish fields empty).
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-se-u5-L2 | notebook (11), calc (14), bookfig (15) | execution progress "executed 1140 of 1200 = 95%" counts the 60 blocked cases (900 passed + 180 failed + 60 blocked = 1140) as executed, while the same notebook says a blocked case "could not run"; executed is 1080, progress 90% (or change the counts) | wrong fact: must fix
+c-se-u4-L4 | hookArt (0); bookfig (4), calc (6, 7) | hook says 10,000 users on the ticket site makes each page take 8 s; the lesson's own graph gives 2.8 s at 10,000 users (the 3 s target holds to about 10,714) | misleading: should fix
+c-se-u2-L2 | pa (16) | "verification works on the code [the built system]; validation works on the document" reverses u4-L1 (11, 12, outro): verification is static review of documents and code, validation runs the product | misleading: should fix
+c-se-u3-L4 | trap2 (10), pa (23) | numbering the messages on a sequence diagram is called a non-standard, mark-losing error; UML allows sequence numbers there (optional, redundant with the time axis). Only the "time axis on a collaboration diagram" half is wrong | misleading: should fix
+c-se-u3-L2 | notebook (14) | "a class adapter needs multiple inheritance, so it is not possible in Java": Java does it when Target is an interface (class Adapter extends Adaptee implements Target) | misleading: should fix
+c-se-u6-L3 | pa (23) | answer and board use "a ten person-week impact" ("1.2, I = 10 pw") for a risk the question gives only as exposure 1.2; P would be 0.12, never shown, and no risk in the lesson has P 0.12 | misleading: should fix
+c-se-u5-L4 | calc (13), bookfig (14) | host 9 is down (unreachable) but the recap reads "11 ok, 1 failed"; Ansible's PLAY RECAP counts it as unreachable=1, failed=0 | misleading: should fix
+c-se-u4-L2 | bookfig (15, 16), calc (18) | the Invoice stub returns ₹1,180 (₹1,000 plus the 18% GST just computed) and GST is charged on it again (₹212.40, total ₹1,392.40) while the narration says "the total comes out right": reads as double taxation | misleading: should fix
+c-se-u2-L4 | bookfig (3) | narration "the arrows are named data flows, each carrying a noun" over a level-1 DFD whose arrows carry no names (only "confirmation"); the lesson's own trap says unnamed flows lose marks | misleading: should fix
+c-se-u1-L1, u3-L1, u3-L2, u3-L3, u4-L3, u6-L3, u6-L4 | agenda (1) | "Chapters x to y of your book" on the agenda card | should fix
+c-se-u2-L4, u3-L1, u4-L3, u6-L1, u6-L4 | bookfig (u2-L4 3, 10; u3-L1 3, 10; u4-L3 3; u6-L1 3, 9; u6-L4 9) | spoken "the book's …": "Here is the book's level one diagram", "In the book's hostel mess", "Here's the book's ticket site", "In the book's figure", "the book's system test", "the book's hostel mess app", "The book's figure", "The book's payroll system" (8 lines) | should fix
+c-se-u1-L3, u2-L4, u3-L4, u4-L4, u5-L4 | outro (28, 22, 25, 24, 24) | "Next time, Unit two/three/four/five/six…" spoken; "NEXT UNIT · Unit N" card | should fix
+c-se-u1-L1, u1-L2, u2-L2, u3-L3, u4-L1, u4-L4, u5-L2, u5-L4, u6-L2, u6-L3 | pq (three per lesson: u1-L1 18/20/22, u1-L2 16/18/20, u2-L2 15/17/19, u3-L3 18/20/22, u4-L1 20/22/24, u4-L4 17/19/21, u5-L2 19/21/23, u5-L4 17/19/21, u6-L2 19/21/23, u6-L3 18/20/22) | spoken Bloom levels: "An understand question", "Question two, apply" / "at the apply level", "Question three, analyze" (30 lines) | should fix
+all 23 lessons | META | META.subject is "biotech" | should fix
+all 23 lessons | figs | "Sources the book draws on: …" on screen | cosmetic: later
+all 23 lessons | kicker, pq cards (engine) | kicker "UNIT n · LESSON k OF K" and "QUESTION n · UNDERSTAND/APPLY/ANALYZE" labels (open question D) | cosmetic: later
+c-se-u1-L2, u4-L4, u5-L2, u5-L4, u6-L2 | agenda (1); bookfig (u1-L2 7, u2-L1 13, u3-L3 12, u5-L1 5, 10, u5-L2 7, 15, u5-L3 4, u5-L4 4, 7, 14, u6-L2 7) | "of your notes" / spoken "Your notes draw it…" without "free" | cosmetic: later
+c-se-u6-L4 | outro (26) | "COURSE COMPLETE · Units 1 to 6" card | cosmetic: later
+c-se-u1-L2, u3-L3, u4-L2, u4-L3 | outro (23, 25, 28, 23) | next-lesson card cut at a comma: "Waterfall, incremental, spiral · Agile"; "UML interaction diagrams · UML state chart" (3.8 also has activity, component, deployment); "System testing · Regression testing" vs narration "system testing, acceptance testing and debugging"; "Performance · Testing object-oriented" | cosmetic: later
+c-se-u5-L2 | calc (13, 14), trap2 (17), pa (22) | underscore subscripts "D_pre", "D_post" on screen outside code (no caret maths in this subject) | cosmetic: later
+c-se-u1-L2 | hookArt (0) | filler "a whole journey" | cosmetic: later
+c-se-u3-L1, u4-L4; u5-L4, u6-L4 | hookArt (0) | repeated hooks: two "crowd on the ticket site" openers; two "the Friday release breaks production" openers; u2-L1 and u4-L4 share the "Long enough to …" joke shape | cosmetic: later
+c-se-u3-L1, u5-L4, u5-L2, u2-L2, u6-L3, u4-L1, u6-L1 | recap (16, 16, 18, 14, 17, 19, 14) | stock or generic recap icons: stopwatch for "99.9 % up allows 8.76 h"; refresh arrow (Declare the state) and stopwatch (The numbers); clock (Break-even) and gauge (Metrics); refresh arrow with tick (Change control); shield and lightning (Risk management); gear and magnifier (QA vs QC); generic list and bar chart (Management spectrum, Metrics) | cosmetic: later
+c-se-u4-L4, u3-L4, u5-L3 | recap (16, 17, 17) | tiny or faint recap pictures: Platforms tree (u4-L4), Interaction and Physical (u3-L4), Delivery pipeline boxes (u5-L3) | cosmetic: later
+c-se-u5-L4, u6-L1, u2-L1, u5-L3 | recap (16, 14, 16, 17) | header pill overflows its card at 0.995: "DECLARE THE STATE" crosses into the next card, "Management Spectrum" runs past its card, "What, how well" clipped at the pill edge, "Continuous integration" touches the card edge | cosmetic: later
+c-se-u6-L1 | recap (14) | "EV 15%" for effort variance; EV normally means earned value | cosmetic: later
+c-se-u1-L3, u2-L1, u3-L3, u3-L2, u1-L2 | bookfig (u1-L3 15, 16; u2-L1 5; u3-L3 4; u3-L2 15; u1-L2 7) | split or thin figures: failure-cause boxes cut at the bottom edge (u1-L3 15) and orphaned on a mostly empty stage (16); one box on an empty stage (u2-L1 5); thin strip with cut card tops (u3-L3 4); facade arrow points to nothing (u3-L2 15); deploy box "10" squeezed with its label outside (u1-L2 7) | cosmetic: later
+c-se-u3-L3 | pa (23) | eight same-looking buttons called a consistency break; it is a missing visual hierarchy (the buttons are consistent) | cosmetic: later
+c-se-u4-L1 | trap2 (9) | "wrong interest at run time" while the example is a withdrawal check (amt < bal) | cosmetic: later
+c-se-u6-L2 | bookfig (8) | "26.9 × ₹80,000 = ₹21,54,240": 26.9 × 80,000 = 21,52,000; 21,54,240 uses the unrounded 26.928 | cosmetic: later
+c-se-u5-L4 | pa (20) | board label "Link and package = 160 s" is the total (3 × 45 s… = 160 s), not link and package | cosmetic: later
+c-se-u4-L1 | pa (25) | chapter reference "new inputs (4.4)" on screen | cosmetic: later
+c-se-u3-L1 | bookfig (3) | "up: 99.9 % of 365 × 24 = 8760 h" reads as if uptime were 8760 h | cosmetic: later
+
+Count: 1 must fix, 13 should fix (8 misleading facts, 5 template lines), 21 cosmetic (35 lines). Patterns: one wrong number
+(blocked cases counted as executed), contradictions inside a lesson or between lessons (u4-L4 hook vs its graph, u2-L2 vs
+u4-L1 on verification and validation, u2-L4 narration vs its own DFD), dated or overstated rules (sequence numbers, Java
+class adapter), "book" wording (7 agendas, 8 spoken lines in 5 lessons, 23 sources lines), unit numbers in 5 outros, spoken
+Bloom levels in 10 lessons (30 lines), and recap pills too long for their cards.
