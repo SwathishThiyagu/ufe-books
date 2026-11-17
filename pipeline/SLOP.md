@@ -389,3 +389,54 @@ spoken Bloom, stock recap icons, generator lines on every lesson). New here: dat
 miners, uncles and PoW geth private nets in Ethereum; the pre-2010 joined-script model in Bitcoin), recap pictures that
 show a state the lesson says can't exist (stacks), a code snippet missing a declaration, one symbol (k) reused for two
 things, and a trap whose wrong answer isn't what the stated mistake produces.
+
+## Computer Graphics (17 Nov)
+
+Audited 17 Nov 2026: all 23 c-graphics lessons (06_Deliver/cse/c-graphics), every scene, narration and frame (sheets at
+0.92; the frames that looked cut off, u2-L4 L05, u4-L1 L11 and u6-L2 L11, re-rendered at 0.995: the first two were typing
+animations and render whole). Checker: 0 page errors, 0 cue failures, 0 text outside the safe area on every sheet. Every
+worked example and model answer recomputed (frame-buffer and data rates, dpi/ppi, Bresenham and midpoint-circle traces,
+scan-line spans, RGB→CMY→HSV, every 2D/3D matrix product, window-to-viewport, Cohen–Sutherland codes and Liang–Barsky u1/u2,
+Sutherland–Hodgman lists, perspective divide, cross-product plane, sphere expansion, blob field, Bezier/de Casteljau, knot
+counts, Phong sum, ray–sphere roots, raw media sizes, Huffman 224 bits, MP4/DVD sizes, motion-vector bits, skew, squash
+volume, tweens, morph, composite alpha, motion blur, link capacity, L1/precision/recall, jitter, segments, U and the RM
+bound, camera storage, LSB/PSNR). All 47 exam traps checked. Scene = 0-based SC index (the Lnn.png number).
+No filler word, site/finder line, college name, TODO, placeholder, "your book" or repeated non-template sentence found.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-graphics-u6-L4 | bookfig (3), calc (5), trap2 (6) | says "so RM fails" and "only EDF guarantees every deadline" for 4/10, 10/40, 5/20 (U = 0.90 > 0.7798). The periods 10, 20, 40 are harmonic, so RM schedules them up to U = 1 (response times 4, 9, 36 ms, all in time); above the Liu–Layland bound the test is only inconclusive. The trap's "Don't write: U ≤ 1, so RM meets every deadline" is true for this very task set | wrong fact: must fix
+c-graphics-u6-L3 | notebook (8), calc (9), recap (18) | a leaky bucket that "drains at one fixed rate" is given a burst: "largest release over 0.5 s = r × T + b = 1,008,000 bits, 2.016 Mbit/s, just above r". A fixed-rate leaky bucket releases at most r × T (1,000,000 bits); r × T + b is the token-bucket bound. Contradicts the lesson's own Q3 answer (24: a leaky bucket allows no burst) | wrong fact: must fix
+c-graphics-u1-L2 | bookfig (15), calc (17) | "The vertex shader scales each corner by two hundred, so the triangle lands at (0,0), (200,0), (0,200)": the shader outputs clip coordinates (−1 to 1); the move to window pixels is the fixed viewport transform after it | misleading: should fix
+c-graphics-u2-L1 | trap2 (13) | marks [1 0 0; 0 1 0; tx ty 1] as wrong ("W′ is no longer one, the point is distorted"). That is the right matrix in the row-vector convention (P′ = P·T) that many syllabus books use; say "with column vectors, P′ = T·P" | misleading: should fix
+c-graphics-u3-L3 | bookfig (15) | Figure 3.8.1: the eye ray meets the sphere head-on along its normal (d = (0,0,−1) at (0,0,−4)), yet the reflected ray is drawn leaving up-left and the refracted ray bending up-right; at normal incidence both go straight (back to the eye, and straight through) | misleading: should fix
+c-graphics-u5-L1 | pq (20), pa (21) | Q3 gives no data ("an equal-step line and a slow-in curve"), but the answer quotes y = x²/12 and "0.25 units from frame 1 to 2" from a graph the question never shows; also calls a slow start "slow-in" (the principle "slow in" means slowing into a pose; the lesson itself calls a slow start ease-in) | misleading: should fix
+c-graphics-u5-L3 | calc (11, 12) | hint "dpi is pixels per inch" contradicts u1-L1 Q1 (dpi = printer dots, ppi = image pixels); should say ppi | misleading: should fix
+c-graphics-u5-L3 | bookfig (10) | figure text "4 × 300 = 1200 × 1200 px" and "4 × 150 = 600 × 600 px": false equalities on screen | misleading: should fix
+c-graphics-u5-L4 | bookfig (3) | Figure 5.7.1 colours contradict the numbers: "blue fill (0, 0, 255)" drawn pale lavender, "background (200, 100, 50)" (orange-brown) drawn pale green; no swatch of the result (160, 80, 91) | misleading: should fix
+c-graphics-u6-L2 | bookfig (11) | narration "Unit six leads down to Notes", but Notes is not drawn: the arrow from Unit6 ends in empty space (Notes only appears on the next scene); still missing at 0.995 | misleading: should fix
+c-graphics-u6-L3 | trap2 (10) | "Don't write: Jitter = d max − d min": peak-to-peak delay variation is a standard jitter measure; the lesson's mean |d − d̄| is one definition. Say "here jitter means …; d max − d min is the spread" | misleading: should fix
+c-graphics-u1-L1, u1-L2, u2-L2, u2-L3, u4-L1, u4-L2, u4-L3, u4-L4, u6-L2, u6-L3, u6-L4 | pq (each lesson's three questions, e.g. u1-L1 17/19/21) | spoken Bloom levels: "An understand question", "Question two, apply", "at the apply level", "an analyze question" (33 lines in 11 lessons) | should fix
+c-graphics-u1-L4, u2-L4, u3-L3, u4-L4, u5-L4 | outro (23, 20, 27, 25, 25) | "Next time, Unit two/three/four/five/six" spoken; "NEXT UNIT, Unit N" card (book2lesson.py writes both) | should fix
+c-graphics-u4-L1, u5-L2 | outro (26, 22) | next-lesson card cut at a comma: "Multimedia hardware and software · Image" (chapter "Image, graphics and animation file formats"), "Authoring metaphors and tools · Painting" (book2lesson.py splits titles on [:;,]) | cosmetic
+c-graphics-u1-L1, u3-L1, u4-L3, u6-L4 | pq/pa (19, 20), notebook/calc (14, 16), pq/pa (20, 21), bookfig/calc (3, 5) | caret maths on screen: "1 MB = 10^6 bytes" (u1-L1, u4-L3), "e^(−d²)", "e^(−4)", "Σ e^(−|p − cᵢ|²)" (u3-L1), "3(2^(1/3) − 1)", "n(2^(1/n) − 1)" (u6-L4) | cosmetic
+c-graphics-u1-L1, u1-L2, u1-L4, u3-L1, u3-L2, u4-L1, u4-L2, u4-L3, u5-L2, u5-L3, u6-L3, u6-L4 | figs (second to last) | "Sources the book draws on: …" shown (the other 11 say "the notes") | cosmetic
+c-graphics-u4-L4 | recap (17) | stock pictures: plain film strip for Compression (no vector or residual), pale grey CD for MPEG family, clock for Sync | cosmetic
+c-graphics-u6-L4 | recap (17) | stock clock for "OS support", stock padlock for "Security" (the lesson has a CPU-share bar and LSB bits to draw) | cosmetic
+c-graphics-u6-L3 | recap (18) | "Four numbers" picture is two blank rectangles, a small clock and an X | cosmetic
+c-graphics-u6-L2 | recap (15) | tiny, faint pictures: two pale boxes for "Hypermedia links", three pale dots for "Two rules" | cosmetic
+c-graphics-u6-L1 | recap (17) | "Key numbers" picture is a small pale bar labelled "÷ (1 + o)" while the card says "rate × (1 + o)" | cosmetic
+c-graphics-u1-L3 | bookfig (9), calc (11, 12) | "seven pixels in the octant" counts (6, 5), which lies past y = x (the mirror of (5, 6)); the first octant is (0,8) to (5,6), six pixels | cosmetic
+c-graphics-u4-L2, u6-L3 | bookfig (4, 4) | figure split over two scenes leaves orphans: "× 7,200 s = 1.3824 GB" with its audio label on the other half (u4-L2); dashed lines leading to a play row drawn only three scenes later (u6-L3) | cosmetic
+c-graphics-u2-L4 | notebook (9) | "View matrix: eye at the origin, looking along +z" with no word that OpenGL looks along −z | cosmetic
+c-graphics-u2-L2, u3-L1, u5-L2, u5-L4 | bookfig (9), bookfig (13), bookfig (9), hookArt (0) | same joke twice: "elevator" (u2-L2, u3-L1), "before lunch" (u5-L2, u5-L4) | cosmetic
+all 23 (engine) | every scene header | "UNIT n · LESSON x OF y" shown on every page (decide whether the unit-number rule covers the header) | cosmetic
+all 23 (engine) | pq, pa | on-screen label "QUESTION n · UNDERSTAND / APPLY / ANALYZE" (decide whether the Bloom rule covers labels) | cosmetic
+
+Not slop (checked): "site" and "Unit6" in u6-L2 are the hypermedia example's own page names; "robust" in u6-L4 is the
+watermarking term; "elevator" is a joke, not filler. YouTube: pipeline.json has live: false for all six units and every
+publish field in upload_sheet.json is empty, so none of the 23 is on YouTube. Same patterns as the other subjects (book
+wording, unit numbers in outros, spoken Bloom, caret maths, stock and faint recap pictures). New here: a scheduling claim
+that ignores harmonic periods, a leaky bucket given the token bucket's formula, figures whose drawn geometry or colours
+contradict their own numbers, next-lesson titles cut at a comma by the generator, and convention-dependent traps (row vs
+column vectors, jitter definition) stated as absolute.
