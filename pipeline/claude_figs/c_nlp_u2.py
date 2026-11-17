@@ -243,6 +243,9 @@ def f8():
 FIG[8] = (f8, 'Gold BIO tags against the system\'s spans. Rao and TCS match exactly; the system\'s LOC span covers team in Pune where gold has only Pune, so one wrong boundary costs a false positive and a false negative, and P = R = F1 = 0.67.',
           'Nine tokens with their gold BIO tags; under them the system spans PER on Rao and ORG on TCS marked as matches, and one LOC span over team in Pune marked as a wrong boundary; boxes give the false positive, the false negative and the scores 0.67.')
 AFTER[8] = 4
+# the quiz answer tagged the title inside the span, against the convention of the worked example
+TEXT[8] = [("Ms/B-PER Iyer/I-PER flew/O from/O Delhi/B-LOC to/O Wipro/B-ORG office/O in/O Bengaluru/B-LOC. The title 'Ms' begins the person span here because it is inside the gold span.",
+            "Ms/O Iyer/B-PER flew/O from/O Delhi/B-LOC to/O Wipro/B-ORG office/O in/O Bengaluru/B-LOC. As with 'Mr' in the worked example, the title 'Ms' stays outside the person span, so it is O.")]
 
 
 # ---- 2.9 triples from one sentence, and scoring a pattern ----
