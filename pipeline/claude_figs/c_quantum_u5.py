@@ -165,7 +165,7 @@ FIG[6] = (f6, 'Each bit of 101 is sent three times; the first block arrives as 1
 # ---- 5.7 three-qubit bit-flip code ----
 def f7():
     o = [T(20, 26, 'Bit-flip code: an X error on qubit 2 and its syndrome', 15, 'start', bold=True)]
-    stages = [('encoded', 'α|000⟩ + β|111⟩', ACS, AC), ('X on qubit 2', 'α|010⟩ + β|101⟩', NXS, NX), ('after X on qubit 2', 'α|000⟩ + β|111⟩', LVS, LV)]
+    stages = [('encoded', 'α|000⟩ + β|111⟩', ACS, AC), ('error: X on qubit 2', 'α|010⟩ + β|101⟩', NXS, NX), ('repaired by X on qubit 2', 'α|000⟩ + β|111⟩', LVS, LV)]
     for i, (n, s, f, c) in enumerate(stages):
         x = 20 + i * 240
         o.append(boxt(x, 50, 200, 60, [n, s], f, c, 14, True))
@@ -219,6 +219,7 @@ TEXT = {
     1: [('Only a few universities teach this as a full topic; in quantum computing it is the classical baseline.',
          'In quantum computing it is the classical baseline.')],
     5: [('Only a few universities teach this topic. Some syllabi call it', 'Some syllabi call it')],
+    7: [('Its redundancy is eight physical qubits per logical qubit.', 'It uses nine physical qubits per logical qubit, eight more than the bare qubit.')],
 }
 
 
