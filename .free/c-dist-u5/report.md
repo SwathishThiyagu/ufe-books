@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/c-dist-u5/tree/books/cse/c-dist/c-dist-u5.html`
 - Status: ok
-- Model calls so far: 30 (113,275 tokens in, 270,202 out), 16.0 minutes
+- Model calls so far: 30 (113,275 tokens in, 270,202 out), 16.1 minutes
 
 ## Checker
 
 ```
-c-dist-u5.html: 7 chapters, 12742 words, 8 figures, 144 KB
+c-dist-u5.html: 7 chapters, 12763 words, 8 figures, 144 KB
 OK
 ```
 
