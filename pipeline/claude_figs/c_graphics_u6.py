@@ -266,3 +266,15 @@ FIG[9] = (f9, 'Each message bit replaces bit 0 of one pixel. Only 150 has to cha
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    return {
+        1: [('= 0.6339%, about 0.63%.', '= 0.6340%, about 0.63%.')],  # 0.633976 rounds up
+        7: [(' Only a few universities teach this topic.', '')],
+        8: [
+            ('Assuming a motion gate shrinks storage. It shrinks compute; storage drops only if the recording policy itself becomes event-only.',
+             'Assuming a motion gate on its own shrinks storage. It shrinks compute; storage drops only when the recording policy itself becomes event-only, as in motion-gated recording.'),
+            ('Only a few universities teach this material, and it is the practical face of multimedia big data.',
+             'This material is the practical face of multimedia big data.')],
+    }.get(k, [])
