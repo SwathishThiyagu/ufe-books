@@ -181,8 +181,18 @@ def text_fixes(k):
     return {
         1: [(' Only a few universities teach this chapter; some syllabi call it SMS messaging and sending e-mail.',
              ' Some syllabi call it SMS messaging and sending e-mail.')],
-        2: [(' Only a few universities teach this.', ''),
-            ('new LatLng(77.0, 12.0) puts a Chennai shop near the North Pole and the map still draws',
+        2: [('new LatLng(77.0, 12.0) puts a Chennai shop near the North Pole and the map still draws',
              'new LatLng(77.0, 12.0) moves a shop near Bengaluru (12.0° N, 77.0° E) into the Arctic, and the map still draws')],
-        3: [(' Only a few universities teach this chapter.', '')],
     }.get(k, [])
+
+
+DROP = {2: [' Only a few universities teach this.'], 3: [' Only a few universities teach this chapter.']}
+
+
+def chapter_fix(k, ch):
+    # sentences removed outright (idempotent, so the module can be applied again)
+    import json
+    raw = json.dumps(ch, ensure_ascii=False)
+    for d in DROP.get(k, []):
+        raw = raw.replace(json.dumps(d, ensure_ascii=False)[1:-1], '')
+    return json.loads(raw)
