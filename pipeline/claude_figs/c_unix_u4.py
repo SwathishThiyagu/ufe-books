@@ -131,11 +131,25 @@ def f5():
     o.append(T(520, 200, '10.0.0.99', 13, bold=True)); o.append(T(520, 220, 'no such host', 13, fill=MUT))
     o.append(L(312, 204, 426, 134, LV, 2.5, arrow='l'))
     o.append(L(312, 220, 424, 206, L2, 2, '6 4', arrow='m'))
-    o.append(T(20, 278, 'ping 10.0.0.5: 4 sent, 4 back, 0% loss. ping 10.0.0.99: Destination Host Unreachable.', 13, 'start', LV, True))
-    o.append(T(20, 300, 'Different /24 networks, so the laptop sends to its default gateway 192.168.1.1.', 13, 'start'))
-    o.append(TM(20, 326, 'sudo mount -t nfs 10.0.0.5:/data /mnt/data', 13, 'start', bold=True))
-    o.append(TM(20, 350, 'scp student@10.0.0.5:/data/report.pdf .', 13, 'start', bold=True))
-    return 366, ''.join(o)
+    # what the commands show: two test rows, then the two commands that use the path
+    o.append(T(20, 290, 'What the commands show', 15, 'start', bold=True))
+    rows = [('ping -c 4 10.0.0.5', ['4 sent, 4 back', '0% loss: path works'], NXS, NX),
+            ('ping -c 4 10.0.0.99', ['Destination Host', 'Unreachable'], PANEL, L2)]
+    for i, (cmd, res, fill, c) in enumerate(rows):
+        y = 306 + i * 74
+        o.append(R(20, y, 330, 58, PANEL, AC, 8, 1.5))
+        o.append(TM(36, y + 34, cmd, 15, 'start', bold=True))
+        o.append(L(354, y + 29, 396, y + 29, c, 2, arrow=arrow_for(c)))
+        o.append(boxt(400, y, 300, 58, res, fill, c, 14, True))
+    o.append(T(20, 478, 'The .99 failure says nothing about .5: test each address on its own.', 14, 'start', LV, True))
+    o.append(T(20, 516, 'Then use the path', 15, 'start', bold=True))
+    for i, (cmd, note) in enumerate([('sudo mount -t nfs 10.0.0.5:/data /mnt/data', 'mount the share'),
+                                      ('scp student@10.0.0.5:/data/report.pdf .', 'copy one file')]):
+        y = 532 + i * 62
+        o.append(R(20, y, 520, 48, ACS, AC, 8, 1.5))
+        o.append(TM(36, y + 30, cmd, 14, 'start', bold=True))
+        o.append(T(556, y + 30, note, 14, 'start', AC, True))
+    return 652, ''.join(o)
 FIG[5] = (f5, 'The laptop and the file server sit on different /24 networks, so the ping goes through gateway 192.168.1.1 and gets 4 of 4 replies. The failure for 10.0.0.99 says nothing about 10.0.0.5.',
           'Two dashed network regions. On 192.168.1.0/24 the laptop sends to gateway 192.168.1.1, which forwards to the file server 10.0.0.5 on 10.0.0.0/24 with 0 percent loss; a dashed arrow to 10.0.0.99 is unreachable.')
 
