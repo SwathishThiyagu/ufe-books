@@ -1,0 +1,217 @@
+{
+ "lead": "A thread is one flow of execution inside a running program. One process can hold several threads, and they share the same variables and memory. Threads let a GUI stay responsive while a download runs, or let a server handle many UPI requests. Python's threading module creates them. Shared data is the danger: two threads can change the same counter at the same time and lose an update. A lock, or a thread-safe queue, makes the order safe. This chapter shows Thread, start, join, Lock and Queue.",
+ "prereq": "You need: loops and functions from Unit 2, classes from Unit 4, and the event-loop idea from <a href=\"#gui-programming-with-tkinter-widgets\">6.4</a>-<a href=\"#gui-layout-management-menus-and-message-boxes\">6.5</a>.",
+ "sections": [
+  {
+   "h3": "Threads inside one process",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A thread is one flow of control in a process. All threads in the process share the same variables, heap and open files. Python's <code>threading.Thread(target=fn, args=(...))</code> creates a thread object for function <code>fn</code>. <code>start()</code> makes it runnable. <code>join()</code> blocks the caller until that thread ends. A daemon thread (<code>daemon=True</code>) is killed when the main program exits; a normal thread keeps the program alive."
+    },
+    {
+     "type": "p",
+     "text": "A process with one thread runs top to bottom. With two threads, the system may switch between them at bytecode boundaries. Each thread has its own call stack but shares globals. Use threads for waiting: network replies, disk reads, GUI events."
+    },
+    {
+     "type": "p",
+     "text": "The Global Interpreter Lock (GIL) allows only one thread to run Python bytecode at a time. It does not make your code safe. A thread switch can happen between two bytecodes, so a statement like <code>counter += 1</code> is a read, an add and a write. Another thread can read the old value between your read and your write. That lost update is a race condition. The GIL protects the interpreter's own data, not your shared counter."
+    }
+   ]
+  },
+  {
+   "h3": "Locks and synchronizers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A <code>Lock</code> has two states: locked and unlocked. <code>lock.acquire()</code> waits until the lock is free, then takes it. <code>lock.release()</code> frees it. The <code>with lock:</code> block calls acquire and release automatically, even if an exception occurs. Use one Lock object shared by all threads; a lock created inside a thread protects nothing."
+    },
+    {
+     "type": "p",
+     "text": "An <code>RLock</code> (reentrant lock) can be acquired again by the same thread. That thread must call <code>release()</code> the same number of times. A <code>Semaphore(n)</code> lets up to n threads enter a section at once. An <code>Event</code> is a flag: one thread calls <code>event.set()</code>, others call <code>event.wait()</code>. A <code>Condition</code> combines a lock with <code>wait()</code> and <code>notify()</code> so threads can wait for a state change, as in a bounded buffer."
+    },
+    {
+     "type": "p",
+     "text": "A common exam mistake is using <code>acquire()</code> without <code>release()</code>; the next thread waits forever. The <code>with</code> statement avoids this. A Lock does not stop a thread from reading a shared variable without the lock; every access to the protected data must use the same lock."
+    }
+   ]
+  },
+  {
+   "h3": "Queue for inter-thread communication",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<code>queue.Queue</code> is a thread-safe FIFO. <code>put(item)</code> adds, <code>get()</code> removes and waits if empty. <code>task_done()</code> marks a got item as processed; <code>join()</code> waits until all items are marked. A producer thread can put work and a consumer thread can get it without writing a lock. This is the standard way to pass data between threads."
+    },
+    {
+     "type": "p",
+     "text": "Use Queue when threads hand over items: a web scraper puts URLs, workers get and fetch. Queue handles the lock internally. <code>put(block=True)</code> waits if full; <code>get(block=True)</code> waits if empty. For a bounded buffer use <code>Queue(maxsize=10)</code>. Do not use a plain list with append and pop as a queue between threads; it is not safe for compound checks and has no blocking get. <code>Queue</code> is FIFO, <code>LifoQueue</code> is LIFO, and <code>PriorityQueue</code> orders by priority."
+    },
+    {
+     "type": "code",
+     "lang": "python",
+     "code": "import threading\nimport queue\n\nq = queue.Queue()\n\ndef producer():\n    for i in range(1, 4):\n        q.put(i)\n\ndef consumer():\n    total = 0\n    for _ in range(3):\n        total += q.get()\n    print(\"total\", total)\n\nt1 = threading.Thread(target=producer)\nt2 = threading.Thread(target=consumer)\nt1.start()\nt2.start()\nt1.join()\nt2.join()",
+     "stdin": "",
+     "output": "total 6"
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Main starts A and B; each holds the lock while adding 1 to the counter. The locked increment repeats 100000 times per thread, so after both join the main thread reads 200000.",
+  "spec": {
+   "type": "sequence",
+   "actors": [
+    "Main",
+    "Thread A",
+    "Thread B",
+    "Lock",
+    "Counter"
+   ],
+   "messages": [
+    {
+     "from": "Main",
+     "to": "Thread A",
+     "label": "start()",
+     "dashed": false
+    },
+    {
+     "from": "Main",
+     "to": "Thread B",
+     "label": "start()",
+     "dashed": false
+    },
+    {
+     "from": "Thread A",
+     "to": "Lock",
+     "label": "acquire",
+     "dashed": false
+    },
+    {
+     "from": "Thread A",
+     "to": "Counter",
+     "label": "counter += 1",
+     "dashed": false
+    },
+    {
+     "from": "Thread A",
+     "to": "Lock",
+     "label": "release",
+     "dashed": false
+    },
+    {
+     "from": "Thread B",
+     "to": "Lock",
+     "label": "acquire",
+     "dashed": false
+    },
+    {
+     "from": "Thread B",
+     "to": "Counter",
+     "label": "counter += 1",
+     "dashed": false
+    },
+    {
+     "from": "Thread B",
+     "to": "Lock",
+     "label": "release",
+     "dashed": false
+    },
+    {
+     "from": "Main",
+     "to": "Thread A",
+     "label": "join()",
+     "dashed": false
+    },
+    {
+     "from": "Main",
+     "to": "Thread B",
+     "label": "join()",
+     "dashed": false
+    },
+    {
+     "from": "Main",
+     "to": "Counter",
+     "label": "read final",
+     "dashed": false
+    }
+   ],
+   "aria": "A main thread starts two worker threads; each acquires a lock, increments a shared counter, releases the lock, and the main thread joins them before reading the final counter."
+  }
+ },
+ "examples": [
+  {
+   "question": "A shared counter starts at 0. Two threads each run <code>for i in range(100000): counter += 1</code>. (a) Explain why the final value can be less than 200000 without a lock. (b) Give the final value when both increments are inside <code>with lock: counter += 1</code>. (c) State where <code>join()</code> is called before reading the final counter.",
+   "steps": [
+    "Each thread runs 100000 iterations. Total increments attempted = 2 × 100000 = 200000.",
+    "Without a lock, <code>counter += 1</code> is load counter, add 1, store back. If both threads load the same old value, both store old + 1. One update is lost. Repeating this gives a final value below 200000.",
+    "With one shared <code>Lock</code>, only one thread can be inside the three steps at a time. The other thread waits. No update is lost, so final value = 200000.",
+    "The main thread calls <code>t1.join()</code> and <code>t2.join()</code> before <code>print(counter)</code>. Without join, main may read before both workers finish."
+   ],
+   "answer": "With one shared lock the final counter is 200000.",
+   "check": "increments_per_thread = 100000\nthreads = 2\nprint(increments_per_thread * threads)",
+   "values": [
+    200000
+   ],
+   "code": {
+    "lang": "python",
+    "code": "import threading\n\ncounter = 0\nlock = threading.Lock()\n\ndef worker():\n    global counter\n    for _ in range(100000):\n        with lock:\n            counter += 1\n\nt1 = threading.Thread(target=worker)\nt2 = threading.Thread(target=worker)\nt1.start()\nt2.start()\nt1.join()\nt2.join()\nprint(counter)",
+    "stdin": ""
+   },
+   "output": "200000"
+  }
+ ],
+ "traps": [
+  "The GIL does not make <code>counter += 1</code> atomic; it is a read, add and write.",
+  "A lock must be one shared object; a lock created inside each worker protects nothing.",
+  "Call <code>join()</code> before reading the final counter, or main may see a partial result.",
+  "<code>RLock</code> needs one <code>release()</code> for every <code>acquire()</code>; a plain <code>Lock</code> acquired twice by the same thread deadlocks.",
+  "<code>queue.Queue</code> is for passing items between threads; it does not replace a lock for protecting a shared counter."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does <code>Thread.start()</code> do?",
+   "marks": 2,
+   "a": "It makes the thread runnable so the function starts executing in a separate flow."
+  },
+  {
+   "level": "understand",
+   "q": "Why can <code>counter += 1</code> lose an update when two threads run it without a lock?",
+   "marks": 3,
+   "a": "It is three steps: read counter, add 1, write counter. If both threads read the same old value before either writes, both write old + 1, so one increment is lost."
+  },
+  {
+   "level": "apply",
+   "q": "Two threads each run 50000 locked increments on a shared counter starting at 0. What is the final value?",
+   "marks": 2,
+   "a": "50000 × 2 = 100000."
+  },
+  {
+   "level": "analyze",
+   "q": "A worker function creates <code>lock = threading.Lock()</code> inside itself and uses <code>with lock:</code>. Does this stop a race on a global counter? Explain.",
+   "marks": 4,
+   "a": "No. Each thread gets its own Lock object, so two threads can enter the section at the same time. The lock must be created outside and shared."
+  },
+  {
+   "level": "apply",
+   "q": "A consumer calls <code>q.get()</code> on an empty <code>queue.Queue</code> with default settings. What happens?",
+   "marks": 2,
+   "a": "It blocks and waits until another thread puts an item into the queue."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between <code>Event</code> and <code>Condition</code>.",
+   "marks": 3,
+   "a": "Event is a simple flag set by one thread and waited on by others. Condition uses a lock with wait and notify so threads can wait for a shared state change."
+  },
+  {
+   "level": "analyze",
+   "q": "A thread acquires an <code>RLock</code> twice and releases it once. What happens?",
+   "marks": 4,
+   "a": "The lock stays held because the release count is one short. The same thread can release it again; another thread trying to acquire it blocks."
+  }
+ ],
+ "beyond": "Not for the exam. Production Python often uses thread pools from <code>concurrent.futures</code>, <code>asyncio</code> for I/O, and multiprocessing for CPU work. The GIL makes threads best for I/O-bound tasks such as web requests and file reads. Search terms: thread pool, race condition, deadlock, producer-consumer queue."
+}
