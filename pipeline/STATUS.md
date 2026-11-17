@@ -109,3 +109,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-se-u6 | free/c-se-u6-book | 1–9 (figure text: ch 8, 9) | OK (library updated; university colour codes and university-hosted sources removed) | 11 Nov 2026 |
 | c-quantum-u1 | free/c-quantum-u1-book | 1–7 | OK (library updated; 4 wrong statements fixed; 2 university sources dropped) | 17 Nov 2026 |
 | c-nlp-u1 | free/c-nlp-u1-book | 1–8 (figure text: ch 5, 6 wrong step reasons fixed) | OK (library updated; Porter step and FST analysis reasons corrected; university-hosted sources dropped) | 17 Nov 2026 |
+| c-mobile-u1 | free/c-mobile-u1-book | 1–8 (figure text: ch 2) | OK (library added; university counts removed; NPTEL source dropped) | 17 Nov 2026 |
