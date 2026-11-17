@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/c-quantum-u5/tree/books/cse/c-quantum/c-quantum-u5.html`
 - Status: ok
-- Model calls so far: 36 (138,952 tokens in, 254,815 out), 7.7 minutes
+- Model calls so far: 36 (138,952 tokens in, 254,815 out), 7.8 minutes
 
 ## Checker
 
 ```
-c-quantum-u5.html: 8 chapters, 13141 words, 9 figures, 164 KB
+c-quantum-u5.html: 8 chapters, 13148 words, 9 figures, 164 KB
 OK
 ```
 
