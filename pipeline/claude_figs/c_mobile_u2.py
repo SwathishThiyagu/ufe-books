@@ -217,6 +217,8 @@ def text_fixes(k):
              'iOS uses XNU, the kernel inside Apple\'s Darwin core, built from Mach and BSD code.')],
         2: [('The Android platform is drawn as a stack of six layers.', 'The Android platform is a stack of six layers.')],
         3: [(' Only a few universities teach this depth.', '')],
+        4: [('onSaveInstanceState(Bundle outState) runs after onPause and before onStop.',
+             'onSaveInstanceState(Bundle outState) runs before the activity can be destroyed: after onStop from Android 9 (API 28), before onStop on older versions.')],
         5: [(' Only a few universities teach this detail.', ''),
             ('The figure shows the call, match and launch.', 'The figure follows both buttons from the intent, through the match, to the launch.')],
     }.get(k, [])

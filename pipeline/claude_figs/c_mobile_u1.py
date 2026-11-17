@@ -87,10 +87,10 @@ def f3():
     o.append(brace(x0 + 2, x0 + cw - 2, yb + 8))
     o.append(T(x0 + cw / 2, yb + 32, '576.875 µs', 13))
     o.append(T(x0 + cw / 2, yb + 48, '= 4.615 ms ÷ 8', 13, fill=MUT))
-    o.append(brace(x0 + cw + 2, x0 + 8 * cw - 2, yb + 8))
-    o.append(T(x0 + 4.5 * cw, yb + 32, 'one frame = 4.615 ms, repeating 1 ÷ 4.615 ms = 216.7 times a second', 13))
-    o.append(T(16, yb + 90, 'Slots: 4 × 8 = 32.   One is the control channel.   Calls at once: 32 − 1 = 31.', 15, 'start', bold=True))
-    return yb + 108, ''.join(o)
+    o.append(brace(x0 + 2, x0 + 8 * cw - 2, yb + 62))
+    o.append(T(x0 + 4 * cw, yb + 84, 'one frame = slots 0 to 7 = 4.615 ms, repeating 1 ÷ 4.615 ms = 216.7 times a second', 13))
+    o.append(T(16, yb + 122, 'Slots: 4 × 8 = 32.   One is the control channel.   Calls at once: 32 − 1 = 31.', 15, 'start', bold=True))
+    return yb + 140, ''.join(o)
 FIG[3] = (f3, 'Four carriers with 8 slots each give 4 × 8 = 32 slots; one carries the control channel, so 31 calls run at once. Each slot is 4.615 ms ÷ 8 = 576.875 µs, and frames repeat 216.7 times a second.',
           'A grid of 4 rows (carriers) by 8 columns (time slots); one cell is marked control and the other 31 are calls; braces show one slot of 576.875 microseconds and one frame of 4.615 milliseconds.')
 
