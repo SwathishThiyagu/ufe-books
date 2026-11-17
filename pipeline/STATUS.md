@@ -134,3 +134,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-unix-u3 | free/c-unix-u3-book | 1–8 | OK (library added; four university mentions removed) | 17 Nov 2026 |
 | c-unix-u4 | free/c-unix-u4-book | 1–7 | OK (library added; university mentions removed; 4.7 old archive renamed www-20261029 so it is really 8 days old) | 17 Nov 2026 |
 | c-unix-u5 | free/c-unix-u5-book | 1–8 | OK (library added; two university mentions removed) | 17 Nov 2026 |
+| c-mobile-u5 | free/c-mobile-u5-book | 1–6 | OK (library added; university counts removed; 5.2 swapped-coordinates trap corrected) | 17 Nov 2026 |
