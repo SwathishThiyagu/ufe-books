@@ -1,13 +1,13 @@
 # c-block-u1: free-model run
 
-- Book: `books/cse/c-block/c-block-u1.html`
+- Book: `work/claude_figs/c-block-u1/tree/books/cse/c-block/c-block-u1.html`
 - Status: ok
 - Model calls so far: 32 (114,985 tokens in, 175,799 out), 5.8 minutes
 
 ## Checker
 
 ```
-c-block-u1.html: 7 chapters, 12586 words, 8 figures, 147 KB
+c-block-u1.html: 7 chapters, 12555 words, 8 figures, 170 KB
 OK
 ```
 
