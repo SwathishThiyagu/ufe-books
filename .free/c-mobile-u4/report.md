@@ -1,8 +1,15 @@
 # c-mobile-u4: free-model run
 
-- Book: `books/cse/c-mobile/c-mobile-u4.html`
-- Status: error
-- Model calls so far: 24 (81,621 tokens in, 153,531 out), 13.6 minutes
+- Book: `work/claude_figs/c-mobile-u4/tree/books/cse/c-mobile/c-mobile-u4.html`
+- Status: ok
+- Model calls so far: 24 (81,621 tokens in, 153,531 out), 13.7 minutes
+
+## Checker
+
+```
+c-mobile-u4.html: 6 chapters, 9913 words, 7 figures, 135 KB
+OK
+```
 
 ## For the reviewer
 
