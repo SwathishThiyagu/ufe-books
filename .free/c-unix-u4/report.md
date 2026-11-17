@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-c-unix-u4.html: 7 chapters, 14068 words, 8 figures, 162 KB
+c-unix-u4.html: 7 chapters, 14068 words, 8 figures, 164 KB
 OK
 ```
 
