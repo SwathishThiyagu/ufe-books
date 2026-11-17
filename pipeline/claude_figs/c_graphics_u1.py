@@ -277,7 +277,10 @@ spec = make_spec(FIG)
 
 def text_fixes(k):
     return {
-        2: [('In the figure, 1 means ink and 0 means paper, so the 1s draw the letter L.',
+        2: [
+            ('= 63.499... ppi, rounded to 63.5 ppi.',
+             '= 63.500... ppi, rounded to 63.5 ppi.'),
+            ('In the figure, 1 means ink and 0 means paper, so the 1s draw the letter L.',
              'In a 1-bit bitmap, 1 means ink and 0 means paper, so a pattern of 1s can draw a letter such as L.')],
         3: [(' Only a few universities teach this display hardware in depth.', ''),
             ('The figure shows the chain.',

@@ -327,16 +327,29 @@ spec = make_spec(FIG)
 
 def text_fixes(k):
     return {
-        1: [('The figure has an equal-step line and a slow-in curve.',
+        1: [
+            ('Squashed height 1, so vertical semi-axis c = 0.5. Area constant: a × c = r² = 1,',
+             'Squashed height 1, so vertical semi-axis b = 0.5. Area constant: a × b = r² = 1,'),
+            ('The figure has an equal-step line and a slow-in curve.',
              'Picture an equal-step line and a slow-in curve on the same graph.'),
             ('In the figure, slow-in uses y = x²/12.', 'A slow-in curve uses y = x²/12.')],
         6: [(' Only a few universities teach this chapter separately.', '')],
         7: [(' Only a few universities teach this chapter, so focus on the model, not menus.', ' Focus on the model, not menus.')],
         8: [(' Only a few universities teach this chapter.', '')],
         9: [(' Only a few universities teach this advanced topic.', '')],
+        3: [
+            ('so the frames are dark near t = 0 and t = 1 and correct only at t = 0.5',
+             'so the frames are too dark before t = 0.5, too bright after it, and correct only at t = 0.5'),
+        ],
     }.get(k, [])
 
 
 def drop_sources():
     # university-hosted pages: the books name no universities
     return ['ocw.mit.edu', 'cs.cmu.edu']
+
+
+def unit_fixes():
+    # glossary: forward kinematics read like inverse kinematics
+    return [('Setting each joint angle in a chain by hand so the end of the chain lands where the animator wants.',
+             'Setting each joint angle in a chain by hand and computing where the end of the chain lands; the reverse problem is inverse kinematics.')]
