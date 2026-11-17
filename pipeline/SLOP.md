@@ -131,3 +131,48 @@ an initializer rule got wrong in a figure, two answers in one lesson that contra
 starting expression never appears on screen. Not slop (checked): "really" (u3-L1 pq 18) and "magic 18" (u4-L2, the term
 "magic number") are plain usage. YouTube: pipeline.json has live: false for all six units and upload_sheet.json holds no
 video links, so none of these 16 lessons is published.
+
+## Quantum Computing (17 Nov)
+
+Audited 17 Nov 2026: all 20 c-quantum lessons (6 units), every scene, narration and frame (sheets at 0.92, re-rendered at
+0.995; the half-written highlight lines at 0.92 render whole at 0.995). Checker: 0 page errors, 0 cue failures, 0 text
+outside the safe area on any lesson. Scene numbers below are the 0-based SC index (the Lnn.png number).
+Facts: every worked example and model answer recomputed (memory for n qubits, eigenvalues, tensor amplitudes, e^(iA),
+Born-rule and ± basis probabilities, partial trace of |Φ+⟩, Bloch angles, CHSH E and 0.8536, Robertson bound, H Z H,
+three-CNOT swap, H S H, T⁴, teleportation and superdense branches, Qiskit counts and bit order, kickback signs,
+Deutsch-Jozsa, Bernstein-Vazirani for s = 101 and 1011, Simon equations, QFT|01⟩, order finding for 15 and 21, Grover
+P(k) for N = 16, counting for N = 100 and 64, one-time pad, BB84 sifting, entropies 0.469 and 0.8113, bit-flip χ, Hamming
+(7,4) codeword, bit-flip syndromes, 3p² failure rate, VQE energy, kernel eigenvalues, Ising form of the portfolio, AES and
+RSA bits). All 46 exam traps checked: every "Don't write" is wrong and every "Write" is right. One stated method is wrong.
+Clean (scripted): no filler words (hits were "take a dive" in a joke, "unlocks" a lock, "landscape" the optimisation term),
+no site or finder line, no college names, no TODO or placeholder, no repeated sentences beyond template lines.
+YouTube: pipeline.json has live: false for all six units and videos.json has no video link, so none is published.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-quantum-u3-L1 | pa (21) | "Multiply by H on the left: one half times zero, two, two, zero, which is X"; board hint "multiply HZ first, then H on the left". H·(HZ) = Z; H Z H = (HZ)·H needs H on the right. The matrix shown is right, the method said is wrong | wrong fact: must fix
+c-quantum-u3-L3 | pa (17) vs bookfig (9) | answer for m1m2 = 11 says "XZ: apply Z first, then X", but the lesson's own circuit applies X (from m2) and then Z (from m1); both work up to a global sign, but the answer contradicts the picture | misleading: should fix
+c-quantum-u1-L2 | bookfig (11) | box "H\|0⟩ = \|+⟩, first row: 0.7071, 0.7071": H\|0⟩ is the first column (same numbers only because H is symmetric); u2-L2 pa (19) says "second column" correctly | misleading: should fix
+c-quantum-u4-L2, u4-L3, u5-L2 (3) | bookfig (4); calc (10); bookfig (3, 8, 13), calc (5, 10, 16) | spoken "the book's picture / example / figure / channel / repetition code", 8 lines (must be "your free notes") | should fix
+c-quantum-u1-L3, u2-L1, u2-L4, u3-L3, u4-L1, u4-L3, u6-L1 (7) | pq (all three) | spoken Bloom levels, 21 lines: "at the understand level", "An understand question", "Question two, apply", "Question three, analyze" | should fix
+c-quantum-u1-L3, u2-L4, u3-L4, u4-L4, u5-L3 (5) | outro (last) | "Next time, Unit two/three/…" spoken, and "NEXT UNIT / Unit N" shown (book2lesson.py:501) | should fix
+c-quantum-u6-L1 | pa (22) | on screen "QPE (Unit 4) reads an eigenvalue of H into ancillas" | should fix
+c-quantum-u6-L2 | outro (25) | "THAT'S A WRAP / All six units" card (unit count shown) | cosmetic: later
+c-quantum all 20 | figs (last but one) | on-screen red note "Sources the book draws on: …" (book2lesson.py:389) | cosmetic: later
+c-quantum-u1-L1, u1-L3, u2-L1, u2-L2, u3-L2, u4-L1, u4-L2, u4-L3, u4-L4 (9) | notebook, calc, trap2, recap, pq/pa, bookfig text | caret maths on screen, about 100 strings: "e^(iθ)", "e^(−iHt/ħ)", "a^(r/2)", "2^(n/2)", "N^(1/3)", "(−1)^(s·x)", "e^(2πijk/N)" (u1-L3 alone has it in 8 scenes) | cosmetic: later
+c-quantum-u2-L1, u2-L3, u2-L4, u3-L1, u4-L1, u4-L2, u4-L3, u5-L2, u5-L3 (9) | notebook, bookfig, calc, pa | underscore subscripts on screen: "ρ_A", "tr_B", "P_m", "H_A ⊗ H_B", "S_z", "F_z", "U_f", "U_w", "U_CNOT", "d_min" (u2-L3 in 12 scenes); same problem as caret maths, for subscripts | cosmetic: later
+c-quantum-u5-L3 | recap (14) | stock recap icons: orange shield (Error correction), six scattered dots (Fault tolerance, the "chain" icon), red down arrow (The threshold); nothing from the lesson (three-qubit code, transversal CNOT, threshold curve) | cosmetic: later
+c-quantum-u6-L2 | recap (17) | stock-looking recap icons: refresh arrow with a tick (Industry), padlock (Security), a bare "U" gate (Quantum AI); small and faint | cosmetic: later
+c-quantum-u1-L3, u3-L2, u4-L2 (3) | recap | tiny recap pictures: icons about a tenth of the card in faint circles (u4-L2's QFT card is a generic four-way arrow) | cosmetic: later
+c-quantum-u1-L3, u4-L2 (2) | recap | header pill wider than its card: "OPERATOR FUNCTIONS" and "BERNSTEIN-VAZIRANI" run into the next card (still there at 0.995) | cosmetic: later
+c-quantum-u2-L4 | bookfig (9) | the view crops off the z magnet, so a stray "½ down" arrow points at a "blocked" box; the rest of the frame is three lines of text | cosmetic: later
+c-quantum-u2-L2 | bookfig (4) | three pairs of probability bars with no headings (the \|0⟩, H\|0⟩, ZH\|0⟩ labels are outside the view) | cosmetic: later
+c-quantum-u4-L3 | calc (10) | "Your turn, with the book's next one" on a worked example the board solves at once, with no pause | cosmetic: later
+c-quantum-u5-L2 | pa (20) | "So the capacity needs a limit": vague; meant "capacity is a limit over many uses" (the screen says so) | cosmetic: later
+c-quantum-u1-L1 | notebook (6) | the "mid-90s" pill touches the "Error correction" label in the timeline picture | cosmetic: later
+
+Counts: 1 must fix, 6 should fix, 13 cosmetic (20 lines). Patterns shared with other subjects: "the book" wording (generator
+note on all 20 figs pages plus 8 spoken lines), unit numbers in outros (generator), spoken Bloom levels, caret maths, stock
+or tiny recap pictures. New here: underscore subscripts typed on screen (9 lessons, the subscript twin of caret maths);
+recap header pills wider than the card (engine, long upper-case labels); a matrix-order method stated backwards while the
+numbers are right; an answer whose gate order contradicts the lesson's own circuit.
