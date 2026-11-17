@@ -176,3 +176,50 @@ note on all 20 figs pages plus 8 spoken lines), unit numbers in outros (generato
 or tiny recap pictures. New here: underscore subscripts typed on screen (9 lessons, the subscript twin of caret maths);
 recap header pills wider than the card (engine, long upper-case labels); a matrix-order method stated backwards while the
 numbers are right; an answer whose gate order contradicts the lesson's own circuit.
+## Mobile Application Development (17 Nov)
+
+Audited 17 Nov 2026: all 17 c-mobile lessons, every scene, narration and frame (sheets at 0.92; every line that looked cut off
+re-rendered at 0.995, where all render whole, so they were typing animations). Checker: 0 page errors, 0 cue failures, 0 text
+outside the safe area on every sheet. About 70 worked numbers and model answers recomputed (transmission and delay times,
+generation download times, GSM slots and frame rate, N/D/Q/SIR, handover loss, tunnel overhead, 802.11 efficiency, RREQ counts,
+weights and dp/px, fitCenter/centerCrop, header-row positions, byte counts, cursor order, 1.5 MB in bytes, SMS parts and cost,
+camera centre and spans, location filter rates, PIN lockout times, versionCode/versionName, card fees, Swift fares, stack-view
+widths, constraint conflicts): no arithmetic error. All 40 exam traps checked: every "Don't write" is wrong and every "Write"
+is right, except where listed. Scene = 0-based SC index (the Lnn.png number). No site/finder line, college name, TODO,
+placeholder or filler word found; the only repeated non-template sentences are the spoken Bloom lines below.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-mobile-u3-L1 | pa (17) | model answer: "Return false, and the event falls through, so the command looks dead". The handler code has already run; false only lets the click go on to fragments or the item's intent, so nothing "looks dead" | wrong fact: must fix
+c-mobile-u6-L3 | bookfig (3), notebook (5) | fare written as "8 km × ₹11.50 = ₹92.00" (no booking fee, outstation rate), while scene 8/11 of the same lesson and u6-L1/L2 price 8 km as 20 + 8 × 9.0 = ₹92; same answer from two contradicting fare rules | misleading: should fix
+c-mobile-u6-L1 | bookfig (10), calc (13) | fareLabel shows "fare = 20 + km * rate" with no parameter type; the same lesson just taught that km = 8 is an Int and km * rate stops the build. The book has fareLabel(km: Double); the lesson never shows it | misleading: should fix
+c-mobile-u5-L2 | bookfig (15) | caption "A lockout delay matters more than PIN length"; by the lesson's own numbers two more digits (100× = 100,000 s) beat the lockout (61×) | misleading: should fix
+c-mobile-u5-L2 | pa (23) | cause given as "the network provider with no GPS view of the sky": the network provider never uses the sky; the cause is that only the network (cell/Wi-Fi) provider is giving fixes | misleading: should fix
+c-mobile-u2-L1 | trap2 (15) | "compileSdk is build time only, never in the manifest": aapt2 has written android:compileSdkVersion into the merged manifest since build tools 28. The point (it does not set run-time behaviour) is right; "never in the manifest" is not | misleading: should fix
+c-mobile-u2-L1 | pa (18) | "a retail phone has no Linux package manager or shell tools": every Android phone ships /system/bin/sh and toybox; only the package manager part is right | misleading: should fix
+c-mobile-u2-L3 | bookfig (4), notebook (5), trap2 (6) | "Check resolveActivity first, start only when not null" is taught as the safe rule; with targetSdk 30+ (the earlier lesson uses 34) package visibility makes resolveActivity return null unless `<queries>` is declared, so Share silently does nothing. Say: declare `<queries>`, or catch ActivityNotFoundException | misleading: should fix
+c-mobile-u2-L3 | notebook (5) | code panel would not compile: "Intent.ACTION_DIAL" and "Uri.parse(...)" with no new Intent, setType/putExtra with no receiver, share never declared, resolveActivity(...) != null with no if | should fix
+c-mobile-u2-L2 | calc (13, 14), bookfig (11, 12) | question says "launch, Home, recents, Back, then rotate" as one sequence; after Back the activity is destroyed, so there is nothing to rotate (needs a relaunch, 3 more lines). Present the five as separate actions | misleading: should fix
+c-mobile-u4-L2 | bookfig (10) | Figure 4.5.1: the ✓ line (what the viewer may do) is orange and the ✗ line (cannot list, cannot write) is green, so the picture reads the forbidden actions as allowed (already noted in done.log, not fixed) | misleading: should fix
+c-mobile-u3-L1 | hookArt (0) | hook repeats u2-L2's hook almost word for word ("tap a counter to seven, turn the phone, it reads zero; where did the seven go?") | should fix
+c-mobile-u1-L3, u2-L3, u3-L2, u4-L2, u5-L3 | outro (27, 23, 26, 28, 23) | "Next time, Unit two/three/four/five/six" spoken; "NEXT UNIT, Unit N" card (book2lesson.py writes this card itself) | should fix
+c-mobile-u1-L1, u1-L2, u1-L3, u2-L1, u2-L3, u3-L1, u3-L2, u4-L2, u5-L1, u5-L2, u5-L3, u6-L4 | pq (u1-L1 18/20/22; u1-L2 15/17/19; u1-L3 20/22/24; u2-L1 17/19/21; u2-L3 16/18/20; u3-L1 16/18/20; u3-L2 19/21/23; u4-L2 21/23/25; u5-L1 14/16/18; u5-L2 18/20/22; u5-L3 16/18/20; u6-L4 14/16/18) | spoken Bloom levels: "An understand question", "Question two, apply", "at the apply level", "Question three, analyze" (36 lines). u2-L2, u4-L1, u6-L1, u6-L2, u6-L3 say only "Question one/two/three" | should fix
+c-mobile-u1-L1, u1-L2, u1-L3, u2-L2, u4-L2, u5-L1, u5-L2, u6-L1, u6-L2, u6-L3, u6-L4 | figs (second to last) | "Sources the book draws on: …" shown; the other 6 lessons say "Sources the notes draw on" | cosmetic
+c-mobile-u5-L2 | calc (12, 13) | formula board "N = 10^d" typed with a caret | cosmetic
+all 17 (engine) | every scene | header strip shows "MOBILE APPLICATION DEVELOPMENT · UNIT n · LESSON k OF K" on every frame (META.kick from book2lesson.py); u6-L4 outro also shows "All six units" | cosmetic
+all 17 (engine) | pq, pa | question cards print the Bloom level on screen ("QUESTION 1 · UNDERSTAND", "· APPLY", "· ANALYZE") from lv, even where the narration avoids it | cosmetic
+all 17 | META | META.subject is "biotech" (book2lesson.py default --subject biotech); not shown today, wrong if the engine ever uses it | cosmetic
+c-mobile-u2-L1 | bookfig (6) | second half of a split figure: the three columns have no platform names (Android, iOS, Windows Phone sit on the previous scene) | cosmetic
+c-mobile-u2-L2 | bookfig (12) | second half of Figure 2.4.1: five line counts under empty space and two orphan boxes (onStart, onResume) cut from the rotate column | cosmetic
+c-mobile-u4-L2 | bookfig (4, 10) | split-figure halves start with an orphan arrow from nothing; scene 4 is a small table in a mostly empty box | cosmetic
+c-mobile-u6-L2 | notebook (13), trap2 (14) | the index-out-of-range trap repeats u6-L1's trap (0...count reads one past the end) one lesson later | cosmetic
+c-mobile-u1-L1 | calc (5, 10) | two conventions in one lesson: "1 KB = 1024 bytes" in example 1, "1 MB = 10⁶ bytes" in example 2 (each hinted, but not explained) | cosmetic
+c-mobile-u2-L1 | notebook (10) | "a stack of six layers" but the narration lists five (native libraries and ART share one) | cosmetic
+c-mobile-u4-L1 | figs (25) | sources line cut: "Sources the notes draw on: Bill Phillips (SQLite databases and content providers)", no book title | cosmetic
+c-mobile-u6-L1 | outro (23) | next card reads "Swift structures · Building" (chapter titles cut mid-name) | cosmetic
+c-mobile-u5-L2 | recap (17) | "Key numbers" card uses a generic clock and padlock for two unrelated numbers (3 updates a minute; PIN 1,000 s → 61,000 s) | cosmetic
+
+Recap pictures otherwise come from each lesson's own content (towers, hexes, tunnels, stacks, tables, fare boxes); no shield,
+refresh arrow or up-arrow stock icon. No picture contradicts its narration except Figure 4.5.1's colours above (the colour
+cues spoken in u1-L3, u2-L2, u5-L1 and u6-L4 match their figures). YouTube: pipeline.json has live: false for all six units
+and videos.json has an empty video link for all 17 lessons, so none is published.
