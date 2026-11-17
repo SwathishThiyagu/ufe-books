@@ -191,15 +191,15 @@ def f7():
         r = []
         for a, b, lab, ok in spans:
             x = x0 + a * cw + 4; w = (b - a + 1) * cw - 8
-            r.append(R(x, y, w, 52, PANEL if ok else NXS, AC if ok else NX, 6, 1.8))
-            r.append(T(x + w / 2, y + 44, lab, 13, bold=True, fill=AC if ok else NX))
+            r.append(R(x, y, w, 52, PANEL if ok else LVS, AC if ok else LV, 6, 1.8))
+            r.append(T(x + w / 2, y + 44, lab, 13, bold=True, fill=AC if ok else LV))
         return ''.join(r)
     o.append(chunks(68, [(0, 1, 'NP', True), (2, 2, 'VP', True), (3, 4, 'NP', True), (5, 7, 'PP', True)]))
     o.append(chunks(148, [(0, 1, 'NP', True), (2, 2, 'VP', True), (3, 4, 'NP', True), (5, 7, 'NP: wrong label', False)]))
     # re-draw the tag text on top of the boxes
     for i in range(8):
         o.append(T(x0 + i * cw + cw / 2, 90, gold[i], 13, bold=gold[i].startswith('B')))
-        o.append(T(x0 + i * cw + cw / 2, 170, pred[i], 13, bold=pred[i].startswith('B'), fill=NX if pred[i] != gold[i] else INK))
+        o.append(T(x0 + i * cw + cw / 2, 170, pred[i], 13, bold=pred[i].startswith('B'), fill=LV if pred[i] != gold[i] else INK))
     y = 228
     o.append(boxt(20, y, 330, 60, ['labelled: 3 of 4 chunks match', 'P = R = F1 = 0.75'], NXS, NX, 14, True))
     o.append(boxt(370, y, 330, 60, ['unlabelled: 4 of 4 spans match', 'P = R = F1 = 1.0'], ACS, AC, 14, True))

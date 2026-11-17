@@ -157,14 +157,14 @@ def f6():
     for i, (a, b) in enumerate(zip(cand, ref)):
         x = x0 + i * cw
         ok = a != 'sat'
-        o.append(R(x + 4, 24, cw - 8, 34, ACS if ok else NXS, AC if ok else NX, 6, 1.6)); o.append(TM(x + cw / 2, 46, a, 15, bold=True))
+        o.append(R(x + 4, 24, cw - 8, 34, ACS if ok else LVS, AC if ok else LV, 6, 1.6)); o.append(TM(x + cw / 2, 46, a, 15, bold=True))
         o.append(R(x + 4, 84, cw - 8, 34, PANEL, L2, 6, 1.2)); o.append(TM(x + cw / 2, 106, b, 15))
     # bigrams
     bg = [('the cat', 1), ('cat sat', 0), ('sat on', 0), ('on the', 1), ('the mat', 1)]
     o.append(T(x0 - 14, 162, 'bigrams', 13, 'end', MUT))
     for i, (b, ok) in enumerate(bg):
         x = x0 + i * cw + cw / 2
-        o.append(R(x + 4, 144, cw - 8, 30, ACS if ok else NXS, AC if ok else NX, 6, 1.4)); o.append(T(x + cw / 2, 164, b, 13, bold=True))
+        o.append(R(x + 4, 144, cw - 8, 30, ACS if ok else LVS, AC if ok else LV, 6, 1.4)); o.append(T(x + cw / 2, 164, b, 13, bold=True))
     y = 204
     o.append(boxt(20, y, 160, 56, ['p₁ = 5 ÷ 6', '= 0.8333'], ACS, AC, 14, True))
     o.append(boxt(195, y, 160, 56, ['p₂ = 3 ÷ 5', '= 0.6'], ACS, AC, 14, True))
