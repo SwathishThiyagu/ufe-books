@@ -1,0 +1,58 @@
+# s-chem-u5: free-model run
+
+- Book: `books/common/s-chem/s-chem-u5.html`
+- Status: ok
+- Model calls so far: 48 (174,034 tokens in, 355,556 out), 10.4 minutes
+
+## Checker
+
+```
+s-chem-u5.html: 9 chapters, 13938 words, 10 figures, 159 KB
+OK
+```
+
+## For the reviewer
+
+- chapter 6: the figure cannot be drawn: tree is too wide (6 leaves); use fewer leaves or shorter labels
+- chapter 9: the figure cannot be drawn: tree is too wide (5 leaves); use fewer leaves or shorter labels
+- chapter 1: the figure cannot be drawn: note "cross-linked, does not soften" runs off the right edge; shorten it
+- chapter 1: the figure could not be drawn; a plain box diagram stands in for it
+- chapter 6: the figure could not be drawn; a plain box diagram stands in for it
+- chapter 9: the figure could not be drawn; a plain box diagram stands in for it
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 3 (heat behaviour) and Exam traps: The text defines an elastomer as 'a cross-linked polymer', but the exam trap says natural rubber is an elastomer. Raw natural rubber is not chemically cross-linked; it is an elastomer because its chains are flexible. Conventional rubbers are only lightly cross-linked after vulcanisation, while thermosets are heavily cross-linked. The definition is too narrow and contradicts the exam trap.
+- ch 1 [low] Figure: The source branch shows only Natural and Synthetic, omitting Semi-synthetic, which is taught in Section 3. The heat branch shows only Thermoplastic and Thermoset, omitting Elastomer, also taught in Section 3. A student may read the tree as the complete classification.
+- ch 1 [low] Section 3 (by mechanism): Chain-growth is not always addition, and step-growth is not always condensation. For example, polyurethane formation is step-growth but not condensation. Writing the two pairs as equivalent is an over-simplification.
+- ch 1 [low] Worked example 1 and Quiz Q5: The DP calculated from a sample's molar mass is an average DP, not the whole-number DP of one chain. The text defines DP for one chain as a whole number, so using 'the degree of polymerisation' for a sample is slightly imprecise.
+- ch 2 [high] Section 1, paragraph 3 ("The two chain directions are not identical because the chain has a repeat pattern."): The reason given is the opposite of the truth. A regular repeat pattern is exactly what makes the two chain directions constitutionally identical: walking left or right from the CHX carbon you meet the same –CH₂–CHX– sequence. A repeat pattern cannot be the reason the two groups differ. If students take this sentence literally, they cannot see why the CHX carbon is a stereocentre at all, and they will think any regular chain automatically creates one.
+- ch 3 [high] Worked example 1: The example states that each benzoyl peroxide molecule produces one radical. Benzoyl peroxide is a diacyl peroxide, (C₆H₅CO)₂O₂ → 2 C₆H₅COO• → 2 C₆H₅• + 2 CO₂, so one molecule yields two radicals, not one. The arithmetic is consistent with the stated assumption, but a student takes away a false fact about a named real initiator, and the DP values (500 and 1000) do not match the real 1:2 stoichiometry.
+- ch 3 [low] Section 3 (Ring-opening) and Exam trap 2: The sentence 'the repeat unit is not the monomer's double bond' is confusing and technically wrong. Ring-opening monomers such as caprolactam and ethylene oxide have a ring, not a C=C double bond, so there is no 'monomer's double bond' to speak of. A student may think ring-opening monomers contain a double bond.
+- ch 3 [low] Section 1 (heading and opening lines): The opening treats 'addition' and 'chain growth' as the same thing and 'condensation' and 'step growth' as the same thing, yet later the chapter says polyurethane is a step-growth polymer that releases no small molecule. The pairing addition = chain growth, condensation = step growth is only a rough rule, and the chapter never states that.
+- ch 4 [high] Section 1, catalyst reaction equation: The equation is not balanced. Left side has 4 Cl (TiCl4); right side has 3 (TiCl3) + 1 (Al(C2H5)2Cl) + 1 (C2H5Cl) = 5 Cl. Carbon and hydrogen balance, but chlorine does not, so the reduction step as written is impossible.
+- ch 4 [low] Section 2, stereoregularity paragraph: "Atactic polypropene is not the product" is too absolute and clashes with the earlier "largely isotactic". Industrial Ziegler-Natta polypropene is typically about 90-95% isotactic and always carries a small atactic or low-tacticity fraction.
+- ch 4 [low] Section 2, bullets on metallocenes: Metallocenes are not part of the Ziegler-Natta family; they are a separate class of single-site catalysts that also work by coordination-insertion. Calling them "of this family" can make a student write metallocene as a Ziegler-Natta catalyst in an exam.
+- ch 5 [low] Figure: The node 'Soft, low Tm' lists atactic PP, but atactic PP is amorphous and has no melting point Tm at all; the chapter itself states an amorphous polymer has only Tg. A student will read this as contradicting Section 3.
+- ch 5 [low] Section 3, first paragraph: 'Tg is not a sharp melting point' can be read as saying Tg is a kind of melting point that is merely broad. Tg is a glass-to-rubber transition, not melting. The opening line 'Two temperatures describe softening' adds to the confusion.
+- ch 5 [low] Section 1, paragraph 1: 'A linear chain ... can slide beside its neighbours' is unclear; chains do not slide past each other in a crystallite, they lie parallel.
+- ch 5 [low] Section 1, paragraph 3: The transparency statement is stated too absolutely: 'a clear bag is mostly amorphous' and 'high-density polyethylene is opaque'. Thin HDPE film is translucent, and LDPE bags are translucent rather than clear; only thick sections look opaque.
+- ch 6 [high] Lead and Section 2 (intro plus the Nylon 6 bullet): The lead says condensation polymers 'come from two bifunctional monomers and lose a small molecule such as water at every link', and Section 2 repeats 'between two monomers ... Every new bond releases one small molecule'. Nylon 6, listed three lines later as a condensation polymer, breaks both statements: it forms from one monomer (caprolactam) by ring opening and loses no small molecule at all, so its repeat-unit mass is identical to the monomer mass. A student who applies the stated rule to nylon 6 will subtract 18 g/mol and get a wrong repeat-unit mass.
+- ch 6 [low] Beyond: 'SBR and nitrile rubber dominate elastomer sales' is not correct. SBR is the largest-volume synthetic rubber, but nitrile rubber is a low-volume specialty rubber used for oil resistance; general-purpose rubbers such as butadiene rubber and natural rubber far outsell it.
+- ch 6 [low] Section 2, polycarbonate bullet: Every other bullet gives the number of small molecules lost per repeat unit, but polycarbonate says only 'HCl leaves'. Since two new carbonate links form per repeat unit, two HCl molecules leave, and a student needs that count for a mass calculation.
+- ch 6 [low] Section 1, paragraph after the table: 'Two entries deserve a second look' introduces a discussion of PTFE, PP and high-density PE — three entries, not two.
+- ch 7 [high] Section 2 (Mv and Mz formulas) and quiz Q5: The superscripts are missing, so the formulas read as products. As printed, Mv = (Σ Ni Mi1+a / Σ Ni Mi)1/a looks like Mi times (1+a), Mz = Σ Ni Mi3 / Σ Ni Mi2 looks like Mi times 3 and Mi times 2, and the Mark-Houwink relation reads [η] = K Mva (K times Mv times a). A student who follows the printed form gets the wrong average.
+- ch 7 [low] Section 1, first sentence after the lead: 'Write Ni for the number of chains that have molar mass Mi, in g/mol' puts the unit 'in g/mol' at the end, where it seems to describe Ni. Ni is a count with no unit; Mi carries the g/mol.
+- ch 7 [low] Figure: The y-axis is labelled 'weight fraction', but neither curve is normalised: the broad curve encloses about three times the area of the narrow one and its peak is slightly higher. A true weight-fraction plot puts the narrow sample's peak higher, not equal or lower.
+- ch 7 [low] Exam traps, second trap: The trap says molar mass must be in g/mol for PDI. PDI is a dimensionless ratio, so any single consistent unit works; what matters is that Mn and Mw use the same unit.
+- ch 7 [low] Section 3, osmometry: With c in kg/m³ and R = 8.314 J mol⁻¹ K⁻¹, the intercept RT/Mn comes out with Mn in kg/mol, while every other number in the chapter is in g/mol. The conversion is not mentioned.
+- ch 7 [low] Section 2, last paragraph: 'The exponent a tilts the weighting toward chains that swell the solution and raise viscosity' is vague: chains do not swell the solution; long chains have a larger hydrodynamic volume and raise viscosity more than their share of mass.
+- ch 8 [high] lead, section 2, worked example 1 step 5, figure-adjacent text: The powers of ten are written without superscripts, so the numbers are literally wrong: 'Conductivities reach 103 S/cm', 'reach 10−3 to 103 S/cm', 'the best samples approach 105 S/cm', 'Undoped conjugated polymers are near 10−10 S/cm', and in the worked example 'Copper is about 105 S/cm, which is 2 × 105 times larger'. A student reads these as 103, 105, 2 × 105 (= 210) and 10 − 10, which contradicts the text's own claim that copper is far better and makes the comparison in step 5 wrong by five orders of magnitude. The figure note ('σ up to 10³ S/cm') shows the intended form.
+- ch 8 [low] section 3, PEDOT:PSS bullet: Describing PEDOT as 'doped with polystyrene sulfonate' suggests PSS is an oxidising dopant like iodine. PSS is a polymeric sulfonate anion that sits beside the already-oxidised PEDOT chain and keeps it charge-balanced and water-dispersible; it does not remove electrons itself.
+- ch 8 [low] section 1, first paragraph: 'This delocalisation is why such chains absorb visible light' is too broad: whether the absorption falls in the visible depends on how long the conjugated segment is and on the gap. Short or wide-gap conjugated chains absorb in the near-UV and look colourless.
+- ch 9 [high] Lead: The claim that joining the two gives "more stiffness and strength per kilogram than either one" is false for the fibre. The chapter's own worked example proves it: the glass fibre alone has a specific modulus of 70 ÷ 2.5 = 28 GPa per g/cm³, while the composite is only 21.9. Along the fibre axis the composite is always weaker and less stiff per kilogram than the bare fibre; the real gain is over bulk metals and over the matrix alone.
+- ch 9 [high] Section 3, SiC–SiC uses: Aircraft brake discs are the standard example of carbon–carbon composites, not of SiC–SiC. Listing them under SiC–SiC teaches the wrong material for the wrong job.
+- ch 9 [low] Section 1, laminate bullet: A laminate is a way of stacking plies, not a fibre form like the other three bullets, and "stiff in two directions" is too narrow — plies can be laid at any angles, and a quasi-isotropic laminate is stiff in every in-plane direction.
+- ch 9 [low] Section 2, carbon bullet (also the lead): A cricket bat blade is willow. Carbon fibre appears only in the handle splice or toe guard of some bats, so listing "cricket bats" flatly under carbon fibre misleads.
+- ch 9 [low] Quiz Q6 answer (and Section 2, heat limit): The 120–150 °C limit is an epoxy figure. Standard polyester matrices are usable only to roughly 60–100 °C, so the answer overstates polyester's heat resistance.
+- ch 9 [low] Section 2, first paragraph: The cross-reference to the resins chapter is typed as plain text "(5.6)" instead of a chapter link, so a student reading on a phone cannot tap through.
