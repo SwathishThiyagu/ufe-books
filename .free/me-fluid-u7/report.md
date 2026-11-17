@@ -1,15 +1,14 @@
 # me-fluid-u7: free-model run
 
 - Book: `books/mech/me-fluid/me-fluid-u7.html`
-- Status: problems
+- Status: ok
 - Model calls so far: 28 (101,339 tokens in, 224,922 out), 5.9 minutes
 
 ## Checker
 
 ```
-me-fluid-u7.html: 8 chapters, 13971 words, 9 figures, 152 KB
-PROBLEMS:
- - text contains "as an AI"
+me-fluid-u7.html: 8 chapters, 13962 words, 9 figures, 152 KB
+OK
 ```
 
 ## For the reviewer
