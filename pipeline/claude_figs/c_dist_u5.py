@@ -201,3 +201,10 @@ def text_fixes(k):
 
 def drop_sources():
     return ['csail.mit.edu']
+
+
+def unit_fixes():
+    return [('a process that wants the section and has a lower timestamp replies at once, otherwise it defers the reply.',
+             'a receiver replies at once unless it is inside the section or wants it with a lower timestamp, in which case it defers the reply.'),
+            ('The token carries a queue Q of waiting processes and an array RN of the largest request number seen from each process.',
+             'The token carries a queue Q of waiting processes and an array LN of the last request number served for each process; every process keeps its own RN array of the largest request numbers it has seen.')]
