@@ -482,3 +482,50 @@ No stock recap icons (shield, refresh arrow, stopwatch, up arrow) and no tiny or
 other subjects: book wording, unit numbers in outros and cross-references, spoken Bloom levels, and the generator's
 "Sources the book draws on" line. New here: unit numbers inside figures and on-screen cross-references ("(Unit 4)"),
 and a narration sentence that names the wrong UML symbol for a multiplicity.
+
+## Digital Logic Design (17 Nov)
+
+Audited 17 Nov 2026: all 22 c-digital lessons (518 scenes), every scene, narration and frame (sheets at 0.92 and re-rendered
+at 0.995; the cut-off lines at 0.92 in u2-L1 sc4 and u2-L4 sc9 were typing animations and render whole at 0.995). Checker:
+0 page errors, 0 cue failures, 0 text outside the safe area on every sheet. None is on YouTube yet (videos.c-digital-uN.json:
+every "video" field empty). Every number, base conversion, complement, IEEE 754 encoding, truth table, K-map, QM chart, adder,
+CLA, BCD adder, comparator, MUX table, FSM table, counter sequence, flip-flop conversion, memory sizing, LUT, CMOS power,
+fan-out, noise margin, DAC/ADC and SAR value was recomputed (mostly in Python); the Verilog was traced by hand (no simulator
+installed). Two wrong facts survived.
+
+c-digital-u2-L3 | notebook (6) | SOP B′D′ + B′C′ + A′C′D called "8 literals"; it has 7 (2 + 2 + 3); the POS map caption repeats "6 literals, against 8" (from book 2.5) | wrong fact: must fix
+c-digital-u3-L2 | trap2 (11) | dropping K "makes 9 + 9 read digit two with a carry: twelve" and the display shows 12; without K, C = 0 and the second adder's carry-out is unused, so it reads 02 with no carry | wrong fact: must fix
+c-digital-u2-L1 | notebook (11) | "the complement of G": G = A(B′C + BC′) is never shown before G′ = A′ + BC + B′C′ | misleading: should fix
+c-digital-u2-L2 | notebook (5) | prime-detector braces span rows 4–6 for AC′ and 5–7 for AC, so each covers a row its term doesn't (AC′ is rows 4, 6; AC is rows 5, 7): picture contradicts the narration | misleading: should fix
+c-digital-u4-L1 | notebook (5) | text says "Z = Q" but the table's Z column copies Q⁺ (1, 0, 0, 1), not the present-state Q column (0, 1, 0, 0) | misleading: should fix
+c-digital-u4-L3 | calc (6) | "On a warm day, dt is seven": heat raises gate delay, it doesn't lower it (same wording in book 4.5) | misleading: should fix
+c-digital-u5-L4 | pq/pa (15, 16) | Q2 says the table "has rows 00 and 11 only", then lists rows 01 and 10 | misleading: should fix
+c-digital-u6-L2 | calc (13, 14) | question board lists only the currents; the 11 ns gate delay, 15 ns clock-to-Q and 20 ns setup used later appear from nowhere (the book gives them) | misleading: should fix
+c-digital-u6-L3 | bookfig (9) | R-2R figure has no bit switches, no op-amp + input and no Rf, while the narration says each bit switch ties its leg to the reference and the figure shows V_out = −I·R_f (book fig 6.7.1 also lacks Rf) | misleading: should fix
+c-digital-u2-L1, u2-L2, u3-L3, u4-L1, u4-L2, u5-L1, u5-L3, u6-L2 | agenda (1); bookfig (u3-L3 3, u5-L3 3) | "Chapters x to y of your book" on the agenda; spoken "the figure from your book", "Your book's Mealy detector" (must be "your free notes") | misleading: should fix
+c-digital-u1-L1, u1-L2, u3-L1 | pq (u1-L1 15/17/19; u1-L2 17/19/21; u3-L1 15/17/19) | spoken Bloom levels: "An understand / apply / analyze question", "Question two, at the apply level", "Question three, analyze" (9 lines) | should fix
+c-digital-u1-L3, u2-L4, u3-L4, u4-L4, u5-L4 | outro (22, 22, 25, 28, 20) | "Next time, Unit two/three/four/five/six" spoken; "NEXT UNIT, Unit N" card (book2lesson.py line 548) | should fix
+c-digital-u4-L2 | part (8) | "this unit" in the narration | should fix
+all 22 | figs (second to last) | "Sources the book draws on: …" shown (book2lesson.py lines 433/436); u2-L2 (20) and u2-L3 (23) notes also say "this unit" | cosmetic
+all 22 (generator) | every scene header | "UNIT n · LESSON k OF K" kicker on every page (book2lesson.py line 358) | cosmetic
+all 22 (engine) | pq, pa | on-screen "QUESTION n · UNDERSTAND / APPLY / ANALYZE" label | cosmetic
+c-digital-u1-L2, u5-L1 | calc (12, 13), notebook (3) | caret maths on screen: "2^(e − 127)", "2^(m+n)" | cosmetic
+c-digital-u1-L3, u3-L1, u3-L4, u4-L4, u5-L1, u5-L2, u6-L2, u6-L3 | u1-L3 10; u3-L1 8; u3-L4 3; u4-L4 5, 6, 7, 17, 18; u5-L1 5; u5-L2 4, 5, 6, 11, 13; u6-L2 3, 4, 11, 12; u6-L3 9, 10 | underscore subscripts on screen (t_cq, f_max, V_out, D_A, C_in, d_min, NM_H …) instead of real subscripts | cosmetic
+c-digital-u5-L2 | recap (13) | stock icons: network graph for "Design", refresh arrows for "Reduction", stopwatch for "Timing" | cosmetic
+c-digital-u2-L3 | recap (16) | plain green check mark for "The cover" | cosmetic
+c-digital-u1-L2 | recap (16) | tiny 4-bit boxes and a faint float bar; "SUBTRACT BY ADDING" tab runs past its card into the IEEE tab (confirmed at 0.995) | cosmetic
+c-digital-u2-L2 | recap (13) | truth-table picture too small to read | cosmetic
+c-digital-u6-L1 | recap (17) | bare decoder lines and small AND/OR boxes: faint, says little | cosmetic
+c-digital-u3-L2 | bookfig (8) | Z wire runs through the "adds 0 C C 0" label (confirmed at 0.995) | cosmetic
+c-digital-u4-L3 | hookArt (0) | opens on "Imagine …" | cosmetic
+c-digital-u3-L3 | outro (22) | narration promises "decoders, encoders and priority encoders"; the next card says "Decoders · Code converters and seven-segment" | cosmetic
+c-digital-u5-L3 | outro (22) | narration promises "flow tables, races, cycles and race-free assignment"; the next card says "Flow tables · Hazards" | cosmetic
+
+Not slop (checked): no college names, TODO, placeholder or site/finder lines; "undefined" (u6-L2) is the TTL undefined
+band; "essential" is essential prime implicants and essential hazards; no repeated sentences beyond the template lines;
+"<" and "<=" in u3-L3 Q3 and the u6-L3 Verilog are real operators. Same patterns as the other subjects (book wording,
+unit numbers in outros, spoken Bloom, generator lines on every lesson, stock recap icons). New here: errors carried
+straight from the unit book (literal count, warm-day delay, R-2R figure without Rf), so the book needs the same fix as
+the lesson; pictures that disagree with their own table (braces over the wrong rows, Z copied from the wrong column);
+calc boards that hide givens used later; trap answers that don't follow from the stated mistake; outro promises that
+don't match the next lesson's card; ASCII maths (^, _) on screen.
