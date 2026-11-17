@@ -307,3 +307,19 @@ def text_fixes(k):
 def drop_sources():
     # university-hosted pages: the books name no universities
     return ['homepages.inf.ed.ac.uk']
+
+
+def chapter_fix(k, ch):
+    # cross-links the writer gave with single quotes or numeric anchors print as literal "<a href=...>" text: repair them
+    import re
+    anchors = {'4.5': 'digital-audio-and-video-file-formats', '4.9': 'synchronization-in-multimedia-presentations'}
+
+    def fix(s):
+        s = re.sub(r"<a href='(#[^']+)'>", r'<a href="\1">', s)
+        return re.sub(r'<a href="#(4\.\d)">', lambda m: f'<a href="#{anchors.get(m.group(1), m.group(1))}">', s)
+
+    def walk(x):
+        if isinstance(x, dict): return {a: (b if a == 'figure' else walk(b)) for a, b in x.items()}
+        if isinstance(x, list): return [walk(v) for v in x]
+        return fix(x) if isinstance(x, str) else x
+    return walk(ch)
