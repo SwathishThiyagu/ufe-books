@@ -5,6 +5,7 @@ usage: python3 lesson_build.py lesson.js out.html [--silent] [--check] [--reuse]
   --check   evaluate the lesson, render every scene, check cues and narration, print the report, build nothing
   --silent  build a draft with estimated timing and no voice (for layout work)
   --reuse   keep the voice already built (out.mp3 and out.words.json beside out.html) when only the drawing or the engine changed
+  --revoice keep the voice of every unchanged line (from out.mp3 and out.words.json) and voice only the new or changed lines
   --no-bumper  build without the channel logo (by default the red panda crossfade plays at the top right over the hook, its three
             poses on the hook's caption cues, and returns over the last 6 s with the Like and Subscribe pills and their sounds;
             poses and sounds come from bumper/ beside this script; nothing is added to the running time)
@@ -109,6 +110,53 @@ def voice(scenes, out_base, voice, speed, gap, lead):
     os.remove(wav)
     return [dict(start=l['start'], end=l['end'], text=l['text'], words=l['words']) for l in lines], total, mp3
 
+def revoice(scenes, base, vo, speed, gap, lead):
+    """Keep the voice of every line whose narration is unchanged (cut from base.mp3 at its words.json start and end) and voice
+    only the new or changed lines with Kokoro; then lay the lines out again with the usual lead and gaps. New clips are scaled
+    to the reused clips' loudness before the whole track gets the same loudnorm pass as a full build."""
+    import numpy as np
+    sys.path.insert(0, KOKORO); import kokoro_tts as K
+    load_pron(K); SR = K.SR
+    W = json.load(open(base + '.words.json', encoding='utf-8'))
+    if W.get('premixed'): sys.exit('--revoice: the old voice track has the end-card sounds mixed in; build without --revoice')
+    if (W.get('voice'), float(W.get('speed', 1.0))) != (vo, float(speed)): sys.exit(f"--revoice: the old track is {W.get('voice')} at {W.get('speed')}; build with the same voice and speed or without --revoice")
+    raw = subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', base + '.mp3', '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True, check=True).stdout
+    old = np.frombuffer(raw, dtype=np.float32)
+    used, plan = set(), []
+    for i, sc in enumerate(scenes):
+        txt = clean(sc['say'])
+        cand = [i] if i < len(W['lines']) and W['lines'][i]['text'] == txt and i not in used else []
+        cand = cand or [j for j, l in enumerate(W['lines']) if l['text'] == txt and j not in used][:1]
+        if cand: used.add(cand[0]); plan.append(('old', cand[0]))
+        else: plan.append(('new', None))
+    clips, metas, rms_old = [], [], []
+    for (kind, j), sc in zip(plan, scenes):
+        if kind == 'old':
+            l = W['lines'][j]; a = old[int(round(l['start'] * SR)):int(round(l['end'] * SR))].copy()
+            clips.append(a); metas.append({'text': l['text'], 'words': [[w, round(t - l['start'], 3)] for w, t in l['words']]})
+            if len(a): rms_old.append(float(np.sqrt(np.mean(a ** 2))))
+        else:
+            a, m = K.speak(sc['say'], vo, speed)
+            clips.append(a); metas.append({'text': m['text'], 'words': m['words'], 'new': True})
+    ref = float(np.median(rms_old)) if rms_old else None
+    for k, m in enumerate(metas):
+        if m.get('new') and ref and len(clips[k]):
+            r = float(np.sqrt(np.mean(clips[k] ** 2)))
+            if r > 0: clips[k] = np.clip(clips[k] * (ref / r), -1, 1)
+    parts, lines, n = [np.zeros(int(lead * SR), np.float32)], [], int(lead * SR)
+    for k, (a, m, sc) in enumerate(zip(clips, metas, scenes)):
+        t = n / SR
+        lines.append(dict(start=round(t, 3), end=round(t + len(a) / SR, 3), text=m['text'], words=[[w, round(t + wt, 3)] for w, wt in m['words']]))
+        parts.append(a.astype(np.float32)); n += len(a)
+        parts.append(np.zeros(int(max(0.0, gap + sc['pause'] - K.PAD_IN - K.PAD_OUT) * SR), np.float32)); n += len(parts[-1])
+    wav = base + '.revoice.wav'; K.write_wav(wav, np.concatenate(parts))
+    mp3 = base + '.mp3'
+    subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', wav, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '112k', mp3], check=True)
+    os.remove(wav)
+    nn = sum(1 for k, _ in plan if k == 'new')
+    print(f'--revoice: {len(scenes) - nn} lines reused, {nn} voiced again' + (': scenes ' + ', '.join(str(i + 1) for i, (k, _) in enumerate(plan) if k == 'new') if nn else ''))
+    return lines, n / SR, mp3
+
 def bumper_overlay(total, poses):
     """The channel logo as an SVG overlay with CSS keyframes on the page timeline (the CBSE lessons' converter-safe way):
     the three poses crossfade 2 s each at the top right over the first INTRO s (pop in, pop out) and again, larger, over the last OUTRO s,
@@ -173,8 +221,8 @@ def bumper_overlay(total, poses):
     return svg, css
 
 def main(args):
-    silent = '--silent' in args; chk = '--check' in args; reuse = '--reuse' in args; nobump = '--no-bumper' in args
-    args = [a for a in args if a not in ('--silent', '--check', '--reuse', '--no-bumper')]
+    silent = '--silent' in args; chk = '--check' in args; reuse = '--reuse' in args; rev = '--revoice' in args; nobump = '--no-bumper' in args
+    args = [a for a in args if a not in ('--silent', '--check', '--reuse', '--revoice', '--no-bumper')]
     vo = opt(args, '--voice', 'af_heart'); speed = opt(args, '--speed', 1.0, float); gap = opt(args, '--gap', 0.55, float); lead = opt(args, '--lead', 0.3, float)
     if len(args) < 2: sys.exit(__doc__)
     lesson, out = args[0], args[1]
@@ -196,11 +244,14 @@ def main(args):
     elif reuse and os.path.exists(base + '.mp3') and os.path.exists(base + '.words.json'):
         W = json.load(open(base + '.words.json', encoding='utf-8')); lines, total, mp3 = W['lines'], W['total'], base + '.mp3'
         premixed = bool(W.get('premixed'))   # audio taken from a built lesson: the pill sounds are already in it
-        if len(lines) != len(scenes): sys.exit(f'--reuse: {len(lines)} voiced lines but {len(scenes)} scenes; the narration changed, build without --reuse')
+        if len(lines) != len(scenes): sys.exit(f'--reuse: {len(lines)} voiced lines but {len(scenes)} scenes; the narration changed, build with --revoice')
         for l, sc in zip(lines, scenes):
-            if l['text'] != clean(sc['say']): sys.exit(f"--reuse: scene {sc['i']+1} narration changed, build without --reuse")
+            if l['text'] != clean(sc['say']): sys.exit(f"--reuse: scene {sc['i']+1} narration changed, build with --revoice")
         print('voice reused from', mp3)
+    elif rev and os.path.exists(base + '.mp3') and os.path.exists(base + '.words.json'):
+        lines, total, mp3 = revoice(scenes, base, vo, speed, gap, lead)
     else:
+        if rev: print('--revoice: no out.mp3 and out.words.json beside the output, so every line is voiced')
         lines, total, mp3 = voice(scenes, base, vo, speed, gap, lead)
     # the channel bumper: poses beside this script; the audio gets BUMPER_IN s of silence before and BUMPER_OUT s after, and every time shifts
     poses = [os.path.join(HERE, 'bumper', f'pose{k}.png') for k in range(3)]
