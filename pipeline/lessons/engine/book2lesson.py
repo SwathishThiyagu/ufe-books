@@ -488,7 +488,34 @@ reference lessons unless something below is unclear; `lesson_kinds.md` has the f
   `<lesson>.pron.json` beside it (never edit another lesson's file; the build reads the engine's, the folder's and yours).
   A bare letter A is written `[A](/ˈA/)`.
 - US spellings in `say` (the on-screen text may keep the book's spelling).
-- No college or university names anywhere.
+- No college or university names anywhere, and no real organisation's brand in examples.
+
+## Text the check fails (SLOP.md rules; they run on every `say`, on the text each scene draws, and on META)
+
+- "book" in any form ("your book", "the book's figure", "unit book"): say "your free notes"; "of your notes" without "free".
+- Unit numbers or unit references ("Unit two", "this unit", "all six units", "(Unit 4)"): the syllabus is universal, so
+  name the topic instead ("in the lesson on phase estimation", "next time: process scheduling").
+- Bloom levels, spoken or shown ("An apply question", "at the analyze level", "Question two, apply."): say only
+  "Question one / two / three".
+- Caret or underscore maths on screen (`2^(n−1)`, `x_i`, `S_W`): use ² ⁻¹ ₐ or a sub/sup tspan
+  (`V<tspan baseline-shift="sub" font-size="70%">in</tspan>`). Code in a monospace font is exempt.
+- A site or finder line ("find this unit in your syllabus on the site"): there is no site yet.
+- A real content phrase that trips a rule ("booking site", "OP_DUP", "the library issues the book") goes in
+  `META.allow:['booking site']`. Warnings (printed, not failing): built-in recap icons, Indian and Western number
+  grouping in one lesson, filler words (imagine, journey, crucial, amazing, delve, unlock).
+
+## Facts (a fact review recomputes these before the subject is approved)
+
+- Every `pq` shows all its givens on screen; its `pa` uses only those and what the lesson showed. A question that
+  reuses or changes the worked example's data says so.
+- A trap's "Don't write" must be wrong under every common convention, and its stated wrong result must be what that
+  mistake really produces (recompute it). If the rule depends on a convention, the card names it.
+- Software, protocol and kernel behaviour names its version or era on screen ("since GCC 14", "since React 17",
+  "before the Merge, 2022"); keep the book's caveats ("simplified", "for every p", "sufficient, not necessary").
+- Draw the end state the line states, in the colours the numbers give; a picture never contradicts its narration.
+- Code on screen is complete and runs as shown, or is marked `frag:true`; output shown is what it prints.
+- If you find an error in the book, write it in your hand-back; do not narrate around it.
+- Recap pictures are the lesson's own (draw them in `EXTRA` as `ICON.name`), filling most of their card.
 
 ## Pictures on every list page (required)
 
@@ -517,8 +544,9 @@ python3 $E/lesson_sheet.py out.html sheet/ --frames --play
 
 The sheet must end clean: 0 page errors, 0 cue failures, 0 text outside the safe area, play-through OK. Then look
 only at: `sheet/sheet.png` (once, whole lesson), every frame the report lists, the `bookfig` and `calc` frames, and
-the four logo frames `B_*`. Fix what is wrong and rebuild with `--reuse` (keeps the voice) when only the drawing
-changed.
+the four logo frames `B_*`, and every layout warning it prints (text over text, text past its card, small recap
+pictures, book figures under half the stage or cut). Fix what is wrong and rebuild with `--reuse` (keeps the voice) when
+only the drawing changed, or `--revoice` (voices only the changed lines) when some narration changed.
 """
 
 
