@@ -261,6 +261,8 @@ def text_fixes(k):
              'Use the outlet only after the scene has loaded: before viewDidLoad it is still nil, so any use in an initializer or an early property observer crashes.'),
             ('written by fareLabel.text = "₹92" when the button is tapped.',
              'written by fareLabel.text = String(format: "₹%.2f", fare) when the button is tapped.')],
+        6: [('With one section the code still works, so the bug appears only when a second section is added.',
+             'With one section, section is always 0, so every row shows fares[0]; index the model array with indexPath.row.')],
         7: [(' Only a few universities teach priorities at this depth.', '')],
         8: [(' Only a few universities teach segues in detail.', '')],
     }.get(k, [])
