@@ -281,6 +281,8 @@ def spec(k):
     d = {'caption': cap, 'spec': {'type': 'svg', 'h': h, 'body': body, 'aria': aria}}
     if k in AFTER: d['after_section'] = AFTER[k]
     return d
+TEXT[1] = [('The reverse is P(the | cat)=c(the cat)/c(cat)=2/2=1.00. They are not equal, so the direction matters.',
+            'Reading the same count the other way round gives c(the cat)/c(cat)=2/2=1.00, but that is not a probability the model defines: the real P(the | cat)=c(cat the)/c(cat)=0/2=0. The numbers differ, so the direction matters.')]
 
 
 def text_fixes(k):
