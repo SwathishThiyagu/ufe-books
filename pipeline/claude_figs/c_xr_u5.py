@@ -218,6 +218,7 @@ FIG[8] = (f8, 'Design B wins on both measures: 90% completion against 80%, and 7
 
 
 TEXT = {
+    3: [('An app accepts voice and gesture. In 100 commands', 'An app accepts voice, gesture and menu commands. In 100 commands')],
     4: [('Only a few universities teach X3D in detail; most teach the same tree idea through an engine.',
          'Most courses teach the same tree idea through an engine rather than through X3D.')],
 }
