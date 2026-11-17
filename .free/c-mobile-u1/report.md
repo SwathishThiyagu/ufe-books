@@ -2,7 +2,7 @@
 
 - Book: `work/claude_figs/c-mobile-u1/tree/books/cse/c-mobile/c-mobile-u1.html`
 - Status: ok
-- Model calls so far: 37 (130,338 tokens in, 239,258 out), 6.5 minutes
+- Model calls so far: 37 (130,338 tokens in, 239,258 out), 6.6 minutes
 
 ## Checker
 
