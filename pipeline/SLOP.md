@@ -735,3 +735,71 @@ Count: 4 must fix, 24 should fix, 16 cosmetic (44 lines). Patterns: four wrong t
 delegation, Angular currency pipe, Mongo updateOne), version-dependent behaviour stated as current (JSX runtime,
 *ngIf/*ngFor, the HTML outline, PWA install), "book" wording (6 agendas, 4 lessons spoken, 23 sources lines), unit numbers
 in 6 outros plus one site/finder line, spoken Bloom levels in 9 lessons, and one writer's "from memory; check" note on screen.
+
+## Machine Learning (18 Nov)
+
+Audited 17–18 Nov 2026: all 19 c-ml lessons (04_Lessons/cse/c-ml/_work/u1–u6/out, byte-identical to the PC copy
+B.Tech/CSE/Machine Learning/html), every scene, narration and last frame (SC dump plus rendered text at 0.995; sheets
+at 0.92 and again at 0.995). Checker: 0 page errors, 0 cue failures, 0 text outside the safe area on every sheet.
+Recomputed every worked example and model answer: accuracy and train/test gaps, the 90%/recall-0 loan model, Find-S
+and candidate elimination (S, G, version space), least squares (Sxy, Sxx, b0, b1, SSE, MSE), every gradient-descent
+step and J value, sigmoid values and the decision boundary, logistic gradients, ridge/lasso values, confusion-matrix
+precision/recall/F1/specificity, CV mean, entropy and information gain, ID3 split, Naive Bayes scores and posterior,
+Laplace smoothing, Bayes optimal classifier, Bayes-net joint and P(S), kNN distances and weights, SVM w, b and margin,
+AdaBoost ε, α and reweighting, LWR normal equations, k-means distances, centroids and SSE, single linkage, EM
+responsibilities and means, PCA covariance, eigenvalues and projections, LDA S_W, S_B, w and projections, silhouettes,
+fuzzy c-means memberships and centres, perceptron runs and MP units, 2–3–1 and 3–4–2 parameter counts, XOR outputs,
+softmax and cross-entropy, sigmoid backprop (δ and the updated weight), momentum steps, L2 decay, vanishing-gradient
+products, convolution and max-pool maps, CNN parameter counts, RNN states and gradient factors, discounted returns,
+TD error, Q-learning and SARSA updates, rule precision and FOIL gain. All exam traps checked; the script found no
+near-duplicate traps. Scene = 0-based SC index (the Lnn.png number).
+No spoken Bloom words (every pq says "Question one/two/three"), no site/finder line, no filler, no TODO; next-lesson
+cards are whole titles. None of these lessons is on YouTube (live false, not uploaded).
+META.subject is "biotech" on all 19 lessons (should be the ML subject id).
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-ml-u1-L2 | notebook (4) | art (u1/out/c-ml-u1-L2.js, writer-made) shows the MAP rule as "h* = arg max P(h) over H", which picks by the prior alone; MAP is argmax_h P(D\|h) P(h) (the notes: argmax [log P(D\|h) + log P(h)]) | wrong fact: must fix
+c-ml-u1-L2 | notebook (4) | design-cycle snake numbered 1 T,P,E · 2 collect · 3 prepare · 4 features · 5 deploy · 6 test once · 7 algorithm · 8 space H: row 2 is numbered backwards, so deploy comes before H, algorithm and test, against the narration and card ("data, features, H, algorithm, test, deploy") | misleading: should fix
+c-ml-u1-L3 | pa (17) | Find-S "why ignore negatives": "No step rejects a negative, so its final hypothesis may cover one", and the picture shows a covered negative. The reason is the opposite: if the target is in H and the data has no noise, the most specific consistent h can never cover a negative, so negatives need no update | misleading: should fix
+c-ml-u2-L2 | trap2 (7) | "Don't write: the answer is p = 0.73", but worked example (a) asks for p at x = 3, and 0.731 is exactly that answer; the trap only holds when the question asks for the class | misleading: should fix
+c-ml-u3-L3 | trap2 (13) | "salary differences are about a million times bigger": the squared terms differ by about 3×10⁶ (8.1×10⁹ vs 2.7×10³); the differences themselves differ by about 1,700× | misleading: should fix
+c-ml-u5-L2 | calc (6, 7) | worked example counts a 2–3–1 network (13 parameters), then runs XOR with only two hidden units h₁, h₂; the third hidden unit is never defined (same mismatch in the c-ml-u5 notes, 5.3 worked example) | misleading: should fix
+c-ml-u5-L3 | trap2 (8) | "Don't write the L2 gradient as λw", but u2-L3 (notebook 9, calc 10) uses ridge ½λw², whose gradient is λw; the trap should name its λw² convention instead of calling λw wrong | misleading: should fix
+c-ml-u5-L4 | calc (13), recap (15) | "Ten steps: 0.1201⁵ ≈ 0.000025" repeats the two-step factor five times; this RNN's real ten-step product (x = 1 each step) is ≈ 3.0×10⁻⁶ (the notes hedge with "ten similar steps"; the lesson does not) | misleading: should fix
+c-ml-u6-L2 | bookfig (8), notebook (10) | FOIL gain "3 × [log₂(3/3) − log₂(4/8)] = 3": the binding counts (4 of 8 before, 3 of 3 after) are given on the board but never derived, and they do not follow from the family tree shown | misleading: should fix
+c-ml-u6-L1 | bookfig (10) | spoken "the book's Python code" (must be "your free notes") | should fix
+c-ml-u1-L3 | outro (23) | "Next time, Unit two…" spoken; "NEXT UNIT · Unit 2" card | should fix
+c-ml-u2-L3 | outro (25) | "Next time, unit three…" spoken; "NEXT UNIT · Unit 3" card | should fix
+c-ml-u3-L4 | outro (24) | "Next time, Unit four…" spoken; "NEXT UNIT · Unit 4" card | should fix
+c-ml-u4-L3 | outro (29) | "Next time, Unit five…" spoken; "NEXT UNIT · Unit 5" card | should fix
+c-ml-u5-L4 | outro (23) | "Next time, unit six…" spoken; "NEXT UNIT · Unit 6" card | should fix
+c-ml-u6-L2 | outro (25) | "revise all six units" spoken; end card "All six units, with your free notes" | should fix
+c-ml-u1-L1, u2-L2, u3-L3 | hookArt (0) | three spam-email hooks | should fix
+c-ml-u4-L1, u4-L2, u4-L3 (and u2-L1) | hookArt (0) | shop-customer hook in three lessons in a row (u2-L1 is a shop too) | should fix
+c-ml-u1-L2, u2-L3 | hookArt (0) | same joke twice: model looks great, the team celebrates ("orders cake" / "high-fives"), then it fails | should fix
+all 19 lessons | META | META.subject = "biotech" | should fix
+all 19 lessons | figs ("For your notes" scene) | "Sources the book draws on: …" on screen | cosmetic
+c-ml-u2-L2 | notebook (4), calc (5, 6), pa (17) | caret maths: "e^(−z)", "e^(−1)", "e^(3)", "e^(−3)" | cosmetic
+c-ml-u3-L4 | bookfig (4), calc (6, 7), trap2 (8) | caret maths: "e^α", "e^−α", "e^0.5493" | cosmetic
+c-ml-u5-L2 | calc (12) | caret maths: "e^zᵢ" | cosmetic
+c-ml-u4-L3 | 3, 6, 7, 8, 10, 16, 17, 18, 21, 24, 25, 27 | underscore subscripts outside code: S_W, S_B, μ_c, N_c, u_ij, d_ij, S_i, M_ij, μ_1 | cosmetic
+c-ml-u1-L3, u3-L3, u3-L4, u4-L2 | notebook (12); calc (5, 6, 11, 12); calc (13, 14); notebook (10) | underscore subscripts: n_train, n_test; Σ_S, Σ_F, x_Q, x_i, w_i; S_x, S_xx, S_y, S_xy; W_k | cosmetic
+c-ml-u5-L2, u5-L3, u5-L4 | notebook (5, 16); notebook (11); notebook (4), calc (6, 19) | code-style names in prose: a_prev, fan_in, C_in (u6-L2 route_clear is a predicate name and can stay) | cosmetic
+c-ml-u1-L2, u2-L2, u2-L3, u3-L4, u4-L2, u5-L1, u5-L2, u5-L3, u5-L4, u6-L2 | recap | tiny pictures: a small icon in a circle, about 1/5 of the card | cosmetic
+c-ml-u4-L3, u3-L1 | recap | Fuzzy card is a thin bar; MAP/MLE card is generic bars | cosmetic
+c-ml-u3-L1, u3-L4, u6-L1, u1-L2 | bookfig (3); bookfig (3); bookfig (10); bookfig (3) | mostly empty stage: two orphan arrows on an empty card; a small table; a small figure; sparse | cosmetic
+c-ml-u4-L1 | notebook (9) | sparse picture | cosmetic
+c-ml-u4-L3 | bookfig (4) | caption "w joins the two class means", but the drawn w starts at the origin and passes through neither mean; the "(1, 2)" label covers the y-axis tick "2" | cosmetic
+c-ml-u4-L3 | bookfig (11) | "A 0.868" label sits on the axis "0" | cosmetic
+c-ml-u4-L1 | bookfig (5) | the 1,000 and 5,000 tick labels sit under the centroid markers | cosmetic
+c-ml-u5-L2 | bookfig (10) | the 0.245 value overlaps its probability bar | cosmetic
+c-ml-u3-L3 | bookfig (9) | the k circle crosses the "2" tick labels | cosmetic
+c-ml-u2-L1 | calc (5) | b₁ = 2 is only spoken, not on the board | cosmetic
+c-ml-u5-L3 | pa (19) | Q2 asks for the velocity and the weight after two steps; the board shows only w (v₂ = 0.95 is implicit) | cosmetic
+
+Count: 1 must fix, 19 should fix, 18 cosmetic (38 lines). Patterns: one wrong formula in writer-made art (u1-L2 MAP),
+traps and model answers that call a valid convention or the correct answer wrong (u2-L2, u5-L3, u1-L3), worked examples
+whose givens are missing or inconsistent (u5-L2 hidden unit, u6-L2 bindings, u5-L4 ten steps), unit numbers in all
+6 last-lesson outros, META.subject "biotech" everywhere, repeated spam/shop/celebration hooks (8 lessons), caret and
+underscore maths (12 lessons), tiny recap pictures (10 lessons).
