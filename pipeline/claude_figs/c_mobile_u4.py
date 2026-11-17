@@ -168,8 +168,8 @@ def f5():
     o.append(L(127, 252, 127, 290, AC, 2, arrow='n'))
     o.append(R(16, 294, 688, 92, LVS, LV, 8, 2))
     o.append(T(30, 318, 'PDF viewer', 14, 'start', bold=True))
-    o.append(T(30, 342, '✓ openInputStream(uri) reads exactly 1,572,864 bytes of this one file', 14, 'start', LV))
-    o.append(T(30, 366, '✗ cannot list reports/, cannot write; the grant ends with the receiving activity', 14, 'start', NX))
+    o.append(T(30, 342, '✓ openInputStream(uri) reads exactly 1,572,864 bytes of this one file', 14, 'start', NX, True))
+    o.append(T(30, 366, '✗ cannot list reports/, cannot write; the grant ends with the receiving activity', 14, 'start', LV))
     return 400, ''.join(o)
 FIG[5] = (f5, 'FileProvider turns the private report.pdf into a content URI; an ACTION_SEND intent carries it with FLAG_GRANT_READ_URI_PERMISSION through the chooser. The viewer may read the 1,572,864 bytes of that one file, and nothing else.',
           'A private folder holding report.pdf; an arrow to FileProvider making a content URI; an intent box with ACTION_SEND, the URI and the read flag; a chooser; and the viewer, which can read the file but cannot list the folder or write.')
