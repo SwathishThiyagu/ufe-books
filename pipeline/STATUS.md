@@ -55,18 +55,18 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-data-u1 | main (library only, apply_html.py) | 1–5 | OK | 10 Nov 2026 |
 | c-toc-u2 | ds/c-toc-u2-book | 1–9 | OK | 10 Nov 2026 |
 | c-data-u2 | main (library only, apply_html.py) | 1–9 | OK | 10 Nov 2026 |
-| c-graphics-u1 | free/c-graphics-u1-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u1 | free/c-graphics-u1-book | 1–9 | OK (library added; figure text: ch 2, 3, 5, 9; university counts removed) | 17 Nov 2026 |
 | c-data-u3 | main (library only, apply_html.py) | 1–8 | OK | 10 Nov 2026 |
 | c-data-u4 | main (library only, apply_html.py) | 1–7 | OK | 10 Nov 2026 |
-| c-graphics-u2 | free/c-graphics-u2-book | 1–8 | OK | 10 Nov 2026 |
+| c-graphics-u2 | free/c-graphics-u2-book | 1–8 | OK (library added; figure text: ch 1, 4; university counts removed) | 17 Nov 2026 |
 | c-data-u5 | main (library only, apply_html.py) | 1–9 | OK | 10 Nov 2026 |
 | c-data-u6 | main (library only, apply_html.py) | 1–8 | OK | 10 Nov 2026 |
-| c-graphics-u3 | free/c-graphics-u3-book | 1–8 | OK | 10 Nov 2026 |
-| c-graphics-u4 | free/c-graphics-u4-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u3 | free/c-graphics-u3-book | 1–8 | OK (library added; university counts removed; MIT OCW source dropped) | 17 Nov 2026 |
+| c-graphics-u4 | free/c-graphics-u4-book | 1–9 | OK (library added; figure text: ch 3, 7; university counts removed; Edinburgh source dropped) | 17 Nov 2026 |
 | c-cv-u1 | free/c-cv-u1-book | 1–9 | OK (library updated) | 10 Nov 2026 |
-| c-graphics-u5 | free/c-graphics-u5-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u5 | free/c-graphics-u5-book | 1–9 | OK (library added; figure text: ch 1 quiz; university counts removed; MIT and CMU sources dropped) | 17 Nov 2026 |
 | c-cv-u2 | free/c-cv-u2-book | 1–8 | OK (library updated) | 10 Nov 2026 |
-| c-graphics-u6 | free/c-graphics-u6-book | 1–9 | OK | 10 Nov 2026 |
+| c-graphics-u6 | free/c-graphics-u6-book | 1–9 | OK (library added; university counts removed; ch 1 quiz rounding 0.6339% → 0.6340%) | 17 Nov 2026 |
 | c-cv-u3 | free/c-cv-u3-book | 1–9 | OK (library updated) | 10 Nov 2026 |
 | c-cv-u4 | free/c-cv-u4-book | 1–9 | OK (library updated) | 10 Nov 2026 |
 | c-cv-u5 | free/c-cv-u5-book | 1–9 | OK (library updated) | 10 Nov 2026 |
@@ -107,3 +107,45 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-se-u4 | free/c-se-u4-book | 1–9 | OK (library updated; university colour codes removed) | 11 Nov 2026 |
 | c-se-u5 | free/c-se-u5-book | 1–8 | OK (library updated; university colour codes removed) | 11 Nov 2026 |
 | c-se-u6 | free/c-se-u6-book | 1–9 (figure text: ch 8, 9) | OK (library updated; university colour codes and university-hosted sources removed) | 11 Nov 2026 |
+| c-quantum-u1 | free/c-quantum-u1-book | 1–7 | OK (library updated; 4 wrong statements fixed; 2 university sources dropped) | 17 Nov 2026 |
+| c-nlp-u1 | free/c-nlp-u1-book | 1–8 (figure text: ch 5, 6 wrong step reasons fixed) | OK (library updated; Porter step and FST analysis reasons corrected; university-hosted sources dropped) | 17 Nov 2026 |
+| c-mobile-u1 | free/c-mobile-u1-book | 1–8 (figure text: ch 2) | OK (library added; university counts removed; NPTEL source dropped; 1.3 frame bracket spans slots 0 to 7) | 17 Nov 2026 |
+| c-dist-u1 | free/c-dist-u1-book | 1–8 | OK (library updated; university mention in 1.4 removed; butterfly link rule in 1.5 corrected; 1.2 SIMD/MIMD wording and 1.4 priority-CRCW winner fixed) | 17 Nov 2026 |
+| c-block-u1 | free/c-block-u1-book | 1–7 (figure text: ch 3) | OK (library added; MIT and Princeton course pages dropped) | 17 Nov 2026 |
+| c-quantum-u2 | free/c-quantum-u2-book | 1–9 | OK (library updated; university mention removed; 2 university sources dropped) | 17 Nov 2026 |
+| c-xr-u1 | free/c-xr-u1-book | 1–6 | OK (library added) | 17 Nov 2026 |
+| c-xr-u2 | free/c-xr-u2-book | 1–7 | OK (library added) | 17 Nov 2026 |
+| c-xr-u3 | free/c-xr-u3-book | 1–8 | OK (library added) | 17 Nov 2026 |
+| c-xr-u4 | free/c-xr-u4-book | 1–8 | OK (library added) | 17 Nov 2026 |
+| c-xr-u5 | free/c-xr-u5-book | 1–8 | OK (library added) | 17 Nov 2026 |
+| c-xr-u6 | free/c-xr-u6-book | 1–7 | OK (library added) | 17 Nov 2026 |
+| c-nlp-u2 | free/c-nlp-u2-book | 1–9 (figure text: ch 3) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
+| c-dist-u2 | free/c-dist-u2-book | 1–7 | OK (library updated; three university mentions removed (2.1, 2.6, 2.7); 2.4 block-split work fixed to O(p log(n/p))) | 17 Nov 2026 |
+| c-block-u2 | free/c-block-u2-book | 1–7 (figure text: ch 5) | OK (library added; university mention in 2.2 removed; HASH160 step in 2.7 corrected) | 17 Nov 2026 |
+| c-mobile-u2 | free/c-mobile-u2-book | 1–6 (figure text: ch 2, 5) | OK (library added; university counts removed; iOS kernel and install sentences, 2.4 onSaveInstanceState timing and the WebView line in the question bank corrected) | 17 Nov 2026 |
+| c-quantum-u3 | free/c-quantum-u3-book | 1–8 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
+| c-dist-u3 | free/c-dist-u3-book | 1–7 (figure text: ch 3) | OK (library updated; 3.4 out-of-bounds count fixed: 24 writes) | 17 Nov 2026 |
+| c-block-u3 | free/c-block-u3-book | 1–7 | OK (library added; 51% threshold wording in 3.3 corrected to more than half) | 17 Nov 2026 |
+| c-mobile-u3 | free/c-mobile-u3-book | 1–6 | OK (library added; university counts removed; root-view, dpi and gravity sentences corrected) | 17 Nov 2026 |
+| c-nlp-u3 | free/c-nlp-u3-book | 1–8 (figure text: ch 1; ch 6 RIGHT-ARC definition fixed) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
+| c-mobile-u4 | free/c-mobile-u4-book | 1–6 | OK (library added; university counts removed; college.db renamed marks.db; putStringSet and deprecated EncryptedSharedPreferences noted) | 17 Nov 2026 |
+| c-quantum-u4 | free/c-quantum-u4-book | 1–9 | OK (library updated; text checked, no changes needed) | 17 Nov 2026 |
+| c-dist-u4 | free/c-dist-u4-book | 1–9 | OK (library updated; university mentions in 4.3 and 4.5 removed; university-hosted course page dropped; Coulouris chapter numbers fixed) | 17 Nov 2026 |
+| c-block-u4 | free/c-block-u4-book | 1–9 (figure 4.1 moved to section 1) | OK (library added; university mentions in 4.4 and 4.7 removed; confirmation count in 4.5 corrected to include the block that holds the payment) | 17 Nov 2026 |
+| c-nlp-u4 | free/c-nlp-u4-book | 1–8 | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
+| c-unix-u1 | free/c-unix-u1-book | 1–6 | OK (library added; quiz 1.5 no longer points at a figure of distro families) | 17 Nov 2026 |
+| c-unix-u2 | free/c-unix-u2-book | 1–5 | OK (library added; university mention in 2.5 removed) | 17 Nov 2026 |
+| c-unix-u3 | free/c-unix-u3-book | 1–8 | OK (library added; four university mentions removed) | 17 Nov 2026 |
+| c-unix-u4 | free/c-unix-u4-book | 1–7 | OK (library added; university mentions removed; 4.7 old archive renamed www-20261029 so it is really 8 days old) | 17 Nov 2026 |
+| c-unix-u5 | free/c-unix-u5-book | 1–8 | OK (library added; two university mentions removed) | 17 Nov 2026 |
+| c-mobile-u5 | free/c-mobile-u5-book | 1–6 | OK (library added; university counts removed; 5.2 swapped-coordinates trap corrected) | 17 Nov 2026 |
+| c-quantum-u5 | free/c-quantum-u5-book | 1–8 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
+| c-block-u5 | free/c-block-u5-book | 1–8 | OK (library added; university mention in 5.8 removed) | 17 Nov 2026 |
+| c-dist-u5 | free/c-dist-u5-book | 1–7 | OK (library updated; university mention in 5.6 removed; university-hosted course page dropped; 5.4 FLP trap wording and Ricart-Agrawala and Suzuki-Kasami glossary entries fixed; 5.2 message count line fixed) | 17 Nov 2026 |
+| c-nlp-u5 | free/c-nlp-u5-book | 1–7 | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
+| c-quantum-u6 | free/c-quantum-u6-book | 1–5 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
+| c-mobile-u6 | free/c-mobile-u6-book | 1–8 (figure text: ch 4) | OK (library added; university counts removed; 6.5 fare code now shows ₹92.00; 6.3 super.init exception added; 6.6 indexPath trap corrected) | 17 Nov 2026 |
+| c-block-u6 | free/c-block-u6-book | 1–9 | OK (library added; university mentions in 6.2, 6.6–6.9 removed; MIT course page dropped) | 17 Nov 2026 |
+| c-nlp-u6 | free/c-nlp-u6-book | 1–8 (figure text: ch 6) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
+| c-dist-u6 | free/c-dist-u6-book | 1–8 | OK (library updated; university mentions in 6.1 and 6.7 removed; university-hosted course page dropped; closure glossary entry fixed) | 17 Nov 2026 |
+| c-nlp-u7 | free/c-nlp-u7-book | 1–8 (ch 5 repeated-name sentence fixed) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |

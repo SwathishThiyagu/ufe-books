@@ -273,3 +273,21 @@ FIG[9] = (f9, 'A 4 cm × 3 cm photo scanned at 300 ppi becomes 472 × 354 = 167,
 
 
 spec = make_spec(FIG)
+
+
+def text_fixes(k):
+    return {
+        2: [
+            ('= 63.499... ppi, rounded to 63.5 ppi.',
+             '= 63.500... ppi, rounded to 63.5 ppi.'),
+            ('In the figure, 1 means ink and 0 means paper, so the 1s draw the letter L.',
+             'In a 1-bit bitmap, 1 means ink and 0 means paper, so a pattern of 1s can draw a letter such as L.')],
+        3: [(' Only a few universities teach this display hardware in depth.', ''),
+            ('The figure shows the chain.',
+             'The figure shows the last link: the video controller re-reading the frame buffer for every refresh.')],
+        5: [(' Only a few universities teach this depth.', ''),
+            ('The figure shows six of these eight stages, leaving out clipping and the per-fragment tests for space.',
+             'The figure follows one triangle from its three vertices to the roughly 20,000 fragments the rasterizer makes in a 200 × 200 viewport.')],
+        9: [('shrinking by two replaces each 2 × 2 block with its mean, as the figure shows.',
+             'shrinking by two replaces each 2 × 2 block with its mean.')],
+    }.get(k, [])
