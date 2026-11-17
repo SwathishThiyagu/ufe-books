@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/c-mobile-u6/tree/books/cse/c-mobile/c-mobile-u6.html`
 - Status: ok
-- Model calls so far: 45 (152,516 tokens in, 234,655 out), 6.4 minutes
+- Model calls so far: 45 (152,516 tokens in, 234,655 out), 6.5 minutes
 
 ## Checker
 
 ```
-c-mobile-u6.html: 8 chapters, 11843 words, 9 figures, 147 KB
+c-mobile-u6.html: 8 chapters, 11864 words, 9 figures, 147 KB
 OK
 ```
 
