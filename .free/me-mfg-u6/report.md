@@ -7,14 +7,14 @@
 ## Checker
 
 ```
-me-mfg-u6.html: 7 chapters, 15065 words, 8 figures, 152 KB
+me-mfg-u6.html: 7 chapters, 15048 words, 8 figures, 152 KB
 PROBLEMS:
- - chapter "abrasive-water-jet-machining": 1943 words is too long (keep under 1900; 900-1600 is the target)
+ - chapter "abrasive-water-jet-machining": 1938 words is too long (keep under 1900; 900-1600 is the target)
 ```
 
 ## For the reviewer
 
-- nothing flagged
+- checker: chapter "abrasive-water-jet-machining": 1938 words is too long (keep under 1900; 900-1600 is the target)
 
 ## Reviewer notes (after any revision)
 
