@@ -1,13 +1,13 @@
 # c-nlp-u7: free-model run
 
-- Book: `books/cse/c-nlp/c-nlp-u7.html`
+- Book: `work/claude_figs/c-nlp-u7/tree/books/cse/c-nlp/c-nlp-u7.html`
 - Status: ok
 - Model calls so far: 39 (164,569 tokens in, 261,935 out), 8.1 minutes
 
 ## Checker
 
 ```
-c-nlp-u7.html: 8 chapters, 14535 words, 9 figures, 165 KB
+c-nlp-u7.html: 8 chapters, 14470 words, 9 figures, 163 KB
 OK
 ```
 
