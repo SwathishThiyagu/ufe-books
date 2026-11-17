@@ -440,3 +440,45 @@ wording, unit numbers in outros, spoken Bloom, caret maths, stock and faint reca
 that ignores harmonic periods, a leaky bucket given the token bucket's formula, figures whose drawn geometry or colours
 contradict their own numbers, next-lesson titles cut at a comma by the generator, and convention-dependent traps (row vs
 column vectors, jitter definition) stated as absolute.
+
+## Object Oriented Programming (17 Nov)
+
+Audited 17 Nov 2026: all 23 c-oop lessons (6 units, 532 scenes, built 17 Nov; the delivered copies in
+06_Deliver/cse/c-oop are byte-identical to the audited ones). Each lesson's SC array was dumped with Playwright and every
+scene's narration and screen text was read. Sheets were rendered at 0.92, and at 0.995 for every frame that looked cut. All
+lines that looked cut at 0.92 were typing animations and render whole at 0.995. Checker: 0 page errors, 0 cue failures and
+0 text outside the safe area on every sheet. Every worked example, model answer and trap was recomputed, and the C++ outputs
+were re-run with g++ (setw/setfill/setprecision, the overflow and modulo lines, the fstream trace, what() overrides).
+None is on YouTube yet (pipeline.json: every unit "live": false).
+
+c-oop-u6-L1 | bookfig (10) | narration says ios::in|ios::ate lets you "seek back and write anywhere", but in|ate opens read-only and every write fails (g++: put() after seekp sets failbit). Writing needs in|out|ate | must fix
+c-oop-u6-L3 | bookfig (14) | "The hollow diamond means any number of them": the hollow diamond means aggregation, and the 0..* multiplicity means "any number" | must fix
+c-oop-u2-L4, u3-L4, u5-L1, u6-L3 | agenda (1) | star "Chapters x to y of your book" | should fix
+c-oop-u4-L2 | agenda (1) | star "Chapters 4.3 to 4.4 of your notes" (missing "free") | should fix
+c-oop-u5-L3 | bookfig (3, 10) | spoken "Your book's figure." | should fix
+c-oop-u1-L4, u2-L4, u3-L4, u4-L4, u5-L4 | outro (23, 22, 26, 20, 26) | "Next time, Unit two/three/four/five/six" spoken; "NEXT UNIT, Unit N" card | should fix
+c-oop-u2-L1 | bookfig (8) | "class Topper : public Student (derived, Unit 3)" on screen | should fix
+c-oop-u3-L3 | notebook (5), pa (20) | "(Unit 4)" on screen twice | should fix
+c-oop-u4-L1 | bookfig (3) | "Templates · Unit 5", "Overriding (Java) · Unit 3" in the figure | should fix
+c-oop-u2-L1, u2-L2, u3-L1, u3-L3, u4-L2, u6-L3 | pq (u2-L1 13/15/17; u2-L2 15/17/19; u3-L1 17/19/21; u3-L3 15/17/19; u4-L2 14/16/18; u6-L3 19/21/23) | spoken Bloom levels: "at the understand/apply/analyze level", "An understand question", "Question two, apply", "Question three, analyze" (18 lines) | should fix
+c-oop-u2-L2 | trap2 (7) | narration opens "Don't write that c equals b calls the copy constructor", then says "Box c equals b … the copy constructor runs": reads as a contradiction until the last sentence | should fix
+all 23 | figs (second to last) | "Sources the book draws on: …" shown | cosmetic
+all 23 (engine) | every scene header | "UNIT n · LESSON x OF y" on every page (same open question as Linux) | cosmetic
+all 23 (engine) | pq, pa | on-screen "QUESTION n · UNDERSTAND / APPLY / ANALYZE" label (same open question as Linux) | cosmetic
+c-oop-u1-L3 | figs (22) | note "(control structures and pointers in the same order as this unit.)": unit wording and a stray full stop | cosmetic
+c-oop-u5-L1 | figs (21) | note calls Balagurusamy "the usual Indian text": regional claim | cosmetic
+c-oop-u3-L4 | recap (18) | "Has-a" picture draws a plain line and a filled diamond, but the card text is "Hollow ◇ … Filled ◆": no hollow diamond drawn | cosmetic
+c-oop-u4-L3 | bookfig (4) | the "p->area(): follow p …" callout runs past the bottom of its panel (still cut at 0.995) | cosmetic
+c-oop-u1-L2 | pq, pa (20, 21) | "IRCTC booking" on screen: a real organisation's name (the voice says "train booking") | cosmetic
+c-oop-u6-L1 | hookArt (0) | ends "Let's take control." | cosmetic
+
+Not slop (checked): "super" (the Java keyword, 60 hits), "just" and "really" in ordinary use, "bits"; Chennai, Delhi, Pune
+and Agra (city names in worked examples, not colleges); "null" and "undefined behaviour" (C++ terms); the one caret
+(u1-L2 scene 13 "^ 11" is the XOR operator, and the result is right). None of the listed filler words appear (delve,
+journey, unlock, crucial, essentially, imagine, amazing). No site or finder line, no TODO or placeholder, no college names.
+No sentence repeats across lessons beyond the template lines ("See you there", the agenda count line, "Your free notes
+are linked …"). Facts: every number, output, truth claim and trap checks out apart from the two must-fix lines above.
+No stock recap icons (shield, refresh arrow, stopwatch, up arrow) and no tiny or faint pictures. Patterns shared with the
+other subjects: book wording, unit numbers in outros and cross-references, spoken Bloom levels, and the generator's
+"Sources the book draws on" line. New here: unit numbers inside figures and on-screen cross-references ("(Unit 4)"),
+and a narration sentence that names the wrong UML symbol for a multiplicity.
