@@ -1,0 +1,503 @@
+{
+ "lead": "This unit explains how an ARM processor is built for programmers: its RISC rules, registers, modes, exceptions, instructions and Thumb form. After it you can read an ARM vector table, trace an instruction, write small ARM assembly, and choose sleep modes for a battery-run device.",
+ "about": "The unit starts with 6.1, which ties ARM's load-store RISC choices to its family names and endian options. 6.2 gives the programmer's model: sixteen visible registers and the CPSR flags. 6.3 adds modes, exceptions and the vector table, so interrupts and reset have a defined path. 6.4 covers the core 32-bit instruction classes; 6.5 shows the 16-bit Thumb encoding and interworking. 6.6, taught by only a few universities, joins assembly and C through the calling convention. 6.7, also advanced, compares ARM7TDMI and Cortex-M cores. 6.8 closes with low-power modes and an energy calculation. Earlier units supply CISC/RISC, addressing modes, stack and interfacing; this unit does not repeat them.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "ARM is a load-store RISC design: only load/store touch memory, and simple fixed-length instructions suit pipelining.",
+   "depth": "Cover RISC vs CISC as a contrast only, then ARM rules: 32-bit fixed instructions, load-store data path, many registers, condition flags, 3-stage fetch-decode-execute pipeline. Explain the data-flow model: registers feed the ALU, memory is reached by LDR/STR. Name families: Classic ARM7, ARM9, ARM10, ARM11; Cortex-A, Cortex-R, Cortex-M. Explain suffix ARM7TDMI: T Thumb, D debug, M multiplier, I embedded ICE. Include big-endian and little-endian byte order; ARM can support both. Some syllabi call this the programming model overview.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "ARM",
+     "style": "accent",
+     "note": "load-store RISC",
+     "children": [
+      {
+       "label": "Classic",
+       "note": "32-bit cores",
+       "children": [
+        {
+         "label": "ARM7",
+         "note": "3-stage"
+        },
+        {
+         "label": "ARM9",
+         "note": "5-stage"
+        },
+        {
+         "label": "ARM11"
+        }
+       ]
+      },
+      {
+       "label": "Cortex",
+       "note": "profiles",
+       "children": [
+        {
+         "label": "Cortex-A",
+         "note": "application"
+        },
+        {
+         "label": "Cortex-R",
+         "note": "real-time"
+        },
+        {
+         "label": "Cortex-M",
+         "note": "microcontroller"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "ARM family tree: Classic ARM7, ARM9 and ARM11 sit beside Cortex-A, Cortex-R and Cortex-M under the ARM root."
+   },
+   "example": "An ARM7TDMI runs with little-endian memory. The 32-bit word 0x12345678 is stored starting at address 0x4000. List the four bytes at 0x4000 to 0x4003. Then say which suffix letters in ARM7TDMI mean Thumb, debug, multiplier and embedded ICE. Answer: 78 56 34 12; T, D, M, I.",
+   "trap": "Do not say all ARM chips are little-endian or that ARM7TDMI is Harvard; check the core and memory system.",
+   "prereq": "Unit 1: CISC/RISC and von Neumann/Harvard; Unit 1 pipelining basics.",
+   "leave": "Detailed family history, Cortex-A memory management and board memory design."
+  },
+  {
+   "k": 2,
+   "idea": "The programmer sees 16 registers (R0-R15) and the CPSR, which holds flags, mode bits and Thumb state.",
+   "depth": "Cover R0-R12 general purpose; R13 SP; R14 LR; R15 PC. Explain PC reads as current instruction + 8 in ARM state and +4 in Thumb because of pipelining; do not overdo. CPSR fields: N,Z,C,V flags; T bit; I and F interrupt masks; M4-M0 mode bits. SPSR in exception modes saves CPSR. Mention banked registers per mode. Some syllabi call this the ARM programmer's model or register set. Keep pipeline detail to Chapter 1 and 7.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Visible ARM registers",
+    "nodes": [
+     {
+      "id": "r",
+      "label": "R0-R12",
+      "note": "general purpose",
+      "style": "accent"
+     },
+     {
+      "id": "sp",
+      "label": "SP R13",
+      "note": "stack pointer"
+     },
+     {
+      "id": "lr",
+      "label": "LR R14",
+      "note": "link return"
+     },
+     {
+      "id": "pc",
+      "label": "PC R15",
+      "note": "next instruction"
+     },
+     {
+      "id": "cpsr",
+      "label": "CPSR",
+      "note": "flags and mode",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "r",
+      "to": "sp",
+      "style": "solid"
+     },
+     {
+      "from": "sp",
+      "to": "lr",
+      "style": "solid"
+     },
+     {
+      "from": "lr",
+      "to": "pc",
+      "style": "solid"
+     },
+     {
+      "from": "pc",
+      "to": "cpsr",
+      "style": "solid"
+     }
+    ],
+    "aria": "ARM programmer's model: R0 to R12, then SP, LR and PC, with CPSR holding flags and mode."
+   },
+   "example": "In ARM state, the instruction at address 0x00008020 reads R15 into R0. What value does R0 get, and why? The CPSR has N=0, Z=1, C=0, V=0. Which flag makes BEQ taken? Answer: R0 = 0x00008028 because PC reads as current + 8; Z = 1 makes BEQ taken.",
+   "trap": "PC is not the address of the current instruction; a read gives current+8 in ARM state, and writing PC jumps.",
+   "prereq": "Chapter 6.1; Unit 1 stored-program and pipeline basics.",
+   "leave": "Detailed pipeline hazards to 6.7; banked register switching to 6.3."
+  },
+  {
+   "k": 3,
+   "idea": "Seven ARM exception types use modes and fixed vector addresses; the CPU switches mode, saves CPSR and jumps.",
+   "depth": "Cover User and privileged modes: FIQ, IRQ, Supervisor, Abort, Undefined, System. Explain exception entry: save CPSR to SPSR_mode, save return address in LR_mode, set CPSR mode bits and masks, load PC from vector. Vector table low addresses: reset 0x00, undefined 0x04, SWI 0x08, prefetch abort 0x0C, data abort 0x10, reserved 0x14, IRQ 0x18, FIQ 0x1C. Mention high vectors 0xFFFF0000 option for some cores. Return uses SUBS PC, LR, #4 or #8 depending on exception. Include concept of stack per mode via banked SP. Some syllabi call these processor modes and exception vectors.",
+   "figure": {
+    "type": "array",
+    "title": "Low vector table",
+    "show_index": true,
+    "index_from": 0,
+    "rows": [
+     {
+      "label": "Addr",
+      "cells": [
+       "0x00",
+       "0x04",
+       "0x08",
+       "0x0C",
+       "0x10",
+       "0x14",
+       "0x18",
+       "0x1C"
+      ]
+     },
+     {
+      "label": "Entry",
+      "cells": [
+       "RST",
+       "UND",
+       "SWI",
+       "PAB",
+       "DAB",
+       "---",
+       "IRQ",
+       "FIQ"
+      ],
+      "marks": {
+       "6": "live",
+       "7": "accent"
+      }
+     }
+    ],
+    "pointers": [
+     {
+      "row": 1,
+      "cell": 6,
+      "label": "IRQ"
+     }
+    ],
+    "aria": "ARM low vector table: reset at 0x00 through FIQ at 0x1C, with IRQ at 0x18 marked and FIQ at 0x1C marked."
+   },
+   "example": "An ARM7TDMI uses low vectors. An IRQ occurs while the CPU is in User mode. Give the vector address the CPU fetches, the mode it enters, the registers it uses to save return address and CPSR, and the usual return instruction. Answer: 0x18, IRQ mode, LR_irq and SPSR_irq, SUBS PC, LR, #4.",
+   "trap": "FIQ is at 0x1C, not 0x18; IRQ return subtracts 4, but data abort needs 8. Reserved 0x14 is not an exception.",
+   "prereq": "Chapters 6.1-6.2; Unit 4 interrupt idea.",
+   "leave": "Interrupt controller (8259) and peripheral interrupt registers to Unit 5; stack instructions to Unit 3."
+  },
+  {
+   "k": 4,
+   "idea": "ARM's core 32-bit instructions split into data processing, load-store and branch, with condition codes on almost every instruction.",
+   "depth": "Cover common formats and addressing modes: immediate, register, register-shifted; load/store with pre-index, post-index, offset and writeback; LDR/STR byte/word, LDM/STM. Data processing: MOV, ADD, SUB, AND, ORR, CMP, with S suffix setting N,Z,C,V. Branch: B, BL, BX; condition field EQ, NE, etc. Mention literal pools only lightly. Some syllabi call this data transfer, data manipulation and control instructions. Keep Thumb to 6.5 and calling convention to 6.6.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "ARM instr",
+     "style": "accent",
+     "children": [
+      {
+       "label": "Data proc",
+       "children": [
+        {
+         "label": "ADD"
+        },
+        {
+         "label": "CMP"
+        }
+       ]
+      },
+      {
+       "label": "Load-store",
+       "children": [
+        {
+         "label": "LDR"
+        },
+        {
+         "label": "STR"
+        }
+       ]
+      },
+      {
+       "label": "Branch",
+       "children": [
+        {
+         "label": "B"
+        },
+        {
+         "label": "BL"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "ARM instruction classes: data processing, load-store and branch, each with two common examples."
+   },
+   "example": "R1 = 0x0000000A, R2 = 0x00000005, R0 = 0x00004000. Write ARM instructions to set R3 = R1 + R2, store R3 at address 0x4004 using R0, and branch to label ZERO if the last result is zero. State the final value of R3 and the memory word at 0x4004. Answer: ADDS R3,R1,R2; STR R3,[R0,#4]; BEQ ZERO; R3 = 0x0000000F, memory at 0x4004 = 0x0000000F, branch not taken.",
+   "trap": "ADD does not change flags; ADDS does. STR with [R0,#4] stores at R0+4, not at R0.",
+   "prereq": "Chapters 6.2-6.3; Unit 3 addressing modes and branch/call ideas.",
+   "leave": "Thumb encodings to 6.5; assembler directives and C calls to 6.6; peripheral loads to Unit 5."
+  },
+  {
+   "k": 5,
+   "idea": "Thumb is a 16-bit encoding of common ARM instructions; the CPU stays the same but code density improves.",
+   "depth": "Cover Thumb as a compressed instruction set: most instructions 16 bits, limited registers R0-R7 for many forms, two-operand format, smaller immediates. Explain interworking: BX and BLX use bit 0 of target address; 0 means ARM, 1 means Thumb. Mention Thumb-2 on Cortex-M as a mixed 16/32-bit set; only a few syllabi need details. State that ARM7TDMI supports ARM and Thumb, not Thumb-2. Some syllabi call this Thumb mode or 16-bit ARM.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "ARM and Thumb interworking",
+    "nodes": [
+     {
+      "id": "arm",
+      "label": "ARM state",
+      "style": "accent"
+     },
+     {
+      "id": "bx1",
+      "label": "BX bit0=1",
+      "note": "to Thumb"
+     },
+     {
+      "id": "thumb",
+      "label": "Thumb state",
+      "style": "live"
+     },
+     {
+      "id": "bx0",
+      "label": "BX bit0=0",
+      "note": "to ARM"
+     }
+    ],
+    "edges": [
+     {
+      "from": "arm",
+      "to": "bx1",
+      "style": "solid"
+     },
+     {
+      "from": "bx1",
+      "to": "thumb",
+      "style": "solid"
+     },
+     {
+      "from": "thumb",
+      "to": "bx0",
+      "style": "solid"
+     },
+     {
+      "from": "bx0",
+      "to": "arm",
+      "label": "cycle",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Interworking cycle: BX with bit 0 set enters Thumb state, and BX with bit 0 clear returns to ARM state."
+   },
+   "example": "A Thumb subroutine's first instruction is at address 0x00002000. A caller wants to enter it with BX R3. What value must R3 hold? What does bit 0 mean? After the subroutine executes BX LR, LR = 0x00001004, which state does the CPU enter and at what instruction address? Answer: R3 = 0x00002001; bit 0 = 1 means Thumb; LR bit 0 = 0 so ARM state at 0x00001004.",
+   "trap": "The address in BX is not the exact instruction address when bit 0 is 1; clear bit 0 to get the Thumb address. Thumb-2 is not ARM7TDMI.",
+   "prereq": "Chapter 6.4; Chapter 6.2 PC and CPSR T bit.",
+   "leave": "Thumb-2 details and Cortex-M exception model to 6.7."
+  },
+  {
+   "k": 6,
+   "idea": "Assembly and C can call each other if both follow the ARM calling convention and preserve the right registers.",
+   "depth": "Only a few universities teach this. Keep short: assembly file layout AREA, ENTRY, EXPORT, labels, DCD; C calling assembly and assembly calling C; AAPCS basics: R0-R3 arguments and return, R4-R11 callee-saved, SP 8-byte aligned at public interface, LR saved on stack. Loop, subroutine and stack frame example. Mention inline assembly only in one line. Link to Unit 3 assembly and Unit 4 embedded C.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Sum loop subroutine",
+    "nodes": [
+     {
+      "id": "load",
+      "label": "Load N",
+      "note": "R1 = N",
+      "style": "accent"
+     },
+     {
+      "id": "zero",
+      "label": "R0=0",
+      "note": "clear sum"
+     },
+     {
+      "id": "add",
+      "label": "Add R1",
+      "note": "R0=R0+R1"
+     },
+     {
+      "id": "dec",
+      "label": "N=N-1",
+      "note": "decrement R1"
+     },
+     {
+      "id": "test",
+      "label": "N=0?",
+      "style": "live"
+     },
+     {
+      "id": "ret",
+      "label": "Return",
+      "note": "R0 holds sum"
+     }
+    ],
+    "edges": [
+     {
+      "from": "load",
+      "to": "zero",
+      "style": "solid"
+     },
+     {
+      "from": "zero",
+      "to": "add",
+      "style": "solid"
+     },
+     {
+      "from": "add",
+      "to": "dec",
+      "style": "solid"
+     },
+     {
+      "from": "dec",
+      "to": "test",
+      "style": "solid"
+     },
+     {
+      "from": "test",
+      "to": "ret",
+      "label": "yes",
+      "style": "solid"
+     },
+     {
+      "from": "test",
+      "to": "add",
+      "label": "no",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Flowchart for a sum loop: clear R0, add R1, decrement N, test for zero, and return with the sum when N reaches zero."
+   },
+   "example": "Write an ARM assembly subroutine SUM that returns 1+2+...+N in R0, with N passed in R1. Use a loop and call it from C with N=10. State the final R0 and one register the subroutine must preserve. Answer: loop adds R1 to R0, decrements R1 until zero; final R0 = 55; preserve R4-R11 if used.",
+   "trap": "R0-R3 are not preserved across a call; if you use R4-R11 in assembly you must save and restore them. Do not forget 8-byte stack alignment.",
+   "prereq": "Chapters 6.4-6.5; Unit 3 assembly; Unit 4 embedded C.",
+   "leave": "Full AAPCS corner cases, C optimization and linker scripts to a toolchain course."
+  },
+  {
+   "k": 7,
+   "idea": "ARM7TDMI is a classic 3-stage von Neumann core; Cortex-M adds NVIC and, on M3/M4, Harvard buses and Thumb-2 for microcontrollers.",
+   "depth": "Only a few universities teach this. ARM7TDMI: 3-stage pipeline, 32-bit load-store, Thumb, debug, multiplier, embedded ICE; unified memory bus, so von Neumann at core level. Cortex-M0/M0+/M3/M4: 32-bit core, NVIC, memory-mapped peripherals; M3/M4 use Thumb-2 and Harvard instruction/data buses. Compare pipeline, interrupt latency and target use. Keep peripheral registers to Unit 5 and low power to 6.8.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "ARM cores",
+     "style": "accent",
+     "children": [
+      {
+       "label": "ARM7TDMI",
+       "note": "classic core",
+       "children": [
+        {
+         "label": "3-stage"
+        },
+        {
+         "label": "von Neumann"
+        },
+        {
+         "label": "Thumb"
+        }
+       ]
+      },
+      {
+       "label": "Cortex-M",
+       "note": "microcontroller",
+       "children": [
+        {
+         "label": "NVIC"
+        },
+        {
+         "label": "Harvard M3/M4"
+        },
+        {
+         "label": "Thumb-2 M3/M4"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "Core comparison tree: ARM7TDMI uses a 3-stage von Neumann design with Thumb, while Cortex-M adds NVIC and, on M3/M4, Harvard buses and Thumb-2."
+   },
+   "example": "A 3-stage pipeline has fetch, decode and execute. Five independent instructions start at cycle 1. In which cycle does the fifth instruction finish? If the core takes 3 cycles per instruction without pipelining, how many cycles for five? Answer: pipelined finish in cycle 7; non-pipelined takes 15 cycles.",
+   "trap": "ARM7TDMI's T means Thumb, not Thumb-2; Cortex-M NVIC is not the same as an external 8259 interrupt controller.",
+   "prereq": "Chapters 6.1, 6.3, 6.5; Unit 1 pipelining basics.",
+   "leave": "Cortex-A memory management, full debug architecture and peripheral interrupt registers."
+  },
+  {
+   "k": 8,
+   "idea": "Low-power design trades active speed against sleep time; clock gating, power gating and sleep modes cut average current.",
+   "depth": "Cover why energy matters: battery devices, thermal limits. Methods: clock gating, power gating, dynamic voltage and frequency scaling (DVFS), sleep modes, WFI/WFE. Cortex-M sleep and deep-sleep ideas; ARM7TDMI has no standard sleep mode, so system-level clock stop. Mention wake sources and retention. Compute average current and energy from active and sleep currents. Keep power-supply circuit design out. Some syllabi call this low-power modes or energy efficiency.",
+   "figure": {
+    "type": "gantt",
+    "unit": "ms",
+    "lanes": [
+     {
+      "label": "CPU",
+      "bars": [
+       {
+        "label": "Active",
+        "start": 0,
+        "end": 10,
+        "style": "accent"
+       },
+       {
+        "label": "Sleep",
+        "start": 10,
+        "end": 100,
+        "style": "muted"
+       }
+      ]
+     }
+    ],
+    "aria": "One 100 ms cycle: the CPU is active for 10 ms and sleeps for the remaining 90 ms."
+   },
+   "example": "A sensor node runs at 20 mA from 3.3 V for 10 ms, then sleeps at 5 µA for 90 ms, repeating every 100 ms. Find the average current and the energy used in one 100 ms cycle. Answer: charge = 20 mA × 10 ms + 0.005 mA × 90 ms = 200.45 mA·ms; average current = 2.0045 mA ≈ 2.00 mA; energy = 2.0045 mA × 3.3 V × 0.1 s = 0.661 mJ.",
+   "trap": "Keep mA and µA in the same unit; 5 µA is 0.005 mA. Average current is charge per full cycle, not the simple mean of 20 mA and 5 µA.",
+   "prereq": "Chapters 6.3 and 6.7; Unit 4 timer/interrupt idea.",
+   "leave": "DC-DC converter design, battery chemistry and thermal simulation to a power electronics course."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "RISC choices set the register model"
+  ],
+  [
+   2,
+   3,
+   "CPSR mode bits select exception modes"
+  ],
+  [
+   3,
+   4,
+   "exception entry uses core instructions and CPSR restore"
+  ],
+  [
+   4,
+   5,
+   "Thumb compresses common ARM instructions"
+  ],
+  [
+   5,
+   6,
+   "C calls mix ARM and Thumb code"
+  ],
+  [
+   6,
+   7,
+   "toolchain targets a named ARM core"
+  ],
+  [
+   7,
+   8,
+   "core and clock choices set sleep options"
+  ],
+  [
+   1,
+   7,
+   "family names map to pipeline and bus features"
+  ]
+ ]
+}

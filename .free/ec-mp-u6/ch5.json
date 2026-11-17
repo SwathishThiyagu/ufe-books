@@ -1,0 +1,190 @@
+{
+ "lead": "Thumb is a 16-bit encoding of common ARM instructions. It exists because 32-bit ARM code uses four bytes per instruction, and embedded flash costs money and power. Thumb keeps the same ARM7TDMI core, registers and programmer model but compresses frequent operations into two bytes. A program mixes ARM and Thumb routines and switches state with BX, or BLX on later cores. Use it in small microcontroller firmware where code size matters, for example a UPI payment terminal or a washing-machine controller.",
+ "prereq": "You need: <a href=\"#arm-instruction-set-data-processing-load-store-branch\">Chapter 6.4</a> for ARM instructions, and <a href=\"#arm-programmer-s-model-registers-and-cpsr\">Chapter 6.2</a> for the PC and the CPSR T bit.",
+ "sections": [
+  {
+   "h3": "Why Thumb exists",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ARM instructions are 32 bits wide. A small microcontroller may have only a few kilobytes of flash, so four bytes for every instruction costs money and power. Thumb is a second encoding of the same ARM7TDMI core: common instructions become 16 bits. The core still has the same registers, flags, modes and data path. The decoder expands each 16-bit Thumb instruction into the internal operation, so no separate Thumb CPU exists. The CPSR (Current Program Status Register) T bit records the state: T=1 means Thumb, T=0 means ARM. In Thumb state, reading the PC (Program Counter, register R15) gives the address of the current instruction plus 4 (ARM7TDMI pipeline); in ARM state it gives the current address plus 8. Each 16-bit Thumb instruction moves execution on by 2 bytes, so a halfword-aligned sequential fetch is 2 bytes apart. Thumb is not a complete replacement for ARM. It covers frequent data processing, load-store, branch, push/pop and subroutine operations. Code density improves because the instruction stream is narrower; instruction fetch from flash also uses less energy. Some syllabi call this Thumb mode or 16-bit ARM."
+    },
+    {
+     "type": "formula",
+     "text": "ARM instruction = 4 bytes; Thumb instruction = 2 bytes",
+     "where": "4 bytes = 32 bits, 2 bytes = 16 bits; this is the size of the encoded instruction, not the data it works on."
+    }
+   ]
+  },
+  {
+   "h3": "What a Thumb instruction looks like",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Most Thumb-1 instructions are 16 bits and use a two-operand format. In ARM, ADD R0, R1, R2 means R0=R1+R2. In Thumb, many forms write ADD R0, R1, meaning R0=R0+R1. The destination is also a source. This saves bits but needs planning: copy one input first if you need to keep it."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Register limits: many forms address only R0-R7, the low registers. A few forms reach R8-R15, but choice is restricted.",
+      "Small immediates: MOV can load 0-255; ADD or SUB immediate is often limited to 0-7; load-store offsets are small and sometimes scaled.",
+      "Load-store: LDR and STR use a low-register base and a small offset; PUSH and POP move multiple low registers and optionally LR (Link Register, register R14) or PC.",
+      "Branches: conditional branches have a short range; BL in Thumb-1 is built from two 16-bit instructions."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Thumb code often needs more instructions than ARM to do the same work because of these limits. The gain is size, not raw speed. Use Thumb for dense control code and ARM for routines that need three-operand arithmetic or full register choice. Both states can call each other."
+    }
+   ]
+  },
+  {
+   "h3": "Interworking: BX, BLX and bit 0",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A program can contain both ARM and Thumb routines. To switch state, branch through a register using BX (Branch and eXchange); later cores also provide BLX (Branch with Link and eXchange). The target register holds an address plus a state bit in bit 0. If bit 0 is 1, the CPU enters Thumb state. If bit 0 is 0, it enters ARM state. BX and BLX copy this bit into the CPSR T bit. The actual instruction address is the register value with bit 0 cleared. Thumb instructions are halfword aligned, so a real Thumb instruction address always has bit 0 = 0; the 1 is only a marker."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Load the target address into a register.",
+      "Set bit 0 to 1 for Thumb, or 0 for ARM.",
+      "Execute BX Rm; for a call use BLX Rm on a core that supports it, so LR gets the return address.",
+      "On return, BX LR uses bit 0 of LR to restore the caller's state."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "The ARM7TDMI supports ARM and Thumb, not Thumb-2. Cortex-M cores (M3 and M4) use Thumb-2, a mixed 16/32-bit set; only a few syllabi need those details, and <a href=\"#arm7tdmi-and-cortex-m-microcontrollers\">Chapter 6.7</a> covers the cores."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 3,
+  "caption": "The cycle between ARM and Thumb state: BX with bit 0 set enters Thumb, and BX with bit 0 clear returns to ARM; the address is always taken with bit 0 cleared.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "ARM and Thumb interworking",
+   "nodes": [
+    {
+     "id": "arm",
+     "label": "ARM state",
+     "style": "accent"
+    },
+    {
+     "id": "bx1",
+     "label": "BX bit0=1",
+     "note": "to Thumb"
+    },
+    {
+     "id": "thumb",
+     "label": "Thumb state",
+     "style": "live"
+    },
+    {
+     "id": "bx0",
+     "label": "BX bit0=0",
+     "note": "to ARM"
+    }
+   ],
+   "edges": [
+    {
+     "from": "arm",
+     "to": "bx1",
+     "style": "solid"
+    },
+    {
+     "from": "bx1",
+     "to": "thumb",
+     "style": "solid"
+    },
+    {
+     "from": "thumb",
+     "to": "bx0",
+     "style": "solid"
+    },
+    {
+     "from": "bx0",
+     "to": "arm",
+     "label": "cycle",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Interworking cycle: BX with bit 0 set enters Thumb state, and BX with bit 0 clear returns to ARM state."
+  }
+ },
+ "examples": [
+  {
+   "question": "A Thumb subroutine's first instruction is at address 0x00002000. A caller wants to enter it with BX R3. What value must R3 hold? What does bit 0 mean? After the subroutine executes BX LR, LR = 0x00001004. Which state does the CPU enter and at what instruction address?",
+   "steps": [
+    "The Thumb instruction address is 0x00002000. It is halfword aligned, so its bit 0 is 0.",
+    "BX uses bit 0 as the state bit. Set it: 0x00002000 OR 0x00000001 = 0x00002001. In decimal this is 8193.",
+    "Bit 0 = 1 means Thumb state, so BX R3 enters Thumb at the instruction address 0x00002000.",
+    "The return value is LR = 0x00001004. Its bit 0 is 0x00001004 AND 1 = 0.",
+    "Bit 0 = 0 means ARM state. Clear bit 0 to get the instruction address: 0x00001004 AND 0xFFFFFFFE = 0x00001004, which is 4100 in decimal."
+   ],
+   "answer": "R3 = 0x00002001 (8193); bit 0 = 1 selects Thumb; BX LR enters ARM state at 0x00001004 (4100).",
+   "check": "thumb_addr = 0x00002000\nr3 = thumb_addr | 1\nlr = 0x00001004\nret_addr = lr & ~1\nprint(r3)\nprint(ret_addr)",
+   "values": [
+    8193,
+    4100
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "The value in BX is not the exact instruction address when bit 0 is 1. Clear bit 0 before using it as a code address; the same value with bit 0 set selects Thumb.",
+  "Thumb-2 is not the same as Thumb-1 and is not supported by ARM7TDMI. ARM7TDMI has ARM and 16-bit Thumb only.",
+  "Many Thumb-1 instructions use only R0-R7. Writing ADD R8, R9, R10 in Thumb-1 is invalid; use ARM state or a different form.",
+  "Thumb two-operand ADD R0, R1 means R0 = R0 + R1, not R0 = R1 + something. The destination is also an input.",
+  "BLX is not available on every ARM core; ARM7TDMI provides BX for interworking. Check the core before using BLX."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does T=1 in the CPSR mean?",
+   "marks": 2,
+   "a": "Thumb state: the core fetches 16-bit Thumb instructions."
+  },
+  {
+   "level": "understand",
+   "q": "Why does Thumb improve code density?",
+   "marks": 3,
+   "a": "Common instructions are encoded in 16 bits instead of 32 bits, so each such instruction uses fewer bytes of flash and fewer fetch bytes."
+  },
+  {
+   "level": "apply",
+   "q": "A Thumb routine starts at 0x00003400. What value in R1 enters it with BX R1?",
+   "marks": 3,
+   "a": "Set bit 0: 0x00003400 OR 0x00000001 = 0x00003401. Clearing bit 0 gives the instruction address 0x00003400."
+  },
+  {
+   "level": "analyze",
+   "q": "A caller loads R3 = 0x00002000 and executes BX R3 to enter a Thumb routine at 0x00002000. What goes wrong?",
+   "marks": 4,
+   "a": "Bit 0 is 0, so BX selects ARM state. The CPU treats 0x00002000 as an ARM instruction address instead of entering Thumb. R3 must be 0x00002001."
+  },
+  {
+   "level": "understand",
+   "q": "Which registers can most Thumb-1 data-processing forms use?",
+   "marks": 2,
+   "a": "R0-R7, the low registers; a few forms can access high registers."
+  },
+  {
+   "level": "apply",
+   "q": "A routine has 1000 instructions. ARM code uses 4 bytes each; Thumb uses 2 bytes each. What is the Thumb saving in bytes and kilobytes?",
+   "marks": 4,
+   "a": "ARM size = 1000 x 4 = 4000 bytes. Thumb size = 1000 x 2 = 2000 bytes. Saving = 4000 - 2000 = 2000 bytes, that is 2 kB (about 1.95 KiB). This assumes both versions need the same 1000 instructions; in practice the Thumb version may need a few more, so the real saving is somewhat smaller."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a Thumb routine need more instructions than the ARM version?",
+   "marks": 5,
+   "a": "Two-operand forms, low-register limits and small immediates force extra MOV or address setup instructions. Size falls, but instruction count can rise."
+  }
+ ],
+ "beyond": "Not for the exam. Production compilers choose ARM or Thumb per function with options such as -mthumb, and linkers insert interworking veneers when needed. Cortex-M moved to Thumb-2 so 32-bit instructions coexist with 16-bit ones, and most microcontroller code is Thumb-only. Code-density work also connects to instruction-fetch energy in flash-based systems. Search next for Thumb-2 encoding, interworking veneers, and ARMv4T versus ARMv7-M."
+}

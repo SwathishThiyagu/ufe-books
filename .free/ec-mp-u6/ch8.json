@@ -1,0 +1,184 @@
+{
+ "lead": "A battery node spends most of its life asleep. Low-power design reduces the average current over a full cycle, not just the current while the CPU runs. It uses clock gating, power gating, dynamic voltage and frequency scaling, and sleep modes. The CPU enters a sleep mode with WFI or WFE and wakes on an interrupt. ARM7TDMI has no standard sleep mode, so the board stops its clock. Cortex-M cores add sleep and deep-sleep control. This chapter shows how to compute average current and energy from active and sleep times.",
+ "prereq": "You need: sleep and wake events build on exceptions in <a href=\"#processor-modes-exceptions-and-vector-table\">Chapter 6.3</a>, the ARM7TDMI and Cortex-M comparison in <a href=\"#arm7tdmi-and-cortex-m-microcontrollers\">Chapter 6.7</a>, and timer interrupts from Unit 4, Timers and counters.",
+ "sections": [
+  {
+   "h3": "Average current over a cycle",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Energy is what drains a battery. Power is P = V × I, where V is supply voltage in volts, I is current in amperes, and P is power in watts. Energy is E = P × t = V × I × t, with t in seconds and E in joules. A CPU that runs at 20 mA for 10 ms and sleeps at 5 µA for 90 ms does not draw 20 mA on average. Charge is current × time. For one 100 ms cycle, Q = I_active t_active + I_sleep t_sleep. Average current is I_avg = Q / T_cycle. Use the same current unit everywhere: 5 µA is 0.005 mA. This average current decides battery life. Peak current decides regulator size and thermal limits, but average current decides how long a coin cell or AA cell lasts."
+    },
+    {
+     "type": "formula",
+     "text": "I_avg = (I_active × t_active + I_sleep × t_sleep) / T_cycle",
+     "where": "I_active and I_sleep are currents in the same unit (A or mA); t_active and t_sleep are times in the same unit (s or ms); T_cycle = t_active + t_sleep is the full cycle time."
+    }
+   ]
+  },
+  {
+   "h3": "Clock gating, power gating and DVFS",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Clock gating stops the clock to a block. A flip-flop with no clock edge does not switch, so dynamic power falls. Dynamic power is P_dyn = α × C × V² × f, where α is activity factor, C is capacitance in farads, V is supply in volts, f is clock frequency in hertz. Clock gating cuts f to zero for that block. It does not cut leakage current."
+    },
+    {
+     "type": "p",
+     "text": "Power gating cuts the supply to a block with a switch. It removes both switching and leakage current. The block loses state unless retention memory or an always-on domain keeps it. Wake-up takes time because the supply must ramp and the block must reset or restore."
+    },
+    {
+     "type": "p",
+     "text": "DVFS changes V and f together. Lowering f at the same V cuts power but not the dynamic energy per operation, because E_op = α × C × V² has no f in it; the block simply takes longer. Lowering V saves real energy because E_op falls with V². The catch is that a lower V needs a lower f to stay stable, so DVFS changes both together. DVFS is used when the workload changes, for example a phone scrolling versus decoding video."
+    },
+    {
+     "type": "p",
+     "text": "WFI (wait for interrupt) and WFE (wait for event) are instructions that let software ask for sleep. WFI wakes on an interrupt. WFE wakes on an event; an event can be an interrupt or a SEV signal. SEV sends an event. The core stops its clock until the wake source arrives."
+    }
+   ]
+  },
+  {
+   "h3": "Sleep modes on ARM7TDMI and Cortex-M",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ARM7TDMI has no architectural sleep mode. The program cannot set a sleep bit inside the core. A board saves power by stopping the clock from outside, often with a power-management chip or CPLD. An interrupt wakes the clock controller, which restarts the clock. The core continues from the instruction after the idle loop. State stays in registers and SRAM because the supply is not cut."
+    },
+    {
+     "type": "p",
+     "text": "Cortex-M adds sleep control. The SCR (System Control Register) has SLEEPDEEP. With SLEEPDEEP = 0, WFI enters sleep; with SLEEPDEEP = 1, WFI enters deep sleep. The chip vendor defines what deep sleep does: it may stop the core clock, gate peripheral clocks, or switch off a power domain. NVIC can wake the core. Some parts keep SRAM and registers in a retention domain; others lose them. Check the wake latency and retention before choosing a mode."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Core",
+      "Sleep control",
+      "Wake source",
+      "State"
+     ],
+     "rows": [
+      [
+       "ARM7TDMI",
+       "External clock stop",
+       "Interrupt to clock controller",
+       "Registers and SRAM kept"
+      ],
+      [
+       "Cortex-M",
+       "WFI/WFE and SLEEPDEEP",
+       "NVIC interrupt or event",
+       "Vendor-defined; retention optional"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One 100 ms cycle: the CPU runs for 10 ms and sleeps for 90 ms. The long sleep bar is why average current is far below the active current.",
+  "spec": {
+   "type": "gantt",
+   "unit": "ms",
+   "lanes": [
+    {
+     "label": "CPU",
+     "bars": [
+      {
+       "label": "Active",
+       "start": 0,
+       "end": 10,
+       "style": "accent"
+      },
+      {
+       "label": "Sleep",
+       "start": 10,
+       "end": 100,
+       "style": "muted"
+      }
+     ]
+    }
+   ],
+   "aria": "One 100 ms cycle: the CPU is active for 10 ms and sleeps for the remaining 90 ms."
+  }
+ },
+ "examples": [
+  {
+   "question": "A sensor node runs from 3.3 V. It draws 20 mA for 10 ms, then sleeps at 5 µA for 90 ms. This repeats every 100 ms. Find the charge used per cycle, the average current, and the energy used in one 100 ms cycle.",
+   "steps": [
+    "Convert the sleep current to milliamperes: 5 µA = 5 / 1000 mA = 0.005 mA.",
+    "Active charge = 20 mA × 10 ms = 200 mA·ms.",
+    "Sleep charge = 0.005 mA × 90 ms = 0.45 mA·ms.",
+    "Total charge per cycle = 200 + 0.45 = 200.45 mA·ms. Since 1 mA·ms = 1 µC, this is 200.45 µC of charge per cycle.",
+    "Average current = 200.45 mA·ms / 100 ms = 2.0045 mA.",
+    "Convert time to seconds: 100 ms = 0.1 s. Energy = V × I_avg × T = 3.3 V × 2.0045 mA × 0.1 s. Use 2.0045 mA = 0.0020045 A. Energy = 3.3 × 0.0020045 × 0.1 = 0.000661485 J = 0.661485 mJ."
+   ],
+   "answer": "The charge per cycle is 200.45 µC (200.45 mA·ms), the average current is 2.0045 mA, and the energy per cycle is 0.661485 mJ.",
+   "check": "active_current_mA = 20.0\nactive_time_ms = 10.0\nsleep_current_uA = 5.0\nsleep_time_ms = 90.0\nvoltage_V = 3.3\ncycle_ms = active_time_ms + sleep_time_ms\nsleep_current_mA = sleep_current_uA / 1000.0\ncharge_mA_ms = active_current_mA * active_time_ms + sleep_current_mA * sleep_time_ms\navg_current_mA = charge_mA_ms / cycle_ms\nenergy_mJ = avg_current_mA * voltage_V * (cycle_ms / 1000.0)\nprint(charge_mA_ms)\nprint(avg_current_mA)\nprint(energy_mJ)",
+   "values": [
+    200.45,
+    2.0045,
+    0.661485
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Unit slip: 5 µA is 0.005 mA, not 5 mA or 0.5 mA. Mixing µA and mA gives an average current a thousand times wrong.",
+  "Average current is total charge divided by the full cycle time. It is not (20 mA + 5 µA)/2. That simple mean ignores how long each state lasts.",
+  "WFI and WFE are not the same. WFI wakes on an interrupt; WFE wakes on an event, which can be an interrupt or a SEV.",
+  "Clock gating saves dynamic power but not leakage. Power gating saves both but loses state unless retention is used.",
+  "ARM7TDMI has no internal sleep mode. An exam answer that says 'set the ARM7TDMI sleep bit' is wrong; the board stops the clock externally."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What is the purpose of the WFI instruction?",
+   "marks": 2,
+   "a": "WFI asks the core to suspend execution until an interrupt is taken. The chip may then stop the core clock or enter a deeper low-power state; WFI is a hint, so the exact action is implementation-defined."
+  },
+  {
+   "level": "understand",
+   "q": "Why does average current use charge over the full cycle rather than the mean of active and sleep currents?",
+   "marks": 3,
+   "a": "Because each current lasts a different time. Charge adds I × t; dividing by the full cycle gives the equivalent constant current that would move the same charge."
+  },
+  {
+   "level": "apply",
+   "q": "A node draws 12 mA for 20 ms and 10 µA for 180 ms, repeating every 200 ms. Find the average current.",
+   "marks": 4,
+   "a": "10 µA = 0.01 mA. Charge = 12 × 20 + 0.01 × 180 = 240 + 1.8 = 241.8 mA·ms. Average current = 241.8 / 200 = 1.209 mA."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can DVFS save more energy than lowering only the clock frequency?",
+   "marks": 4,
+   "a": "Dynamic energy per operation is α × C × V², so lowering V cuts energy quadratically. Lowering f alone cuts power but not energy per operation, and leakage makes it worse over a longer run. DVFS lowers V and f together to keep timing stable, so it saves energy and power."
+  },
+  {
+   "level": "remember",
+   "q": "Which Cortex-M register bit selects deep sleep instead of sleep?",
+   "marks": 2,
+   "a": "The SLEEPDEEP bit in the System Control Register (SCR)."
+  },
+  {
+   "level": "understand",
+   "q": "State one difference between clock gating and power gating.",
+   "marks": 3,
+   "a": "Clock gating stops switching in a block but keeps its supply and state; power gating removes the supply, so leakage falls but state is lost unless retained."
+  },
+  {
+   "level": "analyze",
+   "q": "An ARM7TDMI board must save power while waiting for a key press. Describe a system-level method and its wake path.",
+   "marks": 5,
+   "a": "Use an external clock controller to stop the CPU clock after an idle loop. The keypad interrupt goes to the interrupt controller, which restarts the clock; the core resumes after the idle loop. Registers and SRAM stay powered, so no state restore is needed."
+  },
+  {
+   "level": "apply",
+   "q": "Using the 1.209 mA average current from question 3 and 3.0 V, find the energy in one 200 ms cycle.",
+   "marks": 3,
+   "a": "E = 3.0 V × 1.209 mA × 0.2 s = 3.0 × 0.001209 × 0.2 = 0.0007254 J = 0.7254 mJ."
+  }
+ ],
+ "beyond": "Not for the exam. Modern Cortex-M33 and Cortex-M55 parts add multiple power domains and retention RAM, so the same average-current formula becomes a budget across several domains. Energy harvesting nodes use supercapacitors and duty-cycled radios; the sleep current often dominates the design. Search terms: SLEEPDEEP, WFI, WFE, retention RAM, DVFS governor, energy per operation. Measure sleep current on the real board, because pull-up resistors and leaking I/O pins can exceed the core sleep current."
+}

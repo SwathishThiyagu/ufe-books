@@ -1,0 +1,230 @@
+{
+ "lead": "An ARM processor does not handle every event in one mode. It has seven exception types, each tied to a processor mode and a fixed vector address in low memory. When an exception occurs, the CPU switches to that mode, copies CPSR into the mode's SPSR, saves a return address in LR_mode, and jumps to the vector. This lets interrupts, system calls and memory faults run with separate stacks and saved state. Phones, routers and microcontrollers use it every time a UPI payment or timer tick interrupts normal code.",
+ "prereq": "You need: <a href=\"#arm-programmer-s-model-registers-and-cpsr\">Chapter 6.2</a> for CPSR, mode bits and banked registers, and the interrupt idea from <a href=\"#interrupts-and-interrupt-programming\">Unit 4, Interrupts and interrupt programming</a>.",
+ "sections": [
+  {
+   "h3": "Seven processor modes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ARM divides execution into processor modes. User mode is the normal unprivileged mode for application code. The other six modes are privileged: FIQ, IRQ, Supervisor (SVC), Abort, Undefined and System. Privileged code can change CPSR mode bits; User code cannot. The CPSR is the current program status register described in <a href=\"#arm-programmer-s-model-registers-and-cpsr\">Chapter 6.2</a>."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Mode",
+      "Entered by",
+      "Main use"
+     ],
+     "rows": [
+      [
+       "User",
+       "normal code",
+       "applications; no CPSR write"
+      ],
+      [
+       "FIQ",
+       "fast interrupt",
+       "high-speed data transfer"
+      ],
+      [
+       "IRQ",
+       "normal interrupt",
+       "timer, UART"
+      ],
+      [
+       "Supervisor",
+       "reset, SWI",
+       "OS kernel, system calls"
+      ],
+      [
+       "Abort",
+       "memory fault",
+       "virtual memory handler"
+      ],
+      [
+       "Undefined",
+       "unknown opcode",
+       "emulation, trap"
+      ],
+      [
+       "System",
+       "privileged code",
+       "OS task with User registers"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Each privileged mode has its own R13 (SP) and R14 (LR), and its own SPSR, except System mode, which is privileged but shares the User mode bank and has no SPSR. User mode has no SPSR either. Banked R13 gives FIQ, IRQ, Supervisor, Abort and Undefined each a separate stack, so an IRQ handler cannot overwrite the Supervisor stack. System mode uses SP_usr and LR_usr."
+    }
+   ]
+  },
+  {
+   "h3": "Exception entry and the vector table",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An exception is an event that makes the CPU leave normal flow. The seven ARM exceptions are reset, undefined instruction, software interrupt (SWI), prefetch abort, data abort, IRQ and FIQ. Each has a fixed 4-byte slot in the vector table. The low vector table starts at 0x00000000: reset 0x00, undefined 0x04, SWI 0x08, prefetch abort 0x0C, data abort 0x10, reserved 0x14, IRQ 0x18, FIQ 0x1C. Some cores allow high vectors at 0xFFFF0000 with the same offsets."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "The CPU finishes the current instruction. Reset is immediate.",
+      "It copies CPSR into SPSR_mode of the new mode.",
+      "It writes a return address into LR_mode (R14 of that mode).",
+      "It changes the CPSR mode bits to the exception mode. For IRQ and FIQ it sets the I bit, and for FIQ the F bit too, so the handler is not interrupted by the same source.",
+      "It loads PC from the vector address. The slot usually holds a branch to the real handler, because 4 bytes is too small for a full handler."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "To return, the handler writes PC with the S bit set, for example SUBS PC, LR, #4. This copies SPSR_mode back into CPSR and subtracts 4 bytes from LR. IRQ and FIQ use #4. Prefetch abort also uses #4: LR_pab points 4 bytes past the faulting instruction, so SUBS PC, LR, #4 returns to it. Data abort alone uses #8 because its saved LR points 8 bytes past the faulting instruction. SWI normally returns with MOVS PC, LR because LR already holds the next instruction."
+    }
+   ]
+  },
+  {
+   "h3": "Stacks, System mode and why it matters",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Because R13 is banked, each mode can have its own stack. The IRQ handler uses SP_irq, the Supervisor handler uses SP_svc, and so on. A fault in one mode cannot corrupt another mode's stack. The handler must set up its stack pointer before using it; reset code usually initialises every mode's SP."
+    },
+    {
+     "type": "p",
+     "text": "System mode is privileged but uses the User mode registers, including SP_usr and LR_usr. An OS uses it for privileged tasks that need the application's register bank. User mode remains the only mode that cannot change CPSR mode bits directly; it must ask through SWI."
+    },
+    {
+     "type": "p",
+     "text": "The cost is complexity: every exception needs its own stack, SPSR and return rule. The benefit is safe nesting and fast response. A phone's timer interrupt, a router's packet interrupt and a microcontroller's UART interrupt all use this same mechanism."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Low vector table of an ARM7TDMI-class core. IRQ sits at 0x18 and FIQ at 0x1C; 0x14 is reserved and is not an exception.",
+  "spec": {
+   "type": "array",
+   "title": "Low vector table",
+   "show_index": true,
+   "index_from": 0,
+   "rows": [
+    {
+     "label": "Addr",
+     "cells": [
+      "0x00",
+      "0x04",
+      "0x08",
+      "0x0C",
+      "0x10",
+      "0x14",
+      "0x18",
+      "0x1C"
+     ]
+    },
+    {
+     "label": "Entry",
+     "cells": [
+      "RST",
+      "UND",
+      "SWI",
+      "PAB",
+      "DAB",
+      "---",
+      "IRQ",
+      "FIQ"
+     ],
+     "marks": {
+      "6": "live",
+      "7": "accent"
+     }
+    }
+   ],
+   "pointers": [
+    {
+     "row": 1,
+     "cell": 6,
+     "label": "IRQ"
+    }
+   ],
+   "aria": "ARM low vector table: reset at 0x00 through FIQ at 0x1C, with IRQ at 0x18 marked and FIQ at 0x1C marked."
+  }
+ },
+ "examples": [
+  {
+   "question": "An ARM7TDMI uses low vectors. An IRQ occurs while the CPU is in User mode. Give the vector address the CPU fetches, the mode it enters, the registers it uses to save the return address and CPSR, and the usual return instruction. State the byte address in decimal too.",
+   "steps": [
+    "The IRQ vector is at offset 0x18 in the low table. 0x18 = 24 decimal, so the CPU fetches from byte address 24 (0x18).",
+    "The IRQ exception forces the CPU into IRQ mode, one of the privileged modes.",
+    "The CPU saves the return address in LR_irq (R14_irq) and copies CPSR into SPSR_irq.",
+    "The handler returns with SUBS PC, LR, #4. This restores CPSR from SPSR_irq and subtracts 4 bytes from LR_irq to reach the next instruction."
+   ],
+   "answer": "Vector address 0x18 (24 decimal), IRQ mode, return address in LR_irq, CPSR copy in SPSR_irq, return instruction SUBS PC, LR, #4 (4 bytes).",
+   "check": "print(0x18)\nprint(4)",
+   "values": [
+    24,
+    4
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "FIQ is at 0x1C and IRQ is at 0x18. Swapping them is the most common vector-table mistake.",
+  "0x14 is reserved. It is not an exception and has no handler.",
+  "IRQ, FIQ and prefetch abort return subtract 4 bytes; data abort subtracts 8 bytes. SWI usually uses MOVS PC, LR, not #4.",
+  "CPSR is saved in SPSR_mode, not in LR. LR_mode holds the return address.",
+  "High vectors start at 0xFFFF0000, with the same offsets 0x00 to 0x1C, not at 0x0000FFFF."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "List the low vector addresses for reset, SWI, IRQ and FIQ.",
+   "marks": 2,
+   "a": "Reset 0x00, SWI 0x08, IRQ 0x18, FIQ 0x1C."
+  },
+  {
+   "level": "remember",
+   "q": "Which ARM mode is the only unprivileged mode?",
+   "marks": 2,
+   "a": "User mode."
+  },
+  {
+   "level": "understand",
+   "q": "Why does each privileged mode need its own SP?",
+   "marks": 3,
+   "a": "R13 is banked per mode, so each mode can keep a separate stack. A handler in one mode then cannot overwrite another mode's stack."
+  },
+  {
+   "level": "apply",
+   "q": "A data abort occurs on the instruction at 0x00001000. What is LR_abt and what return instruction retries 0x00001000?",
+   "marks": 4,
+   "a": "LR_abt = 0x00001008. SUBS PC, LR, #8 gives PC = 0x00001000 and retries the instruction."
+  },
+  {
+   "level": "apply",
+   "q": "An IRQ handler must return to 0x00002000. What should LR_irq hold and what instruction returns there?",
+   "marks": 4,
+   "a": "LR_irq = 0x00002004. SUBS PC, LR, #4 gives PC = 0x00002000."
+  },
+  {
+   "level": "apply",
+   "q": "A prefetch abort occurs on the instruction at 0x00003000. What does LR_pab hold and what instruction returns to the faulting instruction?",
+   "marks": 4,
+   "a": "LR_pab = 0x00003004. SUBS PC, LR, #4 gives PC = 0x00003000 and retries the instruction."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is FIQ placed at 0x1C and not in the middle of the vector table?",
+   "marks": 5,
+   "a": "0x1C is the last vector slot. An FIQ handler can start directly there and continue without a branch, which saves time. FIQ also has the highest priority."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does the vector table usually hold branch instructions rather than full handlers?",
+   "marks": 4,
+   "a": "Each vector slot is only 4 bytes. A branch reaches a full handler placed elsewhere in memory."
+  }
+ ],
+ "beyond": "Not for the exam. ARM's exception model grows into TrustZone monitor mode, virtualization hyp mode and Cortex-M's NVIC, which replaces the classic vector table with a table of handler addresses. Search 'ARM exception vectors', 'CPSR mode bits' and 'high vectors' for the architecture reference. The same ideas reappear in RISC-V traps and in x86 interrupt descriptor tables."
+}

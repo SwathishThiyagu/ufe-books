@@ -1,0 +1,219 @@
+{
+ "lead": "The ARM programmer's model is the small set of registers and status bits a programmer can see. It has sixteen 32-bit registers, R0 to R15, and one status register, the CPSR. R0-R12 hold data. R13 is the stack pointer, R14 is the link register, R15 is the program counter. The CPSR holds condition flags, interrupt masks, the Thumb bit and the processor mode. This model exists so that compilers and assembly programmers have a simple, regular target. Every ARM program, from a UPI payment terminal to a Cortex-M motor controller, uses these registers.",
+ "prereq": "You need <a href=\"#risc-and-arm-design-philosophy-arm-families\">Chapter 6.1</a> on RISC and ARM design, and Unit 1 on the stored-program idea and pipelines.",
+ "sections": [
+  {
+   "h3": "Registers R0 to R15",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "ARM state gives 16 visible 32-bit registers, R0 to R15. Each holds 4 bytes. R0-R12 are general purpose: data-processing, load and store instructions can use them freely. The ARM calling convention gives them jobs: R0-R3 pass the first four arguments and return values, R4-R11 hold local variables, and R12 is a scratch register. The hardware does not enforce these roles."
+    },
+    {
+     "type": "p",
+     "text": "R13 is the stack pointer, SP. It points to the top of the current stack; PUSH/POP and STMFD/LDMFD use it. R14 is the link register, LR. A BL (branch with link) copies the return address into LR before jumping. A leaf function can return with BX LR without touching memory. A function that calls another must save LR on the stack. R15 is the program counter, PC."
+    },
+    {
+     "type": "p",
+     "text": "Writing PC jumps to the written address. Reading PC is different: it does not return the address of the instruction now executing. The next section gives the rule."
+    }
+   ]
+  },
+  {
+   "h3": "PC reads as current + 8",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The ARM core pipelines fetch, decode and execute. By the time an instruction executes, the PC has already fetched two instructions ahead in ARM state, or one instruction ahead in Thumb state. A read of R15 therefore returns the current instruction's address plus 8 bytes in ARM state, and plus 4 bytes in Thumb state."
+    },
+    {
+     "type": "formula",
+     "text": "PC_read = A_current + 8",
+     "where": "A_current is the byte address of the instruction now executing; PC_read is the value returned by a read of R15. In Thumb state replace 8 with 4."
+    },
+    {
+     "type": "p",
+     "text": "At address 0x00008020 in ARM state, reading R15 gives 0x00008028. PC-relative loads use this: LDR R0, [PC, #4] reads from PC_read + 4. Assemblers turn labels into the right offset. Hand-written code must add the offset itself. A write to PC jumps; the bottom bit of the written value selects ARM or Thumb state on cores that support BX."
+    }
+   ]
+  },
+  {
+   "h3": "CPSR: flags, masks and mode",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The Current Program Status Register (CPSR) is a 32-bit register with four groups of bits."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Flags</b>: N (bit 31, negative), Z (bit 30, zero), C (bit 29, carry), V (bit 28, signed overflow).",
+      "<b>T bit</b> (bit 5): 0 = ARM state, 1 = Thumb state.",
+      "<b>I and F</b> (bits 7 and 6): I=1 masks IRQ, F=1 masks FIQ.",
+      "<b>Mode bits M4-M0</b> (bits 4-0): User 0b10000, FIQ 0b10001, IRQ 0b10010, Supervisor 0b10011, Abort 0b10111, Undefined 0b11011, System 0b11111. Reset starts in Supervisor mode."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Data-processing instructions update N, Z, C and V only if they have the S suffix: ADDS, SUBS, CMP, TST. CMP is a subtract that discards the result and sets flags. A conditional branch tests one or more flags: BEQ needs Z=1, BNE needs Z=0, BCS needs C=1, BMI needs N=1. The condition is encoded in the instruction, so almost every ARM instruction can be conditional (Chapter 6.4)."
+    },
+    {
+     "type": "p",
+     "text": "In exception modes, the CPU banks registers: each mode has its own R13 and R14, and FIQ also banks R8-R12. On an exception, the CPU switches mode, copies the old CPSR into the SPSR (Saved Program Status Register) of the new mode, and jumps to a vector. The SPSR exists only in exception modes; User mode has none. Banked registers let an exception handler run without saving the user's stack pointer and return address first (Chapter 6.3)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The programmer sees R0-R12 for data, then SP, LR and PC. The CPSR sits beside them and holds flags, interrupt masks, the state bit and the mode bits.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Visible ARM registers",
+   "aria": "ARM programmer's model: R0 to R12, then SP, LR and PC, with CPSR holding flags and mode.",
+   "nodes": [
+    {
+     "id": "r",
+     "label": "R0-R12",
+     "note": "general purpose",
+     "style": "accent"
+    },
+    {
+     "id": "sp",
+     "label": "SP R13",
+     "note": "stack pointer"
+    },
+    {
+     "id": "lr",
+     "label": "LR R14",
+     "note": "link return"
+    },
+    {
+     "id": "pc",
+     "label": "PC R15",
+     "note": "next instruction"
+    },
+    {
+     "id": "cpsr",
+     "label": "CPSR",
+     "note": "flags and mode",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "r",
+     "to": "sp",
+     "style": "solid"
+    },
+    {
+     "from": "sp",
+     "to": "lr",
+     "style": "solid"
+    },
+    {
+     "from": "lr",
+     "to": "pc",
+     "style": "solid"
+    },
+    {
+     "from": "pc",
+     "to": "cpsr",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "In ARM state, the instruction at address 0x00008020 reads R15 into R0. What value does R0 get, and why? The CPSR has N=0, Z=1, C=0, V=0. Which flag makes BEQ taken?",
+   "steps": [
+    "The current instruction's address is A_current = 0x00008020.",
+    "In ARM state a read of R15 returns A_current + 8. The pipeline has already fetched two instructions ahead when this instruction executes.",
+    "R0 = 0x00008020 + 8 = 0x00008028.",
+    "BEQ tests the Z flag. Z=1 means the last result was zero, so the branch is taken. N, C and V do not affect BEQ.",
+    "N=0 and C=0 and V=0 do not change this decision."
+   ],
+   "answer": "R0 = 0x00008028 (decimal 32808) and BEQ is taken because Z=1.",
+   "check": "addr = 0x00008020\nr0 = addr + 8\nz = 1\nprint(r0)\nprint(z)",
+   "values": [
+    32808,
+    1
+   ],
+   "output": ""
+  },
+  {
+   "question": "A Thumb-state instruction at address 0x00004000 reads R15 into R1. What is R1?",
+   "steps": [
+    "A_current = 0x00004000.",
+    "In Thumb state a read of R15 returns A_current + 4.",
+    "R1 = 0x00004000 + 4 = 0x00004004."
+   ],
+   "answer": "R1 = 0x00004004 (decimal 16388).",
+   "check": "addr = 0x00004000\nr1 = addr + 4\nprint(r1)",
+   "values": [
+    16388
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "PC is not the address of the current instruction. In ARM state a read of R15 gives current + 8; in Thumb state current + 4. Many students write +4 for ARM.",
+  "Writing R15 is a jump, not a normal data write. MOV PC, LR returns from a function; the target's bit 0 selects Thumb on cores that support it.",
+  "CPSR and SPSR are different. The SPSR exists only in exception modes and holds the CPSR value saved when the exception occurred.",
+  "Flags change only when the S suffix is present. MOV does not set flags; MOVS does. CMP sets flags without keeping the subtraction result.",
+  "The mode bits M4-M0 are not the T bit. M4-M0 select User, FIQ, IRQ, Supervisor, Abort, Undefined or System; T selects ARM or Thumb state."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name R13, R14 and R15 and state one job of each.",
+   "marks": 2,
+   "a": "R13 = SP, the stack pointer. R14 = LR, the link register; BL puts the return address there. R15 = PC, the program counter; writing it jumps."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a read of R15 return current + 8 in ARM state?",
+   "marks": 3,
+   "a": "The core pipelines fetch, decode and execute. When an instruction executes, two more instructions have already been fetched in ARM state, so the PC is 8 bytes ahead. Thumb uses 2-byte instructions and an offset of 4."
+  },
+  {
+   "level": "apply",
+   "q": "In Thumb state, the instruction at 0x00004000 reads R15 into R1. What is R1?",
+   "marks": 2,
+   "a": "Thumb offset is +4, so R1 = 0x00004000 + 4 = 0x00004004."
+  },
+  {
+   "level": "apply",
+   "q": "The CPSR has N=1, Z=0, C=1, V=0. Which of BEQ, BNE, BCS and BMI are taken?",
+   "marks": 4,
+   "a": "BNE is taken because Z=0. BCS is taken because C=1. BMI is taken because N=1. BEQ is not taken because Z=0."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does an IRQ mode need a banked R13 and R14 and an SPSR?",
+   "marks": 4,
+   "a": "The banked SP gives the handler its own stack without saving the user SP. The banked LR holds the return address without saving the user LR. The SPSR saves the user CPSR so flags and mode can be restored. Entry is fast and user state is not overwritten."
+  },
+  {
+   "level": "remember",
+   "q": "What do the I and F bits of the CPSR do?",
+   "marks": 2,
+   "a": "I=1 masks IRQ; F=1 masks FIQ. They stop interrupts during critical code."
+  },
+  {
+   "level": "analyze",
+   "q": "A programmer uses R13 as a general data register in a function that enables IRQ. Explain the risk.",
+   "marks": 3,
+   "a": "R13 is the stack pointer. Using it for data destroys the stack, so PUSH/POP, saving LR before a call, and interrupt return paths that need the stack fail or corrupt memory."
+  },
+  {
+   "level": "apply",
+   "q": "The CPSR mode bits read 0b10010. Which mode is the CPU in? If F=1, which interrupt is masked?",
+   "marks": 3,
+   "a": "0b10010 is IRQ mode. F=1 masks FIQ. IRQ masking depends on the I bit, not F."
+  }
+ ],
+ "beyond": "Not for the exam. Cortex-M cores replace the classic CPSR with xPSR, PRIMASK, FAULTMASK and BASEPRI registers, and use MSP and PSP instead of one banked SP. TrustZone adds secure and non-secure states with banked status bits. Virtualization extensions add a hypervisor mode. The AAPCS document fixes which registers a function may change. Search 'ARM CPSR bit layout', 'ARM banked registers' and 'AAPCS register roles' to go deeper."
+}

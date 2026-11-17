@@ -1,0 +1,223 @@
+{
+ "lead": "ARM assembly and C call each other because both obey one rule: the AAPCS calling convention. The caller puts arguments in registers and the callee returns a value in R0. Assembly handles startup code, tight loops and hardware access; C handles most application logic. Only a few universities teach this mix at this depth.",
+ "prereq": "You need: <a href=\"#arm-instruction-set-data-processing-load-store-branch\">Chapter 6.4</a>, <a href=\"#thumb-instruction-set\">Chapter 6.5</a>, Unit 3 assembly (stack and subroutines), and Unit 4 embedded C.",
+ "sections": [
+  {
+   "h3": "The AAPCS contract",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "AAPCS means ARM Architecture Procedure Call Standard. It is the rule book for calls between C and assembly. R0-R3 carry the first four arguments; more arguments go on the stack. R0 also carries the return value. R4-R11 are callee-saved: a function that changes them restores them before it returns. R12, R13 (SP), R14 (LR) and R15 (PC) have special roles. SP must be 8-byte aligned at every public interface, because 64-bit values may be passed."
+    },
+    {
+     "type": "p",
+     "text": "At a call the caller sets the arguments, then <code>BL</code> writes the return address into LR. A routine that itself calls another function must save LR first. The usual frame is <code>PUSH {R4, LR}</code> at entry and <code>POP {R4, PC}</code> at exit: it saves the callee-saved register and LR, and returns through PC. Small inline assembly such as <code>__asm(\"NOP\");</code> is allowed for hardware operations."
+    }
+   ]
+  },
+  {
+   "h3": "File layout and the SUM loop",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Assembly files use directives. <code>AREA</code> names a code section, <code>ENTRY</code> marks the first instruction, <code>EXPORT</code> makes a symbol visible to the linker, and <code>DCD</code> stores a 32-bit constant such as <code>N DCD 10</code>. Labels are addresses. The label <code>SUM</code> is the function that C will call."
+    },
+    {
+     "type": "code",
+     "lang": "text",
+     "code": "        AREA    SUMCODE, CODE, READONLY\n        EXPORT  SUM\n        ENTRY\nSUM     PUSH    {R4, LR}      ; save R4 and return address\n        MOV     R4, R1        ; R4 = N\n        MOV     R0, #0        ; R0 = sum = 0\n        CMP     R4, #0\n        BLE     sum_done\nsum_loop\n        ADD     R0, R0, R4    ; sum = sum + N\n        SUBS    R4, R4, #1    ; N = N - 1, set flags\n        BNE     sum_loop\nsum_done\n        POP     {R4, PC}      ; restore R4 and return\n        END",
+     "stdin": "",
+     "output": "N = 10 in R1 -> on return R0 = 55 (0x37)"
+    },
+    {
+     "type": "p",
+     "text": "R1 carries N and R0 returns the sum. <code>SUBS</code> subtracts and sets flags; <code>BNE</code> loops while the result is not zero. For N=10 the additions are 10+9+...+1, so R0 becomes 55. R4 is callee-saved, so it is pushed and popped. LR is saved so the routine can return through <code>POP {R4, PC}</code>: the saved LR goes into PC. The two-register pair also keeps SP 8-byte aligned."
+    }
+   ]
+  },
+  {
+   "h3": "C and assembly calling each other",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "From C, declare the assembly function with a prototype: <code>extern int SUM(int n);</code> then call <code>int s = SUM(10);</code>. A one-argument C call puts 10 in R0. The SUM code above expects N in R1, so use a wrapper <code>MOV R1, R0; B SUM</code>, or declare a two-argument function and pass N as the second argument."
+    },
+    {
+     "type": "p",
+     "text": "From assembly, put arguments in R0-R3 and use <code>BL</code> to call C. Save LR before the call, because BL overwrites it. R4-R11 are preserved by the C function, so a live value in R5 survives the call. Save R4-R11 at entry to your own routine only if your routine changes them, and restore them before you return. The caller must not assume R0-R3 survive a call."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The sum loop used by SUM: R0 is cleared, R4 counts down from N, and each pass adds R4 into R0. For N=10 the final R0 is 55.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Sum loop subroutine",
+   "nodes": [
+    {
+     "id": "load",
+     "label": "R4 = R1",
+     "note": "copy N",
+     "style": "accent"
+    },
+    {
+     "id": "zero",
+     "label": "R0 = 0",
+     "note": "clear sum"
+    },
+    {
+     "id": "first",
+     "label": "N <= 0?",
+     "style": "live"
+    },
+    {
+     "id": "add",
+     "label": "R0 = R0 + R4",
+     "note": "add count"
+    },
+    {
+     "id": "dec",
+     "label": "R4 = R4 - 1",
+     "note": "SUBS sets flags"
+    },
+    {
+     "id": "test",
+     "label": "R4 = 0?",
+     "style": "live"
+    },
+    {
+     "id": "ret",
+     "label": "Return",
+     "note": "R0 holds sum"
+    }
+   ],
+   "edges": [
+    {
+     "from": "load",
+     "to": "zero",
+     "style": "solid"
+    },
+    {
+     "from": "zero",
+     "to": "first",
+     "style": "solid"
+    },
+    {
+     "from": "first",
+     "to": "ret",
+     "label": "yes",
+     "style": "solid"
+    },
+    {
+     "from": "first",
+     "to": "add",
+     "label": "no",
+     "style": "solid"
+    },
+    {
+     "from": "add",
+     "to": "dec",
+     "style": "solid"
+    },
+    {
+     "from": "dec",
+     "to": "test",
+     "style": "solid"
+    },
+    {
+     "from": "test",
+     "to": "ret",
+     "label": "yes",
+     "style": "solid"
+    },
+    {
+     "from": "test",
+     "to": "add",
+     "label": "no",
+     "style": "dashed"
+    }
+   ],
+   "aria": "Flowchart for a sum loop: copy N into R4, clear R0, return zero if N is not positive, otherwise add R4 into R0, decrement R4, and repeat until R4 is zero."
+  }
+ },
+ "examples": [
+  {
+   "question": "Write an ARM assembly subroutine SUM that returns 1+2+...+N in R0, with N passed in R1. Use a loop. Call it from C with N=10. State the final R0 and one register the subroutine must preserve if it uses it.",
+   "steps": [
+    "Clear R0 = 0: this is the running sum.",
+    "Copy the count: R4 = R1. If R4 <= 0, branch straight to return with R0 = 0.",
+    "Loop body: R0 = R0 + R4, then R4 = R4 - 1.",
+    "Use SUBS and BNE to repeat while R4 is not zero.",
+    "For N=10: 10+9+8+7+6+5+4+3+2+1 = 55. Final R0 = 55 = 0x37.",
+    "R4 is callee-saved, so PUSH {R4, LR} at entry and POP {R4, PC} at exit protect it, and R1 is left unchanged."
+   ],
+   "answer": "Final R0 = 55 (0x37). R4 is restored by the push and pop; any other R4-R11 register the routine uses must also be saved.",
+   "check": "n = 10\ntotal = 0\nfor k in range(n, 0, -1):\n    total += k\nprint(total)\n",
+   "values": [
+    55
+   ],
+   "output": "R0 = 55 (0x37)"
+  }
+ ],
+ "traps": [
+  "R0-R3 are not preserved across a call. Keep live values in R4-R11 or on the stack.",
+  "Assembly that uses R4-R11 must save and restore them; the C caller assumes they survive.",
+  "SP must be 8-byte aligned at public interfaces. PUSH {R4, LR} pushes 8 bytes; PUSH {R4} alone breaks alignment.",
+  "A one-argument C call puts the argument in R0, not R1. The SUM example expects R1, so use a wrapper or a second argument.",
+  "BL overwrites LR. A routine that calls another function must save LR first."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which registers carry arguments 1 to 4 in AAPCS?",
+   "marks": 2,
+   "a": "R0-R3."
+  },
+  {
+   "level": "remember",
+   "q": "Which registers are callee-saved?",
+   "marks": 2,
+   "a": "R4-R11."
+  },
+  {
+   "level": "understand",
+   "q": "Why must a subroutine save LR before it calls another function?",
+   "marks": 3,
+   "a": "BL overwrites LR with the new return address; the old return address, the subroutine's own way back, would be lost."
+  },
+  {
+   "level": "apply",
+   "q": "N=6 in R1. Trace SUM. Final R0?",
+   "marks": 4,
+   "a": "21; 6+5+4+3+2+1."
+  },
+  {
+   "level": "apply",
+   "q": "C calls SUM(10) with extern int SUM(int n). Which register holds 10, and what must assembly do if SUM expects R1?",
+   "marks": 4,
+   "a": "R0 holds 10; move R0 to R1 with a wrapper, or change the prototype to pass N as the second argument."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is PUSH {R4, LR} better than PUSH {R4} before a call?",
+   "marks": 5,
+   "a": "It saves LR, which BL will overwrite, and pushes 8 bytes, keeping SP 8-byte aligned."
+  },
+  {
+   "level": "analyze",
+   "q": "An assembly routine uses R5 and calls a C function. What must it save, and where?",
+   "marks": 5,
+   "a": "At entry push R5 and LR, as PUSH {R5, LR}. LR must be saved because BL overwrites it; R5 because this routine uses a callee-saved register and must restore it for its own caller. Pop them back with POP {R5, PC} before returning."
+  },
+  {
+   "level": "understand",
+   "q": "What does EXPORT do in an assembly file?",
+   "marks": 3,
+   "a": "Makes a symbol visible to the linker so C can call it."
+  }
+ ],
+ "beyond": "Not for the exam. Production firmware still uses this mix: startup code in assembly, drivers in C with small inline assembly, linker scripts placing vectors and stacks. Cortex-M follows the same AAPCS, but exception entry puts EXC_RETURN in LR, so stack alignment matters more."
+}

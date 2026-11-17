@@ -1,0 +1,259 @@
+{
+ "lead": "ARM uses a small set of 32-bit instructions. Data processing instructions work inside registers. Load-store instructions move data between a register and memory. Branch instructions change the program counter. Almost every instruction also carries a condition field, so the CPU can execute or skip it based on the CPSR flags. This split suits a load-store RISC core and makes simple pipelines possible. You use it in every ARM program: adding sensor readings, reading a memory-mapped register, and jumping to an interrupt handler.",
+ "prereq": "You need: registers and CPSR from <a href=\"#arm-programmer-s-model-registers-and-cpsr\">Chapter 6.2</a>, modes and exceptions from <a href=\"#processor-modes-exceptions-and-vector-table\">Chapter 6.3</a>, and addressing modes from Unit 3.",
+ "sections": [
+  {
+   "h3": "Data processing instructions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Data processing instructions read Rn and Operand2, pass Operand2 through the barrel shifter, combine the two in the ALU, and write the result to Rd; compare instructions such as CMP use the same path but write only the flags. The common format is <code>OP{S}{cond} Rd, Rn, Operand2</code>. Rd is the destination register. Rn is the first source register. Operand2 is a second source: an immediate, a register, or a register shifted by a constant or by another register. The barrel shifter can shift or rotate Operand2 in the same cycle. Rn is never shifted, and the ALU result goes straight to Rd without any shifter in its path."
+    },
+    {
+     "type": "p",
+     "text": "MOV copies Operand2 to Rd. ADD and SUB do arithmetic. AND, ORR and EOR do bitwise logic. CMP is a subtract that writes only the flags. The S suffix makes the instruction update the CPSR flags: N (negative), Z (zero), C (carry) and V (overflow). Without S, flags stay unchanged. That one letter is often the difference between a working conditional branch and a wrong one."
+    },
+    {
+     "type": "p",
+     "text": "Examples: <code>ADD R3, R1, R2</code> sets R3 = R1 + R2 and leaves flags alone. <code>ADDS R3, R1, R2</code> does the same and updates N, Z, C, V. <code>MOV R0, R1, LSL #2</code> sets R0 = R1 × 4. <code>AND R4, R4, #0x0F</code> keeps only the low four bits of R4. <code>CMP R1, R2</code> computes R1 − R2 and sets flags for a later BEQ, BNE, BLO or BGE."
+    },
+    {
+     "type": "p",
+     "text": "Immediate values are encoded in a compact form, so not every 32-bit constant is allowed as an immediate. For a large constant, load it from a literal pool or build it with MOV and ORR. Some syllabi call data processing 'data manipulation' instructions."
+    }
+   ]
+  },
+  {
+   "h3": "Load-store instructions",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Only load-store instructions move data between registers and memory. A word is 32 bits and occupies four byte addresses. <code>LDR Rd, [Rn]</code> loads the word at address Rn into Rd. <code>STR Rd, [Rn]</code> stores Rd at address Rn. Byte forms <code>LDRB</code> and <code>STRB</code> move 8 bits and zero-extend a loaded byte into the destination register. Halfword forms <code>LDRH</code> and <code>STRH</code> move 16 bits, and <code>LDRSB</code> and <code>LDRSH</code> load a signed byte or halfword with sign extension. In classic ARM, a word address should be four-byte aligned."
+    },
+    {
+     "type": "p",
+     "text": "ARM gives a rich address mode. The offset form <code>LDR R3, [R0, #4]</code> uses address R0 + 4 and does not change R0. Pre-index writeback <code>LDR R3, [R0, #4]!</code> uses R0 + 4, loads, then sets R0 = R0 + 4. Post-index <code>LDR R3, [R0], #4</code> loads from R0 first, then sets R0 = R0 + 4. A register offset is also allowed: <code>LDR R3, [R0, R1]</code>."
+    },
+    {
+     "type": "p",
+     "text": "Multiple-register forms move several words in one instruction. <code>LDMIA R0, {R1-R3}</code> loads R1, R2 and R3 from R0, R0+4 and R0+8. <code>STMIA R0!, {R1-R3}</code> stores those registers and updates R0 to point after the block. IA means increment after; other suffixes change the order for stack use, covered with the calling convention in <a href=\"#arm-assembly-and-c-programming\">Chapter 6.6</a>."
+    },
+    {
+     "type": "p",
+     "text": "<code>LDR R0, =0x12345678</code> is an assembler pseudo-instruction. The assembler puts the constant in a nearby literal pool and generates a PC-relative LDR. Literal pools are a convenience, not a separate hardware instruction."
+    }
+   ]
+  },
+  {
+   "h3": "Branch and condition codes",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Branches change the program counter. <code>B label</code> jumps without saving a return address. <code>BL label</code> branches with link: it copies the address of the next instruction into LR (R14) before jumping, so a subroutine can return with <code>MOV PC, LR</code> or <code>BX LR</code>. <code>BX Rm</code> branches to the address in Rm; bit 0 of Rm selects ARM or Thumb state, so BX also switches instruction sets. Thumb details are in <a href=\"#thumb-instruction-set\">Chapter 6.5</a>."
+    },
+    {
+     "type": "p",
+     "text": "Almost every 32-bit ARM instruction has a 4-bit condition field at bits 31:28; the value 1111 marks the few unconditional encodings. The default suffix is AL, always. A suffix such as EQ makes the instruction execute only when the last flag-setting result was zero. NE means not zero. CS/HS means carry set or unsigned higher or same. CC/LO means carry clear or unsigned lower. MI means negative, PL means positive or zero. GE, LT, GT and LE use signed comparisons. For example, after <code>CMP R1, R2</code>, <code>BEQ ZERO</code> jumps to ZERO only if R1 = R2."
+    },
+    {
+     "type": "p",
+     "text": "Branch offsets are PC-relative. The assembler calculates the distance from the branch instruction to the label, so position-independent code is easy. It encodes the offset relative to the PC, which in ARM state is the branch address plus 8, so the stored offset is the label distance minus 8. A conditional branch does not change flags; it tests the flags already in CPSR. That is why an instruction such as <code>ADDS</code> or <code>CMP</code> must run before <code>BEQ</code>."
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi group B, BL and BX as control instructions. Keep three facts separate: B saves nothing, BL saves the return address in LR, and BX jumps through a register and can change state."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The three ARM instruction classes and two common examples in each. Notice that only load-store instructions touch memory; branch instructions change the program counter.",
+  "spec": {
+   "type": "tree",
+   "shape": "box",
+   "root": {
+    "label": "ARM instr",
+    "style": "accent",
+    "children": [
+     {
+      "label": "Data proc",
+      "children": [
+       {
+        "label": "ADD",
+        "_d": 2,
+        "children": [],
+        "_x": 76.66666666666666,
+        "_y": 170
+       },
+       {
+        "label": "CMP",
+        "_d": 2,
+        "children": [],
+        "_x": 190.0,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 133.33333333333331,
+      "_y": 106
+     },
+     {
+      "label": "Load-store",
+      "children": [
+       {
+        "label": "LDR",
+        "_d": 2,
+        "children": [],
+        "_x": 303.3333333333333,
+        "_y": 170
+       },
+       {
+        "label": "STR",
+        "_d": 2,
+        "children": [],
+        "_x": 416.6666666666667,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 360.0,
+      "_y": 106
+     },
+     {
+      "label": "Branch",
+      "children": [
+       {
+        "label": "B",
+        "_d": 2,
+        "children": [],
+        "_x": 530.0,
+        "_y": 170
+       },
+       {
+        "label": "BL",
+        "_d": 2,
+        "children": [],
+        "_x": 643.3333333333333,
+        "_y": 170
+       }
+      ],
+      "_d": 1,
+      "_x": 586.6666666666666,
+      "_y": 106
+     }
+    ],
+    "_d": 0,
+    "_x": 360.0,
+    "_y": 42
+   },
+   "aria": "ARM instruction classes: data processing, load-store and branch, each with two common examples."
+  }
+ },
+ "examples": [
+  {
+   "question": "R1 = 0x0000000A, R2 = 0x00000005, R0 = 0x00004000. Write ARM instructions to set R3 = R1 + R2, store R3 at address 0x4004 using R0, and branch to label ZERO if the last result is zero. State the final value of R3, the memory word at 0x4004, and whether the branch is taken.",
+   "steps": [
+    "R0 = 0x00004000. R1 = 0x0000000A = 10 decimal. R2 = 0x00000005 = 5 decimal.",
+    "Use <code>ADDS R3, R1, R2</code>. R3 = 0x0000000A + 0x00000005 = 0x0000000F = 15 decimal. No carry and no overflow. The result is positive and nonzero, so N = 0, Z = 0, C = 0, V = 0.",
+    "Use <code>STR R3, [R0, #4]</code>. Effective address = R0 + 4 = 0x00004000 + 0x00000004 = 0x00004004. Store 0x0000000F there. There is no !, so R0 stays 0x00004000.",
+    "Use <code>BEQ ZERO</code>. It tests Z. Z = 0, so the branch is not taken.",
+    "Final: R3 = 0x0000000F, memory word at 0x4004 = 0x0000000F, branch not taken."
+   ],
+   "answer": "R3 = 0x0000000F (15 decimal), memory at 0x4004 holds 0x0000000F (15 decimal), and the BEQ branch is not taken because Z = 0.",
+   "check": "r1 = 0x0000000A\nr2 = 0x00000005\nr0 = 0x00004000\nr3 = (r1 + r2) & 0xFFFFFFFF\naddr = r0 + 4\nmem = r3\nz = 1 if r3 == 0 else 0\nprint(r3)\nprint(mem)\nprint(z)",
+   "values": [
+    15,
+    15,
+    0
+   ],
+   "dry_run": {
+    "head": [
+     "Instruction",
+     "R3",
+     "Memory at 0x4004",
+     "Z"
+    ],
+    "rows": [
+     [
+      "ADDS R3,R1,R2",
+      "0x0000000F",
+      "unchanged",
+      "0"
+     ],
+     [
+      "STR R3,[R0,#4]",
+      "0x0000000F",
+      "0x0000000F",
+      "0"
+     ],
+     [
+      "BEQ ZERO",
+      "0x0000000F",
+      "0x0000000F",
+      "0"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "ADD does not change flags; ADDS does. A conditional branch after plain ADD tests old flags, not the new sum.",
+  "STR with [R0, #4] stores at R0 + 4, not at R0. Pre-index ! changes R0; no ! leaves R0 unchanged.",
+  "CMP writes flags only. It does not put the difference into a register. Use SUB when you need the result as well.",
+  "B and BL differ: BL saves the return address in LR, B does not. BX uses a register and can switch between ARM and Thumb state through bit 0.",
+  "A word load or store uses four bytes. LDRB and STRB touch one byte. Do not use a word store when the device expects a byte register."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the three instruction classes in this chapter and give one example from each.",
+   "marks": 2,
+   "a": "Data processing: ADD. Load-store: LDR or STR. Branch: B, BL or BX."
+  },
+  {
+   "level": "remember",
+   "q": "What does the S suffix do in ADDS?",
+   "marks": 2,
+   "a": "It makes the instruction update the CPSR flags N, Z, C and V from the result."
+  },
+  {
+   "level": "understand",
+   "q": "Why have CMP when SUB can subtract?",
+   "marks": 3,
+   "a": "CMP updates flags for a later branch but does not overwrite a register. SUB gives the difference in a register; CMP only compares."
+  },
+  {
+   "level": "apply",
+   "q": "R1 = 0x10 and R2 = 0x03. After ADDS R3, R1, R2 and then CMP R3, R1, what are R3 and Z?",
+   "marks": 4,
+   "a": "R3 = 0x13. CMP computes 0x13 − 0x10 = 0x03, which is nonzero, so Z = 0."
+  },
+  {
+   "level": "apply",
+   "q": "R0 = 0x2000 and R1 = 0x11. What does STR R1, [R0, #8]! do, and what is R0 afterward?",
+   "marks": 4,
+   "a": "It stores 0x00000011 at address 0x2008 and then writes R0 = 0x2008 because of pre-index writeback."
+  },
+  {
+   "level": "analyze",
+   "q": "A program runs ADD R3, R1, R2 and then BEQ ZERO. Explain why the branch may take the wrong path.",
+   "marks": 5,
+   "a": "ADD does not update flags. BEQ tests the old Z flag left by an earlier instruction, not the result of R1 + R2. Use ADDS before BEQ."
+  },
+  {
+   "level": "analyze",
+   "q": "Explain two reasons ARM separates load-store, data processing and branch instructions.",
+   "marks": 6,
+   "a": "Only load-store touches memory, so arithmetic stays fast and regular for pipelining. Fixed instruction formats with a condition field let many instructions run conditionally without extra branches."
+  },
+  {
+   "level": "understand",
+   "q": "What is the difference between LDR and LDRB?",
+   "marks": 3,
+   "a": "LDR loads a 32-bit word. LDRB loads one byte and zero-extends it into the destination register."
+  }
+ ],
+ "beyond": "Not for the exam. Modern ARM cores use Thumb-2, which mixes 16-bit and 32-bit encodings, and Cortex-M cores execute Thumb only. The same load-store split appears in RISC-V, which also separates memory access from arithmetic. Compilers use these instructions to build calling conventions and position-independent code. Search next for ARM condition codes, barrel shifter, and literal pools."
+}
