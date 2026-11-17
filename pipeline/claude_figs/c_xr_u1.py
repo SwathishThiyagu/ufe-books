@@ -98,7 +98,7 @@ def f4():
         o.append(R(X(2) + 3, y + 8, 7 * s, 30, ACS, AC, 3)); o.append(T(X(5.5) + 3, y + 28, 'render 7', 13))
         o.append(T(X(bud), y - 6, f'budget {bud} ms', 13, 'middle', MUT))
         if fits:
-            o.append(T(X(9.3) + 6, y + 28, 'fits, 2.1 ms spare', 14, 'start', AC, bold=True))
+            o.append(T(X(bud) + 8, y + 28, 'fits, 2.1 ms spare', 14, 'start', AC, bold=True))
         else:
             o.append(R(X(bud), y + 8, (9 - bud) * s + 3, 30, NXS, NX, 3))
             o.append(T(X(9.3) + 6, y + 28, 'overruns by 0.7 ms → dropped frame', 14, 'start', NX, bold=True))
