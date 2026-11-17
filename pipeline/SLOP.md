@@ -803,3 +803,58 @@ traps and model answers that call a valid convention or the correct answer wrong
 whose givens are missing or inconsistent (u5-L2 hidden unit, u6-L2 bindings, u5-L4 ten steps), unit numbers in all
 6 last-lesson outros, META.subject "biotech" everywhere, repeated spam/shop/celebration hooks (8 lessons), caret and
 underscore maths (12 lessons), tiny recap pictures (10 lessons).
+
+## Theory of Computation (18 Nov)
+
+Audited 18 Nov 2026: all 21 c-toc lessons (B.Tech/CSE/Theory of Computation/html: u1 L1–L4, u2 L1–L4, u3 L1–L4, u4 L1–L2,
+u5 L1–L3, u6 L1–L4), every scene, narration and the rendered last frame of each scene (dumped at 0.995), plus
+lesson_sheet.py sheets at 0.92 for all 21 (u4-L2 re-rendered at 0.995). Checker: 0 page errors, 0 cue failures, 0 text
+outside the safe area on every sheet. Recomputed every worked example, model answer and trap in code: every DFA, NFA, ε-NFA,
+PDA and TM trace; every regex on its strings (0+1(01)*, 0*(10*10*)*, (0*1)*0*1 = (0+1)*1, the mobile-number regex); ECLOSE
+sets, the subset construction and the minimisation passes; Arden's rule; Thompson counts (10 states, 9 ε-moves); the
+product DFA and |Q_A| × |Q_B|; every pumping-lemma split; derivations, ambiguity, simplification (8 productions), CNF
+(5 rules) and CYK (V[1,3] = {S}); closure constructions; PDA and DPDA runs; leftmost/rightmost parse orders; TM IDs, the
+unary adder, two-tape 2n+3 and the storage machine; dovetailing step counts; PCP instances (1,2,3 = aabbab; Q2 = aba);
+the diagonal tables, Rice/FIN, Hamiltonian-cycle and SPACE ⊆ TIME arguments. Each wrong fact below was also checked against
+the unit book (c-toc-uN.html): the u4-L2 PDA, the u6-L1 step counts and the u1-L1 figure machine are wrong in the book too.
+Scene = 0-based SC index (the Lnn.png number). Sheets: no stock recap icons (every recap picture is the lesson's own), no
+tiny or faint pictures, no overflow or overlap; no filler word, no repeated hook, joke or trap, no cut next-lesson card.
+pipeline.json has live: false for every unit, so none of these lessons is on YouTube.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-toc-u4-L2 | bookfig (11, 12), notebook (13) | one-state CFG→PDA for S → aSb \| ε has both δ(q, ε, Z₀) = {(q, SZ₀)} and δ(q, ε, Z₀) = {(q, ε)} on the same state, so after a full match it can push S again and accepts (aⁿbⁿ)*: abab and abaabb are accepted (run in code). The book says the final pop is "safe because S → ε"; it is not. Start with S as the initial stack symbol, or use separate start and end states. The scene also flips stack conventions (stack top-left in one table, "bottom → top" in the next) | wrong fact: must fix
+c-toc-u6-L1 | bookfig (3, 4), calc (6, 7), pa (18), figs (21) | dovetailing counts: round k runs "k steps of M, then k of M′", so D stops the moment M accepts at step 6 of round 6: 30 + 6 = 36 steps, not 42 (Q2: 12 + 4 = 16, not 20). The hint "M′ never accepts, so D never waits for it" contradicts 42. Same numbers in the book. Either say D checks only at the end of a round, or use 36 and 16 | wrong fact: must fix
+c-toc-u5-L3 | bookfig (3, 4), notebook (6), pa (23) | machine "accepts strings ending in 1" with q1 as its accept state, but its run passes through q1 at move 1. Under u5-L1's definition (entering q_accept accepts and halts) it accepts 10 and 100; it also breaks the lesson's own trap (18) "never make q01 accepting: halts early". The book uses a private convention (accept on halting in q1; a final state may have outgoing moves) the lesson never states | wrong fact: must fix
+c-toc-u3-L3 | bookfig (12), calc (13, 14) | pumping-lemma proof "Assume CF, with p equal to five": the book's caveat "let p be its pumping length … the same argument works for every p" is dropped, so students learn to choose p themselves (the adversary picks p) | misleading: should fix
+c-toc-u1-L1 | bookfig (14), notebook (15, 16) | Figure 1.3.1 uses a machine where C loops on 0 and 1 (the "contains 01" DFA), straight after trap (12) says that machine is wrong for "ends in 01"; the lesson never says the language changed. Inherited from the book, which reuses the names A, B, C | misleading: should fix
+c-toc-u2-L4 | bookfig (8) | Figure 2.9.1 counts "11 live states plus dead state d = 12" (a complete DFA) but draws no q10 → d edge on 0–9, so an 11-digit number has nowhere to go; only q0 → d on 0–5 is drawn | misleading: should fix
+c-toc-u3-L4 | notebook (17) | Type 3 example S → aS \| B, B → bB \| ε breaks the strict right-linear shape A → aB \| a given in (15) and Figure 3.9.1 (unit rule S → B and an ε-rule) | misleading: should fix
+c-toc-u6-L4 | notebook (3) | "More time or space decides strictly more languages" is false as stated: linear speedup gives TIME(n²) = TIME(2n²); the hierarchy theorems need constructible bounds and a log-factor (time) or strictly larger (space) gap | misleading: should fix
+c-toc-u1-L2 | notebook (9) | side picture shows ECLOSE(q0) = {q0, q1, q2}, ECLOSE(q2) = {q2}, while figure (8) and worked example (10) use ECLOSE(q0) = {q0, q1}, ECLOSE(q2) = {q2, q3}: same names, different machine | misleading: should fix
+c-toc-u2-L2 | bookfig (9) | "subset construction gives the two-state parity DFA" from a Thompson ε-NFA: it gives more states; minimisation is needed for two | misleading: should fix
+c-toc-u6-L4 | outro (21) | "Find this unit in your own syllabus on our site." spoken | should fix
+c-toc-u1-L2, u1-L3, u3-L2 | agenda (1) | "Chapters x to y of your book" on the agenda card (the other 18 say "of your free notes") | should fix
+c-toc-u1-L2, u1-L3, u2-L2, u3-L4, u5-L1, u5-L2, u6-L1, u6-L2 | u1-L2 (3); u1-L3 (3, 8); u2-L2 (3, 5, 9); u3-L4 (11); u5-L1 (5, 10, also in the cue text); u5-L2 (3); u6-L1 (3, 10); u6-L2 (3, 6) | spoken "the book's figure…" / "from your book" | should fix
+c-toc-u1-L4 | outro (23) | "Next time, Unit two…" spoken; "NEXT UNIT · Unit 2" card | should fix
+c-toc-u2-L4 | outro (22) | "Next time, Unit three…" spoken; "NEXT UNIT · Unit 3" card | should fix
+c-toc-u3-L4 | outro (27) | "Next time, Unit four…" spoken; "NEXT UNIT · Unit 4" card | should fix
+c-toc-u4-L2 | outro (29) | "Next time, Unit five…" spoken; "NEXT UNIT · Unit 5" card | should fix
+c-toc-u5-L3 | outro (27) | "Next time, Unit six…" spoken; "NEXT UNIT · Unit 6" card | should fix
+c-toc-u3-L4 | notebook (17); bookfig (4, 13) | "not recursive (Unit 6)" on screen; section cross-references "(3.6)", "(3.5)" on screen | should fix
+c-toc-u1-L3 | pq (14, 16, 18) | spoken Bloom levels: "An understand question", "Question two, apply", "Question three, analyze" | should fix
+c-toc-u3-L1 | pq (17, 19, 21) | spoken Bloom levels: "An understand question", "at the apply level", "at the analyze level" | should fix
+c-toc-u4-L2 | bookfig (16, 17) | Figure 4.5.1 (parse tree of id + id * id) is split across two moving pages: the first shows the top three levels without F and id, the second only the bottom subtrees, so no frame shows the whole tree with all 8 ↓ and 8 ↑ numbers | cosmetic
+c-toc-u6-L4 | outro (21) | card "Unit 6 complete · all six units done" | cosmetic
+c-toc-u3-L2 | figs (22) | sources line cites normal forms, PDAs and the pumping lemma; does not match a lesson on ambiguity and simplification | cosmetic
+c-toc-u2-L3, u5-L2, u6-L1, u6-L2, u6-L3 | u2-L3 (10–12); u5-L2 (10–12); u6-L1 (5, 8, 10–13, 19–21); u6-L2 (5, 10, 12, 16); u6-L3 (9, 11, 12, 20) | underscore maths outside code on screen: \|Q_P\| = \|Q_A\| × \|Q_B\|, q_accept, L_u, A_TM, E_TM, EQ_TM, M_w, S_P, χ_L (use subscripts) | cosmetic
+c-toc-u6-L4 | notebook (18), pa (19) | caret maths 2^(O(s)) on screen | cosmetic
+c-toc-u3-L4 | notebook (13, 15) | audio only: the lexicon reads terminal "a" as "A", so "A goes to a B" is heard as A → AB | cosmetic
+all 21 lessons | figs (the "For your notes" scene) | "Sources the book draws on: …" on screen | cosmetic
+all 21 lessons | META, kicker, pq cards (engine) | META.subject is "biotech"; kicker "UNIT n · LESSON k OF K" and "QUESTION n · UNDERSTAND/APPLY/ANALYZE" labels on every question card | cosmetic
+
+Count: 3 must fix, 18 should fix, 8 cosmetic (29 lines). Patterns: three wrong facts, two of them in the unit book too
+(a one-state PDA that loops back to S, dovetailing counts that ignore early stopping) and one from a private TM acceptance
+convention; a dropped "for every p" in a pumping proof; figures that quietly switch machines (u1-L1, u1-L2) or leave a
+complete DFA incomplete (u2-L4); "book" wording (3 agendas, 8 lessons spoken, 21 sources lines), unit numbers in 5 outros
+plus one site line, spoken Bloom levels in 2 lessons, and _ / ^ maths in 6 lessons.
