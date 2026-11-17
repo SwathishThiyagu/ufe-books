@@ -136,3 +136,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-unix-u5 | free/c-unix-u5-book | 1–8 | OK (library added; two university mentions removed) | 17 Nov 2026 |
 | c-mobile-u5 | free/c-mobile-u5-book | 1–6 | OK (library added; university counts removed; 5.2 swapped-coordinates trap corrected) | 17 Nov 2026 |
 | c-quantum-u5 | free/c-quantum-u5-book | 1–8 | OK (library updated; 2 university mentions removed) | 17 Nov 2026 |
+| c-block-u5 | free/c-block-u5-book | 1–8 | OK (library added; university mention in 5.8 removed) | 17 Nov 2026 |
