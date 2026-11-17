@@ -19,7 +19,7 @@ Each task names **one unit**, for example `c-oop-u3`. Write that one book and no
 5. Check your book with
    `python pack/check_book.py <out> packets/<unit>.json --render`
    and fix everything it lists until it prints `OK`. If Chromium is not available, run it without `--render`, fix everything, and say so in the pull request. Never change the checker, the shell, the standard or the packet to make a check pass.
-6. Facts: write what you know well. If you cannot look something up, leave an uncertain number out or mark it "(from memory; check)". Never invent citations, page numbers, ISBNs or links. In the sources section, list only standard textbooks you are sure of and open web resources you are sure exist; mark any link you did not open "(link not opened; check)".
+6. Facts: write what you know well. If you cannot look something up, leave an uncertain number out. Never invent citations, page numbers, ISBNs or links. In the sources section, list only standard textbooks you are sure of and open web resources you are sure exist, and leave out anything you are not sure of. Do not add notes such as "(from memory; check)" or "(link not opened; check)" anywhere in a book.
 7. The channel's rules, which the checker also enforces: **no college or university names anywhere in the book**, and **no count of the universities that teach a topic** ("taught at 8 of 10" is not allowed). Write "some syllabi call this …" or "only a few universities teach this". The packet names the universities only so you can set the depth.
 
 ## What to change
