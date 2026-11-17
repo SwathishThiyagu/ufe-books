@@ -1,13 +1,13 @@
 # c-quantum-u6: free-model run
 
-- Book: `books/cse/c-quantum/c-quantum-u6.html`
+- Book: `work/claude_figs/c-quantum-u6/tree/books/cse/c-quantum/c-quantum-u6.html`
 - Status: ok
 - Model calls so far: 28 (112,501 tokens in, 243,260 out), 10.0 minutes
 
 ## Checker
 
 ```
-c-quantum-u6.html: 5 chapters, 10456 words, 6 figures, 124 KB
+c-quantum-u6.html: 5 chapters, 10446 words, 6 figures, 124 KB
 OK
 ```
 
