@@ -113,3 +113,5 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-dist-u1 | free/c-dist-u1-book | 1–8 | OK (library updated; university mention in 1.4 removed; butterfly link rule in 1.5 corrected) | 17 Nov 2026 |
 | c-block-u1 | free/c-block-u1-book | 1–7 (figure text: ch 3) | OK (library added; MIT and Princeton course pages dropped) | 17 Nov 2026 |
 | c-quantum-u2 | free/c-quantum-u2-book | 1–9 | OK (library updated; university mention removed; 2 university sources dropped) | 17 Nov 2026 |
+| c-xr-u1 | free/c-xr-u1-book | 1–6 | OK (library added) | 17 Nov 2026 |
+| c-xr-u2 | free/c-xr-u2-book | 1–7 | OK (library added) | 17 Nov 2026 |
