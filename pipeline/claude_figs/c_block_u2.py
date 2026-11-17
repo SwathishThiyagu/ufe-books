@@ -233,7 +233,8 @@ def text_fixes(k):
         2: [('Only a few universities teach the full round schedule; know that the compression function exists and that it is repeated for every block.',
              'You will rarely be asked for the full round schedule; know that the compression function exists and that it is repeated for every block.')],
         5: [('Because the arithmetic is modulo p, the curve is not the smooth drawing you see in the figure. Over a prime field the same equation produces a scattered cloud of integer points, and that scattering is what makes the discrete log hard.',
-             'Because the arithmetic is modulo p, the curve is not a smooth line. Over a prime field the same equation produces a scattered cloud of integer points, as the figure shows for p = 17, and that scattering is what makes the discrete log hard.')],
+             'Because the arithmetic is modulo p, the curve is not a smooth line. Over a prime field the same equation produces a scattered cloud of integer points, as the figure shows for p = 17, and that scattering is what makes the discrete log hard.'),
+            ('77/2 mod 17 is 77 × 9 = 13, not 38 and not 8.5.', '77/2 mod 17 is 77 × 9 = 693 ≡ 13, not 38 (integer division) and not 38.5.')],
         7: [('HASH160 is RIPEMD160, so its output is 160 bits = 20 bytes.',
              'HASH160 is RIPEMD-160 applied to the SHA-256 hash of the key, so its output is 160 bits = 20 bytes.')],
     }.get(k, [])
