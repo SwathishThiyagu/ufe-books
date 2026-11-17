@@ -120,6 +120,57 @@ Not slop (checked): "booking site" (u4-L5 hook) and "train site" (u5-L4 hook) ar
 Same patterns as the AI lessons, so the rules proposed above (no site line, "free notes" never "book", topic not unit
 number, no Bloom words, real superscripts, recap pictures from the lesson) would have caught all of them.
 
+## Data Structures (18 Nov)
+
+Second pass over the same 25 lessons (B.Tech/CSE/Data Structures/html, staged from the PC). It builds on the 17 Nov section
+above: rows already listed there are not repeated, and lines added to a pattern the 17 Nov rows only partly covered say so.
+Method: dumped every scene's say and the rendered text of its last frame at 0.995 (581 scenes), script-checked them for
+book wording, site lines, unit numbers, Bloom words, caret or underscore maths, filler and repeats, ran lesson_sheet.py on
+all 25 at 0.92 and 0.995 and looked at every sheet. Checker: 0 page errors, 0 cue failures, 0 text outside the safe area on
+every lesson. Recomputed every trace and number again, by hand and in Python: addresses, step counts, Euclid, Θ constants,
+recurrences (Hanoi, fib(40) calls, T(1024) = 11), sparse and fast transpose, array-list moves, Josephus (survivor 4),
+polynomial add and R(2) = 68, first and best fit, every stack, queue, circular-queue and deque trace, infix to postfix and
+prefix, postfix 52 and 9, tree counts, inorder traces, BST deletes, AVL RL (preorder 30 20 10 25 40 50), heap build,
+deleteMin and insert 8, red-black inserts, B-tree order 3 and the 2-3 tree, CLRS t = 51 (4 reads), degrees, matrix vs list
+memory (4 MB vs 168 KB), BFS/DFS, Kahn and DFS topological orders, components and cycles, Kruskal and Prim (21), Dijkstra
+and Floyd-Warshall rounds, Bellman-Ford, binary search, the three simple sorts, merge sort (17 comparisons, 24 copies),
+Lomuto, heap sort, Shell 11 vs 21 shifts, radix passes, log₂ n! (7 and 22), external sort k = 9, every hash and probe
+(Knuth's 1.75, 2.5, 50.5, 10, 1.39), mod 13, 17011 prime, KMP lps [0,0,1,2,3,0] and [0,1,0,1,2,2,3] with 9 comparisons vs
+13 naive, Boyer-Moore NEEDLE (shifts 5, 6, 4, found at 15, 10 comparisons, 16 of 24 never read), the trie (8 nodes + root).
+The 17 Nov "facts: clean" no longer holds: the stack dry run below is wrong, and three statements are misleading.
+Sheets: no overflow, overlap or faint picture; one more recap uses engine stock icons (u5-L4). Not on YouTube:
+pipeline.json has live: false for all six units and the upload sheet has no video links.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-ds-u3-L1 | notebook (11) | stack dry run, MAX = 4: after push 5, 8, 2, 9 and the overflowing push 4, it says and shows "pop, pop, peek, pop, pop print 9, 2, 8, 8, 5" and "The last pop finds top at minus one: underflow". Those five calls (four pops) empty the stack exactly, so nothing underflows. The book's question has a fifth pop (pop, pop, peek, pop, pop, pop); the lesson dropped it | wrong fact: must fix
+c-ds-u6-L1 | bookfig (8), figs (19) | spoken and captioned "Only insertion sort does less work when the data is nearly sorted", against the same lesson's notebook (9) and trap2 (11): bubble sort with the swapped flag is O(n) on sorted input. The caption is the book's Figure 6.2.1, so the unit book needs the same fix | misleading: should fix
+c-ds-u2-L3 | recap (14) | card "Keep tail: both ends O(1)": deleting the last node still walks to the node before tail, O(n), as the lesson's own notebook (11) says; only insert at both ends and delete at the front are O(1) | misleading: should fix
+c-ds-u5-L3 | pa (16) | "When is the MST unique?" answered "When all the edge weights are distinct": that is sufficient, not necessary (a graph with tied weights can still have one MST). Say "It is unique if all weights are distinct" | misleading: should fix
+c-ds-u4-L4, u4-L5, u5-L3 | calc (11), calc (6), bookfig (3) | spoken "Now the book's example", "Now the book's number", "Here is the book's figure" (adds 3 lessons to the 17 Nov book rows) | should fix
+c-ds-u1-L3, u2-L4, u5-L2 | pq (18/20/22, 16/18/20, 15/17/19) | spoken Bloom levels: "An understand question", "An apply question", "An analyze question" | should fix
+c-ds-u5-L1 | pq (15, 17, 19) | spoken Bloom levels: "An understand question", "Question two, apply level", "Question three, analyze level" | should fix
+c-ds-u2-L3, u4-L2 | pq (15 / 13) | "An understand question" spoken; the 17 Nov row listed only their Question two and three lines | should fix
+c-ds-u6-L5 | outro (24) | "That completes all six units" spoken and an "All six units" card title (unit reference; the 17 Nov row covers only the site and unit-book lines on this card) | should fix
+c-ds-u3-L2, u4-L2 | hookArt (0) | same calculator hook twice, same picture: "2 + 3 × 4 gives 14, not 20" and "(2 + 3) × 4 = 20" | should fix
+all 25 lessons | figs (19 to 26) | "Sources the book draws on: …" on screen | cosmetic
+all 25 lessons | META | META.subject is "biotech" | cosmetic
+c-ds-u2-L3, u4-L2 | agenda (1) | "Chapters x to y of your notes" without "free" | cosmetic
+c-ds-u4-L5 | bookfig (12) | spoken "Your notes draw the same story" without "free" | cosmetic
+c-ds-u5-L4 | recap (14) | engine stock icons: 'map' network on "Single-Source Shortest" and 'stop' red ✗ on "Negative Edges" | cosmetic
+c-ds-u1-L1 | hookArt (0) | "To find the fortieth mark … forty pointer hops" with "Linked list: 40 pointer hops" on screen: the fortieth mark is index 39, so 39 hops; the lesson's own calc (6) uses roll 41 → index 40 → 40 links | cosmetic
+c-ds-u1-L1 | outro (22) | next-lesson card "Static and dynamic memory allocation · Algorithms" leaves out the third chapter, time and space complexity, that Lesson 2 covers | cosmetic
+c-ds-u1-L4, u2-L1, u2-L2 (hooks); u2-L4 hook, u3-L3 bookfig (4) (jokes) | hookArt (0), bookfig (4) | three hooks set in a cinema row (your row number; row six, seat twelve; a late friend wants the middle seat) and two cinema jokes ("booking a whole cinema for two friends", "a cinema turning you away from empty seats"): different stories, same setting | cosmetic
+c-ds-u3-L2, u4-L2 | trap2 (13 / 11) | the same trap twice, "the first pop is the right operand / right child", also in both recaps and outros (the second is the tree form of the first, so it can stay if the lesson says so) | cosmetic
+c-ds-u6-L5 | pa (18) | example text "IRCTCTRAINS" uses a real organisation's name (as OOP's IRCTC) | cosmetic
+
+Count: 1 must fix, 9 should fix (3 misleading), 10 cosmetic (20 lines). With the 17 Nov rows, Data Structures has 1 must
+fix, 15 should fix and 13 cosmetic. For the synthesis brackets: book wording DS 9 → 12 lessons (plus 25 sources lines),
+spoken Bloom DS 2 → 6 lessons, unit references DS 1 → 2, stock recap icons DS 2 → 3, repeats DS 0 → 2 (calculator hook,
+first-pop trap), META.subject DS 25. Patterns: one dropped step in a trace (the narration kept the book's ending), one
+book caption that contradicts its own chapter, recap and model-answer wording that turns "only for insert" or
+"sufficient" into "always".
+
 ## Linux and Shell Programming (17 Nov)
 
 Audited 17 Nov 2026: all 16 c-unix lessons, every scene, narration and frame (sheets at 0.92 and re-rendered at 0.995; the
