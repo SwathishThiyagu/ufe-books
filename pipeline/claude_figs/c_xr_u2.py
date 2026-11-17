@@ -110,7 +110,7 @@ def f4():
     for i, b in enumerate(sig):
         if not state and b >= 145: state, ev = True, ev + 1
         if state and b <= 135: state = False
-    o.append(T(40, 362, f'One threshold at 140°: the reading crosses it {single} times → {single} fist events.', 14, 'start'))
+    o.append(T(40, 362, f'One threshold at 140°: the reading crosses it upward {single} times → {single} fist events.', 14, 'start'))
     o.append(T(40, 386, 'Hysteresis: fire above 145°, release below 135° → one fist, one event.', 14, 'start', bold=True))
     o.append(T(40, 414, '8-bit ADC over 180°: 180 ÷ 256 = 0.70° per count;  10 sensors × 100 Hz = 1000 bytes per second', 13, 'start', MUT))
     return 428, ''.join(o)

@@ -53,7 +53,7 @@ def f2():
         k = 1 - 200 / Z  # screen hit for eye at x=e: x = e + (0 - e) * (200 / Z) -> e*(1 - 200/Z)
         for sx, c in ((-1, AC), (1, LV)):
             hx = cx + sx * ex * k
-            r.append(L(cx + sx * ex, ye, cx, yo, c, 2))
+            r.append(L(cx + sx * ex, ye, hx if crossed else cx, ys if crossed else yo, c, 2))
             r.append(C(hx, ys, 6, c))
             r.append(T(hx, ys + (24 if crossed else -12), 'L img' if sx < 0 else 'R img', 13, fill=c, bold=True))
         return ''.join(r)

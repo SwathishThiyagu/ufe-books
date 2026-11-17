@@ -86,8 +86,8 @@ def f3():
     ox1, ox2 = c2 - 0.5 * s, c1 + 0.5 * s
     o.append(L((ox1 + ox2) / 2, cy + 60, (ox1 + ox2) / 2, cy + 86, NX, 1.5))
     o.append(Tb((ox1 + ox2) / 2, cy + 104, 'overlap x = 1.0 − 0.9 = 0.1 m', 14, 'middle', NX, True))
-    o.append(L(c1 + 30, 80, c1 - 70, 80, AC, 3, arrow='n')); o.append(T(c1 - 20, 66, '20 N on body 1', 13, 'middle', AC, True))
-    o.append(L(c2 - 30, 80, c2 + 70, 80, LV, 3, arrow='l')); o.append(T(c2 + 20, 66, '20 N on body 2', 13, 'middle', LV, True))
+    o.append(L(c1 - 8, cy - 50, c1 - 108, cy - 50, AC, 3, arrow='n')); o.append(Tb(c1 - 58, cy - 62, '20 N on body 1', 13, 'middle', AC, True))
+    o.append(L(c2 + 8, cy - 50, c2 + 108, cy - 50, LV, 3, arrow='l')); o.append(Tb(c2 + 58, cy - 62, '20 N on body 2', 13, 'middle', LV, True))
     o.append(T(360, 436, 'F = k x = 200 N/m × 0.1 m = 20 N, equal and opposite along the centre line', 14))
     return 452, ''.join(o)
 FIG[3] = (f3, 'The sum of the radii, 1.0 m, is more than the 0.9 m between centres, so the spheres overlap by 0.1 m. The 200 N/m penalty spring pushes them apart with 20 N each, in opposite directions along the centre line.',
