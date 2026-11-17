@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/c-xr-u4/tree/books/cse/c-xr/c-xr-u4.html`
 - Status: ok
-- Model calls so far: 35 (136,589 tokens in, 236,335 out), 6.6 minutes
+- Model calls so far: 35 (136,589 tokens in, 236,335 out), 6.7 minutes
 
 ## Checker
 
 ```
-c-xr-u4.html: 8 chapters, 15499 words, 9 figures, 164 KB
+c-xr-u4.html: 8 chapters, 15499 words, 9 figures, 165 KB
 OK
 ```
 
