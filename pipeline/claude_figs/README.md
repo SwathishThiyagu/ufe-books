@@ -25,6 +25,26 @@ order, then continue with the rest of the table: c-compiler-u1 … u6, c-dl-u1, 
 For any book that is already in the library (main has `books/cse/<sid>/<unit>.html`; true for all c-compiler and c-dl
 units), push with `--push --library` so the library copy on main gets the new figures too.
 
+## Next (17 Nov 2026): the last 8 CSE subjects, then the new core books
+
+These are not in the library yet; `apply.py <unit> <branch> --push --library` now adds them (makes the folder, sets queue.json "ok").
+One fresh chat per subject; in each book also remove college or university names, counts of universities and
+university-hosted sources (`drop_sources()`), and fix any wrong example or answer you see (`chapter_fix` or `text_fixes`).
+
+| Subject | Units | Branch | Note |
+|---|---|---|---|
+| Computer Graphics | c-graphics-u1 … u6 | `free/<unit>-book` | drawing modules exist but were never applied: add `text_fixes`, then apply |
+| NLP | c-nlp-u1 … u7 | `free/<unit>-book` | |
+| Parallel and Distributed Computing | c-dist-u1 … u6 | `free/<unit>-book` | |
+| Mobile Application Development | c-mobile-u1 … u6 | `free/<unit>-book` | |
+| AR/VR | c-xr-u1 … u6 | `free/<unit>-book` | |
+| Quantum Computing | c-quantum-u1 … u6 | `free/<unit>-book` | |
+| Linux and Shell | c-unix-u1 … u5 | `free/<unit>-book` | 5 units |
+| Blockchain | c-block-u1 … u6 | `free/<unit>-book` | |
+
+Then the 20 core subjects DeepSeek started on 17 Nov (branches `free/` lane 1, `ds/` lanes 2 to 5; see
+`pipeline/requests-deepseek*.txt`), the same way, once each book's branch has its "free-model book" commit.
+
 ## Text that describes a figure (added 10 Nov 2026)
 
 A new drawing must never sit next to text that describes the old one. For every chapter you redraw, read the chapter text

@@ -99,8 +99,12 @@ if push:
 if push and library:
     # the book is also the library copy on main: update it there too
     run('git', '-C', ROOT, 'pull', '-q', '--rebase', 'origin', 'main')
+    os.makedirs(os.path.dirname(os.path.join(ROOT, out)), exist_ok=True)  # first book of a subject in the library
     shutil.copy(os.path.join(wt, out), os.path.join(ROOT, out))
-    run('git', '-C', ROOT, 'add', out)
+    for e in q:
+        if e['unit'] == unit: e['status'] = 'ok'
+    json.dump(q, open(os.path.join(ROOT, 'queue.json'), 'w'), ensure_ascii=False, indent=1)
+    run('git', '-C', ROOT, 'add', out, 'queue.json')
     run('git', '-C', ROOT, 'commit', '-q', '-m', f'Library: {unit} with figures redrawn by Claude' + (f'\n\n{trailer}' if trailer else ''))
     run('git', '-C', ROOT, 'push', '-q', 'origin', 'main')
     print('library copy on main updated')
