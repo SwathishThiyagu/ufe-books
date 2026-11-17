@@ -126,3 +126,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-nlp-u3 | free/c-nlp-u3-book | 1–8 (figure text: ch 1; ch 6 RIGHT-ARC definition fixed) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
 | c-mobile-u4 | free/c-mobile-u4-book | 1–6 | OK (library added; university counts removed; college.db renamed marks.db; putStringSet and deprecated EncryptedSharedPreferences noted) | 17 Nov 2026 |
 | c-quantum-u4 | free/c-quantum-u4-book | 1–9 | OK (library updated; text checked, no changes needed) | 17 Nov 2026 |
+| c-dist-u4 | free/c-dist-u4-book | 1–9 | OK (library updated; university mentions in 4.3 and 4.5 removed; university-hosted course page dropped) | 17 Nov 2026 |
