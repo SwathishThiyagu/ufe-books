@@ -128,3 +128,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-quantum-u4 | free/c-quantum-u4-book | 1–9 | OK (library updated; text checked, no changes needed) | 17 Nov 2026 |
 | c-dist-u4 | free/c-dist-u4-book | 1–9 | OK (library updated; university mentions in 4.3 and 4.5 removed; university-hosted course page dropped) | 17 Nov 2026 |
 | c-block-u4 | free/c-block-u4-book | 1–9 (figure 4.1 moved to section 1) | OK (library added; university mentions in 4.4 and 4.7 removed; confirmation count in 4.5 corrected to include the block that holds the payment) | 17 Nov 2026 |
+| c-nlp-u4 | free/c-nlp-u4-book | 1–8 | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
