@@ -443,7 +443,7 @@ column vectors, jitter definition) stated as absolute.
 
 ## Object Oriented Programming (17 Nov)
 
-Audited 17 Nov 2026: all 23 c-oop lessons (6 units, 532 scenes, built 17 Nov; the delivered copies in
+Audited 17 Nov 2026: all 23 c-oop lessons (6 units, 544 scenes, built 17 Nov; the delivered copies in
 06_Deliver/cse/c-oop are byte-identical to the audited ones). Each lesson's SC array was dumped with Playwright and every
 scene's narration and screen text was read. Sheets were rendered at 0.92, and at 0.995 for every frame that looked cut. All
 lines that looked cut at 0.92 were typing animations and render whole at 0.995. Checker: 0 page errors, 0 cue failures and
