@@ -326,3 +326,66 @@ values of C[5]), comparisons whose result depends on an assumption never put on 
 messages), and a second spoken Bloom form ("Question two, apply.") that a check for "at the … level" alone misses.
 Generator defaults (book2lesson.py:324 "of your book", :389 "Sources the book draws on", :501 "NEXT UNIT / Unit N") are
 the source of three of the text patterns.
+
+## Blockchain (17 Nov)
+
+Audited 17 Nov 2026: all 20 c-block lessons (482 scenes), every scene, narration and frame (sheets at 0.92 and re-rendered
+at 0.995; the cut-off lines at 0.92 were typing animations and render whole at 0.995). Checker: 0 page errors, 0 cue
+failures, 0 text outside the safe area on every sheet. None is on YouTube yet (pipeline.json: all draft, live false).
+About 70 worked numbers and model answers recomputed (2¹²⁷ key search, SHA-256 padding to 1024 bits, 2⁶³ hashes in years,
+ECC doubling of P = (5, 1) on y² = x³ + 2x + 2 over F17 and all 18 plotted points, toy ECDSA with n = 11, Base58Check
+25 bytes, flooding hops, fee rates, BFT quorums for n = 7, 10, 13, Tendermint rounds, 16⁴ nonce tries, retarget × 1.1667,
+PoS share 28.93%, fork 355.76 → 356, change and fee in satoshi, P2PKH stack, halving reward in BTC and rupees, UTXO
+selection, 6.67 tx/s, gas and wei to ETH, GHOST weights, insurance payouts with deductible and cap, supply-chain
+percentages, fridge sensor hashes, 83.33 tx/s and 3.6 GB/day): no arithmetic error. All exam traps checked; the one
+whose "Don't write" is not wrong is listed below. Agendas all say "free notes". Scene = 0-based SC index (the Lnn.png
+number). No site/finder line, college name, TODO, placeholder or caret maths found.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+c-block-u4-L2 | notebook (3), trap2 (5), recap (16), outro (24) | "scriptSig and scriptPubKey are joined and run once"; Bitcoin has run scriptSig, then scriptPubKey on the copied stack, separately since 2010, so the trap marks the real behaviour as the wrong answer | wrong fact: must fix
+c-block-u5-L4 | calc (7) | says a transaction's "return value and events" are in the receipt once mined; a receipt holds status, gas used and logs, the return value is not stored (only a call or an event gives it back) | wrong fact: must fix
+c-block-u5-L3 | notebook (3) | SimpleBank code does `emit Paid(msg.sender, msg.value);` with no `event Paid(...)` declared: does not compile | wrong fact: must fix
+c-block-u1-L1 | trap2 (6), pa (17) | "3 January 2009: the network" / "ran live from 3 Jan"; 3 Jan is the genesis block's timestamp, the software and block 1 came on 9 Jan 2009 | misleading: should fix
+c-block-u3-L2 | bookfig (5), calc (8) | "a 40% miner cannot outrun the honest chain" said and drawn as absolute; a 40% miner wins short races often ((q/p)^z = 0.67 for one block behind); only the calc step says "for long" | misleading: should fix
+c-block-u4-L2 | trap2 (15) | narration "a 51% miner can reverse or censor its own transactions": it reverses its own but censors anyone's | misleading: should fix
+c-block-u2-L3 | notebook (11), recap (14) | private key is d and k is the nonce in Part 1, then "P = k × G" in Part 2; the recap shows "P = k × G" beside "Fresh k every time", so the key and the nonce look the same | misleading: should fix
+c-block-u5-L2 | notebook (10), pq/pa (18, 19) | teaches "a call only reads", then the question's CALL opcode changes storage (eth_call vs CALL message call never told apart) | misleading: should fix
+c-block-u5-L3 | calc (11, 12) | "the fee goes to the miner"; u5-L1 teaches base fee burned and tip to the block producer, and there are no miners since the Merge | misleading: should fix
+c-block-u5-L3 | bookfig (10) | private network steps "geth init … unlock A … mine block 1"; current Geth has no PoW mining or account unlock, a private net needs --dev or a consensus client | misleading: should fix
+c-block-u5-L4 | notebook (11), pq/pa (15, 16) | uncle (ommer) blocks taught in the present tense (none since the Merge, Sept 2022); "uncle rewards also discourage selfish mining", but they make selfish mining more profitable | misleading: should fix
+c-block-u6-L1 | trap2 (15) | "Don't subtract the deductible before the cap. That gives 1,70,000": subtracting before the cap gives the same 1,75,000 here (only subtracting twice gives 1,70,000), and deductible first, then limit, is common practice | misleading: should fix
+c-block-u4-L4 | notebook (4) | "Co-spending: one signer held both keys" stated as certain; the next scene teaches CoinJoin, which breaks exactly that heuristic | misleading: should fix
+c-block-u1-L3 | notebook (4) | "Merkle root: one hash for every transaction" reads as one hash per transaction (meant: one hash covering all) | misleading: should fix
+c-block-u4-L2 | recap (16) | Scripts picture shows a stack of TRUE over pubkey over sig; after OP_CHECKSIG only TRUE is left: picture contradicts the narration | misleading: should fix
+c-block-u5-L2 | recap (13) | EVM picture shows the stack 5 / 3 / 2 after ADD, which leaves only [5]: picture contradicts the narration | misleading: should fix
+c-block-u2-L2, u2-L3, u3-L2, u6-L3 | bookfig (u2-L2 5, 11; u2-L3 3; u3-L2 4, 12), calc (u6-L3 15) | spoken "In the book's figure", "the book's toy example"; hint "decimal units, as in the book" (must be "your free notes") | should fix
+c-block-u1-L3, u2-L3, u3-L3, u4-L4, u5-L4 | outro (24, 22, 25, 23, 22) | "Next time, Unit two/three/four/five/six" spoken; "NEXT UNIT, Unit N" card | should fix
+c-block-u1-L1, u1-L2, u2-L2, u3-L2, u5-L2, u6-L3 | pq (u1-L1 14/16/18; u1-L2 18/20/22; u2-L2 16/18/20; u3-L2 19/21/23; u5-L2 14/16/18; u6-L3 18/20/22) | spoken Bloom levels: "An understand question", "at the apply level", "at the analyze level", "Question two, apply", "Question three, analyze" (18 lines) | should fix
+all 20 | figs (second to last) | "Sources the book draws on: …" shown | cosmetic
+all 20 (engine) | every scene header | "UNIT n · LESSON x OF y" on every page (same open question as Linux) | cosmetic
+all 20 (engine) | pq, pa | on-screen "QUESTION n · UNDERSTAND / APPLY / ANALYZE" label (same open question as Linux) | cosmetic
+c-block-u6-L3 | outro (25) | "All six units" card: unit count on screen | cosmetic
+c-block-u1-L1 | recap (13) | stock shield for "Faults" | cosmetic
+c-block-u3-L2 | recap (18) | generic document block for "PoW"; calendar for "Difficulty", though the retune is every 2016 blocks, not by date | cosmetic
+c-block-u6-L3 | recap (17) | stock network graph for "Platforms" | cosmetic
+c-block-u5-L4 | recap (14) | label "GHOST and side chains" runs past its card | cosmetic
+c-block-u2-L2 | notebook (10) | repeats the six-item list of the scene before it word for word | cosmetic
+c-block-u2-L2 | bookfig (11) | curve points faint grey; label backgrounds sit off their labels | cosmetic
+c-block-u2-L2 | trap2 (14) | calculator shows 38.5 while the narration says 38 | cosmetic
+c-block-u2-L1 | bookfig (13) | genesis block shows "prev: none"; elsewhere it is "32 zero bytes" | cosmetic
+c-block-u3-L1 | calc (6), pa (18) | hops counted 1/2/3 in the worked example but round 0/1 in the Q2 answer | cosmetic
+c-block-u4-L1 | notebook (3, 6), calc (9, 11) | 1 BTC written 10,00,00,000 sat (Indian grouping) in two scenes and 100,000,000 sat in two others | cosmetic
+c-block-u1-L1, u4-L1 | hookArt (0) | same hook in both (photo sent to two friends as the double-spend story) | cosmetic
+c-block-u2-L1, u2-L2 | notebook (5), (9) | "don't wait up" line repeated | cosmetic
+c-block-u2-L3, u4-L1 | notebook (11), (3) | "there is no forgot password button" repeated | cosmetic
+c-block-u5-L2 | hookArt (0) | opens on "Imagine …" | cosmetic
+c-block-u5-L3 | pq (17) | "Give Alice balance, Bob balance": reads as a machine-made sentence | cosmetic
+c-block-u2-L3 | bookfig (3) | split crop leaves the figure's boxes open at the bottom | cosmetic
+
+Not slop (checked): "unlock(s)" (Bitcoin locking and unlocking scripts), "robust", "Site 1 / Site 2" (bank branches in a
+story), "bloom" (the receipt's bloom filter). Same patterns as the other subjects (book wording, unit numbers in outros,
+spoken Bloom, stock recap icons, generator lines on every lesson). New here: dated facts stated as current (pre-Merge
+miners, uncles and PoW geth private nets in Ethereum; the pre-2010 joined-script model in Bitcoin), recap pictures that
+show a state the lesson says can't exist (stacks), a code snippet missing a declaration, one symbol (k) reused for two
+things, and a trap whose wrong answer isn't what the stated mistake produces.
