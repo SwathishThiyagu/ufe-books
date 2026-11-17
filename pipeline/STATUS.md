@@ -123,3 +123,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-dist-u3 | free/c-dist-u3-book | 1–7 (figure text: ch 3) | OK (library updated) | 17 Nov 2026 |
 | c-block-u3 | free/c-block-u3-book | 1–7 | OK (library added; 51% threshold wording in 3.3 corrected to more than half) | 17 Nov 2026 |
 | c-mobile-u3 | free/c-mobile-u3-book | 1–6 | OK (library added; university counts removed; root-view, dpi and gravity sentences corrected) | 17 Nov 2026 |
+| c-nlp-u3 | free/c-nlp-u3-book | 1–8 (figure text: ch 1; ch 6 RIGHT-ARC definition fixed) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
