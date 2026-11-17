@@ -115,6 +115,10 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-quantum-u2 | free/c-quantum-u2-book | 1–9 | OK (library updated; university mention removed; 2 university sources dropped) | 17 Nov 2026 |
 | c-xr-u1 | free/c-xr-u1-book | 1–6 | OK (library added) | 17 Nov 2026 |
 | c-xr-u2 | free/c-xr-u2-book | 1–7 | OK (library added) | 17 Nov 2026 |
+| c-xr-u3 | free/c-xr-u3-book | 1–8 | OK (library added) | 17 Nov 2026 |
+| c-xr-u4 | free/c-xr-u4-book | 1–8 | OK (library added) | 17 Nov 2026 |
+| c-xr-u5 | free/c-xr-u5-book | 1–8 | OK (library added) | 17 Nov 2026 |
+| c-xr-u6 | free/c-xr-u6-book | 1–7 | OK (library added) | 17 Nov 2026 |
 | c-nlp-u2 | free/c-nlp-u2-book | 1–9 (figure text: ch 3) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
 | c-dist-u2 | free/c-dist-u2-book | 1–7 | OK (library updated; three university mentions removed (2.1, 2.6, 2.7)) | 17 Nov 2026 |
 | c-block-u2 | free/c-block-u2-book | 1–7 (figure text: ch 5) | OK (library added; university mention in 2.2 removed; HASH160 step in 2.7 corrected) | 17 Nov 2026 |
