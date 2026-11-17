@@ -96,7 +96,7 @@ def f3():
     o.append(bars(80, y + 14, [0.269, 0.731, 0.0], ['α₁', 'α₂', 'α₃'], 300))
     o.append(T(130, y + 14 + 2 * 36 + 18, '(masked: exp(−1e9) = 0)', 13, 'start', NX))
     o.append(boxt(470, y + 18, 240, 82, ['c = 0.269 h₁ + 0.731 h₂', '+ 0 · h₃', '= [0.269, 0.731]'], NXS, NX, 14, True))
-    o.append(T(20, y + 136, 'exp(1), exp(2), exp(3) = 2.718, 7.389, 20.086; sum 30.193. With the mask the sum is 10.108.', 13, 'start', MUT))
+    o.append(T(20, y + 136, 'exp(1), exp(2), exp(3) = 2.718, 7.389, 20.086; sum 30.193. With the mask the sum is 10.107.', 13, 'start', MUT))
     return y + 150, ''.join(o)
 FIG[3] = (f3, 'Softmax turns the scores 1, 2, 3 into weights 0.090, 0.245, 0.665, and the context is the weighted average of the encoder states, [0.755, 0.910]. Masking h₃ as a pad sets its weight to 0, and the rest share 1: [0.269, 0.731].',
           'Two sets of three weight bars: without a mask 0.090, 0.245 and 0.665 giving context 0.755, 0.910; with position 3 masked 0.269, 0.731 and 0 giving context 0.269, 0.731.')
@@ -232,6 +232,7 @@ def spec(k):
     d = {'caption': cap, 'spec': {'type': 'svg', 'h': h, 'body': body, 'aria': aria}}
     if k in AFTER: d['after_section'] = AFTER[k]
     return d
+TEXT[3] = [('New denominator: 2.718 + 7.389 + 0 = 10.108.', 'New denominator: 2.718 + 7.389 + 0 = 10.107.')]
 TEXT[2] = [('h<sub>3</sub> = tanh(-0.6466) = -0.5695, so h<sub>3</sub> ≈ -0.570.', 'h<sub>3</sub> = tanh(-0.6466) = -0.5694, so h<sub>3</sub> ≈ -0.569.'),
            ('h<sub>3</sub> ≈ -0.570.', 'h<sub>3</sub> ≈ -0.569.')]
 

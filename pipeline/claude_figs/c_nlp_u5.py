@@ -247,6 +247,7 @@ def spec(k):
     d = {'caption': cap, 'spec': {'type': 'svg', 'h': h, 'body': body, 'aria': aria}}
     if k in AFTER: d['after_section'] = AFTER[k]
     return d
+TEXT[4] = [('film -2 and songs +3 average to +1 and hide the complaint.', 'film -2 and songs +3 add up to +1 and hide the complaint.')]
 
 
 def text_fixes(k):
