@@ -42,7 +42,7 @@ def f2():
     cx, cy, r = 110, 250, 170
     o = [T(20, 26, 'Feature map |φ(x)⟩ = cos x|0⟩ + sin x|1⟩ and the kernel K = cos²(x − x′)', 15, 'start', bold=True)]
     o.append(L(cx - 10, cy, cx + r + 30, cy, L2, 1.5)); o.append(L(cx, cy + 10, cx, cy - r - 30, L2, 1.5))
-    o.append(T(cx + r + 30, cy + 20, '|0⟩', 13, 'end', MUT, True)); o.append(T(cx - 8, cy - r - 18, '|1⟩', 13, 'end', MUT, True))
+    o.append(T(cx + r + 30, cy - 10, '|0⟩', 13, 'end', MUT, True)); o.append(T(cx - 8, cy - r - 18, '|1⟩', 13, 'end', MUT, True))
     o.append(f'<path d="M{cx + r},{cy} A{r},{r} 0 0 0 {cx},{cy - r}" style="fill:none;stroke:var(--line);stroke-width:1.2;stroke-dasharray:4 4"/>')
     for ang, lab, c, arr in ((0, 'x = 0', AC, 'n'), (45, 'x = π/4', NX, 'x'), (90, 'x = π/2', LV, 'l')):
         a = math.radians(ang)
