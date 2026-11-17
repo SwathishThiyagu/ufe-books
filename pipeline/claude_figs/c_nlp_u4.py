@@ -236,6 +236,8 @@ def spec(k):
     d = {'caption': cap, 'spec': {'type': 'svg', 'h': h, 'body': body, 'aria': aria}}
     if k in AFTER: d['after_section'] = AFTER[k]
     return d
+TEXT[8] = [('A pronoun normally points to C<sub>b</sub>, so centering constrains the search.',
+            'Rule 1 of Centering says: if any element of C<sub>f</sub> of the previous utterance is realised as a pronoun in the current utterance, then C<sub>b</sub> of the current utterance must be realised as a pronoun too. So a pronoun normally points to C<sub>b</sub>, and centering constrains the search.')]
 
 
 def text_fixes(k):
