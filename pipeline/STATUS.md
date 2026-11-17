@@ -129,3 +129,8 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-dist-u4 | free/c-dist-u4-book | 1–9 | OK (library updated; university mentions in 4.3 and 4.5 removed; university-hosted course page dropped) | 17 Nov 2026 |
 | c-block-u4 | free/c-block-u4-book | 1–9 (figure 4.1 moved to section 1) | OK (library added; university mentions in 4.4 and 4.7 removed; confirmation count in 4.5 corrected to include the block that holds the payment) | 17 Nov 2026 |
 | c-nlp-u4 | free/c-nlp-u4-book | 1–8 | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
+| c-unix-u1 | free/c-unix-u1-book | 1–6 | OK (library added; quiz 1.5 no longer points at a figure of distro families) | 17 Nov 2026 |
+| c-unix-u2 | free/c-unix-u2-book | 1–5 | OK (library added; university mention in 2.5 removed) | 17 Nov 2026 |
+| c-unix-u3 | free/c-unix-u3-book | 1–8 | OK (library added; four university mentions removed) | 17 Nov 2026 |
+| c-unix-u4 | free/c-unix-u4-book | 1–7 | OK (library added; university mentions removed; 4.7 old archive renamed www-20261029 so it is really 8 days old) | 17 Nov 2026 |
+| c-unix-u5 | free/c-unix-u5-book | 1–8 | OK (library added; two university mentions removed) | 17 Nov 2026 |
