@@ -7,9 +7,9 @@ const src = fs.readFileSync(process.argv[2], 'utf8'), UNDO_MODE = process.argv[3
 const skip = UNDO_MODE ? new Set() : new Set(JSON.parse(fs.readFileSync(process.argv[3], 'utf8')));
 // this tool's own sub tspan, as written into a '...' or "..." string (attributes tab-separated, quotes plain or escaped)
 const UNDO = /([A-Za-zα-ωΑ-Ω]{1,2})<tspan\\tdy=(\\?["'])\.28em\2\\tfont-size=\2\.62em\2>([^<]*)<\/tspan><tspan\\tdy=\2-\.28em\2>\\u200b<\/tspan>/g;
-const TOK = /(?<![\w.$])(?<!->)(?![A-Z]{2}_[A-Z]{2})(?![a-z]{2}_[a-z]{3})([A-Za-zα-ωΑ-Ω]{1,2})_(\{[^}]*\}|[A-Za-z0-9]{1,6})(?![\w(])/g;
+const TOK = /(?<![\w.$])(?<!->)(?![A-Z]{2}_[A-Z]{3})(?![a-z]{2}_[a-z]{3})([A-Za-zα-ωΑ-Ω]{1,2})_(\{[^}]*\}|[A-Za-z0-9]{1,6})(?![\w(])/g;
 const toks = [...acorn.tokenizer(src, { ecmaVersion: 'latest', allowHashBang: true })];
-// names the JS itself uses (ICON.q_graph, a field st_mtime) are identifiers, never subscripts
+// a string that is only a name the JS uses ('q_graph' for ICON.q_graph) is an id, never a subscript
 const names = new Set(toks.filter(t => t.type.label === 'name').map(t => t.value));
 let out = '', i = 0, n = 0;
 toks.forEach((t, k) => {
@@ -22,7 +22,7 @@ toks.forEach((t, k) => {
     out += src.slice(i, t.start + 1) + nb; i = t.end - 1; return; }
   if (say || !TOK.test(body)) return; TOK.lastIndex = 0;
   const a = q === '"' ? '\\"' : '"';
-  const nb = body.replace(TOK, (m, b, s, at) => { if (skip.has(m)) return m; n++; s = s.replace(/^\{|\}$/g, '');
+  const nb = body.replace(TOK, (m, b, s, at) => { if (skip.has(m) || (names.has(m) && body.trim() === m)) return m; n++; s = s.replace(/^\{|\}$/g, '');
     return `${b}<tspan\\tdy=${a}.28em${a}\\tfont-size=${a}.62em${a}>${s}</tspan><tspan\\tdy=${a}-.28em${a}>\\u200b</tspan>`; });
   out += src.slice(i, t.start + 1) + nb; i = t.end - 1;
 });

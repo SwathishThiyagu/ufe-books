@@ -49,7 +49,7 @@ TEXT_RULES = [
 ]
 SCREEN_RULES = [
     ('caret maths (use ² or a sup tspan)', re.compile(r"[\w)]\^[\w(−-]")),
-    ('underscore subscript (use ₐ or a sub tspan)', re.compile(r"(?<![\w.$])(?<!->)(?![A-Z]{2}_[A-Z]{2})(?![a-z]{2}_[a-z]{3})[A-Za-zα-ωΑ-Ω]{1,2}_(?:\{[^}]*\}|[A-Za-z0-9]{1,6})(?![\w(])")),
+    ('underscore subscript (use ₐ or a sub tspan)', re.compile(r"(?<![\w.$])(?<!->)(?![A-Z]{2}_[A-Z]{3})(?![a-z]{2}_[a-z]{3})[A-Za-zα-ωΑ-Ω]{1,2}_(?:\{[^}]*\}|[A-Za-z0-9]{1,6})(?![\w(])")),
 ]
 WARN_RULES = [
     ('filler word', re.compile(r"\b(?:delve|delving|journey|unlock|crucial|essentially|imagine|amazing|dive into|let['’]s take control)\b", re.I)),
