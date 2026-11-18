@@ -169,15 +169,18 @@ def revoice(scenes, base, vo, speed, gap, lead):
     sys.path.insert(0, KOKORO); import kokoro_tts as K
     load_pron(K); SR = K.SR
     W = json.load(open(base + '.words.json', encoding='utf-8'))
-    if W.get('premixed'): sys.exit('--revoice: the old voice track has the end-card sounds mixed in; build without --revoice')
+    # a track taken out of a built page (premixed) has the end-card sounds in its last OUTRO s: voice again every line that
+    # reaches the first sound, so the sounds are not cut in and then mixed in a second time
+    cut = W['total'] - OUTRO + min(at for _, at in SFX) - 0.05 if W.get('premixed') else None
     if (W.get('voice'), float(W.get('speed', 1.0))) != (vo, float(speed)): sys.exit(f"--revoice: the old track is {W.get('voice')} at {W.get('speed')}; build with the same voice and speed or without --revoice")
     raw = subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', base + '.mp3', '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True, check=True).stdout
     old = np.frombuffer(raw, dtype=np.float32)
     used, plan = set(), []
     for i, sc in enumerate(scenes):
         txt = clean(sc['say'])
-        cand = [i] if i < len(W['lines']) and W['lines'][i]['text'] == txt and i not in used else []
-        cand = cand or [j for j, l in enumerate(W['lines']) if l['text'] == txt and j not in used][:1]
+        ok = lambda j: W['lines'][j]['text'] == txt and j not in used and (cut is None or W['lines'][j]['end'] < cut)
+        cand = [i] if i < len(W['lines']) and ok(i) else []
+        cand = cand or [j for j in range(len(W['lines'])) if ok(j)][:1]
         if cand: used.add(cand[0]); plan.append(('old', cand[0]))
         else: plan.append(('new', None))
     clips, metas, rms_old = [], [], []
