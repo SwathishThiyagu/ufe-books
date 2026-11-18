@@ -22,9 +22,9 @@ toks.forEach((t, k) => {
     out += src.slice(i, t.start + 1) + nb; i = t.end - 1; return; }
   if (say || !TOK.test(body)) return; TOK.lastIndex = 0;
   const a = q === '"' ? '\\"' : '"';
-  const nb = body.replace(TOK, (m, b, s, at) => { if (skip.has(m) || names.has(m)) return m; n++; s = s.replace(/^\{|\}$/g, '');
+  const nb = body.replace(TOK, (m, b, s, at) => { if (skip.has(m)) return m; n++; s = s.replace(/^\{|\}$/g, '');
     return `${b}<tspan\\tdy=${a}.28em${a}\\tfont-size=${a}.62em${a}>${s}</tspan><tspan\\tdy=${a}-.28em${a}>\\u200b</tspan>`; });
   out += src.slice(i, t.start + 1) + nb; i = t.end - 1;
 });
 out += src.slice(i);
-process.stdout.write(JSON.stringify({ n, src: out }));
+process.stdout.write(JSON.stringify({ n, src: out, names: [...names] }));

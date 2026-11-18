@@ -34,12 +34,13 @@ def main(p):
     lines = [l for sc in ev['scenes'] for l in (sc.get('screen') or [])]
     codey = {m.group(0) for l in lines if CODE_LINE.search(l) for m in TOK.finditer(l)}
     prose = {m.group(0) for l in lines if not CODE_LINE.search(l) for m in TOK.finditer(l)}
-    skip = ({m.group(0) for m in TOK.finditer(txt('code'))} | codey) - prose
+    # and names the JS itself uses (ICON.q_graph): never subscripts, unless the same token is also prose on screen (X_cam)
+    skip = ({m.group(0) for m in TOK.finditer(txt('code'))} | codey | set(und['names'])) - prose
     sk = os.path.join(os.path.dirname(os.path.abspath(p)), '.subfix_skip.json'); json.dump(sorted(skip), open(sk, 'w'))
     r = subprocess.run(['node', os.path.join(HERE, 'lesson_subfix_tok.js'), tmp, sk], capture_output=True, text=True); os.remove(sk); os.remove(tmp)
     if r.returncode: sys.exit(r.stderr)
     res = json.loads(r.stdout); new, n = res['src'], res['n']
     if new != src: open(p, 'w', encoding='utf-8').write(new)
-    print(f'{n} subscripts set' + (f' ({und["n"]} earlier ones undone and redone by the current rules)' if und['n'] else ''), ('(skipped, also in code: ' + ', '.join(sorted(skip)) + ')') if skip else '', p)
+    print(f'{n} subscripts set' + (f' ({und["n"]} earlier ones undone and redone by the current rules)' if und['n'] else ''), ('(left as code: ' + ', '.join(sorted(t for t in skip if TOK.fullmatch(t))) + ')') if any(TOK.fullmatch(t) for t in skip) else '', p)
 if __name__ == '__main__':
     main(sys.argv[1])
