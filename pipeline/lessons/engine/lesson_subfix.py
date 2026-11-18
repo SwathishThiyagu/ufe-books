@@ -7,6 +7,7 @@ Only quoted JS strings change. Left alone, and nothing else (maths such as Σ_S,
   snake_case with a 2-letter lowercase head and a 3+ letter lowercase tail (mm_struct, st_mtime, my_read);
   member access (p.st_mtime, x->a_b, $x_y);
   a string that is nothing but a name the JS uses (an icon id such as 'q_graph').
+A token followed by ( is maths too (t_pd(max), C_in(A ⊕ B)); code calls such as my_read( are caught by the shapes above.
 The checker (lesson_build.py) skips the same identifier shapes, so what this leaves alone passes --check.
 Rerunning it repairs a lesson an earlier version damaged: it first turns its own sub tspans back into X_sub, then applies
 the rules again, so wrongly subscripted identifiers come back as plain text.
@@ -15,7 +16,7 @@ Run lesson_build.py --check after it and look at the sheet: a string used outsid
 """
 import json, os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOK = re.compile(r'(?<![\w.$])(?<!->)(?![A-Z]{2}_[A-Z]{3})(?![a-z]{2}_[a-z]{3})([A-Za-zα-ωΑ-Ω]{1,2})_(\{[^}]*\}|[A-Za-z0-9]{1,6})(?![\w(])')
+TOK = re.compile(r'(?<![\w.$])(?<!->)(?![A-Z]{2}_[A-Z]{3})(?![a-z]{2}_[a-z]{3})([A-Za-zα-ωΑ-Ω]{1,2})_(\{[^}]*\}|[A-Za-z0-9]{1,6})(?!\w)')
 def main(p):
     src = open(p, encoding='utf-8').read()
     # undo this tool's own sub tspans in quoted strings first, so a rerun repairs what an earlier version got wrong
