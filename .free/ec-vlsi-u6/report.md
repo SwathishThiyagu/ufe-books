@@ -1,0 +1,54 @@
+# ec-vlsi-u6: free-model run
+
+- Book: `books/ece/ec-vlsi/ec-vlsi-u6.html`
+- Status: ok
+- Model calls so far: 36 (141,282 tokens in, 320,014 out), 6.4 minutes
+
+## Checker
+
+```
+ec-vlsi-u6.html: 9 chapters, 16148 words, 10 figures, 167 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 3, explanation after the DL formula: The text says the formula assumes the test catches a random fraction (1 − T) of defects. With T defined as fault coverage, the test catches fraction T and misses fraction (1 − T). As written, it reverses the meaning and suggests higher coverage catches fewer defects.
+- ch 1 [low] Section 4, reliability paragraph: Reliability itself does not follow the bathtub curve; the failure rate (hazard rate) follows the bathtub curve. Reliability is a decreasing survival probability, not the bathtub shape.
+- ch 2 [high] Section 3, transition delay fault paragraph and exam trap 5: The roles of launch and capture are swapped. In standard usage the launch edge/vector is the one that creates the transition at the line under test, and the capture edge/clock captures the response after the rated clock period. The chapter says the launch vector sets the initial value and the capture vector creates the transition, which contradicts every standard treatment and will make a student write the wrong definition in the exam.
+- ch 2 [low] Section 2, last sentence on fanout: 'a stem fault can be equivalent to branch faults' is too loose. A stem fault is equivalent to the multiple fault in which all fanout branches are stuck at the same value, not to one branch fault. A student may conclude that one branch fault represents the stem.
+- ch 2 [low] Section 3, stuck-open sentence: 'disconnect the output from supply' names only one rail. In static CMOS a stuck-open transistor can disconnect the output from VDD or from ground, depending on whether the broken transistor is in the pull-up or the pull-down network.
+- ch 2 [low] Exam traps, fourth bullet: 'A stuck-open in CMOS can pass a single-vector test' is ambiguous: 'pass a test' can be read as 'is detected by the test', which is the opposite of the intended meaning.
+- ch 2 [low] Section 3, last sentence on redundant faults: The redundant-fault definition is dropped into the delay-fault paragraph, although redundancy is mainly a stuck-at concept, and the wording suggests these faults are known and deleted before any tool runs. Redundancy is normally proved by ATPG.
+- ch 3 [low] Section 1, coverage formula and Section 3, redundant faults: The chapter defines fault coverage as detected faults divided by the testable fault list. Most standard textbooks define fault coverage as detected faults divided by the total collapsed fault list (redundant faults included), and call detected ÷ testable 'fault efficiency' (or 'test efficiency'). A student who writes the chapter's formula in an exam that uses the textbook definition loses marks.
+- ch 3 [low] Section 1, second paragraph: Packing '32 or 64 faults into the bits of a machine word' is slightly off. In parallel fault simulation one bit of the word is reserved for the good circuit, so a 32-bit word carries the good circuit plus 31 faulty copies, not 32 faults.
+- ch 3 [low] Section 3, redundant faults: The split between a redundant fault and an 'untestable fault' is muddled. Standard texts treat the two as the same thing: a fault with no test is redundant (undetectable). The examples given, a tied-off input and a blocked path, are themselves causes of redundancy, not a separate category.
+- ch 3 [low] Worked example 1, step 4: The question asks the student to show the D-frontier, but the step headed 'D-frontier' jumps straight into propagation through Z and never states the set. After steps 2 and 3 the D-frontier is exactly {Z}, and the student must say so to earn the mark.
+- ch 3 [low] Quiz Q8 answer: The last clause, 'so an all-fault target may be below 100 %', reads backwards and will confuse a reader.
+- ch 4 [high] Section 2, clock-skew sentence: The hold-time race is described backwards. During shift, a scan flip-flop should capture the old (pre-edge) value of the preceding cell. A clock-skew/hold-time race makes it capture the new value launched by the preceding cell after the same clock edge, not the old value.
+- ch 4 [high] Exam traps, first bullet: The claim 'Scan does not reduce the number of test patterns' is not generally correct. Full scan can reduce the number of capture patterns compared with sequential ATPG because it makes state setting and observation direct. The safe point is that scan still adds N shift cycles per pattern, so total test time can rise.
+- ch 4 [low] Worked example 1, problem statement and step 3: The question asks for 'shift time per pattern', but the calculation includes the capture cycle: 200 shift cycles plus 1 capture cycle. This can confuse students about whether capture time is included.
+- ch 5 [low] Lead and Section 1: The lead says a cell sits at 'every chip pin', but Section 1 says 'every digital I/O pin'. Boundary-scan cells cover digital pins only; analog, supply and clock pins are not in the BSR. A student may think every pin on the package is included.
+- ch 5 [low] Section 2, paragraph on registers: 'Inside are four registers' lists IDCODE as one of them, but IDCODE is optional in IEEE 1149.1 and the next paragraph correctly says 'most devices also provide IDCODE'. A device without it has only three of these registers.
+- ch 5 [low] Section 1 and Section 2 (pin timing): The text gives the sampling edge for TMS only. Students often assume TDI is sampled on the same edge that TDO changes on, which is wrong and causes timing mistakes when they read a TAP timing diagram.
+- ch 5 [low] Quiz Q4: The answer says an open trace 'can hold the net at 0'. With the driver sending 1 and the trace open, the receiving cell input floats, so the captured bit is not reliable — it may read 0, read 1, or keep the last value. Only the short to ground gives a dependable 0.
+- ch 6 [high] Section 2, weighted LFSR paragraph: The biasing direction is mixed up. ANDing a stage output with a control bit pushes the probability of a 1 below 0.5 (more 0s), which is what a wide OR gate needs; ORing pushes it above 0.5 (more 1s), which is what a wide AND gate needs. As written, the AND weighting is paired with 'wide AND gates need many 1s', which is the opposite of what that hardware does.
+- ch 6 [low] Section 1, test-per-scan paragraph: 'each scan chain is broken open and its flip-flops are stitched into the LFSR, so a vector is shifted in over several clocks' describes the wrong mechanism. In test-per-scan the TPG drives the scan-in pin and the scan-out pin feeds the ORA; the chain is not merged into the LFSR, and the shift-in time follows from the chain length, not from stitching.
+- ch 6 [low] Sections 1 and 2: The symbol L stands for two different quantities: length of the longest scan chain in Section 1 and LFSR period in Section 2. A student flipping between the two formulas can carry the wrong meaning across.
+- ch 6 [low] Quiz Q4 answer: The clause 'so only one XOR delay per clock' has no verb and reads as a fragment; the comparison with the external-XOR form is left implicit.
+- ch 7 [low] Section 2 and Quiz Q1: Section 2 defines n as the number of words, but the figure axis and the Quiz Q1 answer call n the number of 'words or cells'. For a memory with a word width greater than one bit these are different numbers, and a student may multiply by the bit count.
+- ch 7 [low] Section 1, coupling faults paragraph: 'A test must write the aggressor, then read the victim, in both orders' is ambiguous. It can be read as also doing read-victim-then-write-aggressor, which would never excite the fault.
+- ch 7 [low] Section 2, notation paragraph: w0, r0 and r1 are defined but w1 is never defined, yet w1 is used in the worked example and in the BIST data-generator bullet, so a student meeting it first in the example has to guess.
+- ch 7 [low] Figure caption: 'March tests cost 10n accesses' overgeneralises: MATS+ costs 5n, as the chapter's own table says. Only March C− in this plot costs 10n.
+- ch 7 [low] Exam traps, first bullet: The sentence lumps transition faults with the need for 'both directions'. A transition fault is excited by writing the opposite value and then the required value (0 then 1, or 1 then 0), which a single ordered pass already does; only some coupling and address-decoder cases need the ascending and descending passes.
+- ch 7 [low] Beyond: 'a BIST pass can fuse in spare rows or columns' confuses BIST with repair. BIST only detects and reports; the repair step is built-in self-repair (BISR), which programmes the spare rows/columns.
+- ch 8 [high] Worked example 2, step 3: The conclusion 'sharing only helps when cores have unequal test times' is wrong. For cores tested in parallel over a TAM of fixed width w, the best balanced split gives total time max(T_i/w_i) ≥ (Σ P_i L_i)/w, which is exactly the serial time at full width. So splitting the TAM never beats running the cores one after the other at full width purely on time; the example's own numbers (200,000 = 200,000) show this. What really makes parallel sharing pay off is a core that cannot use the extra width because its internal scan chains are fewer than w, plus power limits that stop all cores running at once.
+- ch 8 [low] Worked example 2: The example prints 'output: 100000.0 / 200000.0' but no code block is shown, unlike Worked example 1 where the output is tied to a printed computation.
+- ch 9 [high] Section 2, first paragraph: SNR is defined as full-scale sine power divided by noise-plus-distortion power. That is the definition of SINAD, not SNR. Standard textbooks and data sheets define SNR with harmonics excluded (noise only). ENOB is computed from SINAD, so the formula ENOB = (SINAD − 1.76)/6.02 is being applied to a quantity wrongly named SNR. A student who writes this SNR definition in an exam will lose marks.
+- ch 9 [high] Worked example 1, step 6 and answer: "INL at that code may stay near zero because later codes add back" is wrong reasoning. INL at the missing code is fixed by the sum of DNL up to that code; later codes cannot change it. INL there is near zero only if INL just before the code was about +1.0 LSB, exactly as Q5 correctly says. The step contradicts the quiz answer.
+- ch 9 [low] Exam traps, second bullet: The same faulty reason is repeated: "INL may stay near zero because later codes add back." Later codes only affect later INL values.
+- ch 9 [low] Section 3, IEEE 1149.4 paragraph and Q7: "Analog test cells at pins can force a voltage or current" overstates the standard. The test cell only switches the pin onto the analog test bus AT1/AT2; the voltage or current is forced by an external instrument connected to the bus.

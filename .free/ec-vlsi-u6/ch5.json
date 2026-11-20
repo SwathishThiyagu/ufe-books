@@ -1,0 +1,204 @@
+{
+ "lead": "Boundary scan puts a small test cell at every chip pin and a serial controller on the chip. A board full of chips can then be tested through four wires: TCK, TMS, TDI and TDO. The standard is IEEE 1149.1, usually called JTAG. It checks the wiring between chips, not the logic inside them. Board makers use it to find open and short printed-circuit-board (PCB) traces, and to program flash and FPGAs after soldering. The same port also gives a standard way to reach internal test structures.",
+ "prereq": "You need: scan cells and shift-register behaviour from <a href=\"#design-for-testability-and-scan-design\">6.4</a>, and board and packaging ideas from <a href=\"#need-for-testing-and-manufacturing-test-principles\">6.1</a>.",
+ "sections": [
+  {
+   "h3": "The four mandatory pins",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "JTAG adds a Test Access Port (TAP) to the chip. Four pins are mandatory. TCK is the test clock. TMS is Test Mode Select; the TAP controller samples it on the rising edge of TCK. TDI is Test Data In. TDO is Test Data Out. TRST, an optional asynchronous reset, is not required. A boundary-scan cell sits at every digital I/O pin, between the chip's internal logic and the pad. In normal operation the cell is transparent: signal passes in and out. In test mode the cell can drive the pad from a stored bit, or capture the pad value into a flip-flop. All cells join into one long shift register, the boundary scan register (BSR), with one cell per pin."
+    },
+    {
+     "type": "p",
+     "text": "Why at the pin? A chip's internal logic can be tested by scan (<a href=\"#design-for-testability-and-scan-design\">6.4</a>) or BIST (<a href=\"#built-in-self-test-bist\">6.6</a>). The PCB trace from one chip pin to another has no access point after soldering. A bed of nails probe board is expensive and cannot reach fine-pitch ball-grid arrays. Boundary scan moves the probe to the pin itself. The tester shifts a pattern into the output cells, the chip drives the board traces, and the input cells capture what arrives. A mismatch shows a trace open, a short to a neighbour, or a wrong connection."
+    }
+   ]
+  },
+  {
+   "h3": "TAP controller and registers",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The TAP controller is a 16-state finite state machine. It moves on each rising edge of TCK according to TMS. The important states are Test-Logic-Reset, Run-Test/Idle, Select-DR (data register), Capture-DR, Shift-DR, Update-DR, and the same four for the instruction register: Select-IR, Capture-IR, Shift-IR, Update-IR. Holding TMS high for five TCK cycles reaches Test-Logic-Reset from any state. That is the safety reset."
+    },
+    {
+     "type": "p",
+     "text": "Inside are four registers. The instruction register (IR) holds the current instruction; its length is device-specific. The bypass register is one bit and shortens the chain when a device is not being tested. The IDCODE register returns a device identification number. The boundary scan register has one cell per I/O pin. The TAP controller connects the chosen data register between TDI and TDO during Shift-DR."
+    },
+    {
+     "type": "p",
+     "text": "BYPASS, EXTEST and SAMPLE/PRELOAD are mandatory. BYPASS selects the 1-bit bypass register. EXTEST drives and observes the pins through the boundary cells; it is the board-interconnect test. SAMPLE/PRELOAD captures pin values without disturbing normal operation, and preloads the BSR before EXTEST. Most devices also provide IDCODE, which shifts out the device identity. The instruction in the IR decides which data register is connected."
+    }
+   ]
+  },
+  {
+   "h3": "Daisy chain on a board",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "On a board, devices are wired in a daisy chain. The board's TDI goes to the first device's TDI; its TDO goes to the next device's TDI; the last TDO is the board's TDO. TCK and TMS go to every device in parallel. So the board behaves as one long shift register. All TAP controllers see the same TMS, so they step through states together. The board's total instruction length is the sum of the device IR lengths; the total data length is the sum of the selected register lengths."
+    },
+    {
+     "type": "formula",
+     "text": "L<sub>chain</sub> = Σ L<sub>i</sub>",
+     "where": "L<sub>chain</sub> is the total bits shifted in one Shift-DR or Shift-IR pass; L<sub>i</sub> is the length of the selected register in device i; the sum runs over the N devices in the chain."
+    },
+    {
+     "type": "p",
+     "text": "Board test uses EXTEST. For each net, one device drives a 0 or 1 and another device captures the value. A short to VDD, GND or a neighbour changes the captured bit. An open leaves the input floating or stuck. The tester shifts out all captured bits and compares with the expected netlist. In-system programming reuses the same TAP: the FPGA or flash is put in programming mode and its configuration is shifted through TDI/TDO. One port can control many chips and can also reach internal scan chains (<a href=\"#chip-level-and-system-level-test-techniques\">6.8</a>)."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "TDI enters the selected register and leaves through TDO; TCK and TMS move the TAP controller that chooses the register.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Inside a JTAG device",
+   "nodes": [
+    {
+     "id": "tdi",
+     "label": "TDI",
+     "style": "accent"
+    },
+    {
+     "id": "ir",
+     "label": "Instruction register",
+     "style": "normal"
+    },
+    {
+     "id": "by",
+     "label": "Bypass register",
+     "style": "muted"
+    },
+    {
+     "id": "bsr",
+     "label": "Boundary scan cells",
+     "note": "one per pin",
+     "style": "accent"
+    },
+    {
+     "id": "tap",
+     "label": "TAP controller",
+     "note": "TCK and TMS drive it",
+     "style": "live"
+    },
+    {
+     "id": "tdo",
+     "label": "TDO",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "tdi",
+     "to": "ir",
+     "style": "solid"
+    },
+    {
+     "from": "tdi",
+     "to": "by",
+     "style": "dashed"
+    },
+    {
+     "from": "tdi",
+     "to": "bsr",
+     "style": "solid"
+    },
+    {
+     "from": "tap",
+     "to": "ir",
+     "style": "dashed"
+    },
+    {
+     "from": "tap",
+     "to": "bsr",
+     "style": "dashed"
+    },
+    {
+     "from": "ir",
+     "to": "tdo",
+     "style": "solid"
+    },
+    {
+     "from": "by",
+     "to": "tdo",
+     "style": "solid"
+    },
+    {
+     "from": "bsr",
+     "to": "tdo",
+     "style": "solid"
+    }
+   ],
+   "aria": "Data path from TDI through the selected register to TDO, with the TAP controller issuing select and shift signals and the instruction register choosing the data register."
+  }
+ },
+ "examples": [
+  {
+   "question": "A board carries three JTAG devices in a daisy chain. Their instruction registers are 4, 4 and 5 bits long; their boundary scan registers are 20, 20 and 30 cells; each bypass register is 1 bit. (a) How many TCK cycles are needed in Shift-IR to shift an EXTEST instruction into all three? (b) How many TCK cycles are needed in Shift-DR to pass one data bit through the board in BYPASS mode? (c) How many TCK cycles are needed in Shift-DR to shift a complete boundary-scan pattern through all three boundary scan registers?",
+   "steps": [
+    "Instruction shift length = 4 + 4 + 5 = 13 bits. Shift-IR shifts one bit per TCK, so (a) is 13 cycles. Entry and update add control cycles but shift no instruction bits.",
+    "Bypass chain length = 1 + 1 + 1 = 3 bits. (b) is 3 cycles.",
+    "Boundary scan chain length = 20 + 20 + 30 = 70 cells. (c) is 70 cycles."
+   ],
+   "answer": "The chain needs 13 TCK cycles for the instruction shift, 3 cycles for one bypass bit, and 70 cycles for a full boundary-scan pattern.",
+   "check": "ir = [4, 4, 5]\nbsr = [20, 20, 30]\nbypass = [1, 1, 1]\nprint(sum(ir))\nprint(sum(bypass))\nprint(sum(bsr))",
+   "values": [
+    13,
+    3,
+    70
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Boundary scan tests board wiring and pin behaviour; it does not test the chip's internal logic. Internal logic needs scan or BIST.",
+  "The whole daisy chain is one shift register: instruction lengths add and data-register lengths add. Do not use one device's IR length for the board.",
+  "BYPASS shortens the chain; EXTEST drives and captures pins. They are different instructions.",
+  "SAMPLE/PRELOAD does not drive the board. It captures pin values and preloads boundary cells before a later EXTEST.",
+  "TCK and TMS are not data pins: TDI/TDO carry data, TMS controls state, TCK clocks both."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name the four mandatory JTAG pins and say what each does.",
+   "marks": 2,
+   "a": "TCK is the test clock; TMS selects the TAP state; TDI is serial test data in; TDO is serial test data out."
+  },
+  {
+   "level": "understand",
+   "q": "Why put a boundary-scan cell at every I/O pin instead of probing the board with a bed of nails?",
+   "marks": 3,
+   "a": "Fine-pitch and BGA boards have no accessible probe points. A cell at the pin can drive and capture the trace after soldering, so the board is tested through four wires."
+  },
+  {
+   "level": "apply",
+   "q": "Three devices have IR lengths 3, 5 and 4 bits. What is the board instruction shift length in Shift-IR?",
+   "marks": 2,
+   "a": "3 + 5 + 4 = 12 bits, so 12 TCK cycles."
+  },
+  {
+   "level": "analyze",
+   "q": "A board test captures a 0 where the netlist expects 1 on a trace between two chips. Give two possible physical faults and name the JTAG instruction in use.",
+   "marks": 4,
+   "a": "An open trace or a short to ground can hold the net at 0. The instruction is EXTEST, which drives one pin and captures the other."
+  },
+  {
+   "level": "understand",
+   "q": "What does the bypass register do, and why is it only one bit?",
+   "marks": 3,
+   "a": "It connects a single flip-flop between TDI and TDO for a device not under test, so data passes through in one TCK instead of crossing that device's whole boundary scan register."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can all devices on a board share TCK and TMS but must be ordered from TDI to TDO?",
+   "marks": 4,
+   "a": "Shared TCK and TMS keep every TAP controller in the same state. Test data is serial, so each device's TDO must feed the next device's TDI; this makes one chain."
+  }
+ ],
+ "beyond": "Not for the exam. JTAG is also a debug port: processors expose run-control and memory access through it, and FPGAs use it for configuration. Newer work adds IEEE 1149.7 for two-wire operation and IJTAG (IEEE 1687) for accessing embedded instruments. Security teams now lock or disable JTAG on shipped products because it can read secrets. Search for \"TAP state diagram\", \"EXTEST interconnect test\" and \"IJTAG\" to go further."
+}

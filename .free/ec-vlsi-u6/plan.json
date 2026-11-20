@@ -1,0 +1,641 @@
+{
+ "lead": "A chip that leaves the fab is not automatically a working chip: every die must be tested, and testing costs money, pins and silicon area. This unit shows how defects are turned into fault models, how test vectors are generated and measured, and how designers add testability hardware — scan, boundary scan and BIST — to make testing possible at chip, board and system level.",
+ "about": "The unit starts with why a manufactured chip cannot be trusted without a test, and what test costs in yield and defect level (6.1). Chapter 6.2 turns physical defects into stuck-at and delay fault models, and 6.3 shows how fault simulation and ATPG build vectors for those faults. Hard-to-test sequential logic forces design changes: scan design in 6.4, boundary scan at board level in 6.5, and built-in self-test in 6.6. Chapter 6.7 applies the same thinking to memories with march algorithms and memory BIST, 6.8 places every test step in the wafer-to-system flow, and 6.9 closes with analog and mixed-signal measurement, where a truth table does not exist.",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "Testing checks each fabricated chip against its specification, and manufacturing yield decides how much that test costs and how many bad chips reach the customer.",
+   "depth": "Defect, fault, error and failure, with one example each. Difference between verification (the design is logically correct, Unit 5) and test (this particular chip was built correctly). The test floor: ATE tester, DUT, probe card, device interface board, handler. Cost items: tester capital, test time per die, engineering cost of vectors, multi-site testing. Yield Y, fault coverage T, defect level DL = 1 − Y^(1−T), DPM. Quality (parts shipped good) versus reliability (parts that die in the field: infant mortality, bathtub curve, burn-in, screening). Silicon debug, characterisation, production test, incoming inspection. Some syllabi call fault coverage test coverage.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Where test sits in the manufacturing flow",
+    "nodes": [
+     {
+      "id": "w",
+      "label": "Wafer fabrication",
+      "note": "thousands of die on one wafer",
+      "style": "normal"
+     },
+     {
+      "id": "p",
+      "label": "Wafer probe",
+      "note": "bad die marked with ink",
+      "style": "accent"
+     },
+     {
+      "id": "pk",
+      "label": "Packaging",
+      "note": "cost paid per die",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Final test",
+      "note": "burn-in then ATE",
+      "style": "accent"
+     },
+     {
+      "id": "b",
+      "label": "Board assembly",
+      "note": "solder and interconnect",
+      "style": "normal"
+     },
+     {
+      "id": "s",
+      "label": "System test",
+      "note": "whole product",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "w",
+      "to": "p",
+      "style": "solid"
+     },
+     {
+      "from": "p",
+      "to": "pk",
+      "style": "solid"
+     },
+     {
+      "from": "pk",
+      "to": "f",
+      "style": "solid"
+     },
+     {
+      "from": "f",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "s",
+      "style": "solid"
+     }
+    ],
+    "aria": "Flow from wafer fabrication through probe, packaging, final test and board assembly to system test, with probe and final test marked as the two screening steps."
+   },
+   "example": "A wafer lot has yield Y = 0.90 and the test program has fault coverage T = 0.95. Find the defect level in DPM. DL = 1 − Y^(1−T) = 1 − 0.9^0.05. Now 0.9^0.05 = e^(0.05 × ln 0.9) = e^(−0.005268) = 0.99475, so DL = 0.00525, that is about 5,250 defective parts per million shipped. Repeat with T = 0.99: 0.9^0.01 = e^(−0.001054) = 0.99895, DL = 0.00105, about 1,050 DPM. Doubling the escape-catching power of the test cuts shipped defects roughly five times, and the yield Y itself is what limits how low DL can go.",
+   "trap": "Assuming 100 % fault coverage means zero defective chips shipped, or confusing yield (good die out of the fab) with fault coverage (faults the vectors detect).",
+   "prereq": "None beyond the idea of a fabricated die from Unit 2.",
+   "leave": "Verilog test benches and simulation to Unit 5; defect physics such as latch-up and oxide pinholes to Unit 2."
+  },
+  {
+   "k": 2,
+   "idea": "Physical defects are too many and too varied to test one by one, so they are mapped onto a small set of logical fault models that a program can handle.",
+   "depth": "Why model at all: a defect is physical (short, open, missing implant), a fault is its logical abstraction, an error is a wrong signal value, a failure is the wrong output. Single stuck-at model: line stuck-at-0 (SA0) and stuck-at-1 (SA1), one line at a time. Fault equivalence (two faults no vector can tell apart) and fault collapsing; fault dominance; checkpoints on fanout branches so that a fanout stem is not counted twice. Transistor-level faults: stuck-open, stuck-short, and why a stuck-open in a CMOS gate may need two vectors to detect. Bridging faults, wired AND/OR behaviour. Delay faults: transition delay fault (slow-to-rise, slow-to-fall) and path delay fault; two-vector tests, launch and capture. Redundant faults are untestable. Some syllabi call the single stuck-at model the line stuck-at model.",
+   "figure": {
+    "type": "tree",
+    "shape": "box",
+    "root": {
+     "label": "Defects",
+     "note": "physical",
+     "children": [
+      {
+       "label": "Stuck-at",
+       "edge": "one line fixed",
+       "children": [
+        {
+         "label": "SA0"
+        },
+        {
+         "label": "SA1"
+        }
+       ]
+      },
+      {
+       "label": "Bridging",
+       "edge": "two lines shorted",
+       "children": [
+        {
+         "label": "Wired-AND"
+        },
+        {
+         "label": "Wired-OR"
+        }
+       ]
+      },
+      {
+       "label": "Delay",
+       "edge": "too slow",
+       "children": [
+        {
+         "label": "Transition"
+        },
+        {
+         "label": "Path"
+        }
+       ]
+      },
+      {
+       "label": "Stuck-open",
+       "edge": "transistor never conducts",
+       "children": [
+        {
+         "label": "nMOS open"
+        },
+        {
+         "label": "pMOS open"
+        }
+       ]
+      }
+     ]
+    },
+    "aria": "Hierarchy from physical defects to the four fault model families, each with its two common variants.",
+    "caption": "Physical defects are mapped onto fault models that a program can enumerate."
+   },
+   "example": "A two-input NAND gate has inputs A, B and output Z. (a) List every single stuck-at fault. (b) Collapse them into equivalence classes. (c) Give the smallest test set that detects one fault from every class. There are three lines × two values = 6 faults: A/0, A/1, B/0, B/1, Z/0, Z/1. A/0 forces Z = 1 for every input, and so does B/0, so {A/0, B/0} is one class. A/1 and B/1 are symmetric but not equivalent, since each is detected only when the other input is 1. Z/0 and Z/1 are each alone. That gives 5 classes. Tests, written as (A,B): 01 detects A/1 (good Z = 1, faulty Z = 0); 10 detects B/1; 11 detects the class {A/0, B/0} (good Z = 0, faulty 1) and also Z/0 and Z/1. The smallest set is {01, 10, 11} — three vectors, and 00 detects nothing.",
+   "trap": "Forgetting fault collapsing and reporting 6 faults where 5 classes exist, or claiming A/1 and B/1 are equivalent on a NAND gate.",
+   "prereq": "Boolean gates and truth tables from Unit 3; Verilog gate-level modelling from Unit 5.",
+   "leave": "Memory-specific fault models (coupling, neighbourhood pattern sensitive) to 6.7; the vectors that detect these faults to 6.3."
+  },
+  {
+   "k": 3,
+   "idea": "Fault simulation measures how much of the fault list a vector set actually catches, and ATPG works backwards from a chosen fault to a vector that exposes it.",
+   "depth": "Fault simulation: the good circuit is simulated once, faulty circuits in parallel (parallel fault simulation), or all faults tracked per line (deductive, concurrent); why speed matters when there are millions of faults. Coverage = detected faults ÷ total faults, reported per vector so the vector set can be trimmed. ATPG: exhaustive and pseudo-exhaustive, random and weighted random, then algorithmic. D-algorithm vocabulary: D means 1 in the good machine and 0 in the faulty one, D-bar the reverse; fault activation, D-frontier (gates with a D on an input but no D on the output), J-frontier, line justification, backward propagation, conflict and backtracking. PODEM and FAN named only, with one line each on why they need fewer backtracks. Redundant faults and untestable faults: coverage is measured against the testable fault list. Test compaction and vector ordering.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "The ATPG loop",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Netlist + fault list",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Fault simulation",
+      "note": "coverage of current vectors",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Coverage target met?",
+      "style": "live"
+     },
+     {
+      "id": "d",
+      "label": "ATPG for undetected faults",
+      "style": "next"
+     },
+     {
+      "id": "e",
+      "label": "Test set ready",
+      "style": "normal"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "label": "no",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "b",
+      "label": "add vectors",
+      "style": "dashed"
+     },
+     {
+      "from": "c",
+      "to": "e",
+      "label": "yes",
+      "style": "solid"
+     }
+    ],
+    "aria": "Loop in which fault simulation measures coverage, and ATPG adds vectors for the still-undetected faults until the coverage target is reached."
+   },
+   "example": "The circuit is Z = A·(B + C), built as G1 = NAND(A,B), G2 = NAND(A,C), Z = NAND(G1,G2). Use the D-algorithm to find a test for the fault A stuck-at-0. Step 1, activation: put D on line A, so A = 1 in the good machine and A = 0 in the faulty one. Step 2, propagate through G1: to push D to G1's output set B = 1, then G1 = NOT(A) for this input, so G1 = D-bar. Step 3, G2 = NAND(A,C); with C = 0 the output is 1 whatever A is, so G2 = 1 in both machines and blocks nothing. Step 4, the D-frontier is now G1 into G3: Z = NAND(D-bar, 1) = D. So Z carries D, meaning Z = 1 good and 0 faulty. The vector is (A,B,C) = (1,1,0), and Z = D confirms it is detected. No backtracking was needed.",
+   "trap": "Reading D as 'the fault is present at this line' without fixing the convention (D = good 1, faulty 0), and forgetting that a redundant fault has no test, so 100 % coverage of all faults may be impossible.",
+   "prereq": "Fault collapsing from 6.2; gate-level simulation and test benches from Unit 5.",
+   "leave": "Formal equivalence checking and SAT-based ATPG are outside this unit; scan-based use of these vectors comes in 6.4."
+  },
+  {
+   "k": 4,
+   "idea": "Scan design turns every flip-flop into a shift-register stage during test, so a sequential circuit can be tested as if it were purely combinational.",
+   "depth": "Why sequential circuits are hard: controllability (setting an internal node to a value) and observability (seeing an internal node at a pin), both measured through long time sequences. Ad-hoc DFT: test points, extra pins, disabling feedback. Muxed-D scan cell: a 2:1 multiplexer in front of the D flip-flop, scan enable selects functional D or scan-in SI. Full scan versus partial scan. Test procedure: shift in, capture one cycle, shift out, compare on ATE. Scan overheads: one multiplexer and routing per flip-flop, area, delay on the functional path, scan enable and scan clock pins. Clock skew and hold-time problem during shift, lock-up latches between chains on different clocks. Level-sensitive scan design (LSSD) as the older two-clock alternative — only a few universities teach it. Some syllabi call this scan-path design or scan-based DFT.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "One muxed-D scan cell",
+    "nodes": [
+     {
+      "id": "d",
+      "label": "D (functional)",
+      "style": "normal"
+     },
+     {
+      "id": "si",
+      "label": "SI (scan-in)",
+      "style": "accent"
+     },
+     {
+      "id": "m",
+      "label": "2:1 MUX",
+      "note": "SE = 1 selects SI",
+      "style": "live"
+     },
+     {
+      "id": "ff",
+      "label": "D flip-flop",
+      "style": "normal"
+     },
+     {
+      "id": "q",
+      "label": "Q to next cell",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "d",
+      "to": "m",
+      "style": "solid"
+     },
+     {
+      "from": "si",
+      "to": "m",
+      "style": "solid"
+     },
+     {
+      "from": "m",
+      "to": "ff",
+      "style": "solid"
+     },
+     {
+      "from": "ff",
+      "to": "q",
+      "style": "solid"
+     }
+    ],
+    "aria": "A flip-flop preceded by a multiplexer that chooses between the functional data input and the scan-in input, with the Q output feeding the next cell of the chain."
+   },
+   "example": "A design has 200 flip-flops in a single scan chain, 50 primary inputs, and 1000 scan test patterns. The scan clock is 100 MHz and capture takes exactly 1 cycle. Find the shift time per pattern and the total test time. One pattern needs 200 shift cycles plus 1 capture cycle = 201 cycles, which at 100 MHz (10 ns per cycle) is 2.01 µs. Total for 1000 patterns = 201,000 cycles = 2.01 ms. Now split the chain into 4 chains of 50: shift is 50 cycles, so each pattern is 51 cycles and the total is 51,000 cycles = 0.51 ms, about four times faster, at the cost of four scan-in and four scan-out pins.",
+   "trap": "Saying scan reduces the number of test patterns; scan makes each pattern easy to generate, but shift cycles dominate and often increase total test time, and the scan multiplexer adds area and delay.",
+   "prereq": "Latch and flip-flop structures from Unit 4; combinational ATPG from 6.3.",
+   "leave": "Scan compression, test scheduling and test access mechanisms to 6.8; the board-level version of the same idea to 6.5."
+  },
+  {
+   "k": 5,
+   "idea": "Boundary scan puts a test cell at every chip pin and a small serial controller on chip, so a board full of chips can be tested through four wires instead of a bed of nails.",
+   "depth": "IEEE 1149.1, commonly called JTAG. Four mandatory pins: TCK (test clock), TMS (test mode select), TDI (test data in), TDO (test data out); TRST optional. TAP controller: a 16-state machine driven by TMS on the rising edge of TCK (Test-Logic-Reset, Run-Test/Idle, Select-DR, Capture-DR, Shift-DR, Update-DR, and the same four for the instruction register). Registers: instruction register, bypass (1 bit), IDCODE, boundary scan register with one cell per I/O pin. Mandatory instructions: BYPASS, EXTEST, SAMPLE/PRELOAD, and IDCODE in most devices. Board-level use: daisy chain of TDI to TDO through all devices, one big shift register; testing interconnect opens and shorts between chips, in-system programming of flash and FPGAs. Hierarchical and serial control: one TAP port can control many chips and even internal scan chains (that is 6.8).",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Inside a JTAG device",
+    "nodes": [
+     {
+      "id": "tdi",
+      "label": "TDI",
+      "style": "accent"
+     },
+     {
+      "id": "ir",
+      "label": "Instruction register",
+      "style": "normal"
+     },
+     {
+      "id": "by",
+      "label": "Bypass register",
+      "style": "muted"
+     },
+     {
+      "id": "bsr",
+      "label": "Boundary scan cells",
+      "note": "one per pin",
+      "style": "accent"
+     },
+     {
+      "id": "tap",
+      "label": "TAP controller",
+      "note": "TCK and TMS drive it",
+      "style": "live"
+     },
+     {
+      "id": "tdo",
+      "label": "TDO",
+      "style": "accent"
+     }
+    ],
+    "edges": [
+     {
+      "from": "tdi",
+      "to": "ir",
+      "style": "solid"
+     },
+     {
+      "from": "tdi",
+      "to": "by",
+      "style": "dashed"
+     },
+     {
+      "from": "tdi",
+      "to": "bsr",
+      "style": "solid"
+     },
+     {
+      "from": "tap",
+      "to": "ir",
+      "style": "dashed"
+     },
+     {
+      "from": "tap",
+      "to": "bsr",
+      "style": "dashed"
+     },
+     {
+      "from": "ir",
+      "to": "tdo",
+      "style": "solid"
+     },
+     {
+      "from": "by",
+      "to": "tdo",
+      "style": "solid"
+     },
+     {
+      "from": "bsr",
+      "to": "tdo",
+      "style": "solid"
+     }
+    ],
+    "aria": "Data path from TDI through the selected register to TDO, with the TAP controller issuing the select and shift signals and the instruction register choosing which data register is connected."
+   },
+   "example": "A board carries three JTAG devices in a daisy chain. Their instruction registers are 4, 4 and 5 bits long; their boundary scan registers are 20, 20 and 30 cells; each has a 1-bit bypass register. (a) How many TCK cycles to shift an EXTEST instruction into all three? (b) How many to shift one data bit through the board in BYPASS mode? (c) How many to shift a full boundary scan pattern? (a) Instruction shift length = 4 + 4 + 5 = 13 cycles in Shift-IR, plus 1 cycle to enter and 1 cycle to update. (b) Bypass lengths add to 1 + 1 + 1 = 3, so 3 cycles, which is why BYPASS exists. (c) Boundary scan lengths add to 20 + 20 + 30 = 70 cycles in Shift-DR, before capture and update.",
+   "trap": "Shifting instruction bits and data bits through the same chain length, or thinking boundary scan tests the internal logic of a chip — it tests the wiring between chips and the pins.",
+   "prereq": "Scan cells and shift-register behaviour from 6.4; board and packaging ideas from 6.1.",
+   "leave": "Internal scan chain access through the TAP (IEEE 1500 style) to 6.8; analog extensions to 6.9."
+  },
+  {
+   "k": 6,
+   "idea": "Built-in self-test moves the pattern generator and the response checker onto the chip, so the chip can test itself with almost no external tester.",
+   "depth": "BIST parts: test pattern generator (TPG), circuit under test (CUT), output response analyser (ORA), BIST controller and a pass/fail flip-flop. LFSR as TPG: external-XOR (Fibonacci) and internal-XOR (Galois) forms, seed, taps, maximal-length period 2ⁿ − 1, why all-zero state is not used; weighted and reseeded LFSRs for hard-to-detect faults. Signature analysis with a MISR: shift and mix outputs, final signature compared with the golden signature from a fault-free simulation; aliasing probability about 2^(−n) for an n-bit MISR. Exhaustive, pseudo-exhaustive, pseudo-random and deterministic BIST. Test-per-clock versus test-per-scan (each scan chain used as part of the LFSR). BILBO: one register that is an LFSR in test mode and a normal register otherwise. Costs: area, extra delay, test time, and the need for a golden signature. Some syllabi call this built-in logic block observation or BILBO-based BIST.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Logic BIST loop",
+    "nodes": [
+     {
+      "id": "l",
+      "label": "LFSR (TPG)",
+      "note": "pseudo-random vectors",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Circuit under test",
+      "style": "normal"
+     },
+     {
+      "id": "m",
+      "label": "MISR (ORA)",
+      "note": "compresses outputs",
+      "style": "accent"
+     },
+     {
+      "id": "cp",
+      "label": "Compare signature",
+      "note": "golden value",
+      "style": "live"
+     },
+     {
+      "id": "p",
+      "label": "Pass / fail",
+      "style": "next"
+     }
+    ],
+    "edges": [
+     {
+      "from": "l",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "m",
+      "style": "solid"
+     },
+     {
+      "from": "m",
+      "to": "cp",
+      "style": "solid"
+     },
+     {
+      "from": "cp",
+      "to": "p",
+      "style": "solid"
+     }
+    ],
+    "aria": "On-chip BIST loop in which an LFSR generates vectors, the MISR compresses the responses into a signature, and a comparator against the golden signature gives a single pass or fail bit."
+   },
+   "example": "A 4-bit LFSR has feedback f = b3 ⊕ b0, where b3 is the leftmost bit, and the register shifts left each clock. Seed it with 0001 and list the states. 0001 → 0011 → 0111 → 1111 → 1110 → 1101 → 1010 → 0101 → 1011 → 0110 → 1100 → 1001 → 0010 → 0100 → 1000 → 0001. That is 15 distinct states and then repeat, so it is a maximal-length LFSR with period 2⁴ − 1 = 15 and it generates every non-zero 4-bit vector exactly once. If the same circuit feeds a 16-bit MISR, a faulty circuit that produces a wrong stream still has about 2^(−16), roughly 1 in 65,000, chance of ending with the correct signature.",
+   "trap": "Saying BIST finds every fault or makes ATPG unnecessary; the LFSR may never produce the vector a hard fault needs (random-pattern-resistant faults), and aliasing can hide a fault in the signature.",
+   "prereq": "Scan design from 6.4; shift registers and flip-flops from Unit 4.",
+   "leave": "Memory-specific BIST controller configuration to 6.7; SoC-level BIST scheduling to 6.8."
+  },
+  {
+   "k": 7,
+   "idea": "Memory arrays fail in ways logic does not — cells disturb their neighbours and the address decoder can select the wrong cell — so memories are tested with ordered march algorithms instead of stuck-at vectors.",
+   "depth": "Functional view of a memory as test sees it: address decoder, cell array, sense amplifiers, write drivers, read/write control. Fault models: stuck-at cell, transition fault (up and down), coupling faults (inversion and idempotent, state and dynamic) between two cells, address decoder faults (no cell accessed, multiple cells accessed, wrong cell), neighbourhood pattern sensitive faults, retention faults (cell loses data when not refreshed). Test algorithms and their length: MATS+ (5n), March C− (10n), Checkerboard (4n), Walking 1/0 (2n² and worse), GALPAT (4n²), and why O(n²) tests are used only on small arrays. Reading each march element: ⇑ means ascending address order, ⇓ descending, w0 write 0, r1 read and expect 1. Test of logic around memories: the address and data wrap logic needs its own vectors. Memory BIST controller configuration: address counter, data generator, comparator, algorithm sequencer, and the multiplexer that switches the array to BIST mode. Algorithmic optimisation: march variants that cover the same faults in fewer operations. Only a few universities teach neighbourhood pattern sensitive fault coverage in detail.",
+   "figure": {
+    "type": "plot",
+    "x": {
+     "label": "cells n",
+     "min": 1,
+     "max": 32
+    },
+    "y": {
+     "label": "memory accesses",
+     "min": 0,
+     "max": 4500
+    },
+    "series": [
+     {
+      "name": "March C- (10n)",
+      "expr": "10*x",
+      "style": "accent"
+     },
+     {
+      "name": "GALPAT (4n^2)",
+      "expr": "4*x**2",
+      "style": "live"
+     }
+    ],
+    "aria": "Plot showing memory accesses growing linearly for a march test and quadratically for GALPAT, the gap widening as the number of cells increases.",
+    "caption": "March tests cost 10n accesses; GALPAT costs about 4n², so it is used only on tiny arrays."
+   },
+   "example": "March C− has six elements: M0 ⇑w0, M1 ⇑r0w1, M2 ⇓r1w0, M3 ⇑r0w1, M4 ⇓r1w0, M5 ⇑r0. Count the operations per cell: 1 + 2 + 2 + 2 + 2 + 1 = 10, so the test length is 10n. For a 1024-word memory, 10 × 1024 = 10,240 accesses. At 5 ns per access the test takes 10,240 × 5 ns = 51.2 µs. GALPAT on the same memory needs about 4n² = 4 × 1024² = 4,194,304 accesses, which is 21.0 ms — roughly 400 times longer, which is why the march algorithm is the production choice.",
+   "trap": "Treating a memory as a set of independent stuck-at cells; without ordered reads and writes in both directions, transition and coupling faults are never excited, and the address decoder faults need the ascending and descending passes.",
+   "prereq": "SRAM and DRAM cell structure and decoders from Unit 4; stuck-at and coupling ideas from 6.2.",
+   "leave": "Physical cell layout and sense-amplifier design to Unit 4; the logic BIST engine itself to 6.6."
+  },
+  {
+   "k": 8,
+   "idea": "Testing does not stop at the die: the same chip is tested again after packaging, on the board and inside the system, and each level must be planned and scheduled.",
+   "depth": "Levels: wafer sort, package or final test, board test, system test; what each one can catch and what it costs. Test cost model: cost per die falls as tests move earlier, cost per escape rises. Known-good-die, multi-site test, burn-in and reliability screens. SoC test: core-based test with wrapped cores, test access mechanism (TAM) carrying vectors to each core, test scheduling so cores share a limited pin budget without overlapping, hierarchical and serial control through one TAP port. Module and IP test: a bought-in IP block is delivered with its own test set and a wrapper. IEEE 1500 as the on-chip standard for core test wrappers. Board test: in-circuit test, flying probe, boundary scan interconnect test; system test: functional test of the whole product, software-driven. Test compression and number of pins as practical constraints. Only a few universities teach TAM partitioning algorithms in detail.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "items": [
+     {
+      "label": "System test",
+      "note": "whole product, functional",
+      "style": "muted"
+     },
+     {
+      "label": "Board test",
+      "note": "ICT, boundary scan",
+      "style": "normal"
+     },
+     {
+      "label": "Package test",
+      "note": "final ATE test",
+      "style": "accent"
+     },
+     {
+      "label": "Wafer sort",
+      "note": "probe card on every die",
+      "style": "live"
+     }
+    ],
+    "side": {
+     "top": "later: costlier per failure",
+     "bottom": "earlier: cheaper per test"
+    },
+    "aria": "Four test levels stacked from wafer sort at the bottom to system test at the top, showing that cost per escaped failure rises as test moves later."
+   },
+   "example": "A wafer has 1000 die and 200 of them are defective. Wafer test costs ₹6 per die and catches 90 % of the bad die. Packaging costs ₹80 per die, and final test (the same in both plans) catches whatever escapes. Compare the cost per good die with and without wafer test. Without wafer test: package all 1000 at ₹80 = ₹80,000, ship 800 good, cost per good die = ₹100. With wafer test: pay 1000 × ₹6 = ₹6,000, reject 180 bad die, package 820 at ₹80 = ₹65,600, and 20 bad die escape to be caught at final test, so 800 ship. Total = ₹71,600, cost per good die = ₹89.50. Wafer test saves about 10 % because packaging a bad die throws away the package cost.",
+   "trap": "Comparing test cost per die instead of cost per good die shipped, and ignoring that a die is tested many times so the total test cost adds up across levels.",
+   "prereq": "Test economics from 6.1; scan and boundary scan from 6.4 and 6.5.",
+   "leave": "Details of the TAP state machine to 6.5; package types and floorplanning to Unit 5."
+  },
+  {
+   "k": 9,
+   "idea": "Analog and mixed-signal blocks have no truth table and no clean fault model, so they are tested by measuring specifications and comparing against tolerances.",
+   "depth": "Why digital ATPG does not carry over: continuous values, tolerance windows, very few internal nodes to observe, test cost per pin is high and mixed-signal test can dominate total test cost. Fault classes: hard (catastrophic) faults and soft (parametric) faults, which may pass a functional test but fail a spec. Structural tests for analog: IDDQ, oscillation test, and loopback for mixed-signal. Analog test bus (IEEE 1149.4) as the analog companion of boundary scan — only a few universities teach it. Converter specifications and their measurement: offset error, gain error, DNL (difference between measured code width and the ideal 1 LSB), INL (running sum of DNL, i.e. deviation from the ideal straight line), missing code, SNR and ENOB. Measurement methods: servo ramp, ramp histogram, sine-fit and FFT, and the histogram method for DNL and INL. DFT for analog: test points, bypassing, loopback paths, on-chip measurement.",
+   "figure": {
+    "type": "blocks",
+    "direction": "right",
+    "title": "Loopback test of a mixed-signal block",
+    "nodes": [
+     {
+      "id": "tc",
+      "label": "Digital test pattern",
+      "note": "from ATE or BIST",
+      "style": "accent"
+     },
+     {
+      "id": "dac",
+      "label": "DAC on chip",
+      "style": "normal"
+     },
+     {
+      "id": "an",
+      "label": "Analog path",
+      "note": "filter, amplifier",
+      "style": "normal"
+     },
+     {
+      "id": "adc",
+      "label": "ADC on chip",
+      "style": "normal"
+     },
+     {
+      "id": "cm",
+      "label": "Compare response",
+      "note": "tolerance check",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "tc",
+      "to": "dac",
+      "style": "solid"
+     },
+     {
+      "from": "dac",
+      "to": "an",
+      "style": "solid"
+     },
+     {
+      "from": "an",
+      "to": "adc",
+      "style": "solid"
+     },
+     {
+      "from": "adc",
+      "to": "cm",
+      "style": "solid"
+     }
+    ],
+    "aria": "Loopback path in which a digital pattern drives an on-chip DAC, the analog signal passes through the analog block and an ADC returns it to digital for comparison against tolerances."
+   },
+   "example": "An 8-bit ADC has full-scale range 2.56 V, so the ideal code width, 1 LSB, is 2.56 V ÷ 256 = 10 mV. A ramp histogram measures the width of code 64 as 14 mV and of code 65 as 6 mV. Find DNL and INL at both codes. DNL(64) = 14/10 − 1 = +0.4 LSB; DNL(65) = 6/10 − 1 = −0.4 LSB. INL is the running sum of DNL: assuming INL(63) = 0, INL(64) = +0.4 LSB and INL(65) = 0.4 − 0.4 = 0.0 LSB. A code with measured width 0 mV is a missing code, and its DNL is −1 LSB, which no INL figure reveals on its own.",
+   "trap": "Confusing DNL with INL: DNL is the error of one code width and can be large while INL stays near zero, because INL is the running sum of DNL and cancels.",
+   "prereq": "Test economics from 6.1; specification-based thinking from 6.8; converter circuits from an analog course.",
+   "leave": "Op-amp and data converter design are outside this unit; digital ATPG and BIST stay in 6.3 and 6.6."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "yield and defects create the need for fault models"
+  ],
+  [
+   2,
+   3,
+   "the collapsed fault list is the input to ATPG"
+  ],
+  [
+   3,
+   4,
+   "hard-to-control sequential logic forces scan DFT"
+  ],
+  [
+   4,
+   5,
+   "scan on chip extends to boundary scan at the board"
+  ],
+  [
+   4,
+   6,
+   "scan cells are reused by the BIST generator and analyser"
+  ],
+  [
+   6,
+   7,
+   "the BIST controller architecture becomes the memory BIST engine"
+  ],
+  [
+   5,
+   8,
+   "the TAP port becomes the serial control path for SoC test"
+  ],
+  [
+   7,
+   8,
+   "memory test results feed the chip-level test flow and scheduling"
+  ],
+  [
+   8,
+   9,
+   "system test also has to cover the analog and mixed-signal parts"
+  ]
+ ]
+}

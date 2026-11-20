@@ -1,0 +1,233 @@
+{
+ "lead": "An external tester drives every input and reads every output of a chip, and that machine costs money for every second it runs. Built-in self-test (BIST) moves the pattern generator and the response checker onto the chip itself. An on-chip LFSR makes pseudo-random vectors, a MISR squeezes the replies into a short signature, and one comparator against a stored golden value gives a single pass or fail bit. The chip tests itself at power-on, after packaging, or in the field, with almost no tester.",
+ "prereq": "You need: scan design from <a href=\"#design-for-testability-and-scan-design\">6.4</a>, and flip-flops and shift registers from Unit 4.",
+ "sections": [
+  {
+   "h3": "The BIST loop and its parts",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Built-in self-test (BIST) wraps three blocks around the circuit under test (CUT). The test pattern generator (TPG) makes the input vectors. The output response analyser (ORA) compresses the CUT outputs into one short signature. The BIST controller sequences the run: reset, load the seed, apply N vectors, stop, compare the signature, set pass or fail."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "TPG: an LFSR, a binary counter, or a small on-chip ROM holding ATPG vectors.",
+      "CUT: combinational logic, a scan chain, or a memory array.",
+      "ORA: a MISR or a parity tree; the pass/fail flip-flop holds one bit for the tester to read."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "There are two ways to deliver vectors. In test-per-clock the TPG drives the primary inputs and the flip-flop inputs directly, one vector per clock. In test-per-scan the TPG drives the scan-in input of each chain; L shift clocks push one vector into the chain, one capture clock loads the response, and the shifted-out bits go to the ORA. A vector therefore costs L + 1 clocks. Test-per-scan needs no extra pins but is slower."
+    },
+    {
+     "type": "formula",
+     "text": "T = N × (L + 1)",
+     "where": "T = test time in clock cycles; N = number of test vectors; L = length of the longest scan chain in flip-flops; the extra 1 is the capture clock."
+    }
+   ]
+  },
+  {
+   "h3": "The LFSR as test pattern generator",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A linear feedback shift register (LFSR) is a shift register whose serial input is the XOR of a few of its stages, called taps. With the right taps an n-bit LFSR visits every non-zero n-bit word once before repeating, and is then called maximal-length."
+    },
+    {
+     "type": "formula",
+     "text": "P = 2ⁿ − 1",
+     "where": "P = period, the number of distinct states before the pattern repeats; n = number of LFSR stages (flip-flops). The single state left out is all zeros."
+    },
+    {
+     "type": "p",
+     "text": "In the external-XOR (Fibonacci) form, XOR gates combine the tapped stages and drive the first stage, so the feedback passes through a chain of XORs. In the internal-XOR (Galois) form the XOR gates sit between stages, so the feedback passes through only one XOR per clock and the register can run faster; the trade-off is a less obvious tap table. The taps follow a primitive polynomial, and good tap tables exist for every n."
+    },
+    {
+     "type": "p",
+     "text": "The all-zero word is a lockup state: the feedback of zeros is zero, so the register never leaves 000…0. The seed, the starting word, must therefore be non-zero. Different seeds give shifted copies of the same 2ⁿ − 1 states."
+    },
+    {
+     "type": "p",
+     "text": "Some faults need a vector a plain LFSR rarely makes. A weighted LFSR gates each stage output with a control bit. ANDing the output with the control pushes the probability of a 1 below 0.5, so the stream carries many 0s — good for wide OR gates, which need all-zero inputs. ORing the output with the control pushes the probability of a 1 above 0.5 — good for wide AND gates, which need all-one inputs. Reseeding loads a fresh seed after every block of vectors so the patterns decorrelate."
+    }
+   ]
+  },
+  {
+   "h3": "Signature analysis and BIST flavours",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A multiple-input signature register (MISR) is an n-bit LFSR with one extra XOR per stage: the CUT outputs are XORed into the feedback path at every clock. Every output bit mixes into every register bit, and after the last vector the register holds an n-bit signature. The comparator checks it against the golden signature, the value a fault-free simulation of the same design produces."
+    },
+    {
+     "type": "formula",
+     "text": "P(aliasing) ≈ 2⁻ⁿ",
+     "where": "P(aliasing) = probability that a faulty CUT still ends with the golden signature; n = MISR width in bits. A 16-bit MISR gives about 1 in 65,536."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "Exhaustive BIST: a counter applies all 2ᵐ vectors of an m-input block; fine only for small blocks.",
+      "Pseudo-exhaustive BIST: the circuit is partitioned so each output cone still sees all of its inputs.",
+      "Pseudo-random BIST: the LFSR stream, cheap and effective for most faults.",
+      "Deterministic BIST: ATPG vectors held in an on-chip ROM, or an LFSR reseeded to generate them."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A built-in logic block observer (BILBO) is one register with two jobs. In functional mode it is an ordinary register. In test mode the same flip-flops become an LFSR as TPG or a MISR as ORA, selected by control inputs that add XOR and multiplexer gates per stage. In a chain of blocks, the register after block A is the ORA for A and the TPG for B."
+    },
+    {
+     "type": "p",
+     "text": "The price is area for the LFSR, MISR and controller, delay from the multiplexer at each flip-flop input, extra test time, and the need to resimulate the golden signature whenever the netlist changes. Aliasing means a pass is strong evidence, not proof."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The LFSR feeds vectors to the circuit, the MISR squeezes every response into one signature, and a single comparator turns the whole run into one pass or fail bit.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "Logic BIST loop",
+   "nodes": [
+    {
+     "id": "l",
+     "label": "LFSR (TPG)",
+     "note": "test vectors",
+     "style": "accent"
+    },
+    {
+     "id": "c",
+     "label": "Circuit under test",
+     "style": "normal"
+    },
+    {
+     "id": "m",
+     "label": "MISR (ORA)",
+     "note": "compresses outputs",
+     "style": "accent"
+    },
+    {
+     "id": "cp",
+     "label": "Compare",
+     "note": "golden value",
+     "style": "live"
+    },
+    {
+     "id": "p",
+     "label": "Pass / fail",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "l",
+     "to": "c",
+     "style": "solid"
+    },
+    {
+     "from": "c",
+     "to": "m",
+     "style": "solid"
+    },
+    {
+     "from": "m",
+     "to": "cp",
+     "style": "solid"
+    },
+    {
+     "from": "cp",
+     "to": "p",
+     "style": "solid"
+    }
+   ],
+   "aria": "On-chip BIST loop in which an LFSR generates vectors, the MISR compresses the responses into a signature, and a comparator against the golden signature gives a single pass or fail bit."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 4-bit LFSR shifts left every clock. Its feedback bit f = b<sub>3</sub> ⊕ b<sub>0</sub> enters at b<sub>0</sub>, where b<sub>3</sub> is the leftmost bit and b<sub>0</sub> the rightmost. (a) Seed the register with 0001, list the states until the pattern repeats, and give the period. (b) The same circuit feeds a 16-bit MISR. Give the aliasing probability as a fraction and as a decimal.",
+   "steps": [
+    "Write the state as b<sub>3</sub>b<sub>2</sub>b<sub>1</sub>b<sub>0</sub>. The next state is b<sub>2</sub>b<sub>1</sub>b<sub>0</sub>f, with f = b<sub>3</sub> ⊕ b<sub>0</sub>.",
+    "0001: f = 0 ⊕ 1 = 1, next state 0011.",
+    "0011: f = 0 ⊕ 1 = 1, next 0111. 0111: f = 0 ⊕ 1 = 1, next 1111. 1111: f = 1 ⊕ 1 = 0, next 1110.",
+    "1110: f = 1 ⊕ 0 = 1, next 1101. 1101: f = 1 ⊕ 1 = 0, next 1010. 1010: f = 1 ⊕ 0 = 1, next 0101. 0101: f = 0 ⊕ 1 = 1, next 1011.",
+    "1011: f = 1 ⊕ 1 = 0, next 0110. 0110: f = 0 ⊕ 0 = 0, next 1100. 1100: f = 1 ⊕ 0 = 1, next 1001. 1001: f = 1 ⊕ 1 = 0, next 0010.",
+    "0010: f = 0 ⊕ 0 = 0, next 0100. 0100: f = 0 ⊕ 0 = 0, next 1000. 1000: f = 1 ⊕ 0 = 1, next 0001, the seed again.",
+    "Count: 0001, 0011, 0111, 1111, 1110, 1101, 1010, 0101, 1011, 0110, 1100, 1001, 0010, 0100, 1000. That is 15 distinct states, then repeat.",
+    "Period check: 2⁴ − 1 = 15. The period matches, so the LFSR is maximal-length and generates each non-zero 4-bit vector exactly once.",
+    "Aliasing: 2⁻¹⁶ = 1/65,536 = 1.526 × 10⁻⁵."
+   ],
+   "answer": "The LFSR has 15 states and period 2⁴ − 1 = 15, so it is maximal-length; the 16-bit MISR aliasing probability is 2⁻¹⁶ ≈ 1.53 × 10⁻⁵, about 1 in 65,536.",
+   "check": "b3, b2, b1, b0 = 0, 0, 0, 1\nstart = (b3, b2, b1, b0)\nseq = [start]\nwhile True:\n    f = b3 ^ b0\n    b3, b2, b1, b0 = b2, b1, b0, f\n    if (b3, b2, b1, b0) == start:\n        break\n    seq.append((b3, b2, b1, b0))\nprint(len(seq))\nprint(2**16)\nprint(2**-16)",
+   "values": [
+    15,
+    65536,
+    1.52587890625e-05
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "BIST does not make ATPG unnecessary. Random vectors may never hit a random-pattern-resistant fault, so weighted or deterministic vectors still need fault simulation and ATPG.",
+  "The all-zero seed is a lockup for an XOR-feedback LFSR: the register sits at 000…0 forever. The seed must be non-zero.",
+  "Maximal length is 2ⁿ − 1, not 2ⁿ. The all-zero state is never reached, and counting it is a standard mark-losing slip.",
+  "Aliasing: a faulty circuit can produce the golden signature. A BIST pass means the signature matched, not that the chip has zero defects.",
+  "A MISR only compresses. It cannot tell you which output was wrong, and the golden signature must come from simulating this exact netlist, not from another chip."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Expand TPG and ORA, and say what each does in BIST.",
+   "marks": 2,
+   "a": "TPG = test pattern generator, on-chip block that makes test vectors, usually an LFSR. ORA = output response analyser, on-chip block that compresses CUT responses into a signature, usually a MISR."
+  },
+  {
+   "level": "remember",
+   "q": "What is the period of a maximal-length n-bit LFSR?",
+   "marks": 2,
+   "a": "2ⁿ − 1 states, where n is the number of stages; the all-zero state is excluded."
+  },
+  {
+   "level": "understand",
+   "q": "Why must an LFSR seed be non-zero?",
+   "marks": 3,
+   "a": "In an XOR-feedback LFSR the all-zero word maps to itself: feedback 0 ⊕ 0 = 0, so the register stays at 000…0 and produces no useful vectors. Any non-zero seed keeps it moving through the 2ⁿ − 1 non-zero states."
+  },
+  {
+   "level": "understand",
+   "q": "Give one difference between the external-XOR (Fibonacci) and internal-XOR (Galois) LFSR forms.",
+   "marks": 3,
+   "a": "In external-XOR form the XOR gates combine tapped stages and drive the first stage, so the feedback path is a chain of XORs. In internal-XOR form the XOR gates sit between stages, so the feedback passes through only one XOR per clock and the register can run faster; the trade-off is a less obvious tap table."
+  },
+  {
+   "level": "apply",
+   "q": "A 3-bit LFSR shifts left with f = b<sub>2</sub> ⊕ b<sub>0</sub> entering at b<sub>0</sub>. Start from 001, list the states and give the period.",
+   "marks": 4,
+   "a": "States: 001 → 011 → 111 → 110 → 101 → 010 → 100 → 001. Seven distinct states, period 7 = 2³ − 1, so the LFSR is maximal-length."
+  },
+  {
+   "level": "apply",
+   "q": "A 20-bit MISR checks a circuit. Estimate the aliasing probability.",
+   "marks": 3,
+   "a": "P ≈ 2⁻²⁰ = 9.54 × 10⁻⁷, about 1 in 1,048,576."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does test-per-scan take longer than test-per-clock for the same number of vectors?",
+   "marks": 4,
+   "a": "In test-per-scan each vector must be shifted through L scan flip-flops before one capture clock, so N vectors cost N(L + 1) clocks. Test-per-clock applies one vector per clock but needs direct access to flip-flop inputs, which costs extra multiplexer area and routing."
+  },
+  {
+   "level": "analyze",
+   "q": "A pipeline has block A, then a register, then block B. Explain how a BILBO on that register supports testing.",
+   "marks": 4,
+   "a": "In test mode the register becomes a MISR that compresses A's outputs, then an LFSR that drives B's inputs, so one register serves as ORA for A and TPG for B. In functional mode the same flip-flops act as an ordinary register, selected by control inputs that add XOR and multiplexer gates per stage."
+  }
+ ],
+ "beyond": "Not for the exam. Logic BIST ships inside most large SoCs, run at power-on and again after packaging, and memory BIST controllers reuse the same loop with march algorithms. Embedded-core test is standardised (IEEE 1500), while board access still goes through boundary scan. Current work looks at reseeding an LFSR with ATPG vectors, holding switching activity low so the chip does not burn power while testing itself, and measuring aliasing on real designs. Search: logic BIST, LFSR reseeding, MISR aliasing."
+}

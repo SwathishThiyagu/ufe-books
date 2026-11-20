@@ -1,0 +1,198 @@
+{
+ "lead": "Scan design makes a sequential chip testable by turning its flip-flops into a long shift register during test. In normal mode each flip-flop takes its functional data input. In scan mode the same flip-flops are chained, so the tester can shift any pattern into every internal state bit, apply one functional clock cycle, and shift the captured result out. This separates setting internal nodes from observing them. Full scan is standard in digital ASICs and SoCs; partial scan is used where full scan costs too much area or delay. Some syllabi call it scan-path design or scan-based DFT.",
+ "prereq": "You need: latch and flip-flop structures from Unit 4, especially the D flip-flop, and combinational ATPG from <a href=\"#fault-simulation-and-test-pattern-generation\">6.3</a>.",
+ "sections": [
+  {
+   "h3": "Why sequential circuits are hard",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A combinational circuit is easy to test: apply a vector at the pins, wait for settling, compare outputs. A sequential circuit hides state. To set one internal flip-flop to 1, the tester may need a long sequence of input vectors, each clocked, and the effect must propagate through other state bits. This is the <b>controllability</b> problem: making an internal node take a chosen value from primary inputs. <b>Observability</b> is the reverse: making an internal node's value visible at a primary output. Both get worse as the number of state bits grows. A single stuck-at fault deep in a finite-state machine may need dozens of cycles to excite and propagate, and ATPG time can explode. Ad-hoc DFT attacks this directly: add test points, add extra pins, or disable feedback during test. These help a little but do not give a systematic method. Scan design changes the structure so the state is loaded and read directly."
+    }
+   ]
+  },
+  {
+   "h3": "Muxed-D scan cell and full scan",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The standard scan cell adds a 2:1 multiplexer before each D flip-flop. The multiplexer inputs are the functional data <b>D</b> and the scan-in <b>SI</b>. The select line is scan enable <b>SE</b>. When SE = 0, the cell behaves as a normal flip-flop. When SE = 1, the cell takes SI. Connecting Q of one cell to SI of the next forms a shift register, called a scan chain. The figure shows one cell."
+    },
+    {
+     "type": "p",
+     "text": "<b>Full scan</b> replaces every flip-flop with a scan cell. The circuit then has two modes. In functional mode it runs normally. In scan mode all state bits form one or more shift registers. A combinational ATPG program can treat the scan flip-flops as primary inputs and primary outputs, so it sees only the combinational logic between them. <b>Partial scan</b> converts only some flip-flops. It saves area and delay but leaves a residual sequential circuit, so pattern generation is harder."
+    },
+    {
+     "type": "p",
+     "text": "Overheads: one multiplexer and extra routing per flip-flop; a small area increase; one extra gate delay on the functional path from D to the flip-flop; and global SE and scan clock nets that must be routed with care."
+    },
+    {
+     "type": "p",
+     "text": "During shift, every cell launches and captures on the same clock edge. If clock skew between adjacent cells is large, a cell can capture the new value launched by the previous cell on the same clock edge instead of the old value. This is a hold-time race. Inserting a <b>lock-up latch</b> between chains, or between segments on different clocks, breaks the race. <b>LSSD</b> uses two non-overlapping clocks instead of a multiplexer; only a few universities teach it now. Some syllabi call this scan-based DFT."
+    }
+   ]
+  },
+  {
+   "h3": "Test procedure and cost",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The tester runs a scan pattern in three phases. First, <b>shift in</b>: SE = 1 and the pattern is clocked into the chain one bit per cycle. Second, <b>capture</b>: SE = 0 and one functional clock cycle launches the circuit's response into the flip-flops. Third, <b>shift out</b>: SE = 1 and the captured bits are clocked out to the tester, which compares them with the expected response. The tester is an ATE, automatic test equipment."
+    },
+    {
+     "type": "p",
+     "text": "In steady state, shift-out of one response and shift-in of the next pattern share the same N clock cycles. Under this simplified count, one pattern needs N shift cycles plus 1 capture cycle. Splitting into K equal chains reduces N to N/K, so time falls roughly by K, but each chain needs its own scan-in and scan-out pin."
+    },
+    {
+     "type": "formula",
+     "text": "T_pattern = (N + 1) × T_clk",
+     "where": "T_pattern is the test time for one scan pattern; N is the number of flip-flops in the chain; the 1 is the capture cycle; T_clk is the scan clock period."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One muxed-D scan cell. With SE = 1 the multiplexer chooses SI, so the flip-flops form a shift register; with SE = 0 the cell takes functional D.",
+  "spec": {
+   "type": "blocks",
+   "direction": "right",
+   "title": "One muxed-D scan cell",
+   "nodes": [
+    {
+     "id": "d",
+     "label": "D (functional)",
+     "style": "normal"
+    },
+    {
+     "id": "si",
+     "label": "SI (scan-in)",
+     "style": "accent"
+    },
+    {
+     "id": "m",
+     "label": "2:1 MUX",
+     "note": "SE = 1 selects SI",
+     "style": "live"
+    },
+    {
+     "id": "ff",
+     "label": "D flip-flop",
+     "style": "normal"
+    },
+    {
+     "id": "q",
+     "label": "Q to next cell",
+     "style": "accent"
+    }
+   ],
+   "edges": [
+    {
+     "from": "d",
+     "to": "m",
+     "style": "solid"
+    },
+    {
+     "from": "si",
+     "to": "m",
+     "style": "solid"
+    },
+    {
+     "from": "m",
+     "to": "ff",
+     "style": "solid"
+    },
+    {
+     "from": "ff",
+     "to": "q",
+     "style": "solid"
+    }
+   ],
+   "aria": "A flip-flop preceded by a multiplexer that chooses between the functional data input and the scan-in input, with the Q output feeding the next cell of the chain."
+  }
+ },
+ "examples": [
+  {
+   "question": "A design has 200 flip-flops in one scan chain, 50 primary inputs, and 1000 scan test patterns. The scan clock is 100 MHz and capture takes exactly 1 cycle. Using the convention that one pattern needs N shift cycles plus 1 capture cycle, find the time per pattern including capture and the total test time. Also state the shift time alone. Then split the chain into 4 chains of 50 and repeat.",
+   "steps": [
+    "Clock period T = 1 / (100 MHz) = 10 ns.",
+    "One chain: N = 200 flip-flops; cycles per pattern = 200 + 1 = 201 cycles.",
+    "Shift time alone = 200 × 10 ns = 2000 ns = 2.00 µs. Time per pattern including capture = 201 × 10 ns = 2010 ns = 2.01 µs.",
+    "Total cycles for 1000 patterns = 1000 × 201 = 201,000 cycles.",
+    "Total time = 201,000 × 10 ns = 2,010,000 ns = 2.01 ms.",
+    "Split into 4 chains: N2 = 200 / 4 = 50 flip-flops per chain; cycles per pattern = 50 + 1 = 51 cycles.",
+    "Shift time alone = 50 × 10 ns = 500 ns = 0.50 µs. Time per pattern including capture = 51 × 10 ns = 510 ns = 0.51 µs.",
+    "Total cycles = 1000 × 51 = 51,000 cycles; total time = 51,000 × 10 ns = 510,000 ns = 0.51 ms.",
+    "Speedup = 2.01 ms / 0.51 ms = 3.94, about four times faster."
+   ],
+   "answer": "One chain takes 2.01 ms total; four chains of 50 take 0.51 ms total, nearly four times faster, at the cost of four scan-in and four scan-out pins. Shift time alone is 2.00 µs per pattern for one chain and 0.50 µs for four chains; including capture, the per-pattern times are 2.01 µs and 0.51 µs.",
+   "check": "N = 200\nP = 1000\nf = 100e6\nT_ns = 1e9 / f\ncycles1 = N + 1\nt_per1_us = cycles1 * T_ns / 1000\ntotal_cycles1 = P * cycles1\ntotal_ms1 = total_cycles1 * T_ns / 1e6\nN2 = 50\ncycles2 = N2 + 1\nt_per2_us = cycles2 * T_ns / 1000\ntotal_cycles2 = P * cycles2\ntotal_ms2 = total_cycles2 * T_ns / 1e6\nspeedup = total_ms1 / total_ms2\nfor v in [T_ns, cycles1, t_per1_us, total_cycles1, total_ms1, N2, cycles2, t_per2_us, total_cycles2, total_ms2, round(speedup, 2)]:\n    print(v)",
+   "values": [
+    10.0,
+    201,
+    2.01,
+    201000,
+    2.01,
+    50,
+    51,
+    0.51,
+    51000,
+    0.51,
+    3.94
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Scan makes ATPG easier and can reduce the number of capture patterns, but it adds N shift cycles per pattern, so total test time often rises.",
+  "SE polarity can be flipped in a question. Here SE = 0 means functional D and SE = 1 means scan-in SI; read the definition given.",
+  "Full scan removes sequential depth for ATPG, but it does not remove physical delay. Scan clock skew and hold-time races can still corrupt shifted data.",
+  "The scan multiplexer is on the functional D-to-Q path, so it adds area and delay. Partial scan trades testability for lower area and delay.",
+  "LSSD is not muxed-D scan. LSSD uses two non-overlapping clocks and no multiplexer in front of the flip-flop."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does SE = 1 select in a muxed-D scan cell?",
+   "marks": 2,
+   "a": "It selects SI, the scan-in input, so the cell shifts."
+  },
+  {
+   "level": "understand",
+   "q": "Why does full scan make ATPG easier for a sequential circuit?",
+   "marks": 3,
+   "a": "Every state bit is directly set and observed through the scan chain, so the circuit becomes combinational logic between pseudo-primary inputs and outputs."
+  },
+  {
+   "level": "apply",
+   "q": "A chain has 300 flip-flops, scan clock 50 MHz, and 500 patterns. Using N + 1 cycles per pattern, find total test time.",
+   "marks": 4,
+   "a": "T = 1 / (50 MHz) = 20 ns. Cycles per pattern = 301. Time per pattern = 301 × 20 ns = 6.02 µs. Total = 500 × 301 × 20 ns = 3,010,000 ns = 3.01 ms."
+  },
+  {
+   "level": "analyze",
+   "q": "A scan chain passes simulation but fails during shift on silicon. Give one likely cause and one fix.",
+   "marks": 5,
+   "a": "Clock skew between adjacent cells can cause a hold-time race. Insert lock-up latches or balance the clock tree."
+  },
+  {
+   "level": "remember",
+   "q": "Name the three scan test phases.",
+   "marks": 2,
+   "a": "Shift in, capture, shift out."
+  },
+  {
+   "level": "understand",
+   "q": "State one area cost and one delay cost of full scan.",
+   "marks": 3,
+   "a": "One multiplexer and extra routing per flip-flop add area. The multiplexer adds a gate delay on the functional D-to-Q path."
+  },
+  {
+   "level": "apply",
+   "q": "A chain has 100 flip-flops, scan clock 200 MHz, and 200 patterns. Using N + 1 cycles per pattern, find total test time.",
+   "marks": 4,
+   "a": "T = 1 / (200 MHz) = 5 ns. Cycles per pattern = 101. Time per pattern = 101 × 5 ns = 505 ns. Total = 200 × 101 × 5 ns = 101,000 ns = 101 µs."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, scan chains are compressed on chip: EDT and similar tools feed many short internal chains from a few tester pins. Test scheduling and pin-count planning then decide how many chains fit. Researchers work on X-masking, low-power scan and adaptive test. Search for 'scan compression EDT', 'scan chain hold time lock-up latch' and 'IEEE 1500'."
+}
