@@ -381,3 +381,9 @@
 ## c-ml-u6 (Codex, 5 Nov 2026)
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
 - Neighbouring syllabus lists mix clustering and instance-based learning, which belong to other ML units.
+
+
+## ec-signals-u6 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit; the exam course lists DFS, DTFT, z-transform and properties, and LTI analysis with z, all covered by chapters 6.1, 6.2, 6.4, 6.5 and 6.7.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- The exam course also lists "Discrete-time signals and systems" and the sampling topics in the same unit; those live in the Sampling unit of this subject.

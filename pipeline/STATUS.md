@@ -149,3 +149,4 @@ Writers: DeepSeek lanes = deepseek-books*.yml (requests-deepseek*.txt; lanes 2-3
 | c-nlp-u6 | free/c-nlp-u6-book | 1–8 (figure text: ch 6) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
 | c-dist-u6 | free/c-dist-u6-book | 1–8 | OK (library updated; university mentions in 6.1 and 6.7 removed; university-hosted course page dropped; closure glossary entry fixed) | 17 Nov 2026 |
 | c-nlp-u7 | free/c-nlp-u7-book | 1–8 (ch 5 repeated-name sentence fixed) | OK (library updated; university-hosted sources dropped) | 17 Nov 2026 |
+| ec-signals-u6 | free/ec-signals-u6-book | 1–7 | OK (library added; correction pass: 12 formulas that printed raw tags fixed, carets set as superscripts, cross-unit references named by topic, examples added in 6.3, 6.4, 6.6, three wrong long-question outlines fixed, 13 full model answers, university-hosted links dropped) | 20 Nov 2026 |
