@@ -1,13 +1,13 @@
 # ec-signals-u2: free-model run
 
-- Book: `books/ece/ec-signals/ec-signals-u2.html`
+- Book: `work/ec-signals-u2/preview.html`
 - Status: ok
-- Model calls so far: 22 (75,905 tokens in, 199,277 out), 4.5 minutes
+- Model calls so far: 22 (75,905 tokens in, 199,277 out), 4.7 minutes
 
 ## Checker
 
 ```
-ec-signals-u2.html: 7 chapters, 9491 words, 8 figures, 127 KB
+preview.html: 7 chapters, 17983 words, 9 figures, 225 KB
 OK
 ```
 
