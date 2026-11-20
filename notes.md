@@ -470,3 +470,8 @@
 - Packet `out` path is stale (old 03_Books/ path); the book follows queue.json (books/ece/ec-circuits/) like ec-circuits-u3. The coordinator's note said books/eee/.
 - Draft data error: the bank question with coils of 0.4 H and 0.9 H gave 1.5 H aiding and 0.9 H opposing, which no single M satisfies (aiding − opposing = 4M and the sum = 2(L₁ + L₂) = 2.6 H). Now 1.6 H and 1.0 H, so M = 0.15 H and k = 0.25.
 - Draft errors fixed: the series-parallel resonance formula, R_D = r(1 + Q²) for the practical tank, the energy form of Q, f₁f₂ = f₀² and exact half-power points against f₀ ± BW/2, the effect-of-Q table, "magnetic pressure" for MMF, the k ≤ 1 proof. MIT OCW link dropped.
+
+## ec-circuits-u5 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit (still 9 chapters). The exam course (EE25302) unit "Solution of First and Second Order Networks" is covered in full: series and parallel RL, RC and RLC equations, initial and final conditions, forced and free response, time constants, steady and transient state, and Laplace transforms for circuits.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/). The coordinator's note said books/eee/; the book follows queue.json like the other library books.
+- The draft's MIT web sources were dropped (university-hosted); OpenStax and Khan Academy remain. No link could be opened from the sandbox, so no new links were added.
