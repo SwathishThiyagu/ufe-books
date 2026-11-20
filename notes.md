@@ -475,3 +475,7 @@
 - Packet: no new subtopics for this unit (still 9 chapters). The exam course (EE25302) unit "Solution of First and Second Order Networks" is covered in full: series and parallel RL, RC and RLC equations, initial and final conditions, forced and free response, time constants, steady and transient state, and Laplace transforms for circuits.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/). The coordinator's note said books/eee/; the book follows queue.json like the other library books.
 - The draft's MIT web sources were dropped (university-hosted); OpenStax and Khan Academy remain. No link could be opened from the sandbox, so no new links were added.
+
+## ec-circuits-u6 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit (still 8 chapters). The exam course (EE25302) two-port unit also lists resonance; this subject teaches resonance in its resonance and coupled-circuits book, so it was not repeated here. Network synthesis (Foster and Cauer) is in the packet but not in the EE25302 list; it was kept and corrected.
+- The draft's MIT and NPTEL web sources were dropped (university-hosted); All About Circuits and Khan Academy remain. The sandbox proxy blocked every page, so no link was reopened and none was added.
