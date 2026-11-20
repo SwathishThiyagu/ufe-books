@@ -397,3 +397,8 @@
 ## ec-signals-u4 (Claude correction pass, 20 Nov 2026)
 - Packet: no new subtopics for this unit; the exam course lists Laplace transforms, ROC, properties and the inverse transform (chapters 4.1 to 4.3). Its later unit "Continuous-Time LTI Systems" lists "Analysis of LTI System using Laplace and Fourier transforms", which chapter 4.4 covers (transfer function, poles and zeros, causality and stability, complete response, frequency response).
 - The unit map (render.unit_map) cuts chapter titles at four words, so two boxes read "Properties of the Laplace" and "Inverse Laplace transform by"; a pipeline matter, not a packet one.
+
+## ec-signals-u5 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course's practical sampling and aperture effect are covered in "Low-pass, band-pass and practical sampling" (natural vs flat-top sampling, the sinc droop with a worked example, inverse-sinc compensation). Its "Discrete Fourier series, DTFT, Z-transform and analysis of LTI systems using Z" belong to the subject's Z-transform and discrete Fourier analysis unit, so this book only points to them.
+- "Quantization of sampled signals" is tagged advanced (one syllabus), but it is on the exam course's list; the chapter is kept full length.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
