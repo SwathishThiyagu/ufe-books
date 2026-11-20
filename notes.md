@@ -381,3 +381,111 @@
 ## c-ml-u6 (Codex, 5 Nov 2026)
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
 - Neighbouring syllabus lists mix clustering and instance-based learning, which belong to other ML units.
+
+
+## ec-signals-u6 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit; the exam course lists DFS, DTFT, z-transform and properties, and LTI analysis with z, all covered by chapters 6.1, 6.2, 6.4, 6.5 and 6.7.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- The exam course also lists "Discrete-time signals and systems" and the sampling topics in the same unit; those live in the Sampling unit of this subject.
+
+
+## ec-signals-u3 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course's unit 3 is "Fourier Transform & Laplace Transform": its Fourier topics (aperiodic transform, standard and periodic signals, properties, Hilbert transform and properties) are covered here, its Laplace topics in the Laplace transform unit.
+- Frequency response, distortionless transmission and correlation are not in the exam course's list for this unit; they stay as chapters for the other syllabi.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+## ec-signals-u4 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit; the exam course lists Laplace transforms, ROC, properties and the inverse transform (chapters 4.1 to 4.3). Its later unit "Continuous-Time LTI Systems" lists "Analysis of LTI System using Laplace and Fourier transforms", which chapter 4.4 covers (transfer function, poles and zeros, causality and stability, complete response, frequency response).
+- The unit map (render.unit_map) cuts chapter titles at four words, so two boxes read "Properties of the Laplace" and "Inverse Laplace transform by"; a pipeline matter, not a packet one.
+
+## ec-signals-u5 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course's practical sampling and aperture effect are covered in "Low-pass, band-pass and practical sampling" (natural vs flat-top sampling, the sinc droop with a worked example, inverse-sinc compensation). Its "Discrete Fourier series, DTFT, Z-transform and analysis of LTI systems using Z" belong to the subject's Z-transform and discrete Fourier analysis unit, so this book only points to them.
+- "Quantization of sampled signals" is tagged advanced (one syllabus), but it is on the exam course's list; the chapter is kept full length.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+## ec-signals-u2 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course's unit "Continuous-Time LTI Systems" lists CT systems and their properties (covered in the classification unit), LTI systems, impulse response and convolution (chapters 2.1 to 2.3) and "Analysis of LTI System using Laplace and Fourier transforms" (Laplace transform analysis and Fourier units; chapter 2.6 now previews H(jω) and H(s) of the RC circuit and points there by topic).
+- Packet `where` parsing: the Manipal entry's unit title is "Total Number of contact hours" and its topic list is the whole course; the IIT Delhi and NIT Surathkal entries also list whole courses under unit 1. These lists set no extra depth for this unit.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- render.block puts a formula longer than 46 characters in a <pre> with its tags escaped, so a long formula with <sub>/<sup> prints raw tags; this book uses Unicode sub/superscripts in long formulas.
+
+
+## ec-signals-u1 (Claude correction pass, 20 Nov 2026)
+- The exam course's unit 1 topics list no system classification or system properties; chapters 1.5 and 1.6 stay for the other syllabi (that course likely teaches them with LTI systems).
+- Its "Analogy between vectors and signals" was missing from the draft; chapter 1.7 now carries it (component c12 and the best approximation).
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+
+## ec-circuits-u3 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course (EE25302) spreads this unit over its units "Phasors and AC steady state analysis" (chapters 3.1 to 3.4) and "Three phase circuits" (chapters 3.6 and 3.7); the three-phase chapter now has a 3-wire/4-wire unbalanced star example with a broken neutral, R-Y-B naming throughout, a phasor diagram, and an unbalanced delta long question with wattmeter readings.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/). The coordinator's note said books/eee/; the book follows queue.json like the other library books.
+- Packet `usual_sem` is 2 (the "Usually Sem 2" chip); the EE25302 exam course sits in semester 3.
+- Packet `where` parsing: the Manipal, IIT Delhi and NIT Trichy entries list whole courses under one unit; they set no extra depth here. The Manipal unit title is "Total Number of contact hours".
+- The draft's resonance long question belonged to the resonance unit; it was replaced by an unbalanced delta question.
+
+## me-thermo-u1 (Claude correction pass, 20 Nov 2026; first of subject)
+- Packet: no new subtopics for this unit. The exam course (ME25301) unit 1 also lists the continuum, the state postulate, state diagrams, the ideal gas equation of state and the thermodynamic temperature scale: covered in chapters 1.1, 1.3 and 1.5, with the full treatment left to "Ideal and real gases; equations of state" and "Thermodynamic temperature scale" by topic name.
+- The packet's `where` also carries ME25301 unit 2 (energy, heat and work modes, moving boundary work, first law, steady and unsteady flow). Chapters 1.6 and 1.7 cover heat, work, the work modes and moving boundary work; the rest belongs to the First Law unit.
+- Packet data: the SRM entry (UPY23203J Heat and Thermodynamics, unit 4) is a physics course and includes a lab item ("Carey Foster Bridge"), so it belongs to another subject; the IIT Delhi and NIT Surathkal entries list the whole course under unit 1. They set no extra depth here.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- Web links could not be re-opened from this workspace (proxy refused); the three kept are the ones the draft run had opened, and the unverified Khan Academy link was dropped.
+
+## me-thermo-u3 (Claude correction pass, 20 Nov 2026)
+- Packet: new subtopic "Entropy generation and second-law analysis of control volumes" written as chapter 3.9 (closed-system and steady-flow entropy balance, lost work T₀S_gen, and the microscopic view S = k ln W the exam course lists); the third law moved to 3.10.
+- The exam course (ME25301) unit 3 also lists the limitations of the first law and perpetual motion machines (now in 3.2, PMM1 against PMM2) and exergy analysis of closed and open systems, which belongs to "Available and unavailable energy" and "Exergy analysis and second law efficiency" and is named there by topic.
+- Packet data: the SRM entry (UPY23203J Heat and Thermodynamics) is a physics course and lists thermodynamic potentials and the Joule-Kelvin coefficient under this unit; the IIT Delhi and NIT Surathkal entries list whole courses under one unit. They set no extra depth here.
+- Several of the draft reviewer's "high" flags (ch 3.7 missing inequality, ch 3.9 missing exponents) were artefacts of its plain-text view stripping "<" and tags; the book itself was right there. The real errors were the long formulas printing raw <sub> tags, the 3.1 example's reversed device, the 3.5 gas-thermometer and 3.9 steam-table claims, and a C program in the 3.8 example.
+- Web: MIT OCW (university-hosted) and an unopened Khan Academy link dropped.
+
+## me-thermo-u2 (Claude correction pass, 20 Nov 2026)
+
+- Packet: new subtopic "Unsteady flow processes: filling and emptying of vessels" written as chapter 2.7 (USUF mass and energy balances, filling an empty tank to γTᵢ, adiabatic discharge following the reversible adiabatic law); the draft's limitations chapter moved to 2.8.
+- Exam course (ME25301) unit 2 topics covered: forms of energy and Q − W = ΔE (2.1), moving boundary work and free expansion (2.1), first law for closed systems and control volumes (2.1, 2.6), steady and unsteady flow (2.6, 2.7). Heat, work modes and reversible processes belong to other units and are named there by topic.
+- Packet data: "Specific heats of gases" and "Perpetual motion machine of the first kind" are tagged advanced, though PMM-1 is in most first-law textbooks as a one-line corollary. The SRM entry (UPY23203J Heat and Thermodynamics) is a physics course, and the IIT Delhi and NIT Surathkal entries list whole courses under one unit.
+- Draft errors fixed: the bank's isothermal-vs-adiabatic compression outline (a closed-system adiabatic needs less boundary work to the same pressure), the free-expansion question ("same whatever the gas" holds for U₂ = U₁, not T₂ = T₁), an unnamed refrigerant (now R-134a), q = Δh for every no-work device, PMM-1 lead, Unit/Chapter cross-references. MIT OCW link dropped.
+
+## me-thermo-u6 (Claude correction pass, 20 Nov 2026)
+
+- Exam course: ME25301 Engineering Thermodynamics has no cycles unit (pipeline/EXAM_ND2026.md), so this book serves the other syllabi; the packet's exam entry is ME25C11 Applied Thermodynamics unit 3 (Carnot, Otto, Diesel, Dual and Brayton cycles, air standard efficiency, MEP, comparison), all covered in chapters 6.1 to 6.4.
+- Packet data: the NIT Trichy list for this unit also has psychrometric properties and the chart, which the universal syllabus puts in "Pure Substances and Gas Mixtures" (Psychrometry); the IIT Delhi and NIT Surathkal entries list whole courses under one unit.
+- The DeepSeek draft had no chapter 1 and no unit sections; its chapter states were used only as material. Its flagged errors (Dual cut-off ratio, the comparison's "gas cools" reason and drafting leftover, pump-work factor, wet-exhaust check, open-heater pump, compressor-with-liquid sentence, absorption component count, two-temperature absorption COP) are all gone.
+- Property values: steam from IAPWS (they match the common SI steam tables to the printed digits; interpolated superheat values may differ by about 1 kJ/kg), R-134a with the IIR reference (h = 200 kJ/kg for saturated liquid at 0 °C; tables with another reference shift every h by a constant).
+## me-thermo-u4 (Claude correction pass, 20 Nov 2026)
+
+- Packet: two new subtopics written as full chapters: 4.3 "Exact differentials, reciprocity and cyclic relations" (exactness test, δq inexact and ds exact with two traced paths, reciprocity and cyclic relations checked for air) and 4.7 "Expansivity, compressibility, Mayer relation and Joule-Thomson coefficient" (β, κT, κs, cp − cv = Tvβ²/κT with water at 25 °C, γ = κT/κs, μJT with a van der Waals nitrogen example and inversion temperature). The draft's 4.3 to 4.5 moved to 4.4 to 4.6; the draft's Maxwell chapter now carries the TdS equations and energy relations, and its throttling section moved to 4.7.
+- Exam course (ME25301) coverage: exergy analysis of closed and open systems (4.2, closed-tank and turbine examples); reciprocity and cyclic relations, Helmholtz and Gibbs functions, Maxwell relations, Clapeyron and Clausius-Clapeyron, volume expansivity, isothermal and adiabatic compressibility, Mayer relation and Joule-Thomson coefficient all have chapters.
+- Draft errors fixed: 4.1 example step (1000 × 0.6 written for 1000 × 0.4), dead state now includes rest, height and chemical equilibrium, the Gibbs chapter's claim that −ΔG bounds turbine shaft work, the "kJ/kg K" units trap for A and G, the garbled throttling sentence, van der Waals μJT units, dT/dp vs dp/dT for ice, and the 4.6 figure caption that showed a model value as data.
+- Packet data: the SRM entry (UPY23203J Heat and Thermodynamics) is a physics course; it lists the Joule-Kelvin coefficient for van der Waals gases, which set the depth of 4.7. The `where` list also carries ME25C11 unit 2, which belongs mostly to the first- and second-law units.
+- Web: MIT OCW (university-hosted) dropped; the three kept links are the ones the draft run had opened (the proxy refused new fetches here). Not independently verified: water β = 2.57 × 10⁻⁴ K⁻¹ and κT = 4.52 × 10⁻¹⁰ Pa⁻¹ at 25 °C (given as data in the example) and nitrogen's measured maximum inversion temperature "near 620 K".
+## ec-circuits-u1 (Claude correction pass, 20 Nov 2026)
+
+- Exam course (EE25302) topics for this unit covered: types of sources (ideal and practical, independent and dependent, V-I lines) in 1.2; series-parallel review including L and C in 1.5; star and delta transformation with an unbalanced bridge in 1.6. Mesh and nodal analysis with dependent sources and supermesh/supernode belong to the network-theorems unit; locus diagrams to the resonance unit.
+- Packet data: the subject is listed under ECE (`books/ece/`, crumb "Electronics & Communication") although EE25302 is an EEE course; queue.json's out path was kept. "Network topology: graphs, tie-sets and cut-sets" is not in the EE25302 unit topics but is in the other syllabi, so it stays a full chapter. The NIT Calicut unit entry lists transient analysis, which belongs to the transient-analysis unit.
+- Draft errors fixed: 1.4 worked example (series pairs denied, "each chord closes a mesh"), 1.5 first trap (its "wrong" formula was the right one), 1.6 power warning and balanced trap, 1.7 arrow sentence and simulator claim, 1.8 "smallest set" lead, missing connectedness condition and "bad data" claim; formula lines that would print raw sub/sup tags. MIT OCW, Khan Academy and ibiblio links dropped.
+
+
+
+## ec-circuits-u4 (Claude correction pass, 20 Nov 2026)
+- Packet: new exam subtopic "Locus diagrams of RL, RC and RLC circuits" (EE25302) written as a new chapter 4.5 (current circles for R or X varied, series RLC with frequency varied, parallel branches and the two resonant settings, two worked examples); the draft's mutual inductance, dot convention, transformer and magnetic circuit chapters moved to 4.6 to 4.9.
+- Packet `out` path is stale (old 03_Books/ path); the book follows queue.json (books/ece/ec-circuits/) like ec-circuits-u3. The coordinator's note said books/eee/.
+- Draft data error: the bank question with coils of 0.4 H and 0.9 H gave 1.5 H aiding and 0.9 H opposing, which no single M satisfies (aiding − opposing = 4M and the sum = 2(L₁ + L₂) = 2.6 H). Now 1.6 H and 1.0 H, so M = 0.15 H and k = 0.25.
+- Draft errors fixed: the series-parallel resonance formula, R_D = r(1 + Q²) for the practical tank, the energy form of Q, f₁f₂ = f₀² and exact half-power points against f₀ ± BW/2, the effect-of-Q table, "magnetic pressure" for MMF, the k ≤ 1 proof. MIT OCW link dropped.
+
+## ec-circuits-u5 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit (still 9 chapters). The exam course (EE25302) unit "Solution of First and Second Order Networks" is covered in full: series and parallel RL, RC and RLC equations, initial and final conditions, forced and free response, time constants, steady and transient state, and Laplace transforms for circuits.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/). The coordinator's note said books/eee/; the book follows queue.json like the other library books.
+- The draft's MIT web sources were dropped (university-hosted); OpenStax and Khan Academy remain. No link could be opened from the sandbox, so no new links were added.
+
+## ec-circuits-u6 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit (still 8 chapters). The exam course (EE25302) two-port unit also lists resonance; this subject teaches resonance in its resonance and coupled-circuits book, so it was not repeated here. Network synthesis (Foster and Cauer) is in the packet but not in the EE25302 list; it was kept and corrected.
+- The draft's MIT and NPTEL web sources were dropped (university-hosted); All About Circuits and Khan Academy remain. The sandbox proxy blocked every page, so no link was reopened and none was added.
+
+## ec-circuits-u2 (Claude correction pass, 20 Nov 2026)
+- The packet on main adds "Compensation theorem" as subtopic 7 (from the exam course); the draft had no chapter for it, so chapter 2.7 is new and AC applications moved to 2.8. Only a few syllabi list compensation; the chapter says so without naming any.
+- The draft's state had review7.json for the AC chapter; it is now review8.json.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/).
+## me-thermo-u5 (Claude correction pass, 20 Nov 2026)
+- The packet was built from ME25C11 Applied Thermodynamics; the exam course ME25301 unit 4 covers pure substances, property diagrams, the Gibbs phase rule, tables and charts, real gases, van der Waals, Z and the generalized chart, but not gas mixtures or psychrometry. Chapters 5.9 and 5.10 stay for the other syllabi.
+- The Gibbs phase rule (new in the packet) is chapter 5.3; the draft's chapters 5.3–5.9 moved to 5.4–5.10.
+- Draft errors fixed: v_g at 1 atm 1.673 m³/kg (not 1.694), the 0 °C / 0.5 kPa triple-point example, the steam calorimeter limits, and the psychrometry bank answer (30 °C DBT, 20 °C WBT gives w 0.0105, φ 40 %, dew point 14.8 °C).
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.

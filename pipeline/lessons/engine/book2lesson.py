@@ -25,6 +25,8 @@ LV = {'remember': 'R', 'understand': 'U', 'apply': 'A', 'analyze': 'N', 'analyse
 UNIS = re.compile(r"\b(Anna Univ(?:ersity)?|SRM(?: IST)?|IIT ?(?:Madras|Delhi|Bombay)|IIT[MDB]|NIT (?:Trichy|Surathkal|Calicut)|NIT[TKC]|Manipal(?: \(MIT\))?|MIT Manipal|Christ(?: University)?)(?:'s)?\b")
 
 
+NUMW = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+
 def nouni(s):
     s = re.sub(r'[;,]?\s*\b(?:%s)\b[^.;)]*' % UNIS.pattern[3:-3], '', s) if False else s
     return UNIS.sub('some syllabi', s)
@@ -354,7 +356,7 @@ def lesson_js(B, k, K, chs, meta):
     w("const P=k=>`[${k}](/${PR[k]}/)`;")
     w(f"const BOOKVARS={js(B['vars'])};")
     parts = [c['title'] for c in chs]
-    w(f"const META={{n:{k}, subject:{js(meta['subject'])}, title:'TODO short lesson title', badge:'Lesson {k}', kick:{js(B['subject'].upper())},   /* the engine adds ' · ' + the title: no unit or lesson number */")
+    w(f"const META={{n:{k}, subject:{js(meta['subject'])}, title:'TODO short lesson title', badge:'Lesson', kick:{js(B['subject'].upper())},   /* the engine adds ' · ' + the title: no unit or lesson number */")
     w(f"  series:'University free n easy', big:'TODO ONE WORD', star:'TODO starring line',")
     w(f"  parts:{js(parts)},   // TODO shorten each to 2-4 words")
     w(f"  chips:{js([chip(p) for p in parts])}}};   // TODO two short upper-case lines per part")
@@ -362,7 +364,7 @@ def lesson_js(B, k, K, chs, meta):
     w("const SC=[")
     w("/* ---- intro ---- IMPROVISE: the hook is the one place for a fresh idea (a daily-life or engineering moment the lesson explains) */")
     w("{s:0,k:'hookArt',term:'Hook',say:'TODO',cues:{},art:[['TODO icon','a',1110,440,1.6]],caps:[['TODO','c1'],['TODO','c2'],['TODO','c3',1]],bang:['TODO question','b']},")
-    w(f"{{s:0,k:'agenda',term:'Today',say:'TODO Today, … Three parts, one worked example, and exam practice.',cues:{{t:'TODO',r:'TODO',p1:'TODO',p2:'TODO'{',p3:' + js('TODO') if len(chs) > 2 else ''},q:'TODO'}},big:META.big,ribbon:'TODO',ribbon2:{js(ribbon2(chs))},star:{js('Chapters ' + a + ' to ' + b + ' of your free notes' if a != b else 'Chapter ' + a + ' of your free notes')}}},")
+    w(f"{{s:0,k:'agenda',term:'Today',say:'TODO Today, … Three parts, one worked example, and exam practice.',cues:{{t:'TODO',r:'TODO',p1:'TODO',p2:'TODO'{',p3:' + js('TODO') if len(chs) > 2 else ''},q:'TODO'}},big:META.big,ribbon:'TODO',ribbon2:{js(ribbon2(chs))},star:{js(NUMW[len(chs)].capitalize() + ' chapters of your free notes' if len(chs) > 1 else 'One chapter of your free notes')}}},")
     for i, c in enumerate(chs, 1):
         w(f"/* ---- part {i}: {c['num']} {c['title']} ({c['words']} words in the book) ---- */")
         pts = [(lambda t: t if len(t) <= 46 else t[:46].rsplit(' ', 1)[0])(re.sub(r'\s*\(.*?\)', '', x)) for x in c['h3'][:3]] or ['TODO', 'TODO', 'TODO']
@@ -377,9 +379,9 @@ def lesson_js(B, k, K, chs, meta):
             hv = halves(F) if fs < 22 and vb[3] >= 260 else []
             if len(hv) == 2:
                 for half, view, sub in hv:
-                    w(f"{{s:{i},k:'bookfig',term:{js((F['label'] or 'Figure') + ' (' + half + ')')},title:{js(c['title'])},view:{js(view)},say:'TODO walk through this half of the figure',cues:{{s1:'TODO',s2:'TODO',s3:'TODO',cap:'TODO'}},steps:4,cap:'TODO one-line takeaway',fig:{js(sub)}}},   // IMPROVISE: auto-zoomed (text would be ~{fs}px whole); cut at a clean gap with only this half's pieces; adjust view:[x,y,w,h] or merge back")
+                    w(f"{{s:{i},k:'bookfig',term:{js('Figure: ' + c['title'][:40] + ' (' + half + ')')},title:{js(c['title'])},view:{js(view)},say:'TODO walk through this half of the figure',cues:{{s1:'TODO',s2:'TODO',s3:'TODO',cap:'TODO'}},steps:4,cap:'TODO one-line takeaway',fig:{js(sub)}}},   // IMPROVISE: auto-zoomed (text would be ~{fs}px whole); cut at a clean gap with only this half's pieces; adjust view:[x,y,w,h] or merge back")
             else:
-                w(f"{{s:{i},k:'bookfig',term:{js(F['label'] or 'Figure')},title:{js(c['title'])},say:'TODO walk through the figure in the order it builds',cues:{{s1:'TODO',s2:'TODO',s3:'TODO',s4:'TODO',cap:'TODO'}},steps:4,cap:'TODO one-line takeaway',fig:{fig}}},   // build steps are each item's third value (1-4): change them if the order reads wrong")
+                w(f"{{s:{i},k:'bookfig',term:{js('Figure: ' + c['title'][:40])},title:{js(c['title'])},say:'TODO walk through the figure in the order it builds',cues:{{s1:'TODO',s2:'TODO',s3:'TODO',s4:'TODO',cap:'TODO'}},steps:4,cap:'TODO one-line takeaway',fig:{fig}}},   // build steps are each item's third value (1-4): change them if the order reads wrong")
         w(f"/* book: the chapter, paragraph by paragraph (first sentences):")
         for p in c['body'][:10]:
             w('   - ' + (sentences(p)[0] if sentences(p) else p)[:240].replace('*/', '* /'))
@@ -416,11 +418,11 @@ def lesson_js(B, k, K, chs, meta):
         tip = '   // the answer is a calculation: replace al with calc:{f,hint,fk,steps,live} so the working transforms on screen' if numeric else '   // shorten each line to fit; book answer above'
         w(f"{{s:QZ,k:'pa',term:'Answer {n_}',lv:'{q['lv']}',n:{n_},q:{js(q['q'])},say:'TODO',cues:{{{','.join(f'a{j}:' + js('TODO') for j in range(1, len(al) + 1))}}},al:[{','.join('[' + js(x) + ",'a" + str(j) + "']" for j, x in enumerate(al, 1))}]}},{tip}")
     tags = [['Free notes for this lesson (PDF)', 'link in the description'],   # only lesson PDFs are offered (3 Nov 2026)
-            [span[0].upper() + span[1:], '; '.join(c['title'] for c in chs)[:120]],
+            ['In this lesson', '; '.join(c['title'] for c in chs)[:120]],   # chapter titles, never numbers (they reveal the unit)
             ['Key terms and glossary', 'at the end of the notes']]
     def clip(t, n):
         return t if len(t) <= n else t[:n].rsplit(' ', 1)[0].rstrip(',;:') + '…'
-    figs = [[F['label'] or c['num'], clip(F['caption'] or c['title'], 150)] for c in chs for F in c['figs']]
+    figs = [[clip(c['title'], 40), clip(F['caption'] or c['title'], 150)] for c in chs for F in c['figs']]   # named by content, never 'Figure 1.1.1' (chapter numbers reveal the unit)
     def src_short(x):
         m = re.match(r'(.+?),\s*(?:and others,|et al\.?,)?\s*(.+?)(?:,|\.\s)', x)
         a_ = x.split(',')[0]

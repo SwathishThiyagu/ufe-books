@@ -1,5 +1,5 @@
 """Turn the model's JSON into the book's HTML, inside pack/book_shell.html."""
-import html, re, os, datetime
+import html, re, os, datetime, hashlib
 import figures as F
 
 ALLOWED = re.compile(r'</?(?:b|i|em|strong|code|sub|sup)>|<br\s*/?>|<a href="#[a-z0-9-]+">|</a>', re.I)
@@ -209,6 +209,22 @@ def summary_html(P, plan, us):
 
 GROUPS = [('remember-understand', 'Remember and understand'), ('apply', 'Apply'), ('analyze-evaluate', 'Analyze and evaluate')]
 
+def model_answer(items):
+    """A long question's model answer: a list of numbered steps. A step is text, or a dict with 'text' plus any of
+    'table' {head, rows} (scrolls sideways on phones), 'pre' (working laid out line by line; <sub>/<sup> allowed) and 'svg' {h, body, aria}."""
+    lis = []
+    for n, it in enumerate(items if isinstance(items, list) else [items], 1):
+        if not isinstance(it, dict): it = {'text': it}
+        li = inline(it.get('text', ''))
+        if it.get('pre'): li += '<pre>' + '\n'.join(r[:len(r) - len(r.lstrip())] + inline(r) for r in str(it['pre']).rstrip().split('\n')) + '</pre>'
+        if isinstance(it.get('table'), dict): li += table(it['table'].get('head'), it['table'].get('rows'))
+        if isinstance(it.get('svg'), dict):
+            sp = dict(it['svg']); sp['type'] = 'svg'
+            li += '<div class="fig">' + F.render(sp, 'ma-' + hashlib.md5(str(sp.get('body', '')).encode()).hexdigest()[:8]) + '</div>'
+        lis.append(f'<li>{li}</li>')
+    return '<p><b>Model answer.</b></p><ol class="steps">' + ''.join(lis) + '</ol>'
+
+
 def bank_html(P, us):
     out = ['<section id="question-bank"><h2>Exam question bank</h2>']
     if us.get('bank_note'): out.append(f'<p class="note">{inline(us["bank_note"])}</p>')
@@ -223,7 +239,11 @@ def bank_html(P, us):
             try: mk = int(q.get('marks', 13))
             except (TypeError, ValueError): mk = 13
             outline = '; '.join(str(x).rstrip('.') for x in q.get('outline') or []) + '.'
-            out.append(f'<details data-level="{lv}"><summary><span class="lvl">{lv.capitalize()}</span> <span style="min-width:0;overflow-wrap:anywhere">{inline(q.get("q"))}</span> <span class="marks">{mk} marks</span></summary><p>{inline(outline)}</p></details>')
+            body = f'<p>{inline(outline)}</p>'
+            if q.get('answer'):
+                # a full model answer (correction pass, Nov 2026): "Points to cover" (the outline), then numbered steps
+                body = f'<p><b>Points to cover.</b> {inline(outline)}</p>' + model_answer(q['answer'])
+            out.append(f'<details data-level="{lv}"><summary><span class="lvl">{lv.capitalize()}</span> <span style="min-width:0;overflow-wrap:anywhere">{inline(q.get("q"))}</span> <span class="marks">{mk} marks</span></summary>{body}</details>')
         out.append('</div>')
     out.append('</section>')
     return ''.join(out)
@@ -243,8 +263,7 @@ def sources_html(us, web_checked):
         books.append(f'<li>{s}{"" if s.endswith(".") else "."}</li>')
     out = ['<section id="sources"><h2>Sources and further reading</h2><h3>Textbooks</h3><ul class="srcs">' + ''.join(books) + '</ul>']
     if web_checked:
-        out.append('<h3>Open web resources</h3>')
-        out.append(f'<p class="note">Each link below was opened by the book script on {datetime.date.today():%d %b %Y} and returned a page; the pages were not read line by line.</p><ul class="srcs">')
+        out.append('<h3>Further reading online</h3><ul class="srcs">')
         for w in web_checked:
             url = html.escape(w['url'], quote=True)
             out.append(f'<li>{inline(w.get("title"))}: <a href="{url}">{html.escape(re.sub(r"^https://(www\\.)?", "", w["url"]).rstrip("/"), quote=False)}</a></li>')
