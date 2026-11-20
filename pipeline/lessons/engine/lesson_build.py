@@ -49,6 +49,7 @@ TEXT_RULES = [
 ]
 SCREEN_RULES = [
     ('caret maths (use ² or a sup tspan)', re.compile(r"[\w)]\^[\w(−-]")),
+    ('a chapter, figure or lesson number (they reveal the unit: name the topic)', re.compile(r"\bchapters? \d+\.\d+|\bfigure \d+\.\d+|\blesson \d+\b", re.I)),
     ('underscore subscript (use ₐ or a sub tspan)', re.compile(r"(?<![\w.$])(?<!->)(?![A-Z]{2}_[A-Z]{3})(?![a-z]{2}_[a-z]{3})[A-Za-zα-ωΑ-Ω]{1,2}_(?:\{[^}]*\}|[A-Za-z0-9]{1,6})(?![\w(])")),
 ]
 WARN_RULES = [
@@ -69,7 +70,7 @@ def text_rules(ev):
         for name, rx in rules:
             m = rx.search(txt)
             if m: out.append(f'{where}: {name}: "{txt[max(0, m.start() - 25):m.end() + 25].strip()}"')
-    for key in ('kick', 'title', 'series', 'star', 'big'):
+    for key in ('kick', 'title', 'series', 'star', 'big', 'badge'):
         if isinstance(meta.get(key), str): hit(f'META.{key}', strip(meta[key]), TEXT_RULES + SCREEN_RULES, probs)
     nums = {'in': [], 'we': []}
     for sc in ev['scenes']:
