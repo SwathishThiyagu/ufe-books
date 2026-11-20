@@ -42,3 +42,10 @@ OK
 - ch 6 [low] Section 3: 'A movable boundary lets displacement work cross' uses the term displacement work without defining it, so the label is not usable on its own.
 - ch 7 [low] figure (plot spec): The caption and aria text describe a constant-pressure path that ends at 0.25 m³, but the plotted series runs from 0.10 m³ to 0.30 m³, so the drawn line is longer than the process the chapter is about. A student reading the area from the graph would get 200 × 0.20 = 40 kJ, not the stated 30 kJ.
 - ch 7 [low] quiz Q8: The symbol V is used for the potential difference of the capacitor, but everywhere else in the chapter V is volume and φ is potential difference. A student can read 'charged from 0 to V' as a volume.
+
+## Claude correction pass (20 Nov 2026)
+
+- Every chapter rewritten from the draft against the ME25301 exam course: continuum and Knudsen number (1.1), two-boundary tank example (1.2), state postulate, ideal gas equation and state diagrams with a traced cycle (1.3), piston force balance with the atmosphere and a sand-by-sand quasi-static table (1.4), triple point, ideal-gas and thermodynamic scales with gas-thermometer and thermocouple examples (1.5), boundary-dependent heat or work and the other sign convention (1.6), work on constant-p, pV = C and pVⁿ = C paths, free expansion, shaft, electrical, spring, film and flow work (1.7).
+- All the reviewer notes above are resolved (piston balance, pV = C wording, fast-process wording, symbol V for potential, figure ranges).
+- Every figure redrawn by hand from its chapter's example (pipeline/claude_figs/me_thermo_u1.py); 13 long questions with full model answers; Khan Academy link dropped (not verified).
+- check_book --render: OK.
