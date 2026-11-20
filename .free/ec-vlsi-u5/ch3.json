@@ -1,0 +1,256 @@
+{
+ "lead": "A digital circuit can be written in Verilog at three levels. Gate-level modelling instantiates primitive gates and switches. Dataflow modelling writes continuous Boolean equations with assign. Behavioural modelling writes algorithms inside initial and always blocks. All three can describe the same multiplexer, counter or FSM. The level you choose controls how close the code sits to the netlist, how easy it is to read, and what a synthesis tool can accept. Designers use gate level for netlists, dataflow for datapaths, and behavioural for control.",
+ "prereq": "You need: <a href=\"#verilog-hdl-modules-ports-data-types-operators\">Chapter 5.2</a> for modules, ports, data types and operators, and Unit 1 for MOS switch behaviour.",
+ "sections": [
+  {
+   "h3": "Three levels, one circuit",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Gate-level modelling is structural. You place gates by name: and, or, not, nand, nor, xor, xnor. Each gate instance has output first, then inputs. A 2-input AND is <code>and g1(y, a, b);</code>. Output y is a wire. Gate primitives have no memory. A user-defined primitive, or UDP, adds a truth-table gate when the built-in set is not enough. A UDP declares a table of input combinations and output values. Switch-level primitives such as nmos, pmos and cmos model transistors as switches. They are used for MOS circuits and cell-level simulation, not ordinary synthesis. Transistor behaviour is in Unit 1."
+    },
+    {
+     "type": "p",
+     "text": "Dataflow modelling is equation-based. A continuous assignment <code>assign y = a & b;</code> drives y whenever a or b changes. The right side is an expression, not a sequence of statements. The conditional operator <code>?:</code> builds a mux. Dataflow suits adders, comparators and multiplexers because the equations match the datapath."
+    },
+    {
+     "type": "p",
+     "text": "Behavioural modelling is algorithmic. An initial block runs once at time zero. An always block repeats forever. The sensitivity list says when it runs: <code>always @(*)</code> for combinational logic, <code>always @(posedge clk)</code> for a clocked register. Inside you write if, case, for and while. Synthesis turns these into gates, but only a subset is synthesizable."
+    }
+   ]
+  },
+  {
+   "h3": "Dataflow: equations as hardware",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A continuous assignment targets a wire. <code>wire [3:0] y; assign y = sel ? b : a;</code> is a 4-bit 2-to-1 mux. The expression uses bitwise operators &, |, ^, ~, logical operators &&, ||, !, reduction operators such as &a, and concatenation {a,b}. The conditional operator <code>cond ? x : y</code> returns x when cond is 1 and y when cond is 0. For sel=1, the mux gives b; for sel=0, it gives a."
+    },
+    {
+     "type": "formula",
+     "text": "Y = sel ? B : A",
+     "where": "Y is the 4-bit output; sel is the 1-bit select; A and B are 4-bit inputs. sel=1 selects B, and sel=0 selects A."
+    },
+    {
+     "type": "p",
+     "text": "Continuous assignments run in parallel. Order in the file does not matter. A change on any right-side signal schedules a new evaluation. This is why dataflow code reads like hardware. Use one assign per output or per equation. Do not assign the same wire from two different assign statements; that creates multiple drivers and X in simulation."
+    },
+    {
+     "type": "p",
+     "text": "The synthesizable subset allows assign with operators, conditional expressions, concatenation and bit selects. It does not allow delays such as <code>assign #5 y = a;</code> in synthesis, real arithmetic, or assignments to reg. A dataflow mux maps to gates or to a mux cell. The worked example uses the same equation."
+    }
+   ]
+  },
+  {
+   "h3": "Behavioural: processes and always blocks",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Behavioural code runs as a process. <code>initial</code> executes once; it is common in test benches and FPGA initialisation, but not in ASIC synthesis. <code>always</code> repeats. A combinational block uses <code>always @(*)</code>. A clocked block uses <code>always @(posedge clk)</code>. The star means every signal read in the block is in the sensitivity list. An incomplete list can simulate but synthesis assumes all reads, so hardware and simulation drift apart."
+    },
+    {
+     "type": "p",
+     "text": "Use blocking <code>=</code> in combinational always blocks: statements execute in order, like gates settling. Use nonblocking <code>&lt;=</code> in sequential always blocks: all right sides are sampled at the clock edge, then left sides update together. Mixing them in one clocked block creates races and can infer different registers."
+    },
+    {
+     "type": "p",
+     "text": "<code>if</code> and <code>case</code> are synthesizable. A <code>case</code> must cover all input patterns or have a default. A <code>for</code> loop with a constant bound is unrolled into parallel hardware. A <code>while</code> loop with a nonconstant bound is not synthesizable. A combinational always block must assign every output on every path, or synthesis infers a latch."
+    },
+    {
+     "type": "p",
+     "text": "An FSM uses two common styles. The two-block style has one clocked always block for the state register and one combinational always block for next state and outputs. The one-block style puts state register, next-state and output logic in a single clocked always block. Two-block code separates sequential and combinational logic clearly. One-block code is shorter but easier to make a mistake with blocking and nonblocking."
+    }
+   ]
+  },
+  {
+   "h3": "Choosing the level",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Use gate level for a netlist from synthesis or a cell library. Use dataflow for an equation: adder, comparator, mux, bitwise unit. Use behavioural for control: FSM, handshake, counter, register file. A D flip-flop is a clocked always block; at gate level it is a library cell. Most RTL mixes dataflow and behavioural code in one module."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Level",
+      "Best for",
+      "Typical statement"
+     ],
+     "rows": [
+      [
+       "Gate-level",
+       "Netlist, cell library",
+       "and g1(y, a, b);"
+      ],
+      [
+       "Dataflow",
+       "Datapath equation",
+       "assign y = sel ? b : a;"
+      ],
+      [
+       "Behavioural",
+       "Control, FSM, registers",
+       "always @(*) if (sel) y = b; else y = a;"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Synthesis accepts a subset: modules, ports, wires and regs, assign, always with @(*) or @(posedge clk), if, case, constant-bound for, arithmetic and bitwise operators. It rejects delays, real variables, dynamic memory, initial blocks for ASIC hardware, and nonconstant loops. Switch primitives are for simulation and cell design, not general synthesis."
+    },
+    {
+     "type": "p",
+     "text": "The same 4-bit mux can be written in all three levels. Gate level uses four instances of a 1-bit mux module, or gate primitives wired as a mux. Dataflow uses one conditional assign. Behavioural uses an if in always @(*). The simulation result must agree. <a href=\"#test-benches-and-simulation\">Chapter 5.4</a> builds the test bench that checks it; <a href=\"#programmable-logic-devices-and-fpga-architecture\">Chapter 5.5</a> maps the same logic into FPGA lookup tables."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "One specification can be written as primitive gates, continuous assignments or always blocks; all three reach the same simulated circuit.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "aria": "One specification branches into gate-level, dataflow and behavioural descriptions, and all three lead to the same simulated circuit.",
+   "nodes": [
+    {
+     "id": "spec",
+     "label": "Specification",
+     "note": "function, timing",
+     "style": "muted"
+    },
+    {
+     "id": "gate",
+     "label": "Gate-level",
+     "note": "primitive gates",
+     "style": "accent"
+    },
+    {
+     "id": "data",
+     "label": "Dataflow",
+     "note": "assign equations",
+     "style": "live"
+    },
+    {
+     "id": "beh",
+     "label": "Behavioural",
+     "note": "always blocks",
+     "style": "next"
+    },
+    {
+     "id": "sim",
+     "label": "Same circuit",
+     "note": "one simulation",
+     "style": "normal"
+    }
+   ],
+   "edges": [
+    {
+     "from": "spec",
+     "to": "gate",
+     "style": "solid"
+    },
+    {
+     "from": "spec",
+     "to": "data",
+     "style": "solid"
+    },
+    {
+     "from": "spec",
+     "to": "beh",
+     "style": "solid"
+    },
+    {
+     "from": "gate",
+     "to": "sim",
+     "style": "solid"
+    },
+    {
+     "from": "data",
+     "to": "sim",
+     "style": "solid"
+    },
+    {
+     "from": "beh",
+     "to": "sim",
+     "style": "solid"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "A 4-bit 2-to-1 multiplexer selects A when sel=0 and B when sel=1. For A=4'b1010, B=4'b0110 and sel=1, write the dataflow and behavioural forms and find Y.",
+   "steps": [
+    "Write the inputs: A=4'b1010 (decimal 10), B=4'b0110 (decimal 6), sel=1.",
+    "Dataflow form: <code>assign Y = sel ? B : A;</code>. The condition sel is true, so the expression returns B.",
+    "Behavioural form: <code>always @(*) if (sel) Y = B; else Y = A;</code>. sel=1 takes the if branch, so Y becomes B.",
+    "Substitute B: Y=4'b0110. Its decimal value is 0×8 + 1×4 + 1×2 + 0×1 = 6."
+   ],
+   "answer": "The output is Y = 4'b0110, which is decimal 6, selected from input B.",
+   "check": "sel = 1\nA = 0b1010\nB = 0b0110\nY = B if sel else A\nprint(Y)",
+   "values": [
+    6
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Mixing <code>=</code> and <code>&lt;=</code> in one clocked always block. Use <code>&lt;=</code> for every state register update.",
+  "An incomplete sensitivity list. Use <code>@(*)</code> for combinational blocks, or list every signal the block reads.",
+  "Assigning a reg in a continuous assign or a wire in an always block. Wires take assign; regs take procedural assignment.",
+  "A combinational always block with if but no else, or case with no default, infers a latch instead of gates.",
+  "Using an initial block for ASIC synthesis. Initial blocks are for test benches and for some FPGA power-up states."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Name four gate primitives and one switch-level primitive in Verilog.",
+   "marks": 2,
+   "a": "and, or, nand, xor are gate primitives; nmos is a switch-level primitive."
+  },
+  {
+   "level": "understand",
+   "q": "Why does dataflow code not depend on statement order?",
+   "marks": 3,
+   "a": "Continuous assignments run in parallel. Each assign drives its wire whenever a right-side signal changes, so file order does not decide the result."
+  },
+  {
+   "level": "apply",
+   "q": "For A=4'b1100, B=4'b1010 and sel=0, find Y for <code>assign Y = sel ? B : A;</code>.",
+   "marks": 4,
+   "a": "sel=0 selects A. A=1100 in binary, which is decimal 12. So Y=4'b1100=12."
+  },
+  {
+   "level": "analyze",
+   "q": "Why is nonblocking <code>&lt;=</code> used in a clocked always block?",
+   "marks": 5,
+   "a": "It samples all right sides at the clock edge, then updates all left sides together. This matches register behaviour and avoids order-dependent races."
+  },
+  {
+   "level": "analyze",
+   "q": "A combinational <code>always @(*)</code> contains <code>if (en) y = d;</code> with no else. What may synthesis infer and why?",
+   "marks": 4,
+   "a": "It may infer a latch, because y must keep its old value when en=0. Combinational logic must assign y on every path."
+  },
+  {
+   "level": "apply",
+   "q": "Write the behavioural form of a 4-bit 2-to-1 mux with output Y, inputs A and B, and select sel.",
+   "marks": 5,
+   "a": "Declare <code>reg [3:0] Y;</code>. Then write <code>always @(*) if (sel) Y = B; else Y = A;</code>. sel=1 selects B, and sel=0 selects A."
+  },
+  {
+   "level": "understand",
+   "q": "What is a user-defined primitive in Verilog?",
+   "marks": 3,
+   "a": "A UDP is a custom gate defined by a truth table of input combinations and output values. It extends the built-in gate set."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can an incomplete sensitivity list pass simulation but fail after synthesis?",
+   "marks": 4,
+   "a": "Simulation may keep old values until some listed signal changes. Synthesis assumes the block reads all signals used in its expressions, so the hardware can differ from the simulation."
+  }
+ ],
+ "beyond": "Not for the exam. SystemVerilog adds always_comb and always_ff, which let tools check that a block is purely combinational or clocked. RTL lint tools flag incomplete sensitivity lists, latches and blocking assignments in clocked blocks before synthesis. Formal equivalence checks compare the RTL with the gate netlist after synthesis. High-level synthesis moves behavioural code into C/C++ style descriptions, but the synthesizable subset idea remains. Search next for SystemVerilog always_ff, RTL lint, and synthesizable Verilog subset."
+}

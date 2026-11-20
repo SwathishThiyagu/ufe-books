@@ -1,0 +1,200 @@
+{
+ "lead": "A test bench is a Verilog module that drives a design under test (DUT) with inputs and checks its outputs in simulation. It exists because a design can compile and still be wrong. The bench supplies clock, reset and data vectors, waits for the DUT to settle, compares each output with a golden value, and reports pass or fail. It also writes a VCD waveform file for inspection. Engineers use test benches before synthesis, during FPGA bring-up, and whenever a block changes and must be rechecked.",
+ "prereq": "You need: <a href=\"#verilog-hdl-modules-ports-data-types-operators\">Chapter 5.2</a> for modules and ports, and <a href=\"#gate-level-dataflow-and-behavioural-modelling\">Chapter 5.3</a> for initial and always blocks.",
+ "sections": [
+  {
+   "h3": "Test bench parts and stimulus",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A test bench has no ports. It declares reg signals for inputs it drives, wire signals for outputs it observes, and instantiates the DUT by module name. The connection can be by name, as in mux2 uut(.a(a), .b(b), .s(s), .y(y)); here uut is the instance name and y is the observed output. A clock needs three parts. First a timescale directive, <code>`timescale 1ns/1ps</code>, so that #1 means 1 ns. Second, a clock register that starts at 0: <code>reg clk = 0;</code>, or an initial block that sets <code>clk = 0;</code>. Third, the free-running always block: <code>always #5 clk = ~clk;</code>. With a 1 ns/1 ps timescale, #5 is 5 ns, so the half period is 5 ns and the full period is 10 ns. Without the zero start the register holds x, ~x is still x, and the clock line never toggles, so every clocked block in the bench stalls. Reset is driven in an initial block: set rst=1, wait #20, then rst=0. Stimulus is also an initial block. Assign inputs, wait a delay, read outputs, and repeat. A task groups one vector application: drive a, b and s, wait #10, then compare y. $display prints one event; $monitor prints again whenever any listed signal changes. $dumpfile(\"dump.vcd\") names the value change dump (VCD) file and $dumpvars(0, tb) records all signals below the test bench. Some syllabi call this verification by simulation; it uses vectors, not formal proof."
+    }
+   ]
+  },
+  {
+   "h3": "Simulation cycle and races",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "At each simulation time, the simulator runs active events, then inactive events, then nonblocking updates. A blocking assignment (=) changes the variable at once. A nonblocking assignment (<=) computes the right side now and updates at the end of the time step, in the nonblocking region. Clocked DUTs should use <= so all flip-flops sample the old values together. The test bench must respect that order. If the bench drives a clocked DUT with blocking assignments at posedge clk, the DUT may see the new value in the same time step and the result depends on event order. This is a race. If the bench samples y with $display at the same posedge, it may print the old y before the nonblocking update. Fix: drive inputs away from the active edge, use nonblocking in sequential logic, and check outputs after a small delay such as #1, or on the opposite edge. A combinational DUT also needs time to settle; a zero-delay compare after changing inputs can catch y while it is still x."
+    }
+   ]
+  },
+  {
+   "h3": "Self-checking, vectors and VCD",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A self-checking test bench holds the expected value for each vector and compares it with the DUT output. It keeps an error count, prints FAIL with the time and vector when y differs, and prints PASS at the end only if errors=0. Golden vectors come from a truth table, a reference model, or a known-good simulation. For long tests, put vectors in a file and load them with $readmemh(\"vectors.hex\", mem); then loop over the array, drive inputs, wait, and compare. This separates data from code and lets you reuse the same bench. Timing checks compare when an output changes, not only its final value; a simple check waits a fixed delay and samples. For clocked logic, sample a short delay after the active edge, for example <code>#1 y_sample = y;</code> after <code>posedge clk</code>, so that the flip-flop's clock-to-Q delay has passed. Setup and hold times are constraints on the DUT inputs relative to that edge; they are not a delay after which the bench samples. $dumpfile and $dumpvars write a VCD file that a waveform viewer can open. The VCD is for debug, not for pass/fail. Coverage closure and production test are in Unit 6."
+    }
+   ]
+  },
+  {
+   "h3": "Compile and run",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Simulation is a two-step job: compile the DUT and test bench together, then run the top test-bench module. With Icarus Verilog, a common command is iverilog -o tb.out tb.v mux2.v; the first file can be the bench and the second the DUT. Run it with vvp tb.out. The $display and $monitor lines appear on the terminal. The $dumpfile and $dumpvars calls create dump.vcd; open it with gtkwave dump.vcd. Other simulators use different commands, such as vlog and vsim, but the idea is the same. Always end the stimulus with $finish so the simulator stops. If the transcript shows PASS and no FAIL lines, the vectors passed. Read the first FAIL line, note the time, inputs and expected value, then open the VCD near that time. That is the normal debug loop."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The test bench drives a=1, b=0, s=0, waits 10 ns, reads y=1, and the checker returns pass. Notice the compare happens after the delay, not at the instant the inputs change.",
+  "spec": {
+   "type": "sequence",
+   "aria": "A test bench sends a=1 b=0 s=0 to the DUT, waits 10 time units, receives y=1, sends expect y=1 to the checker, and the checker replies pass.",
+   "actors": [
+    "Test bench",
+    "DUT",
+    "Checker"
+   ],
+   "messages": [
+    {
+     "from": "Test bench",
+     "to": "DUT",
+     "label": "a=1 b=0 s=0",
+     "dashed": false
+    },
+    {
+     "from": "Test bench",
+     "to": "DUT",
+     "label": "wait #10",
+     "dashed": true
+    },
+    {
+     "from": "DUT",
+     "to": "Test bench",
+     "label": "y=1",
+     "dashed": false
+    },
+    {
+     "from": "Test bench",
+     "to": "Checker",
+     "label": "expect y=1",
+     "dashed": false
+    },
+    {
+     "from": "Checker",
+     "to": "Test bench",
+     "label": "pass",
+     "dashed": false
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Write a self-checking test bench for a 2:1 mux with y = (~s & a) | (s & b). Apply four vectors at #0, #10, #20 and #30: (a,b,s)=(1,0,0), (1,0,1), (0,1,0), (0,1,1). Find the expected y values and state when the checker compares.",
+   "steps": [
+    "The mux equation selects a when s=0 and b when s=1: y = a if s=0, else y = b.",
+    "Vector 1 at 0 ns: a=1, b=0, s=0, so y=a=1.",
+    "Vector 2 at 10 ns: a=1, b=0, s=1, so y=b=0.",
+    "Vector 3 at 20 ns: a=0, b=1, s=0, so y=a=0.",
+    "Vector 4 at 30 ns: a=0, b=1, s=1, so y=b=1.",
+    "The initial (stimulus) block drives each vector, then waits #10 for the DUT to settle. After that delay the checker compares y with the expected value, increments errors on a mismatch, and PASS is printed only when errors=0."
+   ],
+   "answer": "Expected y values are 1, 0, 0, 1 for the four vectors; each compare happens 10 ns after its vector is applied.",
+   "check": "vectors = [(1,0,0),(1,0,1),(0,1,0),(0,1,1)]\nfor a,b,s in vectors:\n    y = ((1-s) & a) | (s & b)\n    print(y)",
+   "values": [
+    1,
+    0,
+    0,
+    1
+   ],
+   "dry_run": {
+    "head": [
+     "apply_ns",
+     "a",
+     "b",
+     "s",
+     "expected_y"
+    ],
+    "rows": [
+     [
+      "0",
+      "1",
+      "0",
+      "0",
+      "1"
+     ],
+     [
+      "10",
+      "1",
+      "0",
+      "1",
+      "0"
+     ],
+     [
+      "20",
+      "0",
+      "1",
+      "0",
+      "0"
+     ],
+     [
+      "30",
+      "0",
+      "1",
+      "1",
+      "1"
+     ]
+    ]
+   },
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Comparing y at the same instant you change a, b or s. The DUT may still hold x or the old value. Wait for the delay first.",
+  "Driving a clocked DUT with blocking assignments at posedge. The bench and the DUT race; use nonblocking in the DUT and sample away from the edge.",
+  "Calling $dumpfile but never $dumpvars. The VCD file stays empty or incomplete.",
+  "Trusting a waveform by eye when the bench has no checker. A long dump can hide a wrong bit; add expected values and an error count.",
+  "Forgetting $finish. The clock keeps running and the batch simulation does not end."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What does DUT mean in a test bench?",
+   "marks": 2,
+   "a": "Design under test: the module being driven and checked."
+  },
+  {
+   "level": "understand",
+   "q": "Why does a test bench wait #10 after changing inputs before reading a combinational output?",
+   "marks": 3,
+   "a": "To let the DUT settle and avoid sampling x or an old value."
+  },
+  {
+   "level": "apply",
+   "q": "For y=(~s & a) | (s & b), find y for a=0, b=1, s=1.",
+   "marks": 4,
+   "a": "s=1 selects b, so y=1."
+  },
+  {
+   "level": "analyze",
+   "q": "A DUT uses q<=d at posedge clk. The bench uses blocking assignment and reads q at the same posedge. Explain the risk.",
+   "marks": 5,
+   "a": "Race: the bench may read old q before the nonblocking update. Drive away from the edge and sample after #1 or on the opposite edge."
+  },
+  {
+   "level": "remember",
+   "q": "Which two system tasks write a VCD file?",
+   "marks": 2,
+   "a": "$dumpfile names it; $dumpvars records signals."
+  },
+  {
+   "level": "understand",
+   "q": "What is a golden vector?",
+   "marks": 3,
+   "a": "A known-correct input-output pair used as the expected value in a checker."
+  },
+  {
+   "level": "apply",
+   "q": "A self-checking bench has errors=0. Four vectors are checked, and only vector 3 mismatches. What final message and count?",
+   "marks": 4,
+   "a": "errors=1; print FAIL count=1, not PASS."
+  }
+ ],
+ "beyond": "Not for the exam. In industry, test benches grow into verification environments with constrained-random stimulus, scoreboards and functional coverage. UVM is a common methodology for this. Emulation and FPGA prototyping run long tests at near-real speed. Formal verification proves properties without vectors; coverage closure and production test are covered in Unit 6. Search for UVM scoreboard, functional coverage, and simulation-based verification."
+}
