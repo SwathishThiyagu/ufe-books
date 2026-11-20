@@ -387,3 +387,9 @@
 - Packet: no new subtopics for this unit; the exam course lists DFS, DTFT, z-transform and properties, and LTI analysis with z, all covered by chapters 6.1, 6.2, 6.4, 6.5 and 6.7.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
 - The exam course also lists "Discrete-time signals and systems" and the sampling topics in the same unit; those live in the Sampling unit of this subject.
+
+
+## ec-signals-u3 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course's unit 3 is "Fourier Transform & Laplace Transform": its Fourier topics (aperiodic transform, standard and periodic signals, properties, Hilbert transform and properties) are covered here, its Laplace topics in the Laplace transform unit.
+- Frequency response, distortionless transmission and correlation are not in the exam course's list for this unit; they stay as chapters for the other syllabi.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
