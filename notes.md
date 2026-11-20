@@ -422,3 +422,10 @@
 - Packet `usual_sem` is 2 (the "Usually Sem 2" chip); the EE25302 exam course sits in semester 3.
 - Packet `where` parsing: the Manipal, IIT Delhi and NIT Trichy entries list whole courses under one unit; they set no extra depth here. The Manipal unit title is "Total Number of contact hours".
 - The draft's resonance long question belonged to the resonance unit; it was replaced by an unbalanced delta question.
+
+## me-thermo-u1 (Claude correction pass, 20 Nov 2026; first of subject)
+- Packet: no new subtopics for this unit. The exam course (ME25301) unit 1 also lists the continuum, the state postulate, state diagrams, the ideal gas equation of state and the thermodynamic temperature scale: covered in chapters 1.1, 1.3 and 1.5, with the full treatment left to "Ideal and real gases; equations of state" and "Thermodynamic temperature scale" by topic name.
+- The packet's `where` also carries ME25301 unit 2 (energy, heat and work modes, moving boundary work, first law, steady and unsteady flow). Chapters 1.6 and 1.7 cover heat, work, the work modes and moving boundary work; the rest belongs to the First Law unit.
+- Packet data: the SRM entry (UPY23203J Heat and Thermodynamics, unit 4) is a physics course and includes a lab item ("Carey Foster Bridge"), so it belongs to another subject; the IIT Delhi and NIT Surathkal entries list the whole course under unit 1. They set no extra depth here.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- Web links could not be re-opened from this workspace (proxy refused); the three kept are the ones the draft run had opened, and the unverified Khan Academy link was dropped.
