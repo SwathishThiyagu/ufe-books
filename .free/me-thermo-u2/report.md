@@ -43,3 +43,11 @@ OK
 - ch 7 [low] Section 3 and Worked example 1, step 6: 'would decrease entropy' and 'it would reduce entropy' do not say whose entropy. The cup's own entropy increases when it warms, so a student may think the statement is wrong.
 - ch 7 [low] Section 2, fifth bullet: 'the same end states and the same energy balance' can be read as the same Q and W for both paths, which is false: the reversible and irreversible paths have different Q and W even though Q − W = ΔU holds for both.
 - ch 7 [low] Section 2, PMM paragraph: 'See Chapter 2.5 for PMM-1' is plain text, not an internal chapter link in the book's style.
+
+## Claude correction pass (20 Nov 2026)
+
+- Packet on main has 8 chapters: new chapter 2.7 Unsteady flow processes (filling and emptying of vessels); the old chapter 7 (limitations) is now ch8.json.
+- Every worked example and quiz answer recomputed; steam (3 MPa/350 °C, 20 kPa) and R-134a (800/200 kPa) values checked against property libraries.
+- Fixed: path-area sentence, energy forms and Q − W = ΔE added, free-expansion work, PMM-1 tests, nozzle q ≠ Δh row, carets and underscores set as super/subscripts, cross-unit references named by topic.
+- Wrong outlines fixed: closed-system adiabatic compression to the same pressure needs less boundary work than isothermal; free expansion T₂ = T₁ only for an ideal gas; refrigerant named (R-134a).
+- Figures redrawn by hand (pipeline/claude_figs/me_thermo_u2.py); 15 long questions with full model answers (two new: tank filling, and the compressor-cooler-throttle chain now has numbers).
