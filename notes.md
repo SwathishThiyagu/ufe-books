@@ -429,3 +429,10 @@
 - Packet data: the SRM entry (UPY23203J Heat and Thermodynamics, unit 4) is a physics course and includes a lab item ("Carey Foster Bridge"), so it belongs to another subject; the IIT Delhi and NIT Surathkal entries list the whole course under unit 1. They set no extra depth here.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
 - Web links could not be re-opened from this workspace (proxy refused); the three kept are the ones the draft run had opened, and the unverified Khan Academy link was dropped.
+
+## me-thermo-u3 (Claude correction pass, 20 Nov 2026)
+- Packet: new subtopic "Entropy generation and second-law analysis of control volumes" written as chapter 3.9 (closed-system and steady-flow entropy balance, lost work T₀S_gen, and the microscopic view S = k ln W the exam course lists); the third law moved to 3.10.
+- The exam course (ME25301) unit 3 also lists the limitations of the first law and perpetual motion machines (now in 3.2, PMM1 against PMM2) and exergy analysis of closed and open systems, which belongs to "Available and unavailable energy" and "Exergy analysis and second law efficiency" and is named there by topic.
+- Packet data: the SRM entry (UPY23203J Heat and Thermodynamics) is a physics course and lists thermodynamic potentials and the Joule-Kelvin coefficient under this unit; the IIT Delhi and NIT Surathkal entries list whole courses under one unit. They set no extra depth here.
+- Several of the draft reviewer's "high" flags (ch 3.7 missing inequality, ch 3.9 missing exponents) were artefacts of its plain-text view stripping "<" and tags; the book itself was right there. The real errors were the long formulas printing raw <sub> tags, the 3.1 example's reversed device, the 3.5 gas-thermometer and 3.9 steam-table claims, and a C program in the 3.8 example.
+- Web: MIT OCW (university-hosted) and an unopened Khan Academy link dropped.
