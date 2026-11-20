@@ -479,3 +479,8 @@
 ## ec-circuits-u6 (Claude correction pass, 20 Nov 2026)
 - Packet: no new subtopics for this unit (still 8 chapters). The exam course (EE25302) two-port unit also lists resonance; this subject teaches resonance in its resonance and coupled-circuits book, so it was not repeated here. Network synthesis (Foster and Cauer) is in the packet but not in the EE25302 list; it was kept and corrected.
 - The draft's MIT and NPTEL web sources were dropped (university-hosted); All About Circuits and Khan Academy remain. The sandbox proxy blocked every page, so no link was reopened and none was added.
+
+## ec-circuits-u2 (Claude correction pass, 20 Nov 2026)
+- The packet on main adds "Compensation theorem" as subtopic 7 (from the exam course); the draft had no chapter for it, so chapter 2.7 is new and AC applications moved to 2.8. Only a few syllabi list compensation; the chapter says so without naming any.
+- The draft's state had review7.json for the AC chapter; it is now review8.json.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/).
