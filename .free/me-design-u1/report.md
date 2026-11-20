@@ -1,0 +1,42 @@
+# me-design-u1: free-model run
+
+- Book: `books/mech/me-design/me-design-u1.html`
+- Status: error
+- Model calls so far: 26 (99,446 tokens in, 221,667 out), 4.8 minutes
+
+## For the reviewer
+
+- chapter 4: worked example 2 needs "question", "steps" and "answer"
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Worked example 1, step 8: The factor decision says "keep material and welding at ₹240 total", but ₹240 is the full cost including machining (₹60) and overhead (₹30). Material plus welding is only 110 + 40 = ₹150. A student reading this cannot reconcile the number with step 6.
+- ch 1 [low] Section 2, cost formula: Written as C = C_mat + C_mach + C_setup / n, the setup division can be misread as applying to the whole sum. All three terms are added, and the setup share is the third.
+- ch 1 [low] Section 2, cost formula definition: The formula has no overhead term, but the worked example (₹30 overhead) and quiz Q3 (₹20 overhead) both add overhead per piece. The symbol list and later sums do not match.
+- ch 1 [low] Section 2, paragraph after the formula: "Casting is cheap in large batches and ruinous in small ones; the reverse holds for machining from bar stock" overstates the second half. Machining from bar stock is not ruinous at large batches, it only loses the per-piece advantage to casting.
+- ch 3 [low] Section 3, fits definitions: The text says that in a clearance fit the hole is always larger than the shaft, so the minimum clearance is positive. This contradicts the chapter's own table, where H7/h6 is listed as a clearance fit with a minimum clearance of zero, since the hole and shaft limits are the same size in that case. A student may think H7/h6 is not a clearance fit.
+- ch 3 [low] Section 3 and Exam trap 3: The shaft-basis fit is written 'h6/G7' (shaft symbol first) twice. In an ISO 286 designation the hole is always written first, so the standard form is G7/h6. The reversed order can make a student think the first symbol is always the hole, even though it is the shaft in this designation.
+- ch 3 [low] Section 1, rounding sentence: 'The calculated values are rounded to familiar numbers: 10, 12.5, 16, 20, 25, 31.5, 40, 50, 63, 80' follows a sentence about both R5 and R10 and does not say which series it lists, so a reader can take it as the R5 set or as a mixed set.
+- ch 3 [low] Worked example 1, step 6: The symbol ei appears in step 6 without a definition. Section 2 defines only the hole lower deviation EI and the shaft upper deviation es.
+- ch 4 [high] Worked example 2: The example is empty. It has a heading and a blank answer field, so the chapter would publish with a missing worked example.
+- ch 4 [low] Quiz Q5: The answer says the allowable stress 'may even exceed the yield strength'. Mild steel has Sy about 250 MPa and Sut about 400–450 MPa, so Sut/2 is about 200–225 MPa, which is below Sy. For the case given, the claim is false.
+- ch 4 [low] Figure: The chain reads load → strength → required FoS → allowable stress → check, so it looks as if the 45 kN load produces the allowable stress. The 45 kN node feeds nothing: the actual stress of 180 MPa needs the area 250 mm², which is not shown, so that number appears from nowhere. The edges 'load needs strength' and 'strength divided by FoS' also read awkwardly.
+- ch 5 [low] Figure caption (Section 3): The caption calls the repeating dynamic trace a 'square wave', but the plotted series ramps 1 → 2 → 1, which is a triangular wave. A student reading the caption while looking at the graph sees a contradiction.
+- ch 5 [low] Worked example, steps 1–5: Powers of ten are written without superscripts: '500 × 10−6 m²', '200 × 109 Pa', '1.962 × 105 Pa', '9.81 × 10−7 m'. Read literally, 200 × 109 Pa is 2.18 × 10⁴ Pa, not 200 GPa, so the numbers as printed are wrong.
+- ch 5 [low] Section 3, step list: The conversion step says 'Convert h, L, A and E to m, N and Pa'. Area belongs in m², and the newton is the unit of W, which is not in the list of quantities being converted.
+- ch 5 [low] Section 3, formula box: The symbol list defines g (gravitational acceleration in m/s²), but g does not appear in the dynamic-factor formula or anywhere in the box. The definition is unused and can make a student hunt for a missing g.
+- ch 6 [low] Figure caption: "Notice that only torsion gives shear stress; the other two give normal stress" contradicts Section 1, which gives direct shear τ = V/A. A shear force V is also an internal resultant and it does produce shear stress, so a student can take away the wrong rule that shear stress comes only from torque.
+- ch 6 [low] Section 3: The same radial coordinate is written as r in τ = Tr/J and as ρ in J = ∫ ρ² dA, with no statement that they are the same quantity. A student may think they are two different distances.
+- ch 6 [low] Exam traps, last bullet: "gives stress in N/mm² = MPa only after correct conversion" does not say which way the error goes, so it cannot be used as a check.
+- ch 7 [low] Section 3, second paragraph: The text says the principal stresses 'are the largest and smallest normal stresses at that point'. In plane stress the element also has a third principal stress σ3 = 0 on the face normal to the page. If both in-plane principal stresses are compressive (say −30 MPa and −80 MPa), the algebraically largest normal stress at the point is 0, not −30 MPa, so the sentence as written contradicts the 3D stress state.
+- ch 7 [low] Section 1, last sentence: 'Transverse shear stress is usually small at the surface' is imprecise. For a round shaft the transverse shear stress is exactly zero at the top and bottom surface fibres (where bending stress is largest) and maximum at the neutral axis, so 'small at the surface' can mislead a student about where to check it.
+- ch 7 [low] Figure, nodes 'bend' and 'principal': The node labelled 'Bending stress' carries the note 'M = 300 N·m', which is a moment, not a stress, and the node labelled 'Principal stresses' shows only σ1 = 162.5 MPa. A student reading the flow cannot see the bending stress value or the second principal stress.
+- ch 8 [low] Section 2, beam deflection table: The table gives results in terms of w, E and I but never defines these symbols or their units; a student reading only the table cannot tell that w is load per unit length (N/mm), E is Young's modulus (N/mm²) and I is the second moment of area (mm⁴).
+- ch 8 [low] Figure, strength-check node: The note reads 'σ ≤ S/FoS', but S is not a symbol used anywhere in the text; the chapter defines yield strength as S_y. A student may read S as a different quantity (for example, allowable stress itself).
+- ch 8 [low] Section 3, last paragraph: 'Stiffness often controls long shafts and slender beams because deflection grows with length cubed in bending' gives a bending reason for shafts as well, but a shaft's angle of twist grows only linearly with length (θ = TL/(GJ)). The stated reason does not explain why stiffness controls long shafts.
+- ch 8 [low] Worked example 1, answer line: The answer says 'use 34 mm, and the deflection is then 2.15 mm'. The value 2.15 mm belongs to b = 33.47 mm; at b = 34 mm the deflection is about 2.02 mm. The rounded size and the quoted deflection do not match.
+- ch 9 [low] Section 1, first paragraph: "a fibre at distance y from the neutral axis has length proportional to y" is wrong: in a straight beam every fibre between two sections has the same original length. What varies with y is the change in length, and hence the strain.
+- ch 9 [low] Section 1, sentence after the stress formula: Typo "r = Ri n" — the stray n makes the sentence read as a product Ri × n.
+- ch 9 [low] Section 1, formula block for Rn and e: The symbol b appears in A = b h without ever being defined. Depth h, Ri and Ro are defined; the width is not.
+- ch 9 [low] Section 2, critical-section sentence: "the horizontal section through the hook where the load line passes near the centre of curvature" is garbled: the load line is taken to pass through the centre of curvature, so it cannot pass "near" it, and it does not identify which horizontal section is critical.
+- ch 9 [low] Figure: Both plotted curves include the direct stress P/A (the +11.111 term), but the axis is labelled simply "stress (MPa)" and the curves are named "curved" and "straight". The chapter defines σ as bending stress only, so a student may take the curve as bending stress alone (the inner value would then read about 110 MPa, not 121 MPa).
