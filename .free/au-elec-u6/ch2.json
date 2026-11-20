@@ -1,0 +1,185 @@
+{
+ "lead": "CAN is a two-wire, multi-master broadcast bus. Every node hears every frame; there is no master and no address. A dominant 0 beats a recessive 1 on the wire, so when two nodes start together the one with the lower identifier wins arbitration and keeps transmitting. The loser stops and receives, with no data lost. Classic CAN carries 0 to 8 data bytes at up to 1 Mbit/s. CAN FD keeps the same arbitration and adds a faster data phase and up to 64 bytes, so it suits today's ECUs that exchange longer calibration and sensor packets.",
+ "prereq": "You need: <a href=\"#vehicle-networking-and-need-for-data-buses\">Chapter 6.1</a> for the shared-bus idea, and Unit 3 for digital signals and sensors.",
+ "sections": [
+  {
+   "h3": "Arbitration: the lowest identifier wins",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CAN is broadcast and multi-master. Each node has a CAN controller and a transceiver. The bus has two wires, CAN_H and CAN_L, with 120 Ω termination at both ends. A 0 is dominant: if one node drives 0 and another drives 1, the wire reads 0. A 1 is recessive. This wired-AND behaviour is the whole trick behind arbitration."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Bus idle: recessive.",
+      "Nodes with a frame send SOF, a dominant 0.",
+      "All nodes send identifier bits, most significant first, and listen.",
+      "A node that sends 1 and reads 0 has lost.",
+      "It stops transmitting, switches to receive, and the winner continues."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "No data is destroyed. The winner's frame is exactly the frame that all nodes receive. The lower identifier has higher priority because a 0 at an earlier bit beats a 1. This is non-destructive arbitration. A node that loses does not retry at once; it waits for the bus to become idle and competes again. This gives predictable priority for urgent signals such as a crash sensor over a cabin temperature update."
+    }
+   ]
+  },
+  {
+   "h3": "Classic CAN frame, timing and faults",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Classic CAN frame fields, left to right: SOF (1 dominant bit); arbitration field (11-bit standard identifier or 29-bit extended identifier, plus RTR and IDE); control field (DLC, 4 bits); data field (0 to 8 bytes); CRC (15 bits); ACK (2 bits); EOF (7 recessive bits). RTR marks a remote frame. IDE selects standard or extended format. DLC encodes length; for classic CAN values 9 to 15 are not used as lengths. The CRC checks the frame; after CRC, any receiver that saw a valid CRC drives ACK dominant."
+    },
+    {
+     "type": "p",
+     "text": "Bit stuffing keeps edges for synchronisation: after five identical bits, the transmitter inserts one opposite bit. Stuffing runs from SOF through CRC. Receivers remove stuffed bits. A form, CRC or stuff error makes a node send an error frame: six dominant bits for an active error. Each node keeps a transmit error counter (TEC) and receive error counter (REC). Errors increase the counters; good frames decrease them. A node with TEC above 255 goes bus-off and stops transmitting."
+    },
+    {
+     "type": "p",
+     "text": "Bit timing divides one bit into time quanta (tQ). The segments are sync, propagation, phase 1 and phase 2. The sample point is the end of phase 1. Classic CAN tops out at 1 Mbit/s. ISO 11898-2 is the high-speed physical layer."
+    },
+    {
+     "type": "formula",
+     "text": "SP = (1 + PROP + PHASE1) / N",
+     "where": "SP is the sample point as a fraction of one bit; N = 1 + PROP + PHASE1 + PHASE2 is the total number of time quanta in the bit; PROP is the propagation segment in time quanta; PHASE1 and PHASE2 are the phase buffer segments."
+    }
+   ]
+  },
+  {
+   "h3": "CAN FD: same arbitration, faster data",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "CAN FD keeps the same arbitration and ACK scheme. It changes the frame after the identifier. FDF (FD Format) marks an FD frame. A classic controller sees a recessive bit where it expects dominant, raises a form error and sends an error frame, so the FD frame is destroyed. Classic and FD nodes therefore cannot share one bus; every controller and transceiver on the segment must support CAN FD. BRS (Bit Rate Switch) is recessive to switch to the fast data phase; the arbitration phase stays at the nominal rate. ESI (Error State Indicator) reports the sender's error state. DLC can now mean 0 to 8, 12, 16, 20, 24, 32, 48 or 64 bytes. The CRC is stronger: 17 bits for up to 16 data bytes and 21 bits for longer frames. Remote frames are dropped in CAN FD, so RTR is not used."
+    },
+    {
+     "type": "p",
+     "text": "Typical use: nominal arbitration at 500 kbit/s or 1 Mbit/s, data phase commonly 2 to 5 Mbit/s. The faster phase shortens long calibration, software download and sensor packets. Physical layer remains ISO 11898-2 high-speed, so the same two wires and 120 Ω termination are used."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "Field order in a classic CAN frame and a CAN FD frame. The identifier follows SOF; BRS is the switch to the fast data phase. Only the new and changed bits are drawn in the FD row: the IDE bit is still present in every frame.",
+  "spec": {
+   "type": "array",
+   "title": "Frame fields from left to right",
+   "show_index": false,
+   "aria": "Array showing the field order of a classic CAN frame and a CAN FD frame, with the identifier in both frames and the bit-rate switch (BRS) in the CAN FD frame highlighted.",
+   "rows": [
+    {
+     "label": "Classic CAN",
+     "cells": [
+      "SOF",
+      "ID",
+      "RTR",
+      "IDE",
+      "DLC",
+      "DATA",
+      "CRC",
+      "ACK",
+      "EOF"
+     ],
+     "marks": {
+      "1": "accent"
+     }
+    },
+    {
+     "label": "CAN FD",
+     "cells": [
+      "SOF",
+      "ID",
+      "FDF",
+      "res",
+      "BRS",
+      "ESI",
+      "DLC",
+      "DATA",
+      "CRC",
+      "ACK",
+      "EOF"
+     ],
+     "marks": {
+      "1": "accent",
+      "4": "accent"
+     }
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "question": "Nodes A and B start arbitration together. A uses standard identifier 0x123 and B uses 0x121. Both send data frames with 8 data bytes. Which node wins arbitration, at which identifier bit, and what are the two decimal identifiers?",
+   "steps": [
+    "A: 0x123 = 291 decimal. B: 0x121 = 289 decimal.",
+    "Write 11 identifier bits. A = 001 0010 0011. B = 001 0010 0001.",
+    "Compare from the most significant bit. They agree until bit 1, counting bit 0 at the least significant end.",
+    "At bit 1, A sends recessive 1 and B sends dominant 0.",
+    "B wins arbitration. A stops transmitting and becomes a receiver. B's frame continues intact."
+   ],
+   "answer": "B wins with identifier 0x121 at bit 1; the decimal identifiers are 291 for A and 289 for B.",
+   "check": "a = 0x123\nb = 0x121\ndiff = a ^ b\nbit = diff.bit_length() - 1\nprint(bit)\nprint(a)\nprint(b)",
+   "values": [
+    1,
+    291,
+    289
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Lower identifier wins, not higher; dominant is 0 and recessive is 1.",
+  "The losing node keeps receiving the winning frame; it does not retry in the same arbitration.",
+  "CAN FD switches only the data phase with BRS; arbitration stays at the nominal bit rate.",
+  "DLC is not a plain byte count above 8 in CAN FD: 9 means 12 bytes, 10 means 16, 15 means 64.",
+  "Bus-off is a transmitter state after TEC exceeds 255, not a normal error frame."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Which bit value is dominant on a CAN bus?",
+   "marks": 2,
+   "a": "0. A dominant 0 overwrites a recessive 1."
+  },
+  {
+   "level": "understand",
+   "q": "Why is CAN arbitration called non-destructive?",
+   "marks": 3,
+   "a": "The losing transmitter stops before it can corrupt the winning frame, so the winning frame is received intact."
+  },
+  {
+   "level": "apply",
+   "q": "Nodes send 0x200 and 0x204. Which wins and at which identifier bit?",
+   "marks": 4,
+   "a": "0x200 = 512 and 0x204 = 516. 11-bit forms: 010 0000 0000 and 010 0000 0100. They differ at bit 2; 0x200 sends 0 there and 0x204 sends 1, so 0x200 wins."
+  },
+  {
+   "level": "analyze",
+   "q": "A transmitter sends recessive 1 and reads dominant 0 during the identifier. What does it do next?",
+   "marks": 3,
+   "a": "It loses arbitration, stops transmitting, and becomes a receiver for the rest of the winning frame."
+  },
+  {
+   "level": "remember",
+   "q": "Name two fields that CAN FD adds after the identifier.",
+   "marks": 2,
+   "a": "FDF and BRS; ESI is also added."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does CAN FD use a stronger CRC?",
+   "marks": 4,
+   "a": "Longer payloads and a faster data phase raise the chance of undetected bit errors, so 17-bit or 21-bit CRC is used."
+  },
+  {
+   "level": "apply",
+   "q": "What is the sample point if N = 10 tQ, PROP = 3, PHASE1 = 2 and PHASE2 = 4?",
+   "marks": 4,
+   "a": "SP = (1 + 3 + 2) / 10 = 6 / 10 = 0.60, so the sample point is at 60% of the bit."
+  }
+ ],
+ "beyond": "Not for the exam. CAN FD is now common in new ECUs, and CAN XL extends payload and rate for zonal architectures. Partial networking lets ECUs wake only when needed. Security work adds authentication and intrusion detection above CAN. Search terms: CAN FD transceiver, CAN XL, partial networking, automotive intrusion detection."
+}

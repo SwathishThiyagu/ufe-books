@@ -1,0 +1,611 @@
+{
+ "lead": "A modern car has dozens of electronic control units that must share data over a few wires, and the same car talks to the world outside through radio. This unit explains the buses inside the vehicle, the diagnostic port, the safety rules for their software, and the V2X and VANET systems that connect vehicles to each other and to the road. After it you can read a CAN frame, pick a bus for a given sensor, decode an OBD-II fault, and describe how a safety message travels from one car to another.",
+ "about": "The unit starts with why a car needs a data bus at all (6.1), then takes the bus protocols in order of speed and cost: CAN and CAN FD (6.2), LIN, FlexRay and automotive Ethernet (6.3). Chapter 6.4 shows how a standard scan tool talks to any car through OBD-II. Chapter 6.5 adds the software rules behind safety-critical ECUs, MISRA C and ISO 26262. The last three chapters move outside the car: V2X and connected services (6.6), the VANET network formed by moving vehicles (6.7), and the DSRC/802.11p/WAVE radio stack that carries the messages (6.8).",
+ "chapters": [
+  {
+   "k": 1,
+   "idea": "A shared two-wire bus replaces a thick web of point-to-point wires, so many ECUs can exchange many signals at low cost and weight.",
+   "depth": "Define node, ECU, gateway, harness, topology (bus, star, ring), bandwidth, latency and determinism. Show the wiring count: n nodes fully connected need n(n−1)/2 links, while a bus needs one medium and one transceiver per node. Typical car has tens of ECUs and several buses joined by a gateway; one signal may be needed by many nodes. Some syllabi call the classes A (body, below 10 kbit/s), B (low-speed data), C (powertrain, high speed) and D (safety, time-triggered). Twisted pair, 120 Ω termination, common-mode noise, fault diagnosis. Trade-off: one medium means shared bandwidth, so the protocol must decide who talks when.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "ECUs sharing one bus through a gateway",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "ECU 1",
+      "note": "engine",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "ECU 2",
+      "note": "brake",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "ECU 3",
+      "note": "door",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "CAN bus",
+      "note": "twisted pair, 2 wires",
+      "style": "accent"
+     },
+     {
+      "id": "e",
+      "label": "Gateway",
+      "note": "routes between buses",
+      "style": "next"
+     },
+     {
+      "id": "f",
+      "label": "Body bus",
+      "note": "LIN",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     }
+    ],
+    "aria": "Block diagram: three ECUs share one two-wire bus, which reaches other buses through a gateway."
+   },
+   "example": "Question: A car has 12 ECUs and each ECU must exchange one signal with every other ECU. Compare the link count for full point-to-point wiring with one shared bus. Answer: point-to-point needs n(n−1)/2 = 12×11/2 = 66 links, so 66 twisted pairs and 132 transceiver ends. One bus needs one medium and 12 transceivers; the saving grows quickly with n.",
+   "trap": "Counting every pair twice: 12 ECUs need 66 links, not 132. A bus is not a star; all nodes share one medium, so they cannot all talk at once.",
+   "prereq": "Unit 1 power distribution and harness basics; Unit 3 sensor and actuator signal conditioning.",
+   "leave": "Frame formats to 6.2; LIN, FlexRay and Ethernet details to 6.3; diagnostics to 6.4."
+  },
+  {
+   "k": 2,
+   "idea": "CAN is a multi-master broadcast bus where a dominant 0 beats a recessive 1, so the lowest identifier wins arbitration without losing data; CAN FD keeps that scheme and adds a faster data phase and up to 64 data bytes.",
+   "depth": "Frame fields in order: SOF, arbitration field (11-bit standard or 29-bit extended identifier plus RTR and IDE), control (DLC), data 0-8 bytes, CRC, ACK, EOF. Bit stuffing, CRC checking, error frames, transmit and receive error counters, bus-off. Bit timing: sync segment, propagation segment, phase segments, sample point; 1 Mbit/s maximum for classic CAN. Arbitration is non-destructive: a node sending recessive 1 while another sends dominant 0 stops as a transmitter and becomes a receiver. CAN FD adds FDF, BRS (switch to fast data phase, commonly 2-5 Mbit/s), ESI and DLC up to 64 bytes, with a stronger CRC; remote frames are dropped. Physical layer ISO 11898-2 high-speed. Leave higher-layer protocols such as CANopen and J1939.",
+   "figure": {
+    "type": "array",
+    "title": "Frame fields from left to right",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "Classic CAN",
+      "cells": [
+       "SOF",
+       "ID",
+       "RTR",
+       "IDE",
+       "DLC",
+       "DATA",
+       "CRC",
+       "ACK",
+       "EOF"
+      ],
+      "marks": {
+       "1": "accent",
+       "6": "live"
+      }
+     },
+     {
+      "label": "CAN FD",
+      "cells": [
+       "SOF",
+       "ID",
+       "FDF",
+       "BRS",
+       "ESI",
+       "DLC",
+       "DATA",
+       "CRC",
+       "ACK",
+       "EOF"
+      ],
+      "marks": {
+       "3": "accent"
+      }
+     }
+    ],
+    "aria": "Array showing the field order of a classic CAN frame and a CAN FD frame, with the identifier and bit-rate switch fields highlighted."
+   },
+   "example": "Question: Nodes A and B start together with identifiers 0x123 and 0x121. Which wins arbitration, and at which bit? Answer: 0x123 = 0001 0010 0011 and 0x121 = 0001 0010 0001 in binary. The fields agree until bit 1, the second-least-significant bit. A sends recessive 1 there and B sends dominant 0, so B wins and A becomes a receiver. B's lower identifier gives it higher priority.",
+   "trap": "Lower identifier wins, not higher; dominant is 0, recessive is 1. A node that loses arbitration keeps receiving the winning frame; it does not retry immediately.",
+   "prereq": "Chapter 6.1 bus basics; Unit 3 digital signals and sensors.",
+   "leave": "LIN, FlexRay and Ethernet to 6.3; fault-code services to 6.4; coding rules to 6.5.",
+   "figure_note": ""
+  },
+  {
+   "k": 3,
+   "idea": "Each bus fills a niche: LIN is a cheap single-wire master-slave bus for body switches, FlexRay is a time-triggered dual-channel bus for x-by-wire, and automotive Ethernet is a switched high-bandwidth backbone.",
+   "depth": "LIN: one wire, 12 V signalling, one master and up to 15 slaves, schedule table polling, frame with break, sync, protected identifier, data and checksum, 1-20 kbit/s, sleep and wake. FlexRay: two channels at 10 Mbit/s each, communication cycle with static TDMA segment, dynamic FTDMA segment, symbol window and network idle time; fault-tolerant, deterministic, used for steering and damping. Automotive Ethernet: 100BASE-T1 and 1000BASE-T1 single twisted pair, switched star, VLANs, SOME/IP for service communication, AVB/TSN for bounded latency; 10BASE-T1S for short zonal links. Keep framing details short for LIN and FlexRay.",
+   "figure": {
+    "type": "array",
+    "title": "Bus comparison",
+    "show_index": false,
+    "rows": [
+     {
+      "label": "LIN",
+      "cells": [
+       "1",
+       "20k",
+       "M-S",
+       "Low"
+      ],
+      "marks": {
+       "1": "muted"
+      }
+     },
+     {
+      "label": "FlexRay",
+      "cells": [
+       "2",
+       "10M",
+       "TDMA",
+       "High"
+      ],
+      "marks": {
+       "1": "accent"
+      }
+     },
+     {
+      "label": "Ethernet",
+      "cells": [
+       "2",
+       "100M",
+       "Sw",
+       "Med"
+      ],
+      "marks": {
+       "1": "live"
+      }
+     }
+    ],
+    "aria": "Table comparing LIN, FlexRay and Ethernet on wires, rate, access method and cost."
+   },
+   "example": "Question: A 1000-byte payload must cross the car. How long does it take on 100 Mbit/s Ethernet and on a 20 kbit/s LIN bus? Answer: payload = 1000×8 = 8000 bits. Ethernet: 8000/100×10⁶ = 80 µs. LIN: 8000/20×10³ = 0.4 s = 400 ms. Overhead is ignored, so real times are a little longer.",
+   "trap": "LIN has one master that polls; it is not multi-master. FlexRay's static segment is time-triggered, so do not call the whole protocol pure event-driven.",
+   "prereq": "Chapters 6.1 and 6.2.",
+   "leave": "OBD-II to 6.4; V2X radio to 6.8.",
+   "figure_note": ""
+  },
+  {
+   "k": 4,
+   "idea": "OBD-II standardises the 16-pin diagnostic connector, the messages and the fault-code format, so one scan tool can read emissions-related data from any compliant car.",
+   "depth": "J1962 connector: pins 4 and 5 ground, pin 16 battery positive, pins 6 and 14 CAN, pins 7 and 15 K-line, pins 2 and 10 older J1850. Services: 01 current data, 02 freeze frame, 03 stored DTCs, 04 clear, 05 oxygen sensor results, 06 test results, 09 VIN, 0A permanent codes. PID response uses 1 or 2 data bytes; show the scaling formula for a common PID. DTC format: letter P/C/B/U plus four hex digits, for example P0301. Readiness monitors, drive cycle, malfunction indicator lamp (MIL). CAN at 500 kbit/s with 11-bit identifiers and 250 kbit/s with 29-bit identifiers. OBD-II is emissions-focused; manufacturer enhanced diagnostics go deeper.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Path from scan tool to fault code",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Scan tool",
+      "note": "generic or OEM",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "J1962 connector",
+      "note": "pins 6 and 14",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "CAN bus",
+      "note": "500 kbit/s",
+      "style": "normal"
+     },
+     {
+      "id": "d",
+      "label": "Engine ECU",
+      "note": "monitors sensors",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "DTC + freeze frame",
+      "note": "stored fault data",
+      "style": "accent"
+     },
+     {
+      "id": "f",
+      "label": "MIL",
+      "note": "dashboard lamp",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "f",
+      "style": "solid"
+     }
+    ],
+    "aria": "Block diagram: a scan tool plugs into the 16-pin connector, reaches the ECU over CAN, reads stored fault codes and freeze-frame data, and the ECU drives the malfunction lamp."
+   },
+   "example": "Question: PID 0C returns bytes A = 0x1A and B = 0xF0. Find the engine speed. Answer: A = 26 and B = 240. RPM = ((A×256) + B)/4 = ((26×256) + 240)/4 = (6656 + 240)/4 = 6896/4 = 1724 rpm.",
+   "trap": "P in P0301 means powertrain, not petrol. OBD-II codes are generic; a manufacturer-specific code needs enhanced diagnostics beyond the standard services.",
+   "prereq": "Chapter 6.2 CAN frames and physical layer.",
+   "leave": "CAN frame details to 6.2; safety process to 6.5."
+  },
+  {
+   "k": 5,
+   "idea": "MISRA C removes risky C constructs, and ISO 26262 assigns an ASIL level from hazard risk and then demands a documented safety lifecycle with evidence that the level is met.",
+   "depth": "Only a few universities teach this; keep it short. MISRA C:2012 gives required and advisory guidelines with documented deviations: no recursion, no dynamic memory after start-up, no implicit conversions that lose value, braces on every if/else, no pointer arithmetic outside arrays, check return values. ISO 26262:2018 parts 1-12; item definition, hazard analysis and risk assessment (HARA), safety goal, ASIL A-D plus QM from severity, exposure and controllability, fault tolerant time interval (FTTI), technical safety concept, safety mechanisms, hardware metrics SPFM and LFM, ASIL decomposition, V-model, confirmation measures. Do not turn this into a full safety-engineering course.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "ISO 26262 safety lifecycle",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "Item definition",
+      "note": "boundary and function",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "Hazard analysis",
+      "note": "HARA",
+      "style": "normal"
+     },
+     {
+      "id": "c",
+      "label": "Safety goals",
+      "note": "ASIL A-D",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "Technical concept",
+      "note": "safety mechanisms",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Implementation",
+      "note": "software and hardware",
+      "style": "normal"
+     },
+     {
+      "id": "f",
+      "label": "Verification",
+      "note": "tests and metrics",
+      "style": "live"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     },
+     {
+      "from": "e",
+      "to": "f",
+      "style": "solid"
+     }
+    ],
+    "aria": "Block diagram of the ISO 26262 safety lifecycle from item definition to verification."
+   },
+   "example": "Question: A safety goal has FTTI = 200 ms. Sensor sampling takes 20 ms, two-frame confirmation takes 40 ms, and the actuator needs 30 ms. How much time remains for fault detection? Answer: detection budget = 200 − 20 − 40 − 30 = 110 ms. The safety mechanism must detect the fault and start the safe reaction within 110 ms.",
+   "trap": "Passing MISRA checks does not prove ASIL compliance; ISO 26262 also needs the process, hardware metrics and evidence. ASIL D is the highest level, not a component grade you can buy.",
+   "prereq": "Chapter 6.2 for CAN behaviour; Chapter 6.4 for diagnostic monitors.",
+   "leave": "CAN and LIN protocol details to 6.2-6.3; detailed hazard mathematics to a dedicated safety course."
+  },
+  {
+   "k": 6,
+   "idea": "V2X lets a vehicle exchange messages with other vehicles, roadside units, pedestrians and networks, adding awareness beyond radar and camera, and the same electronics unit feeds the connected cabin.",
+   "depth": "Types: V2V, V2I, V2P, V2N, V2G. Safety use cases: forward collision warning, intersection movement assist, emergency vehicle warning, road-hazard alert, green light optimal speed advisory. Cellular V2X (LTE-V2X sidelink and 5G-V2X) compared with 802.11p; telematics control unit, cloud services, over-the-air updates, tolling. Infotainment: head unit, smartphone projection, audio and video, navigation, HUD listed here in some syllabi (its optics belong to Unit 2), cybersecurity attack surface and message authentication. Connected autonomous vehicles use V2X as one more input beside radar, camera and LiDAR.",
+   "figure": {
+    "type": "graph",
+    "directed": true,
+    "title": "V2X links around one vehicle",
+    "nodes": [
+     {
+      "id": "V1",
+      "label": "Car 1",
+      "x": 1,
+      "y": 2,
+      "note": "OBU",
+      "style": "accent"
+     },
+     {
+      "id": "V2",
+      "label": "Car 2",
+      "x": 3,
+      "y": 2,
+      "note": "OBU",
+      "style": "normal"
+     },
+     {
+      "id": "RSU",
+      "label": "RSU",
+      "x": 2,
+      "y": 1,
+      "note": "roadside unit",
+      "style": "next"
+     },
+     {
+      "id": "Ped",
+      "label": "Pedestrian",
+      "x": 1,
+      "y": 3,
+      "note": "phone app",
+      "style": "normal"
+     },
+     {
+      "id": "Cloud",
+      "label": "Cloud",
+      "x": 4,
+      "y": 1,
+      "note": "backend",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "V1",
+      "to": "V2",
+      "label": "V2V",
+      "style": "solid"
+     },
+     {
+      "from": "V1",
+      "to": "RSU",
+      "label": "V2I",
+      "style": "solid"
+     },
+     {
+      "from": "V2",
+      "to": "RSU",
+      "label": "V2I",
+      "style": "dashed"
+     },
+     {
+      "from": "Ped",
+      "to": "V1",
+      "label": "V2P",
+      "style": "solid"
+     },
+     {
+      "from": "RSU",
+      "to": "Cloud",
+      "label": "backhaul",
+      "style": "solid"
+     },
+     {
+      "from": "V2",
+      "to": "Cloud",
+      "label": "V2N",
+      "style": "dashed"
+     }
+    ],
+    "aria": "Graph of V2X links: vehicle to vehicle, vehicle to roadside unit, vehicle to pedestrian, and roadside unit to cloud."
+   },
+   "example": "Question: Two cars close at 40 m/s relative speed. A warning is useful 2.5 s before a possible collision. How far ahead must it arrive, and how much does 100 ms of V2X latency add? Answer: distance = 40×2.5 = 100 m. Latency adds 40×0.1 = 4 m, so the message must arrive by 104 m.",
+   "trap": "V2X is radio communication, not a radar or camera sensor. V2V works without network coverage; only V2N services need the cellular network.",
+   "prereq": "Chapters 6.1 and 6.3; Unit 5 ADAS sensors.",
+   "leave": "Routing inside the vehicle network to 6.7; radio stack to 6.8; HUD optics to Unit 2."
+  },
+  {
+   "k": 7,
+   "idea": "A VANET is an ad hoc network of moving vehicles, with road-constrained motion and no fixed infrastructure, so routing uses position and road knowledge rather than stable links.",
+   "depth": "Only a few universities teach this; keep it shorter. WHO global status reports on road safety put road traffic deaths above one million a year, most in low- and middle-income countries; this motivates safety applications. Connected autonomous vehicles need V2X because sensors cannot see through buildings. Ad hoc wireless network: no fixed infrastructure, multi-hop. VANET domains: in-vehicle domain, ad hoc domain (on-board unit, OBU, and roadside unit, RSU), infrastructure domain. Characteristics: high speed, short connection time, predictable road paths, GPS available, no energy limit, large scale. Applications: safety (collision warning, hazard warning, intersection warning) and non-safety (traffic information, tolling, parking, infotainment). Routing families: topology-based AODV and DSR, position-based GPSR greedy and perimeter modes, geocast, broadcast storm problem, store-and-forward for gaps.",
+   "figure": {
+    "type": "blocks",
+    "direction": "down",
+    "title": "Three VANET domains",
+    "nodes": [
+     {
+      "id": "a",
+      "label": "In-vehicle domain",
+      "note": "ECUs on CAN",
+      "style": "normal"
+     },
+     {
+      "id": "b",
+      "label": "OBU",
+      "note": "on-board unit",
+      "style": "accent"
+     },
+     {
+      "id": "c",
+      "label": "Ad hoc domain",
+      "note": "OBU-OBU, OBU-RSU",
+      "style": "accent"
+     },
+     {
+      "id": "d",
+      "label": "RSU",
+      "note": "roadside unit",
+      "style": "normal"
+     },
+     {
+      "id": "e",
+      "label": "Infrastructure",
+      "note": "Internet and cloud",
+      "style": "muted"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a",
+      "to": "b",
+      "style": "solid"
+     },
+     {
+      "from": "b",
+      "to": "c",
+      "style": "solid"
+     },
+     {
+      "from": "c",
+      "to": "d",
+      "style": "solid"
+     },
+     {
+      "from": "d",
+      "to": "e",
+      "style": "solid"
+     }
+    ],
+    "aria": "Block diagram of the three VANET domains: in-vehicle, ad hoc and infrastructure."
+   },
+   "example": "Question: A packet at (0,0) must reach a destination at (100,0). Neighbours are A at (40,10), B at (70,−20) and C at (20,30). Which neighbour does greedy forwarding choose? Answer: distance to destination: A = √(60²+10²) = √3700 ≈ 60.8; B = √(30²+20²) = √1300 ≈ 36.1; C = √(80²+30²) = √7300 ≈ 85.4. Greedy forwarding sends to B, the closest to the destination.",
+   "trap": "VANET nodes are not energy-limited and move on roads, so generic MANET assumptions fail at highway speed. AODV link repair cannot keep up with 120 km/h traffic.",
+   "prereq": "Chapters 6.1 and 6.6; basic IP routing helps.",
+   "leave": "MAC and PHY details to 6.8."
+  },
+  {
+   "k": 8,
+   "idea": "DSRC is the 5.9 GHz radio, IEEE 802.11p is its Wi-Fi-derived MAC and PHY, and WAVE (IEEE 1609) is the stack above it that handles multi-channel timing, networking and security.",
+   "depth": "Only a few universities teach this; keep it short. DSRC uses the 5.9 GHz band (about 5.85-5.925 GHz in the US, 5.855-5.925 GHz in Europe), 10 MHz channels, a control channel and service channels. 802.11p: OFDM with 10 MHz channels, outside-context operation, no association or authentication handshake, EDCA priorities, roughly 3-27 Mbit/s depending on modulation. WAVE stack: IEEE 1609.1 resource manager, 1609.2 security, 1609.3 networking with WSMP and IPv6, 1609.4 multi-channel coordination with a 100 ms sync interval split into control-channel and service-channel intervals. Basic safety message (BSM) sent about 10 times per second.",
+   "figure": {
+    "type": "stack",
+    "pyramid": false,
+    "title": "WAVE protocol stack",
+    "items": [
+     {
+      "label": "Applications",
+      "note": "BSM at 10 Hz",
+      "style": "normal"
+     },
+     {
+      "label": "IEEE 1609.3",
+      "note": "WSMP, IPv6",
+      "style": "normal"
+     },
+     {
+      "label": "IEEE 1609.4",
+      "note": "CCH/SCH every 100 ms",
+      "style": "accent"
+     },
+     {
+      "label": "802.11p MAC",
+      "note": "EDCA, no association",
+      "style": "normal"
+     },
+     {
+      "label": "802.11p PHY",
+      "note": "OFDM, 10 MHz",
+      "style": "normal"
+     },
+     {
+      "label": "5.9 GHz radio",
+      "note": "DSRC band",
+      "style": "muted"
+     }
+    ],
+    "side": {
+     "top": "higher layers",
+     "bottom": "radio"
+    },
+    "aria": "Stack diagram of the WAVE protocol stack from applications down to the 5.9 GHz radio."
+   },
+   "example": "Question: A 300-byte BSM is sent at 6 Mbit/s. How long is one transmission, and how many fit in a 50 ms control-channel interval that keeps 10% for overhead? Answer: 300 bytes = 2400 bits, so time = 2400/6×10⁶ = 400 µs = 0.4 ms. Usable time = 50×0.9 = 45 ms, so 45/0.4 = 112 messages fit.",
+   "trap": "802.11p uses 10 MHz channels, not the 20 MHz of 802.11a, so the headline data rate is about half. WAVE is more than 802.11p; it includes the 1609 multi-channel and security layers.",
+   "prereq": "Chapters 6.6 and 6.7.",
+   "leave": "V2X applications to 6.6; VANET routing to 6.7."
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   "a shared medium needs an arbitration rule"
+  ],
+  [
+   2,
+   3,
+   "CAN's 1 Mbit/s ceiling opens room for LIN, FlexRay and Ethernet"
+  ],
+  [
+   2,
+   4,
+   "OBD-II messages travel in CAN frames"
+  ],
+  [
+   2,
+   5,
+   "safety-critical CAN code follows MISRA and ASIL rules"
+  ],
+  [
+   3,
+   6,
+   "the Ethernet backbone carries infotainment and V2X traffic"
+  ],
+  [
+   6,
+   7,
+   "V2X services are delivered over a VANET"
+  ],
+  [
+   7,
+   8,
+   "a VANET needs a radio link, supplied by DSRC"
+  ],
+  [
+   6,
+   8,
+   "DSRC and 802.11p are one radio option for V2X"
+  ]
+ ]
+}
