@@ -484,3 +484,8 @@
 - The packet on main adds "Compensation theorem" as subtopic 7 (from the exam course); the draft had no chapter for it, so chapter 2.7 is new and AC applications moved to 2.8. Only a few syllabi list compensation; the chapter says so without naming any.
 - The draft's state had review7.json for the AC chapter; it is now review8.json.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/).
+## me-thermo-u5 (Claude correction pass, 20 Nov 2026)
+- The packet was built from ME25C11 Applied Thermodynamics; the exam course ME25301 unit 4 covers pure substances, property diagrams, the Gibbs phase rule, tables and charts, real gases, van der Waals, Z and the generalized chart, but not gas mixtures or psychrometry. Chapters 5.9 and 5.10 stay for the other syllabi.
+- The Gibbs phase rule (new in the packet) is chapter 5.3; the draft's chapters 5.3–5.9 moved to 5.4–5.10.
+- Draft errors fixed: v_g at 1 atm 1.673 m³/kg (not 1.694), the 0 °C / 0.5 kPa triple-point example, the steam calorimeter limits, and the psychrometry bank answer (30 °C DBT, 20 °C WBT gives w 0.0105, φ 40 %, dew point 14.8 °C).
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
