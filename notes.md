@@ -436,3 +436,10 @@
 - Packet data: the SRM entry (UPY23203J Heat and Thermodynamics) is a physics course and lists thermodynamic potentials and the Joule-Kelvin coefficient under this unit; the IIT Delhi and NIT Surathkal entries list whole courses under one unit. They set no extra depth here.
 - Several of the draft reviewer's "high" flags (ch 3.7 missing inequality, ch 3.9 missing exponents) were artefacts of its plain-text view stripping "<" and tags; the book itself was right there. The real errors were the long formulas printing raw <sub> tags, the 3.1 example's reversed device, the 3.5 gas-thermometer and 3.9 steam-table claims, and a C program in the 3.8 example.
 - Web: MIT OCW (university-hosted) and an unopened Khan Academy link dropped.
+
+## me-thermo-u2 (Claude correction pass, 20 Nov 2026)
+
+- Packet: new subtopic "Unsteady flow processes: filling and emptying of vessels" written as chapter 2.7 (USUF mass and energy balances, filling an empty tank to γTᵢ, adiabatic discharge following the reversible adiabatic law); the draft's limitations chapter moved to 2.8.
+- Exam course (ME25301) unit 2 topics covered: forms of energy and Q − W = ΔE (2.1), moving boundary work and free expansion (2.1), first law for closed systems and control volumes (2.1, 2.6), steady and unsteady flow (2.6, 2.7). Heat, work modes and reversible processes belong to other units and are named there by topic.
+- Packet data: "Specific heats of gases" and "Perpetual motion machine of the first kind" are tagged advanced, though PMM-1 is in most first-law textbooks as a one-line corollary. The SRM entry (UPY23203J Heat and Thermodynamics) is a physics course, and the IIT Delhi and NIT Surathkal entries list whole courses under one unit.
+- Draft errors fixed: the bank's isothermal-vs-adiabatic compression outline (a closed-system adiabatic needs less boundary work to the same pressure), the free-expansion question ("same whatever the gas" holds for U₂ = U₁, not T₂ = T₁), an unnamed refrigerant (now R-134a), q = Δh for every no-work device, PMM-1 lead, Unit/Chapter cross-references. MIT OCW link dropped.
