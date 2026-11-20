@@ -414,3 +414,11 @@
 - The exam course's unit 1 topics list no system classification or system properties; chapters 1.5 and 1.6 stay for the other syllabi (that course likely teaches them with LTI systems).
 - Its "Analogy between vectors and signals" was missing from the draft; chapter 1.7 now carries it (component c12 and the best approximation).
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+
+## ec-circuits-u3 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course (EE25302) spreads this unit over its units "Phasors and AC steady state analysis" (chapters 3.1 to 3.4) and "Three phase circuits" (chapters 3.6 and 3.7); the three-phase chapter now has a 3-wire/4-wire unbalanced star example with a broken neutral, R-Y-B naming throughout, a phasor diagram, and an unbalanced delta long question with wattmeter readings.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one (books/ece/ec-circuits/). The coordinator's note said books/eee/; the book follows queue.json like the other library books.
+- Packet `usual_sem` is 2 (the "Usually Sem 2" chip); the EE25302 exam course sits in semester 3.
+- Packet `where` parsing: the Manipal, IIT Delhi and NIT Trichy entries list whole courses under one unit; they set no extra depth here. The Manipal unit title is "Total Number of contact hours".
+- The draft's resonance long question belonged to the resonance unit; it was replaced by an unbalanced delta question.
