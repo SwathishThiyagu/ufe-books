@@ -479,3 +479,8 @@
 ## ec-circuits-u6 (Claude correction pass, 20 Nov 2026)
 - Packet: no new subtopics for this unit (still 8 chapters). The exam course (EE25302) two-port unit also lists resonance; this subject teaches resonance in its resonance and coupled-circuits book, so it was not repeated here. Network synthesis (Foster and Cauer) is in the packet but not in the EE25302 list; it was kept and corrected.
 - The draft's MIT and NPTEL web sources were dropped (university-hosted); All About Circuits and Khan Academy remain. The sandbox proxy blocked every page, so no link was reopened and none was added.
+## me-thermo-u5 (Claude correction pass, 20 Nov 2026)
+- The packet was built from ME25C11 Applied Thermodynamics; the exam course ME25301 unit 4 covers pure substances, property diagrams, the Gibbs phase rule, tables and charts, real gases, van der Waals, Z and the generalized chart, but not gas mixtures or psychrometry. Chapters 5.9 and 5.10 stay for the other syllabi.
+- The Gibbs phase rule (new in the packet) is chapter 5.3; the draft's chapters 5.3–5.9 moved to 5.4–5.10.
+- Draft errors fixed: v_g at 1 atm 1.673 m³/kg (not 1.694), the 0 °C / 0.5 kPa triple-point example, the steam calorimeter limits, and the psychrometry bank answer (30 °C DBT, 20 °C WBT gives w 0.0105, φ 40 %, dew point 14.8 °C).
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
