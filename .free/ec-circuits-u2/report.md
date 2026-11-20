@@ -43,3 +43,16 @@ OK
 - ch 7 [low] Section 3, conjugate-match formula box: The box states Z_L = Z_th* without saying this is the condition for maximum average power transfer. A student skimming may read it as a general rule for any load.
 - ch 7 [low] Section 2, superposition formula and step list: The formula defines |V_k| as a peak amplitude, but the chapter's phasors (and the worked example) are RMS. The step 'Write the time waveform for that frequency' does not say to multiply an RMS phasor magnitude by √2, so a student can get the amplitude wrong by √2.
 - ch 7 [low] Figure caption and first block: The caption says the flow starts from a 'time-domain AC circuit', but the first block is labelled with the phasor V_s = 10∠0° V RMS, not a time-domain waveform.
+
+## Correction pass (Claude, Opus high)
+
+- Packet on main now has 8 subtopics: compensation theorem added as chapter 7, AC applications moved to chapter 8 (old review7.json renamed review8.json).
+- All 8 chapters rewritten: every worked example re-traced with concrete numbers and a power or direct-solution check; every reviewer flag above fixed.
+- All 8 figures redrawn with real labels (pipeline/claude_figs/ec_circuits_u2.py on main).
+- Question bank: 14 questions, each with points to cover and a full computed model answer (360-670 words).
+- Notes cleanups: no cross-unit numbers, no "(from memory; check)", "Further reading online", university-hosted sources removed.
+
+```
+ec-circuits-u2.html: 8 chapters, 25315 words, 9 figures, 258 KB
+OK
+```
