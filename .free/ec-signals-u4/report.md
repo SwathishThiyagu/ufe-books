@@ -29,3 +29,12 @@ OK
 - ch 3 [low] Figure, node f: The last node is labelled x(t) but its note gives only the ROC ("ROC Re(s)>−1"), not the time function the flowchart is supposed to end with. The reader has to jump back to the text to see the result.
 - ch 4 [high] Section 2 (cancellation example), echoed by Quiz Q4: The example does not show what the sentence claims. In H(s)=(s+1)/((s+1)(s−2)) the cancelled factor (s+1) is a stable pole at s=−1 paired with a zero at s=−1. Cancelling it gives 1/(s−2), which still shows the pole at s=2. So nothing is hidden, and the sentence 'hides an unstable pole at s=2' is wrong; it also contradicts the Q4 answer, which says the pole at s=2 survives cancellation.
 - ch 4 [low] Section 2 and Exam traps (pole on the jω axis): 'A simple axis pole gives a sustained bounded oscillation' is true only for a simple pole pair at s=±jω with ω≠0. A simple pole at s=0 gives a constant, non-decaying impulse response, and a step input gives a growing ramp, not an oscillation. Quiz Q6 itself uses a pole at s=0, so the trap wording can mislead.
+
+## Correction pass (Claude, 20 Nov 2026)
+
+Rewritten from the draft by hand: every worked example traced and every number run (sympy), figures redrawn
+(pipeline/claude_figs/ec_signals_u4.py), every long question given a full model answer. The reviewer's high flags above are
+all fixed: the chapters now separate the bilateral and one-sided transforms, scaling and shifting state their one-sided
+limits, the cancellation example and the jω-axis wording are corrected. Question-bank fixes: the ROC question had
+−e^(−2t)u(−t) ↔ −1/(s + 2) (it is +1/(s + 2)); the RC question had H(s) = 1/(s + 1000) (it is 1000/(s + 1000)); the
+pole-at-zero point said a step stays bounded (it gives a ramp). University-hosted web sources dropped.
