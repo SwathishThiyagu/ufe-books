@@ -462,3 +462,11 @@
 - Exam course (EE25302) topics for this unit covered: types of sources (ideal and practical, independent and dependent, V-I lines) in 1.2; series-parallel review including L and C in 1.5; star and delta transformation with an unbalanced bridge in 1.6. Mesh and nodal analysis with dependent sources and supermesh/supernode belong to the network-theorems unit; locus diagrams to the resonance unit.
 - Packet data: the subject is listed under ECE (`books/ece/`, crumb "Electronics & Communication") although EE25302 is an EEE course; queue.json's out path was kept. "Network topology: graphs, tie-sets and cut-sets" is not in the EE25302 unit topics but is in the other syllabi, so it stays a full chapter. The NIT Calicut unit entry lists transient analysis, which belongs to the transient-analysis unit.
 - Draft errors fixed: 1.4 worked example (series pairs denied, "each chord closes a mesh"), 1.5 first trap (its "wrong" formula was the right one), 1.6 power warning and balanced trap, 1.7 arrow sentence and simulator claim, 1.8 "smallest set" lead, missing connectedness condition and "bad data" claim; formula lines that would print raw sub/sup tags. MIT OCW, Khan Academy and ibiblio links dropped.
+
+
+
+## ec-circuits-u4 (Claude correction pass, 20 Nov 2026)
+- Packet: new exam subtopic "Locus diagrams of RL, RC and RLC circuits" (EE25302) written as a new chapter 4.5 (current circles for R or X varied, series RLC with frequency varied, parallel branches and the two resonant settings, two worked examples); the draft's mutual inductance, dot convention, transformer and magnetic circuit chapters moved to 4.6 to 4.9.
+- Packet `out` path is stale (old 03_Books/ path); the book follows queue.json (books/ece/ec-circuits/) like ec-circuits-u3. The coordinator's note said books/eee/.
+- Draft data error: the bank question with coils of 0.4 H and 0.9 H gave 1.5 H aiding and 0.9 H opposing, which no single M satisfies (aiding − opposing = 4M and the sum = 2(L₁ + L₂) = 2.6 H). Now 1.6 H and 1.0 H, so M = 0.15 H and k = 0.25.
+- Draft errors fixed: the series-parallel resonance formula, R_D = r(1 + Q²) for the practical tank, the energy form of Q, f₁f₂ = f₀² and exact half-power points against f₀ ± BW/2, the effect-of-Q table, "magnetic pressure" for MMF, the k ≤ 1 proof. MIT OCW link dropped.
