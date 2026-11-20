@@ -1,0 +1,295 @@
+{
+ "lead": "A full adder adds three bits and gives a sum and a carry. A wide adder chains full adders and passes carries along. The real design question is how fast the carry reaches the last bit. Ripple carry hands it stage by stage. Carry look-ahead computes every carry from the a and b bits. This sets the speed of ALUs, address incrementers and loop counters.",
+ "prereq": "You need the static CMOS gates of Unit 3 (AND, OR, XOR) and the half-adder and full-adder truth tables.",
+ "sections": [
+  {
+   "h3": "Half adder, full adder and the standard cell",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "A half adder adds two bits, a and b. The symbol ⊕ means exclusive OR: the result is 1 when exactly one input is 1."
+    },
+    {
+     "type": "formula",
+     "text": "S = a ⊕ b,   C = a · b",
+     "where": "a and b are the input bits; S is the sum bit; C is the carry bit."
+    },
+    {
+     "type": "p",
+     "text": "A full adder takes three inputs: a, b and the carry-in c from the right column."
+    },
+    {
+     "type": "formula",
+     "text": "S = a ⊕ b ⊕ c,   C = a · b + c · (a ⊕ b)",
+     "where": "c is the carry into this column; S is the sum bit; C is the carry out."
+    },
+    {
+     "type": "p",
+     "text": "The term a·b says a carry leaves when both inputs are 1. The term c·(a⊕b) says a carry also leaves when exactly one input is 1 and a carry came in."
+    },
+    {
+     "type": "p",
+     "text": "In static CMOS a full adder is one complex gate, not five separate gates. The usual cell uses 28 transistors: a majority network for carry, an XOR network for sum. The carry-out is ready before the sum, because the sum waits for the carry. Some syllabi call it the mirror adder."
+    }
+   ]
+  },
+  {
+   "h3": "Ripple carry adder",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An n-bit ripple carry adder puts n full adders in a row. Bit i of a and bit i of b enter adder i, and the carry-out of adder i becomes the carry-in of adder i+1. Bit 0 is the least significant column. c0 is the carry into it, and c0 = 0 for plain addition."
+    },
+    {
+     "type": "p",
+     "text": "Each full adder needs two gate delays to turn its carry-in into a carry-out: one AND level, then one OR level. The worst case is a carry born at bit 0 and propagated through every stage. That happens when g₀ = 1 and every later pᵢ = 1, for example a = 1111 and b = 0001."
+    },
+    {
+     "type": "formula",
+     "text": "t_carry = 2n gate delays,   t_sum = 2n + 1 gate delays",
+     "where": "n is the number of bits; a gate delay is the delay of one simple CMOS gate, a few tens of picoseconds in a modern process."
+    },
+    {
+     "type": "p",
+     "text": "For n = 32 the carry reaches the top after 64 gate delays and the final sum after 65. At 40 ps per gate delay that is 2.6 ns, longer than a 1 GHz clock period. The layout is regular, so ripple adders stay in slow timers, peripheral registers and address increments. Faster answers are in <a href=\"#carry-select-carry-save-and-carry-skip-adders\">Chapter 4.2</a>."
+    },
+    {
+     "type": "p",
+     "text": "Subtraction reuses the same hardware. a − b equals a + b̄ + 1, where b̄ is b with every bit inverted. XOR each bit of b with a subtract control line, and drive c0 from the same line."
+    }
+   ]
+  },
+  {
+   "h3": "Carry look-ahead adder",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Carry look-ahead stops waiting for the carry to walk. Each column computes two signals from its own aᵢ and bᵢ only. Generate gᵢ = aᵢ·bᵢ is 1 when the column creates a carry. Propagate pᵢ = aᵢ⊕bᵢ is 1 when the column passes an incoming carry on."
+    },
+    {
+     "type": "p",
+     "text": "Careful: some texts define pᵢ = aᵢ + bᵢ. That also works in the carry recurrence below, but not in the sum equation, where the XOR version is needed. Fix your choice on paper before writing any formula."
+    },
+    {
+     "type": "formula",
+     "text": "cᵢ₊₁ = gᵢ + pᵢ · cᵢ",
+     "where": "cᵢ is the carry entering column i; gᵢ and pᵢ are that column's generate and propagate; cᵢ₊₁ is the carry leaving it."
+    },
+    {
+     "type": "p",
+     "text": "Substituting the recurrence into itself removes every carry from the right-hand side. For four bits:"
+    },
+    {
+     "type": "formula",
+     "text": "c₁ = g₀ + p₀c₀\nc₂ = g₁ + p₁g₀ + p₁p₀c₀\nc₃ = g₂ + p₂g₁ + p₂p₁g₀ + p₂p₁p₀c₀\nc₄ = g₃ + p₃g₂ + p₃p₂g₁ + p₃p₂p₁g₀ + p₃p₂p₁p₀c₀",
+     "where": "each cᵢ now depends only on the g and p of the columns below it and on c₀; no carry is computed from another carry in sequence."
+    },
+    {
+     "type": "p",
+     "text": "Every carry is now a two-level AND-OR function of g, p and c0, so one block — the look-ahead carry unit, also called LCU — builds all of them at the same time. A 4-bit look-ahead adder gives all carries in about three gate delays (one for g and p, two for the widest AND-OR), against eight for ripple. Each sum then costs one more XOR: sᵢ = pᵢ ⊕ cᵢ."
+    },
+    {
+     "type": "p",
+     "text": "For wider adders the same trick is applied to blocks. A 4-bit block has a group generate G = g₃ + p₃g₂ + p₃p₂g₁ + p₃p₂p₁g₀ and a group propagate P = p₃p₂p₁p₀. Blocks are chained with c_next = G + P·c_in, giving a tree of look-ahead units whose delay grows with log n instead of n. A single-level look-ahead for n bits would need AND terms of n+1 inputs, so practical designs stop at 4 or 8 bits per block and add group logic above."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Property",
+      "Ripple carry",
+      "Carry look-ahead"
+     ],
+     "rows": [
+      [
+       "Worst-case carry delay",
+       "2n gate delays",
+       "about 3 gate delays for 4 bits"
+      ],
+      [
+       "Fan-in needed",
+       "2 or 3 inputs everywhere",
+       "grows with bit position"
+      ],
+      [
+       "Layout",
+       "one cell repeated",
+       "cells plus a carry unit"
+      ],
+      [
+       "Best for",
+       "small n, slow paths",
+       "4 to 16 bits, or as a block"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 2,
+  "caption": "Two routes to the last sum bit: the dashed ripple path waits for every full adder in turn, while the look-ahead block builds all four carries from g and p at once.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Two paths to the last sum bit",
+   "nodes": [
+    {
+     "id": "in",
+     "label": "Inputs a, b",
+     "note": "1011 and 0110",
+     "style": "normal"
+    },
+    {
+     "id": "fa",
+     "label": "Full adder cell",
+     "note": "sum and carry",
+     "style": "normal"
+    },
+    {
+     "id": "gp",
+     "label": "Generate, propagate",
+     "note": "g = a·b, p = a⊕b",
+     "style": "normal"
+    },
+    {
+     "id": "la",
+     "label": "Look-ahead carry",
+     "note": "all carries at once",
+     "style": "accent"
+    },
+    {
+     "id": "out",
+     "label": "Sum bits",
+     "note": "10001 = 17",
+     "style": "live"
+    }
+   ],
+   "edges": [
+    {
+     "from": "in",
+     "to": "fa",
+     "style": "solid"
+    },
+    {
+     "from": "fa",
+     "to": "out",
+     "label": "ripple, slow",
+     "style": "dashed"
+    },
+    {
+     "from": "in",
+     "to": "gp",
+     "style": "solid"
+    },
+    {
+     "from": "gp",
+     "to": "la",
+     "style": "solid"
+    },
+    {
+     "from": "la",
+     "to": "out",
+     "style": "solid"
+    }
+   ],
+   "aria": "The ripple path goes from full adder to sum bit through every stage, while the look-ahead block computes all carries in parallel."
+  }
+ },
+ "examples": [
+  {
+   "question": "A 4-bit carry look-ahead adder has a = 1011 and b = 0110, with c0 = 0. Using g_i = a_i·b_i and p_i = a_i⊕b_i, find every g, every p, every carry, every sum bit, and the final result.",
+   "steps": [
+    "Bits: a₃a₂a₁a₀ = 1011, so a₀ = 1, a₁ = 1, a₂ = 0, a₃ = 1. b₃b₂b₁b₀ = 0110, so b₀ = 0, b₁ = 1, b₂ = 1, b₃ = 0.",
+    "Generate: g₀ = 0, g₁ = 1, g₂ = 0, g₃ = 0, so g = 0100.",
+    "Propagate: p₀ = 1, p₁ = 0, p₂ = 1, p₃ = 1, so p = 1101.",
+    "Carries: c₁ = 0; c₂ = 1; c₃ = 1; c₄ = 1.",
+    "Sums: s₀ = 1, s₁ = 0, s₂ = 0, s₃ = 0. Result = c₄s₃s₂s₁s₀ = 10001₂ = 17. Check: 11 + 6 = 17."
+   ],
+   "answer": "The sum is 10001₂ = 17, with g = 0100, p = 1101 and carries c₁c₂c₃c₄ = 0111.",
+   "check": "a=0b1011\nb=0b0110\nc0=0\ng=[((a>>i)&1)&((b>>i)&1) for i in range(4)]\np=[((a>>i)&1)^((b>>i)&1) for i in range(4)]\nc=[c0]\nfor i in range(4): c.append(g[i]|(p[i]&c[i]))\ns=[p[i]^c[i] for i in range(4)]\nprint(g,p,c[1:],s,c[4]*16+s[3]*8+s[2]*4+s[1]*2+s[0])",
+   "values": [
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    17
+   ],
+   "output": ""
+  },
+  {
+   "question": "A 32-bit ripple carry adder uses full adder cells in which the carry takes 2 gate delays per stage and the sum takes one more delay. Each gate delay is 40 ps. Find the worst-case delay to the final sum bit.",
+   "steps": [
+    "Carry chain: n = 32 stages, so the carry out of the last stage is ready after 2 × 32 = 64 gate delays.",
+    "Last sum bit: one extra XOR after its carry arrives, giving 64 + 1 = 65 gate delays.",
+    "Time: 65 × 40 ps = 2600 ps = 2.6 ns."
+   ],
+   "answer": "The worst-case delay to the final sum bit is 65 gate delays, that is 2.6 ns.",
+   "check": "n=32\ngd=40\ncarry=2*n\ntotal=carry+1\nprint(carry,total,total*gd,total*gd/1000)",
+   "values": [
+    64,
+    65,
+    2600,
+    2.6
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "Mixing the two definitions of p. With pᵢ = aᵢ + bᵢ the carry recurrence still holds, but sᵢ = pᵢ ⊕ cᵢ is wrong; the sum must be written aᵢ ⊕ bᵢ ⊕ cᵢ.",
+  "Forgetting the last XOR delay: the carry arrives at 2n gate delays, the final sum one delay later at 2n + 1.",
+  "Index slip: the recurrence is cᵢ₊₁ = gᵢ + pᵢcᵢ, driven by column i, not gᵢ₊₁.",
+  "Building a single-level look-ahead for 32 bits. The AND terms grow to 33 inputs and the gate becomes huge and slow; use 4-bit blocks with group generate and group propagate."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "Write the half-adder sum and carry equations.",
+   "marks": 2,
+   "a": "S = a ⊕ b and C = a · b, where a and b are the input bits, S is the sum bit and C is the carry bit."
+  },
+  {
+   "level": "remember",
+   "q": "How many transistors does the standard static CMOS full adder cell use, and what is it sometimes called?",
+   "marks": 2,
+   "a": "28 transistors; some syllabi call it the mirror adder."
+  },
+  {
+   "level": "understand",
+   "q": "Why does the last sum bit arrive later than the last carry?",
+   "marks": 3,
+   "a": "The carry of stage i must be formed before the sum of stage i can be formed, because sᵢ = pᵢ ⊕ cᵢ. Once the final carry c_n arrives, one more XOR is needed, so the sum lands one gate delay after the carry."
+  },
+  {
+   "level": "apply",
+   "q": "For the 4-bit ripple adder a = 1011 and b = 0110 with c0 = 0, when is each carry ready? Compare with the worst-case bound for n = 4.",
+   "marks": 4,
+   "a": "g₀ = 1·0 = 0; g₁ = 1·1 = 1; p₂ = 0⊕1 = 1; p₃ = 1⊕0 = 1. The carry is born at column 1, so c₂ is ready at about 2 gate delays, c₃ at about 4, c₄ at about 6, and the last sum bit s₃ at about 7. The 2n = 8 and 2n+1 = 9 figures are the worst-case bound for a 4-bit ripple adder, not the timing of this input."
+  },
+  {
+   "level": "analyze",
+   "q": "Why does a single-level look-ahead carry unit stop scaling beyond about 8 bits?",
+   "marks": 5,
+   "a": "The equation for c_n contains a product term p_{n−1}p_{n−2}…p₀c₀, so the widest gate needs n+1 inputs. In static CMOS a wide AND means long series stacks or a chain of gates, which adds delay, area and capacitance. Blocking with group generate and group propagate keeps every gate small and turns the delay into a logarithmic tree."
+  },
+  {
+   "level": "analyze",
+   "q": "Give an input pair for a 4-bit adder that causes the worst-case ripple delay, and explain why.",
+   "marks": 4,
+   "a": "a = 1111 and b = 0001. Column 0 gives g₀ = 1, so a carry is born at the bottom. Every later column has exactly one input at 1, so pᵢ = 1 and each stage must pass the carry on, giving the full 2n gate delay path."
+  }
+ ],
+ "beyond": "Not for the exam. Production adders rarely use a plain single-level look-ahead; they use parallel prefix networks such as Kogge-Stone, Brent-Kung and Han-Carlson, which trade area against fan-out while keeping logarithmic depth. The Ling adder reformulates generate and propagate so that fewer transistors sit on the critical path. Search for parallel prefix adder and Ling carry to go further.",
+ "figure_note_placeholder": ""
+}
