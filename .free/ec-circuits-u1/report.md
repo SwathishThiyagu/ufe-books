@@ -1,13 +1,13 @@
 # ec-circuits-u1: free-model run
 
-- Book: `books/ece/ec-circuits/ec-circuits-u1.html`
+- Book: `work/ec-circuits-u1/tree/books/ece/ec-circuits/ec-circuits-u1.html`
 - Status: ok
-- Model calls so far: 24 (85,474 tokens in, 205,944 out), 4.8 minutes
+- Model calls so far: 33 (85,474 tokens in, 205,944 out), 5.4 minutes
 
 ## Checker
 
 ```
-ec-circuits-u1.html: 8 chapters, 14779 words, 9 figures, 144 KB
+ec-circuits-u1.html: 8 chapters, 22993 words, 10 figures, 219 KB
 OK
 ```
 
@@ -49,3 +49,20 @@ OK
 - ch 8 [low] Lead: The lead says these sets give the "smallest independent set of KVL and KCL equations". A student can read this as saying fewer equations are enough. The fundamental tie-sets give the full (maximum) number of independent loop equations, b − n + 1, and the fundamental cut-sets give the full number of independent node equations, n − 1. Together they are a complete basis set of b equations, not a smallest set.
 - ch 8 [low] Section 1, first formula: The counts Tree branches = n − 1 and chords = b − n + 1 are stated without the condition that makes them true. They hold only for a connected graph. For a graph with two separate parts the counts change, and a student may apply the formula blindly.
 - ch 8 [low] Beyond: The sentence says power-system state estimation uses network topology to detect "bad data". Bad-data detection uses extra (redundant) measurements and their residuals, not the graph shape; only islanding detection is a topology question.
+
+## Claude correction pass (20 Nov 2026)
+
+- Every worked example and quiz answer traced and recomputed (Python for the bridge, ladder and dependent-source circuits).
+- Wrong in the draft and fixed: 1.4 worked example (claimed no two branches were in series and that each chord closes a mesh);
+  1.5 first trap (its "wrong" formula was the right one); 1.6 "do not use the equivalent for power" overstated and the balanced
+  trap garbled; 1.7 current-arrow sentence, ideal-source wording and the simulator claim; 1.8 lead ("smallest set"), missing
+  connectedness condition, "bad data" claim; 1.1 definitions that were only units; 1.3 loop and node definitions.
+- Rewritten from the draft: every chapter, with second worked examples in 1.1 (integral forms), 1.2 (VCCS amplifier, battery
+  loading), 1.3 (dependent source), 1.4 (open branch recount), 1.5 (capacitors), 1.6 (unbalanced bridge by delta-star),
+  1.7 (two practical sources merged). One bridge circuit (36 V; 20, 20, 10, 2, 8 ohm) runs through 1.4, 1.6 and 1.8 and gives
+  the same currents by star-delta and by tie-sets.
+- Exam course coverage added: types of sources (ideal, practical, V-I lines, forbidden connections), short and open circuits,
+  DC and AC, L and C in series and parallel, ladder and balanced bridge, incidence, tie-set and cut-set matrices.
+- Every figure redrawn by hand (pipeline/claude_figs/ec_circuits_u1.py); cross-unit numbers replaced by topic names;
+  "taught by only a few universities" removed; MIT, Khan Academy and ibiblio links dropped; formulas no longer print raw tags.
+- Question bank: 14 long questions made concrete, each with Points to cover and a full Model answer.
