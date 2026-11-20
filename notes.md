@@ -393,3 +393,7 @@
 - Packet: no new subtopics for this unit. The exam course's unit 3 is "Fourier Transform & Laplace Transform": its Fourier topics (aperiodic transform, standard and periodic signals, properties, Hilbert transform and properties) are covered here, its Laplace topics in the Laplace transform unit.
 - Frequency response, distortionless transmission and correlation are not in the exam course's list for this unit; they stay as chapters for the other syllabi.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+## ec-signals-u4 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit; the exam course lists Laplace transforms, ROC, properties and the inverse transform (chapters 4.1 to 4.3). Its later unit "Continuous-Time LTI Systems" lists "Analysis of LTI System using Laplace and Fourier transforms", which chapter 4.4 covers (transfer function, poles and zeros, causality and stability, complete response, frequency response).
+- The unit map (render.unit_map) cuts chapter titles at four words, so two boxes read "Properties of the Laplace" and "Inverse Laplace transform by"; a pipeline matter, not a packet one.
