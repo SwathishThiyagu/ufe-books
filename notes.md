@@ -408,3 +408,9 @@
 - Packet `where` parsing: the Manipal entry's unit title is "Total Number of contact hours" and its topic list is the whole course; the IIT Delhi and NIT Surathkal entries also list whole courses under unit 1. These lists set no extra depth for this unit.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
 - render.block puts a formula longer than 46 characters in a <pre> with its tags escaped, so a long formula with <sub>/<sup> prints raw tags; this book uses Unicode sub/superscripts in long formulas.
+
+
+## ec-signals-u1 (Claude correction pass, 20 Nov 2026)
+- The exam course's unit 1 topics list no system classification or system properties; chapters 1.5 and 1.6 stay for the other syllabi (that course likely teaches them with LTI systems).
+- Its "Analogy between vectors and signals" was missing from the draft; chapter 1.7 now carries it (component c12 and the best approximation).
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
