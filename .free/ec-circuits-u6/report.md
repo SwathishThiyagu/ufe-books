@@ -1,13 +1,13 @@
 # ec-circuits-u6: free-model run
 
-- Book: `books/ece/ec-circuits/ec-circuits-u6.html`
+- Book: `../wt-u6/books/ece/ec-circuits/ec-circuits-u6.html`
 - Status: ok
-- Model calls so far: 30 (109,995 tokens in, 295,911 out), 6.5 minutes
+- Model calls so far: 33 (109,995 tokens in, 295,911 out), 6.7 minutes
 
 ## Checker
 
 ```
-ec-circuits-u6.html: 8 chapters, 15066 words, 9 figures, 151 KB
+ec-circuits-u6.html: 8 chapters, 22781 words, 11 figures, 245 KB
 OK
 ```
 
