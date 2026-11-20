@@ -297,6 +297,7 @@ def split_lessons(chs, spec=None):
         return groups
     n = len(chs)
     best = None
+    cap = [4300]
     # all ways to cut into groups of 2-3 chapters (a group of 1 only when the unit has 1 chapter or a chapter is huge)
     def rec(i, acc):
         nonlocal best
@@ -308,9 +309,12 @@ def split_lessons(chs, spec=None):
             return
         for k in (2, 3, 1):
             if i + k <= n and (k > 1 or n == 1 or chs[i]['words'] > 2600):
-                if sum(c['words'] for c in chs[i:i + k]) <= 4300 or k == 1:
+                if sum(c['words'] for c in chs[i:i + k]) <= cap[0] or k == 1:
                     rec(i + k, acc + [chs[i:i + k]])
     rec(0, [])
+    if best is None and n > 1:   # long chapters: no 3-chapter group fits the cap, so allow larger groups rather than one giant lesson
+        cap[0] = 10 ** 9
+        rec(0, [])
     return best[1] if best else [chs]
 
 
