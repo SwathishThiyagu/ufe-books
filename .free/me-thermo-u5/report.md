@@ -1,13 +1,14 @@
 # me-thermo-u5: free-model run
 
-- Book: `books/mech/me-thermo/me-thermo-u5.html`
+- Book: `work/me-thermo-u5/tree/books/mech/me-thermo/me-thermo-u5.html`
 - Status: ok
-- Model calls so far: 31 (121,451 tokens in, 308,794 out), 6.4 minutes
+- Model calls so far: 36 (121,451 tokens in, 308,794 out), 6.4 minutes
 
 ## Checker
 
 ```
-me-thermo-u5.html: 9 chapters, 17474 words, 10 figures, 174 KB
+render check skipped: No module named 'playwright'
+me-thermo-u5.html: 10 chapters, 23599 words, 13 figures, 223 KB
 OK
 ```
 
