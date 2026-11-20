@@ -2,12 +2,12 @@
 
 - Book: `books/ece/ec-signals/ec-signals-u1.html`
 - Status: ok
-- Model calls so far: 29 (109,053 tokens in, 230,264 out), 5.6 minutes
+- Model calls so far: 29 (109,053 tokens in, 230,264 out), 5.8 minutes
 
 ## Checker
 
 ```
-ec-signals-u1.html: 7 chapters, 13228 words, 8 figures, 140 KB
+ec-signals-u1.html: 8 chapters, 24182 words, 10 figures, 243 KB
 OK
 ```
 
@@ -42,3 +42,16 @@ OK
 - ch 7 [low] Section 2 (orthogonal sets): The definition "⟨φ_m, φ_n⟩ = 0 for every m ≠ n" is satisfied by a set that contains the zero signal. Then ‖φ_n‖² = 0, the coefficient formula c_n = ⟨x, φ_n⟩/‖φ_n‖² divides by zero, and the zero element adds nothing to the span.
 - ch 7 [low] Section 3 table: The vector row "‖u‖² = Σ u_n²" uses plain squares, but the chapter works with complex signals and the signal column correctly uses |c_n|². For complex vectors the squared modulus is needed, otherwise the two rows disagree.
 - ch 7 [low] Beyond: "Wavelets ... stay orthogonal, which is why JPEG 2000 works" overstates the case. The default JPEG 2000 wavelet filters are biorthogonal; they need a dual basis rather than strict orthogonality, so the stated reason is not accurate.
+
+## Claude correction pass (20 Nov 2026)
+
+- Every worked example traced and recomputed; all draft answers were right. Removed the script printouts shown as "Output".
+- Fixed: broken formulas that showed raw <sub>/<sup> tags (ch 2, 3, 6); |x|² as normalised power and DT power units (ch 2);
+  DT sums of periodic sequences are always periodic (ch 2); "sample" means any value of x[n] (ch 1); sampler is a hybrid
+  system (ch 1); correlation -> convolution for reversal (ch 4); memory/causality reading rules (ch 5); "accumulator" trap (ch 5).
+- Added: ch 2 worked example 2 (DT even/odd parts, energy 7.5 + 6.5 = 14); ch 3 signum, rect, tri, sinc, parabolic;
+  ch 4 amplitude operations; ch 7 rewritten around the analogy between vectors and signals (best approximation c12,
+  square wave by (4/pi) sin t); new ch 8 Complete sets of orthogonal functions and Parseval's relation.
+- Every figure redrawn by hand from its chapter's example (pipeline/claude_figs/ec_signals_u1.py).
+- Cross-unit numbers replaced by topic names; MIT and Khan Academy links dropped; web heading "Further reading online".
+- Question bank: 16 long questions (2 new), each with Points to cover and a full numbered Model answer.
