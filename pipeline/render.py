@@ -211,12 +211,12 @@ GROUPS = [('remember-understand', 'Remember and understand'), ('apply', 'Apply')
 
 def model_answer(items):
     """A long question's model answer: a list of numbered steps. A step is text, or a dict with 'text' plus any of
-    'table' {head, rows} (scrolls sideways on phones), 'pre' (working laid out line by line) and 'svg' {h, body, aria}."""
+    'table' {head, rows} (scrolls sideways on phones), 'pre' (working laid out line by line; <sub>/<sup> allowed) and 'svg' {h, body, aria}."""
     lis = []
     for n, it in enumerate(items if isinstance(items, list) else [items], 1):
         if not isinstance(it, dict): it = {'text': it}
         li = inline(it.get('text', ''))
-        if it.get('pre'): li += f'<pre>{html.escape(str(it["pre"]).rstrip(), quote=False)}</pre>'
+        if it.get('pre'): li += '<pre>' + '\n'.join(r[:len(r) - len(r.lstrip())] + inline(r) for r in str(it['pre']).rstrip().split('\n')) + '</pre>'
         if isinstance(it.get('table'), dict): li += table(it['table'].get('head'), it['table'].get('rows'))
         if isinstance(it.get('svg'), dict):
             sp = dict(it['svg']); sp['type'] = 'svg'
