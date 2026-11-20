@@ -402,3 +402,9 @@
 - Packet: no new subtopics for this unit. The exam course's practical sampling and aperture effect are covered in "Low-pass, band-pass and practical sampling" (natural vs flat-top sampling, the sinc droop with a worked example, inverse-sinc compensation). Its "Discrete Fourier series, DTFT, Z-transform and analysis of LTI systems using Z" belong to the subject's Z-transform and discrete Fourier analysis unit, so this book only points to them.
 - "Quantization of sampled signals" is tagged advanced (one syllabus), but it is on the exam course's list; the chapter is kept full length.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+## ec-signals-u2 (Claude correction pass, 20 Nov 2026)
+- Packet: no new subtopics for this unit. The exam course's unit "Continuous-Time LTI Systems" lists CT systems and their properties (covered in the classification unit), LTI systems, impulse response and convolution (chapters 2.1 to 2.3) and "Analysis of LTI System using Laplace and Fourier transforms" (Laplace transform analysis and Fourier units; chapter 2.6 now previews H(jω) and H(s) of the RC circuit and points there by topic).
+- Packet `where` parsing: the Manipal entry's unit title is "Total Number of contact hours" and its topic list is the whole course; the IIT Delhi and NIT Surathkal entries also list whole courses under unit 1. These lists set no extra depth for this unit.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- render.block puts a formula longer than 46 characters in a <pre> with its tags escaped, so a long formula with <sub>/<sup> prints raw tags; this book uses Unicode sub/superscripts in long formulas.
