@@ -632,3 +632,11 @@
 - No new subtopics for this unit. EE3591 lists this material as its unit 2 "Inverters", which opens with "IGBT, static and dynamic behavior"; the packet keeps IGBTs in "Power BJT, MOSFET and IGBT", so this book points there by topic name. "Various harmonic elimination techniques" is an exam topic, though the packet tags "Harmonic elimination techniques" advanced; chapter 6 covers pulse-width, notching (selective elimination), transformer phase-shifting and stepped-wave methods.
 - Packet data: one university's `where` entry (unit title "Total Number of contact hours") lists its whole course; another mixes inverters and choppers in one unit; the packet `out` path is stale (03_Books/...).
 - Harmonic amplitudes in the SPWM chapter (bipolar m_f and m_f ± 2, unipolar 2m_f ± 1 at m_a = 0.8) and the selective-elimination and cascaded H-bridge switching angles were computed by script (FFT and Newton iteration), not copied from a table.
+
+## ec-vlsi-u4 (Claude correction pass, 21 Nov 2026)
+- The packet now has 10 subtopics; the three new ones (pipelining and sequential circuits; timing issues and clocking strategies; memory architecture and building blocks) are chapters 4.7, 4.8 and 4.10. The draft's memory chapter moved to 4.9, and 4.6 (latches and registers) was rewritten.
+- EC3552 spreads this material over its unit 3 "Sequential Logic Circuits and Clocking Strategies" (static and dynamic latches and registers, timing issues, pipelines, clock strategies, memory architecture and building blocks) and unit 4 "Interconnect, Memory Architecture and Arithmetic Circuits" (adders, multipliers, memory cells). The exam topics from both are covered here: C²MOS and TSPC registers, Schmitt trigger, monostable and astable circuits, skew and jitter, self-timed and asynchronous design, and memory core and periphery.
+- PLA, PAL and FPGA belong to the programmable-devices unit (u5) and are only named here.
+- EC3552's unit 4 also lists interconnect parameters and wire models (covered in the u3 book) and "Logic implementation using programmable devices (ROM, PLA, FPGA)": ROM as logic is in 4.9, PLA and FPGA are in u5.
+- Packet data: one `where` entry (ECPC23, unit 3) has an empty unit title; the packet `out` path is stale (03_Books/...); queue.json holds the right one.
+- The MIT OCW source was dropped from the sources list (university-hosted).
