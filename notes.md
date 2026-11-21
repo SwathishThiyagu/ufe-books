@@ -597,3 +597,9 @@
 ## ee-pe-u3 (Claude correction pass, 21 Nov 2026)
 - EE3591 lists this material as its unit 1 "Switching Power Supplies", which also names MOSFET dynamic behaviour, driver and snubber circuits, and switching loss calculations with thermal design; the packet keeps those in "Power Semiconductor Devices", so this book points there by topic name and adds a junction-temperature check (3.2) and the switching-loss example (3.7). "Isolated topologies" is covered by flyback, forward and a new push-pull/half-bridge/full-bridge paragraph in 3.6.
 - Packet data: one university's `where` lists its whole course (devices to UPS) as unit 1 with the title "Total Number of contact hours"; another's unit title is "Heat Sinks for Power Switching Devices" over a DC-DC topic list; one university's unit 4 mixes inverters and choppers; the packet `out` path is stale (03_Books/...).
+
+## ec-vlsi-u6 (Claude correction pass, 21 Nov 2026)
+- The packet's nine subtopics already cover CEC362 and the testing half of EC3552 unit 5; no chapter was added. EC3552 topics not named in the packet (wafer-to-chip flow, test and verification issues of SoCs and embedded cores, test coding) are worked into 1 (flow, test versus verification) and 8 (SoC and core issues, test coding). Test benches and the ASIC flow stay in "ASIC Design and Testing".
+- "Test coding" is not defined by the syllabus; it is read as turning patterns into a tester program (STIL, IEEE 1450), with don't-care fill and compression (8).
+- The draft's March C− had the wrong element order (it missed 24 of 80 simulated cell faults); corrected to ⇕(w0); ⇑(r0,w1); ⇑(r1,w0); ⇓(r0,w1); ⇓(r1,w0); ⇕(r0).
+- Packet data: the packet `out` path is stale (03_Books/...); queue.json holds the right one.
