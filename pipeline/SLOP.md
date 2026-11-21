@@ -1601,3 +1601,56 @@ u5 5.6 superscript (renders), u5 Fig 5.2.1 label (fixed), generator sources line
 right in u5-L1, u6-L1, u6-L2, u6-L3, u7-L1). Clean on facts: u5-L1, u5-L2, u5-L3, u6-L2, u6-L3, u7-L1, u7-L2, u7-L3.
 Patterns: a figure caption's "less than 1 dB" said without its error-rate range (book and lesson); the figs-note
 generator again kept chapter notes in place of source titles.
+
+## Antennas, RF and Microwave Engineering fact review B (Nov 2026)
+
+Audited 21 Nov 2026: the 13 lessons on the branches lesson/ec-antenna-u2-L1 … L4, u3-L1 … L3, u5-L1 … L3 and
+u6-L1 … L3, every scene's narration and on-screen text against the library books books/ece/ec-antenna/ec-antenna-u2, u3,
+u5 and u6.html on main, each lesson's sheet once. Recomputed in python every worked example, model answer, trap, picture
+number and recap number: u2 Hertzian dipole Rr 0.877 Ω, Prad 0.439 W, |E| 62.8 mV/m, D 1.5 / 6.00 (7.78 dBi),
+41253/90² = 5.09, G 1.30 dBi, Q 0.316 Ω / 0.151 V/m; ηrad 0.497, G −1.28 dBi, Ae 0.0593 m², PLF 20 / 15 / 10 µW,
+near field 1.82 m, far field 28.8 m (57.6 m at 24 GHz), 0.48 / 4.8 m, G 12.55 dBi, Ae 0.0143 m²; λ/2 dipole 1.41 m,
+60 mV/m, 4.77 µW/m², monopole 0.75 m, 1.414 A, 84.9 mV/m, loop Rr 3.8 mΩ (61 mΩ trap), η 7 %, ferrite leff 7.9 mm,
+Voc 7.9 µV, 5.5e-7 Ω, folded 292 Ω, Γ −0.0135, VSWR 1.03, RL 37.4 dB, plain 4.11 / 4.3 dB; Voc 0.955 mV, 1.56 nW,
+Aem 1.07 m², 10.7 µW, −19.7 dBm, FSPL 80.05 dB, Pr −62.05 dBm, M 28 dB, hop 62.95 − 140.04 + 34.95 − 2 = −44.14 dBm,
+leff 0.318 m, Voc 0.637 mV. u3 pair nulls 0°, 60°, 120°, 180°, FNBW 47.2°, HPBW 26.3° / 20.3° / 69.3°, D 5 / 10,
+Chebyshev x0 1.2933, 1.3988, 2.25, 2.7024, currents 1 : 1.609 : 1.932, steer −155.9°, AF 3.346; Yagi 300 / 282 / 270 mm,
+LPDA 14.17 → 16 dipoles, βd 54°, horn Ae 0.0040 m², G 55.9 (17.5 dBi, trap 111.7 / 20.5 dBi), 21.0° / 20.1°, 10.7 / 11.1
+cm, dish 15 791 × 0.6 = 9475 (39.8 dBi), 1.75° / 3.5°; patch W 38.04 mm, εeff 4.086, ΔL 0.739, L 29.44 mm, λg 61.84,
+trap 62.5 mm, R ≥ 6 m, G(test) 20 / 20.4 dBi, fc 10.02 MHz, MUF 19.48 MHz, skip 668 km, OWF 16.6 MHz, Q2 W 23.7 mm.
+u5 spiral Z 8.50 + j36.1, 2.87 nH, fSR 3.56 GHz, Q 6.28 → 4.25, varactor 1.283 / 0.567 / 2.26 / 1.50, Q 31.2, MIM Q 15.9;
+Friis 1.585 + 0.470 + 0.0285 = 2.083 (3.19 dB), 314 K, −90.8 dBm; IIP3 10 dBm, OIP3 30 dBm, P1dB 0 dBm in / 19 out,
+SFDR 56.2 dB; LO 945 MHz, image 990, α 9.60 (19.6 dB), 5 stages 98.2 dB, EIRP 26 dBm (398 mW), leak −22 dBm,
+Ls 0.25 nH, Lg 14.41 nH, Qin 2.21, trap 1.57 nH / 314 Ω, LO 2.5 / image 2.6 GHz; mixer 2.55 / 2.65 GHz, 16.1 dB,
+−33 dBm, spurs, PDC 0.99 W, ηD 25.3 %, PAE 20.2 %, class B 39.4 % / A 12.6 % (trap 19.7 %), Leeson floor −168 dB,
+−125.6 / −75.6 dBc/Hz, 20 log 200 = 46 dB, half-IF 922.5 MHz. u6 R 18.6 km, cτ 300 m, ΔR 150 m, trap 37.2 km,
+Rmax 38.8 km, 8 MW for ×2, 2.1× trap, plate 13 963 m² (41.4 dBsm), sphere ka 118, 9 km / 75 m, 6.7×; Tr 1.333 ms,
+Runamb 150 / 120 km, folded 50 / 80 km, Pav 1 kW, fd 1949 Hz (trap 975), beat 100 kHz, 60 m, 20 m/s, blind 15 / 18.75 /
+75 m/s, |H| 1.18 / 1.732, Q2 75 km, Q3 45 / 20 km; monopulse 0.12 → 0.0667° → 1.164e-3 rad → 23.3 m, Q2 0.025°,
+N 4.00e-14 W, S/N 2.5, N0 4e-20, E 1e-19 J, E/N0 2.5, 2E/N0 5.0 (7.0 dB), CFAR α = 16(10^(4/16) − 1) = 12.45,
+chirp 50 µs × 5 MHz → 30 m, duplexer 70 dB (+80 → +10 dBm), dish 1.75°, G 8685 (39.4 dB), Pav 1 kW. Every "Don't
+write" is false under each common convention and every stated wrong result is what the mistake gives; every exam
+question shows its givens; every claim is in the book; ribbon2 equals the calc scenes in all 13 lessons; no college
+names, no unit or lesson numbers (u6-L3's next card reads "Revise from the start"). Fixed lessons rebuilt with --reuse
+(narration unchanged, so --revoice would only re-encode the voice); each --check OK, cuecheck 0 late cues, sheet 0 page
+errors, 0 cue failures, 0 text outside the safe area, play-through OK. Book fix (check_book --render OK): u5 Fig 5.3.1
+"wanted tone, slope 1" moved above the wanted line, clear of "40 dB = −40 dBc", and "IM3, slope 3" moved off the IM3 line.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-antenna-u2-L1 | figs (sources) | credits Balanis for "the Friis equation", which this lesson does not teach; now Balanis (radiation integrals and the infinitesimal dipole, fundamental antenna parameters) | should fix: fixed 6b808f0
+ec-antenna-u2-L4 | figs (sources) | credits Kraus and Marhefka for "beam solid angle and directivity", not taught here; now Pozar (effective area and the Friis formula), as the book's list gives | should fix: fixed 94713f0
+ec-antenna-u3-L3 | figs (sources) | Balanis and Kraus by title only; Kraus covers arrays, Yagi and horns, not this lesson, and the propagation source is missing; now Balanis (microstrip antennas, measurements) and Saunders and Aragón-Zavala (propagation mechanisms) | should fix: fixed c49ec89
+ec-antenna-u6-L2 | figs (sources) | "Mark A. Richards (detection and antennas)" drops Scheer and Holm and names topics not taught; Mahafza's "detection" not taught; now Richards, Scheer and Holm (Doppler and clutter) and Mahafza (waveforms and PRF worked numerically) | should fix: fixed 63ee299
+ec-antenna-u5-L2 | figs (sources) | book titles lowercased ("RF microelectronics", "microwave engineering", "CMOS radio-frequency integrated circuits") | cosmetic: fixed b4cfaf5
+ec-antenna-u2-L3 | pa (Q2 board) | "λ = 3 × 10⁸ / 3 × 10⁸" reads as (3 × 10⁸ / 3) × 10⁸; now "3 × 10⁸ / (3 × 10⁸)" | cosmetic: fixed 874a621
+ec-antenna-u5-L1 | bookfig (two tones, IM3) | the lesson's re-cut of Fig 5.3.1 already keeps "wanted tone, slope 1" clear of "40 dB = −40 dBc"; "IM3, slope 3" just touches the IM3 line | cosmetic: no change
+ec-antenna-u5-L1 | bookfig (4, 5, 10) | sheet notes the figures fill 23 to 49 % of the stage | cosmetic: later
+ec-antenna-u6-L2 | hookArt (1) | "Hills echo thousands of times louder": the book's clutter is 40 to 60 dB above the aircraft echo, so thousands is the low end; kept | cosmetic: no change
+
+Count: 0 must fix; 4 should-fix fixed in 4 lessons (all the sources note), 2 cosmetic fixed, 3 cosmetic left; 1 book
+figure fixed. Writer-known items checked: u5 Fig 5.3.1 overlap (book fixed; the lesson's own cut was already clear);
+u2 Friis credit (fixed in u2-L1 and u2-L4; u2-L2 and u2-L3 right); ribbon2 equals the calc scenes everywhere;
+generator sources note (fixed in u2-L1, u2-L4, u3-L3, u5-L2, u6-L2; right in the other 8); every bookfig matches its book
+figure and every picture's numbers check. Clean on facts: all 13. Patterns: the figs-note generator again credits a
+book for a topic of another lesson of the same unit (Friis in u2-L1, detection in u6-L2) or drops co-authors and titles.
