@@ -1,31 +1,22 @@
 {
- "lead": "Delta modulation (DM) is a one-bit differential coder. At every sampling instant it compares the input with a staircase built from past bits, and sends 1 if the input is above the staircase or 0 if it is below. The staircase moves by a fixed step Δ. Adaptive delta modulation (ADM) changes Δ with the signal slope. DM and ADM are used in low-cost speech links, voice storage and simple sensor telemetry where a low bit rate and simple hardware matter more than high fidelity.",
- "prereq": "You need: <a href=\"#differential-pcm-and-adaptive-dpcm\">Chapter 4.5 DPCM</a> for prediction from past samples, <a href=\"#sampling-theorem-aliasing-and-reconstruction\">Chapter 4.1</a> for sampling rate, and the slope of a sinusoid from Unit 1.",
+ "lead": "Delta modulation (DM) is the simplest differential coder: one bit per sample. At each clock tick it compares the input with a staircase built from past bits and sends 1 if the input is higher, 0 if lower; the staircase then moves one step Δ up or down. The hardware is a comparator, a clock and an integrator. Adaptive delta modulation (ADM) changes Δ with the signal slope, which makes DM usable for speech in low-cost voice links.",
+ "prereq": "You need: <a href=\"#differential-pcm-and-adaptive-dpcm\">DPCM</a>, of which DM is the 1-bit case, and the slope of a sinusoid.",
  "sections": [
   {
    "h3": "How delta modulation works",
    "blocks": [
     {
      "type": "p",
-     "text": "Delta modulation (DM) sends one bit for every sample. The transmitter keeps a staircase estimate x̂(t) of the input x(t). A comparator asks one question at each clock tick: is x(t) above or below x̂(t)? A 1 means above, a 0 means below. That single bit is transmitted. The same bit drives an integrator, which adds Δ for a 1 and subtracts Δ for a 0. So x̂(t) moves one step of Δ volts toward the input. Δ is the step size."
-    },
-    {
-     "type": "steps",
-     "items": [
-      "Sample the comparator output at f_s.",
-      "Send 1 if x(t) > x̂(t); otherwise send 0.",
-      "Move the staircase by +Δ for 1 and -Δ for 0.",
-      "Repeat at the next clock tick."
-     ]
+     "text": "The transmitter keeps a staircase approximation x̃ of the input. At sample n it compares x[n] with the previous staircase value x̃[n − 1] and sends b[n] = 1 if x[n] ≥ x̃[n − 1], else 0. The staircase then moves: x̃[n] = x̃[n − 1] + Δ for a 1 and − Δ for a 0. This is DPCM with the prediction x̂[n] = x̃[n − 1] and a two-level quantizer ±Δ."
     },
     {
      "type": "formula",
-     "text": "R_b = f_s",
-     "where": "R_b is the DM bit rate in bits per second; f_s is the sampling rate in samples per second. DM sends one bit per sample."
+     "text": "R<sub>b</sub> = f<sub>s</sub>",
+     "where": "One bit per sample, so the bit rate equals the sampling rate. To track speech, f<sub>s</sub> is many times the Nyquist rate (32 to 64 kHz for telephone speech)."
     },
     {
      "type": "p",
-     "text": "At the receiver, an integrator repeats the same staircase from the received bits: +Δ for 1, -Δ for 0. A lowpass filter then smooths the staircase into an estimate of x(t). The receiver needs no code-word boundary or multi-level decoder, only the bit clock. The staircase is not the final audio; it is the running estimate. DM is the 1-bit limiting case of DPCM, covered in <a href=\"#differential-pcm-and-adaptive-dpcm\">Chapter 4.5</a>."
+     "text": "The receiver rebuilds the same staircase from the bits with an accumulator (an integrator in analog form), then a lowpass filter at f<sub>m</sub> smooths it. It needs only the bit clock: there are no word boundaries. Because each bit only says “higher” or “lower”, the staircase never settles on a steady input: when the gap is smaller than Δ, a step overshoots and the next one comes back."
     }
    ]
   },
@@ -34,182 +25,225 @@
    "blocks": [
     {
      "type": "p",
-     "text": "The staircase can change only by Δ at each sample, so its fastest possible slope is Δf_s volts per second. If |dx/dt| exceeds this, x̂(t) lags behind. The modulator then sends a long run of 1s or 0s, but the staircase still cannot catch the input. This is slope overload. It causes large errors on steep parts of the signal."
+     "text": "The staircase can rise at most Δ per sample, a slope of Δf<sub>s</sub> volts per second. When the input rises faster, the staircase falls behind and sends a long run of equal bits while the gap grows: <b>slope overload</b>. For x(t) = A sin(2πft) the steepest slope is 2πfA, at the zero crossings, so there is no overload when"
     },
     {
      "type": "formula",
-     "text": "Δ f_s ≥ 2π f A",
-     "where": "Δ is the step size in volts; f_s is the sampling rate in samples per second; f is the sinusoid frequency in hertz; A is its peak amplitude in volts. This is the no-slope-overload condition for x(t) = A sin(2πft)."
+     "text": "Δ f<sub>s</sub> ≥ 2π f A",
+     "where": "Δ in volts, f<sub>s</sub> in samples/s, f the tone frequency in Hz, A the peak amplitude in volts."
     },
     {
      "type": "p",
-     "text": "For x(t)=A sin(2πft), dx/dt=2πfA cos(2πft). The largest magnitude is 2πfA. Slope overload is avoided when Δf_s is at least 2πfA."
-    },
-    {
-     "type": "p",
-     "text": "A large Δ prevents overload but makes the staircase jump too far around a slowly varying input. The estimate then oscillates up and down near x(t), producing granular noise. A small Δ reduces this buzz but overloads on steep slopes. Fixed DM must choose one compromise between slope overload and granular noise. Granular noise is the DM quantization noise; it is not the same as slope overload."
+     "text": "On a slow or flat input the staircase hunts up and down by Δ around it: <b>granular noise</b>, the DM form of quantization noise. A large Δ cures overload but raises granular noise; a small Δ does the reverse. The figure and the second worked example show both on one tone: the staircase hunts at the peak and lags on the falling slope."
     }
    ]
   },
   {
-   "h3": "Adaptive delta modulation and PCM comparison",
+   "h3": "Adaptive DM and the comparison with PCM",
    "blocks": [
     {
      "type": "p",
-     "text": "ADM varies Δ with the signal. The receiver can deduce the same changes from the received bits, so no extra bits are sent. A common rule: after a run of equal bits (say three or four 1s, or three or four 0s), the staircase is being pushed one way, so multiply Δ by a factor above 1. When bits alternate, the staircase is hovering, so multiply Δ by a factor below 1. Keep Δ between Δ_min and Δ_max."
+     "text": "<b>ADM</b> changes the step from the bit pattern. A run of equal bits means the staircase is falling behind, so the step is multiplied by a factor K &gt; 1 (often 1.5 or 2); alternating bits mean it is hunting, so the step is divided by K, within limits Δ<sub>min</sub> and Δ<sub>max</sub>. The receiver sees the same bits and repeats the same rule, so no extra bits are sent. CVSD, continuously variable slope DM, is the version used for voice."
     },
     {
      "type": "p",
-     "text": "During steep slopes Δ grows, so ADM tracks without slope overload. During quiet parts Δ shrinks, so granular noise falls. This gives a more constant signal-to-noise ratio over a wide amplitude range than fixed DM. ADM still sends one bit per sample: R_b=f_s."
-    },
-    {
-     "type": "p",
-     "text": "DM needs only a comparator, clock and integrator; PCM needs a multi-level quantizer and an n-bit encoder. PCM bit rate is f_s n, so 8 kHz speech with 8 bits is 64 kbit/s. DM at 64 kbit/s uses f_s = 64 kHz, one bit per sample. That high sampling helps slope tracking, but DM still has coarser quantization and a fixed-step trade-off. ADM improves dynamic range while keeping one bit per sample. For the same quality DM often needs a higher f_s than PCM, so its bandwidth is not automatically lower."
-    },
-    {
-     "type": "p",
-     "text": "DM and ADM appear in low-cost voice recorders, simple telemetry and some speech codecs. DPCM in <a href=\"#differential-pcm-and-adaptive-dpcm\">Chapter 4.5</a> generalizes the same prediction idea to n-bit differences."
+     "text": "For a tone at the largest amplitude that avoids overload, DM gives SNR = 3f<sub>s</sub>³/(8π²f<sup>2</sup>W), where W is the receiver filter bandwidth. With f = 1 kHz, W = 4 kHz and f<sub>s</sub> = 64 kHz this is 2490, or 34.0 dB, while 8-bit PCM at the same 64 kbit/s gives 49.9 dB. Doubling f<sub>s</sub> adds only 9 dB to DM. So DM wins on simplicity and robustness to single bit errors (one error moves the output by only 2Δ), and PCM wins on quality per bit."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "The comparator, sampler and feedback integrator produce one bit per sample. The values are the worked example: x(t) is 1 kHz and 2 V, f_s = 32 kHz, Δ = 0.1 V.",
-  "spec": {
-   "type": "blocks",
-   "direction": "right",
-   "title": "Delta modulator",
-   "nodes": [
-    {
-     "id": "a",
-     "label": "x(t)",
-     "note": "1 kHz, 2 V",
-     "style": "normal"
-    },
-    {
-     "id": "b",
-     "label": "Comparator",
-     "style": "accent"
-    },
-    {
-     "id": "c",
-     "label": "Sampler",
-     "note": "fs = 32 kHz",
-     "style": "live"
-    },
-    {
-     "id": "d",
-     "label": "1-bit output",
-     "style": "next"
-    },
-    {
-     "id": "e",
-     "label": "Integrator",
-     "note": "Δ = 0.1 V",
-     "style": "normal"
-    }
-   ],
-   "edges": [
-    {
-     "from": "a",
-     "to": "b",
-     "style": "solid"
-    },
-    {
-     "from": "b",
-     "to": "c",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "e",
-     "style": "solid"
-    },
-    {
-     "from": "e",
-     "to": "b",
-     "style": "dashed"
-    }
-   ],
-   "aria": "The delta modulator compares the input with an integrator staircase, samples the comparator decision into one bit per sample, and feeds the bit back through the step-size integrator."
-  }
- },
  "examples": [
   {
-   "question": "A 1 kHz sinusoid of peak amplitude 2 V is encoded by delta modulation with step size Δ = 0.1 V and sampling rate f_s = 32 kHz. (a) Find the maximum slope of the sinusoid. (b) Find the maximum slope of the DM staircase. (c) Does slope overload occur? (d) Find the minimum f_s that avoids slope overload for this sinusoid with the same Δ.",
+   "question": "A 1 kHz sinusoid of peak 2 V is delta modulated with Δ = 0.1 V and f<sub>s</sub> = 32 kHz. (a) Find the largest slope of the input and of the staircase. (b) Does slope overload occur? (c) Find the smallest f<sub>s</sub>, and the smallest Δ at 32 kHz, that avoid it.",
    "steps": [
-    "For x(t)=A sin(2πft), maximum slope = 2πfA. Here f=1000 Hz and A=2 V.",
-    "2π×1000×2=12,566.37 V/s, rounded to 12,566 V/s.",
-    "DM staircase maximum slope = Δf_s = 0.1×32,000 = 3,200 V/s.",
-    "12,566 > 3,200 V/s, so slope overload occurs.",
-    "Minimum f_s = (2πfA)/Δ = 12,566.37/0.1 = 125,663.7 Hz, about 125,660 Hz or 126 kHz."
+    "Input: 2πfA = 2π × 1000 × 2 = 12 566 V/s.",
+    "Staircase: Δf<sub>s</sub> = 0.1 × 32 000 = 3200 V/s.",
+    "12 566 &gt; 3200 V/s, so slope overload occurs near every zero crossing.",
+    "Smallest f<sub>s</sub> = 2πfA/Δ = 12 566/0.1 = 125 664 samples/s, about 125.7 kHz.",
+    "Or keep 32 kHz and raise the step: Δ ≥ 12 566/32 000 = 0.393 V, at the cost of more granular noise."
    ],
-   "answer": "Slope overload occurs; to avoid it f_s must be at least about 126 kHz (125,660 Hz using the rounded slope).",
-   "check": "import math\nf = 1000.0\nA = 2.0\ndelta = 0.1\nfs = 32000.0\nmax_slope = 2*math.pi*f*A\nstair_slope = delta*fs\nfs_min = max_slope/delta\nprint(int(round(max_slope)))\nprint(int(round(stair_slope)))\nprint(int(round(fs_min, -1)))",
-   "values": [
-    12566,
-    3200,
-    125660
+   "answer": "Slope overload occurs (12 566 V/s against 3200 V/s); avoid it with f<sub>s</sub> ≥ 125.7 kHz, or Δ ≥ 0.393 V at 32 kHz."
+  },
+  {
+   "question": "x(t) = sin(2π·500t) V is delta modulated at f<sub>s</sub> = 8 kHz with Δ = 0.3 V, starting from x̃ = 0. Trace samples 0 to 12 and say where granular noise and slope overload appear.",
+   "dry_run": {
+    "head": [
+     "n",
+     "x[n]",
+     "x̃[n − 1]",
+     "b[n]",
+     "x̃[n]",
+     "x − x̃"
+    ],
+    "rows": [
+     [
+      "0",
+      "0.00",
+      "0.00",
+      "1",
+      "0.30",
+      "−0.30"
+     ],
+     [
+      "1",
+      "0.38",
+      "0.30",
+      "1",
+      "0.60",
+      "−0.22"
+     ],
+     [
+      "2",
+      "0.71",
+      "0.60",
+      "1",
+      "0.90",
+      "−0.19"
+     ],
+     [
+      "3",
+      "0.92",
+      "0.90",
+      "1",
+      "1.20",
+      "−0.28"
+     ],
+     [
+      "4",
+      "1.00",
+      "1.20",
+      "0",
+      "0.90",
+      "+0.10"
+     ],
+     [
+      "5",
+      "0.92",
+      "0.90",
+      "1",
+      "1.20",
+      "−0.28"
+     ],
+     [
+      "6",
+      "0.71",
+      "1.20",
+      "0",
+      "0.90",
+      "−0.19"
+     ],
+     [
+      "7",
+      "0.38",
+      "0.90",
+      "0",
+      "0.60",
+      "−0.22"
+     ],
+     [
+      "8",
+      "0.00",
+      "0.60",
+      "0",
+      "0.30",
+      "−0.30"
+     ],
+     [
+      "9",
+      "−0.38",
+      "0.30",
+      "0",
+      "0.00",
+      "−0.38"
+     ],
+     [
+      "10",
+      "−0.71",
+      "0.00",
+      "0",
+      "−0.30",
+      "−0.41"
+     ],
+     [
+      "11",
+      "−0.92",
+      "−0.30",
+      "0",
+      "−0.60",
+      "−0.32"
+     ],
+     [
+      "12",
+      "−1.00",
+      "−0.60",
+      "0",
+      "−0.90",
+      "−0.10"
+     ]
+    ]
+   },
+   "steps": [
+    "Rule: b = 1 if x[n] ≥ x̃[n − 1]; then x̃[n] = x̃[n − 1] ± 0.3 V.",
+    "Check the slopes first: the input reaches 2π × 500 × 1 = 3142 V/s, the staircase only 0.3 × 8000 = 2400 V/s, so overload is expected near the zero crossings.",
+    "n = 3 to 6: around the peak the bits alternate 1, 0, 1, 0 and the staircase hunts between 0.90 and 1.20 V: granular noise.",
+    "n = 7 to 12: the bits stay 0 but the error grows to −0.38 and −0.41 V at n = 9 and 10, because the input falls 0.38 V per sample near the crossing and the staircase only 0.30 V: slope overload."
    ],
-   "output": ""
+   "answer": "Granular hunting between 0.90 and 1.20 V at the peak; overload on the falling slope with errors up to 0.41 V. A step of 2π × 500/8000 = 0.393 V or more would remove the overload."
   }
  ],
  "traps": [
-  "DM bit rate is f_s, not f_s×n. One bit leaves every sample even though the staircase has many voltage levels.",
-  "A larger Δ reduces slope overload but increases granular noise. A larger step is not always better.",
-  "Slope overload depends on the maximum input derivative, not on peak amplitude alone. A small high-frequency sine can overload while a large slow sine does not.",
-  "The receiver integrator output is a staircase, not the final smooth signal. The lowpass filter after it produces the smooth estimate; it is not PCM reconstruction.",
-  "ADM adapts Δ from the received bit pattern. It does not send extra side bits, so its bit rate is still f_s."
+  "DM bit rate is f<sub>s</sub>, not n f<sub>s</sub>: one bit per sample.",
+  "A larger Δ is not simply better: it removes slope overload but raises granular noise.",
+  "Overload depends on the slope 2πfA, not on amplitude alone: a small high-frequency tone can overload while a large slow one does not.",
+  "ADM sends no side information; the receiver derives the same steps from the received bits, so R<sub>b</sub> is still f<sub>s</sub>."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "State the bit rate of DM and define its step size.",
-   "marks": 2,
-   "a": "R_b = f_s, one bit per sample. Δ is the voltage added to the staircase for a 1 and subtracted for a 0."
-  },
-  {
-   "level": "remember",
    "q": "What does a transmitted 1 mean in DM?",
    "marks": 2,
-   "a": "The input x(t) was above the current staircase estimate, so the next staircase step goes up by Δ."
+   "a": "The input was at or above the previous staircase value, so the staircase steps up by Δ."
   },
   {
    "level": "understand",
-   "q": "Why does a fixed step size force a trade-off in DM?",
+   "q": "Define granular noise and slope overload, and say when each appears.",
    "marks": 3,
-   "a": "Large Δ avoids slope overload but increases granular noise. Small Δ reduces granular noise but causes slope overload on steep signals."
-  },
-  {
-   "level": "understand",
-   "q": "Define granular noise and say when it appears.",
-   "marks": 3,
-   "a": "Granular noise is oscillation of the staircase around a slowly varying input when Δ is too large. It is the DM quantization noise."
+   "a": "Granular noise is the staircase hunting by ±Δ around a slow or flat input, when Δ is large. Slope overload is the staircase falling behind a steep input, when Δf<sub>s</sub> is smaller than the input slope."
   },
   {
    "level": "apply",
-   "q": "A 1 V, 500 Hz sinusoid uses DM with Δ=0.05 V. Find the minimum f_s to avoid slope overload.",
-   "marks": 4,
-   "a": "Maximum slope = 2π×500×1 = 3141.6 V/s. f_s ≥ 3141.6/0.05 = 62,832 Hz, about 62.8 kHz."
+   "q": "A 1 V, 500 Hz tone uses DM with Δ = 0.05 V. Find the smallest f<sub>s</sub> that avoids overload.",
+   "marks": 3,
+   "a": "2π × 500 × 1 = 3141.6 V/s; f<sub>s</sub> ≥ 3141.6/0.05 = 62 832 samples/s, about 62.8 kHz."
   },
   {
    "level": "apply",
-   "q": "DM has f_s=16 kHz and Δ=0.2 V. Find the maximum staircase slope. Can it track a 2 V, 300 Hz sinusoid?",
+   "q": "DM has f<sub>s</sub> = 16 kHz and Δ = 0.2 V. Can it follow a 2 V, 300 Hz tone?",
+   "marks": 3,
+   "a": "Staircase 0.2 × 16 000 = 3200 V/s; tone 2π × 300 × 2 = 3770 V/s. No: 3770 &gt; 3200, so it overloads."
+  },
+  {
+   "level": "apply",
+   "q": "ADM starts from 0 with Δ = 0.2 V and multiplies the step by 1.5 after a repeated bit, divides by 1.5 after a change. Find the staircase for bits 1, 1, 1, 1, 0 and compare fixed DM.",
    "marks": 4,
-   "a": "Δf_s = 0.2×16,000 = 3,200 V/s. Required slope = 2π×300×2 = 3,769.9 V/s. No: 3,769.9 > 3,200 V/s, so slope overload occurs."
+   "a": "Steps 0.2, 0.3, 0.45, 0.675, then 0.45 down: staircase 0.2, 0.5, 0.95, 1.625, 1.175 V. Fixed DM gives 0.2, 0.4, 0.6, 0.8, 0.6 V, so ADM climbs about twice as fast on a steep input."
   },
   {
    "level": "analyze",
-   "q": "Compare DM, ADM and PCM for a 64 kbit/s telephone speech link.",
-   "marks": 5,
-   "a": "PCM at 8 kHz and 8 bits gives 64 kbit/s with good fidelity. DM or ADM at 64 kbit/s has f_s = 64 kHz and one bit per sample; hardware is simple, but fixed DM has a slope/granular trade-off and coarser quantization. ADM widens dynamic range. PCM is preferred for trunk speech; DM and ADM suit low-cost low-power links."
+   "q": "Compare DM and PCM for a 64 kbit/s speech channel.",
+   "marks": 4,
+   "a": "PCM: 8 bits at 8 kHz, 49.9 dB for a full-scale sine. DM: 1 bit at 64 kHz, about 34 dB for a 1 kHz tone in 4 kHz. DM is far simpler and one bit error moves the output by only 2Δ; PCM gives much better quality per bit, so trunks use PCM and cheap links DM or ADM."
   }
  ],
- "beyond": "Not for the exam. Delta modulation is the simplest predictive coder, and its feedback staircase grows into delta-sigma (ΣΔ) modulation, the core of many audio and sensor ADCs. Continuously variable slope delta modulation (CVSD) is a practical cousin used in some Bluetooth voice links. Search for delta-sigma ADC, CVSD and adaptive quantization to see the descendants of this chapter."
+ "beyond": "Not for the exam. Put the integrator before the comparator instead of in the feedback path and DM becomes delta-sigma (ΣΔ) modulation, the basis of most audio and sensor ADCs. CVSD is still used for voice in legacy Bluetooth headsets. Search next for delta-sigma ADC and noise shaping.",
+ "figure": {
+  "after_section": 2,
+  "caption": "Delta modulation of the second worked example (8000 samples/s, Δ = 0.3 V): at the peak the bits alternate and the staircase hunts by ±Δ, while near the falling zero crossing the input drops 0.38 V per sample and the staircase, limited to 0.3 V, falls behind.",
+  "spec": {
+   "type": "svg",
+   "h": 340,
+   "body": "<rect x=\"170.8\" y=\"40.0\" width=\"147.2\" height=\"62.8\" style=\"fill:var(--next-soft)\"/><rect x=\"403.2\" y=\"136.9\" width=\"108.5\" height=\"120.0\" style=\"fill:var(--live-soft)\"/><text x=\"244.4\" y=\"32.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">granular: hunting ±Δ</text><text x=\"457.5\" y=\"274.9\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--live)\" font-weight=\"700\">slope overload</text><line x1=\"70.0\" y1=\"160.0\" x2=\"690.0\" y2=\"160.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><line x1=\"70.0\" y1=\"36.0\" x2=\"70.0\" y2=\"284.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"61.0\" y=\"256.8\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">&#8722;1</text><text x=\"61.0\" y=\"164.5\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">0</text><text x=\"61.0\" y=\"72.2\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">1</text><text x=\"70.0\" y=\"26.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">volts</text><polyline points=\"70.0,160.0 70.8,159.3 71.5,158.6 72.3,157.8 73.1,157.1 73.9,156.4 74.7,155.7 75.4,154.9 76.2,154.2 77.0,153.5 77.8,152.8 78.5,152.0 79.3,151.3 80.1,150.6 80.8,149.9 81.6,149.2 82.4,148.4 83.2,147.7 84.0,147.0 84.7,146.3 85.5,145.6 86.3,144.8 87.0,144.1 87.8,143.4 88.6,142.7 89.4,142.0 90.2,141.3 90.9,140.6 91.7,139.9 92.5,139.2 93.2,138.5 94.0,137.7 94.8,137.0 95.6,136.3 96.3,135.6 97.1,134.9 97.9,134.2 98.7,133.6 99.5,132.9 100.2,132.2 101.0,131.5 101.8,130.8 102.5,130.1 103.3,129.4 104.1,128.7 104.9,128.1 105.7,127.4 106.4,126.7 107.2,126.0 108.0,125.3 108.8,124.7 109.5,124.0 110.3,123.3 111.1,122.7 111.8,122.0 112.6,121.4 113.4,120.7 114.2,120.0 114.9,119.4 115.7,118.7 116.5,118.1 117.3,117.4 118.0,116.8 118.8,116.2 119.6,115.5 120.4,114.9 121.2,114.3 121.9,113.6 122.7,113.0 123.5,112.4 124.2,111.8 125.0,111.2 125.8,110.5 126.6,109.9 127.3,109.3 128.1,108.7 128.9,108.1 129.7,107.5 130.4,106.9 131.2,106.3 132.0,105.7 132.8,105.2 133.6,104.6 134.3,104.0 135.1,103.4 135.9,102.9 136.7,102.3 137.4,101.7 138.2,101.2 139.0,100.6 139.8,100.1 140.5,99.5 141.3,99.0 142.1,98.4 142.8,97.9 143.6,97.3 144.4,96.8 145.2,96.3 145.9,95.8 146.7,95.2 147.5,94.7 148.3,94.2 149.1,93.7 149.8,93.2 150.6,92.7 151.4,92.2 152.2,91.7 152.9,91.2 153.7,90.8 154.5,90.3 155.2,89.8 156.0,89.3 156.8,88.9 157.6,88.4 158.3,88.0 159.1,87.5 159.9,87.1 160.7,86.6 161.4,86.2 162.2,85.7 163.0,85.3 163.8,84.9 164.6,84.5 165.3,84.1 166.1,83.7 166.9,83.2 167.7,82.8 168.4,82.5 169.2,82.1 170.0,81.7 170.8,81.3 171.5,80.9 172.3,80.5 173.1,80.2 173.9,79.8 174.6,79.5 175.4,79.1 176.2,78.8 176.9,78.4 177.7,78.1 178.5,77.8 179.3,77.4 180.1,77.1 180.8,76.8 181.6,76.5 182.4,76.2 183.1,75.9 183.9,75.6 184.7,75.3 185.5,75.0 186.2,74.7 187.0,74.4 187.8,74.2 188.6,73.9 189.4,73.7 190.1,73.4 190.9,73.1 191.7,72.9 192.4,72.7 193.2,72.4 194.0,72.2 194.8,72.0 195.6,71.8 196.3,71.6 197.1,71.4 197.9,71.2 198.7,71.0 199.4,70.8 200.2,70.6 201.0,70.4 201.8,70.2 202.5,70.1 203.3,69.9 204.1,69.8 204.8,69.6 205.6,69.5 206.4,69.3 207.2,69.2 207.9,69.1 208.7,68.9 209.5,68.8 210.3,68.7 211.1,68.6 211.8,68.5 212.6,68.4 213.4,68.3 214.2,68.2 214.9,68.2 215.7,68.1 216.5,68.0 217.2,68.0 218.0,67.9 218.8,67.9 219.6,67.8 220.3,67.8 221.1,67.8 221.9,67.7 222.7,67.7 223.4,67.7 224.2,67.7 225.0,67.7 225.8,67.7 226.6,67.7 227.3,67.7 228.1,67.7 228.9,67.8 229.7,67.8 230.4,67.8 231.2,67.9 232.0,67.9 232.8,68.0 233.5,68.0 234.3,68.1 235.1,68.2 235.9,68.2 236.6,68.3 237.4,68.4 238.2,68.5 239.0,68.6 239.7,68.7 240.5,68.8 241.3,68.9 242.1,69.1 242.8,69.2 243.6,69.3 244.4,69.5 245.1,69.6 245.9,69.8 246.7,69.9 247.5,70.1 248.2,70.2 249.0,70.4 249.8,70.6 250.6,70.8 251.3,71.0 252.1,71.2 252.9,71.4 253.7,71.6 254.4,71.8 255.2,72.0 256.0,72.2 256.8,72.4 257.5,72.7 258.3,72.9 259.1,73.1 259.9,73.4 260.6,73.7 261.4,73.9 262.2,74.2 263.0,74.4 263.8,74.7 264.5,75.0 265.3,75.3 266.1,75.6 266.9,75.9 267.6,76.2 268.4,76.5 269.2,76.8 270.0,77.1 270.7,77.4 271.5,77.8 272.3,78.1 273.1,78.4 273.8,78.8 274.6,79.1 275.4,79.5 276.1,79.8 276.9,80.2 277.7,80.5 278.5,80.9 279.2,81.3 280.0,81.7 280.8,82.1 281.6,82.5 282.4,82.8 283.1,83.2 283.9,83.7 284.7,84.1 285.4,84.5 286.2,84.9 287.0,85.3 287.8,85.7 288.5,86.2 289.3,86.6 290.1,87.1 290.9,87.5 291.6,88.0 292.4,88.4 293.2,88.9 294.0,89.3 294.8,89.8 295.5,90.3 296.3,90.8 297.1,91.2 297.9,91.7 298.6,92.2 299.4,92.7 300.2,93.2 300.9,93.7 301.7,94.2 302.5,94.7 303.3,95.2 304.1,95.8 304.8,96.3 305.6,96.8 306.4,97.3 307.1,97.9 307.9,98.4 308.7,99.0 309.5,99.5 310.2,100.1 311.0,100.6 311.8,101.2 312.6,101.7 313.4,102.3 314.1,102.9 314.9,103.4 315.7,104.0 316.5,104.6 317.2,105.2 318.0,105.7 318.8,106.3 319.6,106.9 320.3,107.5 321.1,108.1 321.9,108.7 322.6,109.3 323.4,109.9 324.2,110.5 325.0,111.2 325.8,111.8 326.5,112.4 327.3,113.0 328.1,113.6 328.8,114.3 329.6,114.9 330.4,115.5 331.2,116.2 331.9,116.8 332.7,117.4 333.5,118.1 334.3,118.7 335.1,119.4 335.8,120.0 336.6,120.7 337.4,121.4 338.1,122.0 338.9,122.7 339.7,123.3 340.5,124.0 341.2,124.7 342.0,125.3 342.8,126.0 343.6,126.7 344.4,127.4 345.1,128.1 345.9,128.7 346.7,129.4 347.4,130.1 348.2,130.8 349.0,131.5 349.8,132.2 350.6,132.9 351.3,133.6 352.1,134.2 352.9,134.9 353.7,135.6 354.4,136.3 355.2,137.0 356.0,137.7 356.8,138.5 357.5,139.2 358.3,139.9 359.1,140.6 359.9,141.3 360.6,142.0 361.4,142.7 362.2,143.4 362.9,144.1 363.7,144.8 364.5,145.6 365.3,146.3 366.1,147.0 366.8,147.7 367.6,148.4 368.4,149.2 369.1,149.9 369.9,150.6 370.7,151.3 371.5,152.0 372.2,152.8 373.0,153.5 373.8,154.2 374.6,154.9 375.4,155.7 376.1,156.4 376.9,157.1 377.7,157.8 378.4,158.6 379.2,159.3 380.0,160.0 380.8,160.7 381.5,161.4 382.3,162.2 383.1,162.9 383.9,163.6 384.6,164.3 385.4,165.1 386.2,165.8 387.0,166.5 387.8,167.2 388.5,168.0 389.3,168.7 390.1,169.4 390.8,170.1 391.6,170.8 392.4,171.6 393.2,172.3 393.9,173.0 394.7,173.7 395.5,174.4 396.3,175.2 397.0,175.9 397.8,176.6 398.6,177.3 399.4,178.0 400.1,178.7 400.9,179.4 401.7,180.1 402.5,180.8 403.2,181.5 404.0,182.3 404.8,183.0 405.6,183.7 406.3,184.4 407.1,185.1 407.9,185.8 408.7,186.4 409.4,187.1 410.2,187.8 411.0,188.5 411.8,189.2 412.6,189.9 413.3,190.6 414.1,191.3 414.9,191.9 415.6,192.6 416.4,193.3 417.2,194.0 418.0,194.7 418.8,195.3 419.5,196.0 420.3,196.7 421.1,197.3 421.9,198.0 422.6,198.6 423.4,199.3 424.2,200.0 424.9,200.6 425.7,201.3 426.5,201.9 427.3,202.6 428.1,203.2 428.8,203.8 429.6,204.5 430.4,205.1 431.2,205.7 431.9,206.4 432.7,207.0 433.5,207.6 434.2,208.2 435.0,208.8 435.8,209.5 436.6,210.1 437.4,210.7 438.1,211.3 438.9,211.9 439.7,212.5 440.5,213.1 441.2,213.7 442.0,214.3 442.8,214.8 443.6,215.4 444.3,216.0 445.1,216.6 445.9,217.1 446.7,217.7 447.4,218.3 448.2,218.8 449.0,219.4 449.8,219.9 450.5,220.5 451.3,221.0 452.1,221.6 452.9,222.1 453.6,222.7 454.4,223.2 455.2,223.7 456.0,224.2 456.7,224.8 457.5,225.3 458.3,225.8 459.0,226.3 459.8,226.8 460.6,227.3 461.4,227.8 462.1,228.3 462.9,228.8 463.7,229.2 464.5,229.7 465.2,230.2 466.0,230.7 466.8,231.1 467.6,231.6 468.3,232.0 469.1,232.5 469.9,232.9 470.7,233.4 471.4,233.8 472.2,234.3 473.0,234.7 473.8,235.1 474.5,235.5 475.3,235.9 476.1,236.3 476.9,236.8 477.6,237.2 478.4,237.5 479.2,237.9 480.0,238.3 480.8,238.7 481.5,239.1 482.3,239.5 483.1,239.8 483.8,240.2 484.6,240.5 485.4,240.9 486.2,241.2 486.9,241.6 487.7,241.9 488.5,242.2 489.3,242.6 490.1,242.9 490.8,243.2 491.6,243.5 492.4,243.8 493.1,244.1 493.9,244.4 494.7,244.7 495.5,245.0 496.2,245.3 497.0,245.6 497.8,245.8 498.6,246.1 499.4,246.3 500.1,246.6 500.9,246.9 501.7,247.1 502.4,247.3 503.2,247.6 504.0,247.8 504.8,248.0 505.6,248.2 506.3,248.4 507.1,248.6 507.9,248.8 508.7,249.0 509.4,249.2 510.2,249.4 511.0,249.6 511.8,249.8 512.5,249.9 513.3,250.1 514.1,250.2 514.9,250.4 515.6,250.5 516.4,250.7 517.2,250.8 518.0,250.9 518.7,251.1 519.5,251.2 520.3,251.3 521.0,251.4 521.8,251.5 522.6,251.6 523.4,251.7 524.2,251.8 524.9,251.8 525.7,251.9 526.5,252.0 527.2,252.0 528.0,252.1 528.8,252.1 529.6,252.2 530.4,252.2 531.1,252.2 531.9,252.3 532.7,252.3 533.5,252.3 534.2,252.3 535.0,252.3 535.8,252.3 536.5,252.3 537.3,252.3 538.1,252.3 538.9,252.2 539.6,252.2 540.4,252.2 541.2,252.1 542.0,252.1 542.8,252.0 543.5,252.0 544.3,251.9 545.1,251.8 545.8,251.8 546.6,251.7 547.4,251.6 548.2,251.5 549.0,251.4 549.7,251.3 550.5,251.2 551.3,251.1 552.0,250.9 552.8,250.8 553.6,250.7 554.4,250.5 555.1,250.4 555.9,250.2 556.7,250.1 557.5,249.9 558.2,249.8 559.0,249.6 559.8,249.4 560.6,249.2 561.3,249.0 562.1,248.8 562.9,248.6 563.7,248.4 564.5,248.2 565.2,248.0 566.0,247.8 566.8,247.6 567.5,247.3 568.3,247.1 569.1,246.9 569.9,246.6 570.6,246.3 571.4,246.1 572.2,245.8 573.0,245.6 573.8,245.3 574.5,245.0 575.3,244.7 576.1,244.4 576.9,244.1 577.6,243.8 578.4,243.5 579.2,243.2 580.0,242.9 580.7,242.6 581.5,242.2 582.3,241.9 583.0,241.6 583.8,241.2 584.6,240.9 585.4,240.5 586.1,240.2 586.9,239.8 587.7,239.5 588.5,239.1 589.2,238.7 590.0,238.3 590.8,237.9 591.6,237.5 592.4,237.2 593.1,236.8 593.9,236.3 594.7,235.9 595.5,235.5 596.2,235.1 597.0,234.7 597.8,234.3 598.6,233.8 599.3,233.4 600.1,232.9 600.9,232.5 601.6,232.0 602.4,231.6 603.2,231.1 604.0,230.7 604.8,230.2 605.5,229.7 606.3,229.2 607.1,228.8 607.9,228.3 608.6,227.8 609.4,227.3 610.2,226.8 611.0,226.3 611.7,225.8 612.5,225.3 613.3,224.8 614.0,224.2 614.8,223.7 615.6,223.2 616.4,222.7 617.1,222.1 617.9,221.6 618.7,221.0 619.5,220.5 620.2,219.9 621.0,219.4 621.8,218.8 622.6,218.3 623.4,217.7 624.1,217.1 624.9,216.6 625.7,216.0 626.4,215.4 627.2,214.8 628.0,214.3 628.8,213.7 629.5,213.1 630.3,212.5 631.1,211.9 631.9,211.3 632.6,210.7 633.4,210.1 634.2,209.5 635.0,208.8 635.8,208.2 636.5,207.6 637.3,207.0 638.1,206.4 638.9,205.7 639.6,205.1 640.4,204.5 641.2,203.8 642.0,203.2 642.7,202.6 643.5,201.9 644.3,201.3 645.0,200.6 645.8,200.0 646.6,199.3 647.4,198.6 648.1,198.0 648.9,197.3 649.7,196.7 650.5,196.0 651.2,195.3 652.0,194.7 652.8,194.0 653.6,193.3 654.4,192.6 655.1,191.9 655.9,191.3 656.7,190.6 657.5,189.9 658.2,189.2 659.0,188.5 659.8,187.8 660.5,187.1 661.3,186.4 662.1,185.8 662.9,185.1 663.6,184.4 664.4,183.7 665.2,183.0 666.0,182.3 666.8,181.5 667.5,180.8 668.3,180.1 669.1,179.4 669.9,178.7 670.6,178.0 671.4,177.3 672.2,176.6 673.0,175.9 673.7,175.2 674.5,174.4 675.3,173.7 676.1,173.0 676.8,172.3 677.6,171.6 678.4,170.8 679.1,170.1 679.9,169.4 680.7,168.7 681.5,168.0 682.2,167.2 683.0,166.5 683.8,165.8 684.6,165.1 685.4,164.3 686.1,163.6 686.9,162.9 687.7,162.2 688.5,161.4 689.2,160.7 690.0,160.0\" style=\"fill:none;stroke:var(--live);stroke-width:2.2;stroke-linejoin:round\"/><polyline points=\"70.0,160.0 70.0,132.3 108.8,132.3 108.8,132.3 108.8,104.6 147.5,104.6 147.5,104.6 147.5,76.9 186.2,76.9 186.2,76.9 186.2,49.2 225.0,49.2 225.0,49.2 225.0,76.9 263.8,76.9 263.8,76.9 263.8,49.2 302.5,49.2 302.5,49.2 302.5,76.9 341.2,76.9 341.2,76.9 341.2,104.6 380.0,104.6 380.0,104.6 380.0,132.3 418.8,132.3 418.8,132.3 418.8,160.0 457.5,160.0 457.5,160.0 457.5,187.7 496.2,187.7 496.2,187.7 496.2,215.4 535.0,215.4 535.0,215.4 535.0,243.1 573.8,243.1 573.8,243.1 573.8,270.8 612.5,270.8 612.5,270.8 612.5,243.1 651.2,243.1 651.2,243.1 651.2,215.4 690.0,215.4 690.0,215.4 690.0,187.7\" style=\"fill:none;stroke:var(--accent);stroke-width:2.6;stroke-linejoin:round\"/><circle cx=\"70.0\" cy=\"160.0\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"70.0\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><text x=\"70.0\" y=\"326.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">n = 0</text><circle cx=\"108.8\" cy=\"124.7\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"108.8\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><circle cx=\"147.5\" cy=\"94.7\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"147.5\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><circle cx=\"186.2\" cy=\"74.7\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"186.2\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><circle cx=\"225.0\" cy=\"67.7\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"225.0\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><text x=\"225.0\" y=\"326.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">n = 4</text><circle cx=\"263.8\" cy=\"74.7\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"263.8\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><circle cx=\"302.5\" cy=\"94.7\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"302.5\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><circle cx=\"341.2\" cy=\"124.7\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"341.2\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><circle cx=\"380.0\" cy=\"160.0\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"380.0\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><text x=\"380.0\" y=\"326.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">n = 8</text><circle cx=\"418.8\" cy=\"195.3\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"418.8\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><circle cx=\"457.5\" cy=\"225.3\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"457.5\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><circle cx=\"496.2\" cy=\"245.3\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"496.2\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><circle cx=\"535.0\" cy=\"252.3\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"535.0\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><text x=\"535.0\" y=\"326.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">n = 12</text><circle cx=\"573.8\" cy=\"245.3\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"573.8\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><circle cx=\"612.5\" cy=\"225.3\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"612.5\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><circle cx=\"651.2\" cy=\"195.3\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"651.2\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><circle cx=\"690.0\" cy=\"160.0\" r=\"4\" style=\"fill:var(--live);stroke:var(--fig);stroke-width:2\"/><text x=\"690.0\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><text x=\"690.0\" y=\"326.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">n = 16</text><text x=\"61.0\" y=\"306.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">bits</text><line x1=\"330.0\" y1=\"18.0\" x2=\"356.0\" y2=\"18.0\" style=\"stroke:var(--live);stroke-width:3\"/><text x=\"362.0\" y=\"22.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">x(t), 500 Hz, 1 V</text><line x1=\"503.8\" y1=\"18.0\" x2=\"529.8\" y2=\"18.0\" style=\"stroke:var(--accent);stroke-width:3\"/><text x=\"535.8\" y=\"22.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">staircase, Δ = 0.3 V</text>",
+   "aria": "A 1 volt, 500 hertz sine with sample dots and the delta-modulation staircase of step 0.3 volts over 16 samples, the bit sent at each sample written below; a shaded region at the peak marks granular noise and one near the falling zero crossing marks slope overload."
+  }
+ }
 }

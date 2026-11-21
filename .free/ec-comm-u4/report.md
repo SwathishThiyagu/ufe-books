@@ -1,13 +1,13 @@
 # ec-comm-u4: free-model run
 
-- Book: `books/ece/ec-comm/ec-comm-u4.html`
+- Book: `work/ec-comm-u4/tree/books/ece/ec-comm/ec-comm-u4.html`
 - Status: ok
-- Model calls so far: 22 (80,434 tokens in, 171,524 out), 5.5 minutes
+- Model calls so far: 22 (80,434 tokens in, 171,524 out), 5.9 minutes
 
 ## Checker
 
 ```
-ec-comm-u4.html: 8 chapters, 14081 words, 9 figures, 156 KB
+ec-comm-u4.html: 8 chapters, 20706 words, 11 figures, 300 KB
 OK
 ```
 
@@ -45,3 +45,9 @@ OK
 - ch 8 [low] Worked example 1, step 6 and answer: Step 6 says Manchester is DC-free and self-clocking as if it were the only such code. Polar RZ is also DC-free when bits are equally likely (its PSD is a sinc² with no line at DC) and it puts a transition in every bit period, as Section 3 itself says. The question does not state bit statistics, so a careful student can answer 'polar RZ' and be marked wrong.
 - ch 8 [low] Section 3, last paragraph: 'NRZ is best for bandwidth but needs scrambling or framing to avoid long runs. RZ sits between them.' The phrase 'sits between them' is unclear and, on bandwidth, wrong: RZ needs about twice the bandwidth of NRZ, the same order as Manchester. Its only middle position is in clock content, not width.
 - ch 8 [low] Figure table, RZ row: The RZ cells are written '+0' and '−0'. The symbol 0 here means the zero-volt level, not the bit 0, and the table gives no key, so a reader can mistake '−0' for a minus sign followed by the bit value zero.
+
+## Correction pass (Claude, 21 Nov 2026)
+
+- Every reviewer note fixed ([high] first); every chapter rewritten from the draft, every example, trap, quiz and bank answer recomputed by script.
+- Second worked examples added in every chapter; eight figures hand-drawn from the chapter examples (pipeline/claude_figs/ec_comm_u4.py).
+- 14 full model answers; cross-unit references named by topic; MIT links dropped.

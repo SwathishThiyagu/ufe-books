@@ -1,45 +1,44 @@
 {
- "lead": "Differential pulse-code modulation (DPCM) sends the difference between each sample and a prediction made from past samples, not the full sample. Speech, audio and many sensor signals change slowly from one sample to the next, so this difference is small and needs fewer bits than PCM for the same quality. The receiver rebuilds the signal by adding back the same prediction. Adaptive DPCM (ADPCM) also changes the quantizer step with the signal’s short-term energy. Telephone speech at 32 kbit/s from 64 kbit/s PCM is a standard use.",
- "prereq": "You need <a href=\"#uniform-and-non-uniform-quantization-companding\">quantization</a>, <a href=\"#pulse-code-modulation-pcm\">PCM</a>, and correlation from Unit 1.",
+ "lead": "Differential pulse code modulation (DPCM) sends the difference between each sample and a prediction made from past samples, instead of the sample itself. Speech and most sensor signals change little from one sample to the next, so the difference is small and needs fewer bits for the same quality. The receiver adds the same prediction back. Adaptive DPCM (ADPCM) also adjusts the quantizer step to the signal’s short-term level; it carries telephone speech at 32 kbit/s, half the PCM rate.",
+ "prereq": "You need: <a href=\"#pulse-code-modulation-pcm\">PCM</a> and correlation between samples (see Random processes, stationarity, correlation and power spectral density).",
  "sections": [
   {
-   "h3": "Predict, subtract, encode",
+   "h3": "Predict, subtract, quantize",
    "blocks": [
     {
      "type": "p",
-     "text": "Let x[n] be the sample at time index n, and let x̂[n] be its prediction from earlier samples. DPCM sends the prediction error e[n] = x[n] − x̂[n]. If the signal is smooth, e[n] is small. The quantizer replaces e[n] by one of L = 2<sup>R</sup> allowed levels, and the encoder sends that level as an R-bit code word. The bit rate is fs·R bit/s, where fs is the sampling frequency in samples per second and R is the number of bits per sample. This is the same form as PCM, but R can be smaller because the error has lower variance than the original signal."
+     "text": "Let x[n] be the sample at time index n, x̂[n] its <b>prediction</b> from earlier samples and x̃[n] the <b>reconstructed sample</b> that both ends can compute. DPCM quantizes the <b>prediction error</b> e[n] = x[n] − x̂[n] to q[n] and sends the level number as a code word of N bits, from L = 2ᴺ levels. The bit rate is N f<sub>s</sub>, the PCM formula with N bits for the difference. N can be smaller than the PCM word length because e[n] has a smaller spread than x[n]."
     },
     {
      "type": "formula",
-     "text": "e[n] = x[n] − x̂[n]",
-     "where": "x[n] is the input sample at index n; x̂[n] is the predicted value; e[n] is the prediction error sent to the quantizer."
+     "text": "e[n] = x[n] − x̂[n],   x̃[n] = x̂[n] + q[n]",
+     "where": "The reconstructed sample differs from the input only by the quantization error of the difference: x[n] − x̃[n] = e[n] − q[n]."
     },
     {
      "type": "p",
-     "text": "For a simple predictor x̂[n] = x̃[n−1], where x̃ is the reconstructed past sample, the error depends on how strongly adjacent samples are correlated. For a first-order Markov source with variance σ² and adjacent-sample correlation ρ, the prediction-error variance is σ_e² = 2σ²(1−ρ). A value of ρ close to 1 means a slow signal and a small error."
+     "text": "The simplest predictor uses the last reconstructed sample, x̂[n] = x̃[n − 1]. For a signal with variance σ² and correlation ρ between neighbouring samples, the error variance is then σ<sub>e</sub>² = 2σ²(1 − ρ). The best single-coefficient predictor x̂[n] = a x̃[n − 1] uses a = ρ and gives σ<sub>e</sub>² = σ²(1 − ρ²). Practical speech coders use several past samples."
     }
    ]
   },
   {
-   "h3": "Closed-loop predictor in transmitter and receiver",
+   "h3": "Why the predictor sits inside the loop",
    "blocks": [
     {
      "type": "p",
-     "text": "The figure shows the order: subtractor, quantizer, encoder, channel, decoder, adder, predictor. The transmitter also needs a local decoder. After quantizing e[n] to q[n], it forms the reconstructed sample x̃[n] = x̂[n] + q[n] and stores x̃[n] for the next prediction."
+     "text": "The figure shows the transmitter and the receiver separately. The receiver has only q[n], so it can form only x̃. The transmitter therefore contains a copy of the receiver, its <b>local decoder</b>: it adds q[n] to x̂[n] to get x̃[n], and predicts the next sample from x̃, never from the true x."
     },
     {
      "type": "steps",
      "items": [
       "Predict x̂[n] from stored reconstructed samples.",
-      "Subtract to get e[n] = x[n] − x̂[n].",
-      "Quantize e[n] to q[n] and encode its level index.",
-      "In the transmitter, add x̂[n] + q[n] to get x̃[n].",
-      "Send the index; the receiver decodes q[n], adds the same x̂[n], and updates its predictor."
+      "Subtract: e[n] = x[n] − x̂[n].",
+      "Quantize e[n] to q[n] and send its code.",
+      "Both ends add: x̃[n] = x̂[n] + q[n], and store it for the next prediction."
      ]
     },
     {
      "type": "p",
-     "text": "Both predictors must use x̃, not the true input x. If the transmitter predicts from x[n] but the receiver has only x̃[n], their predictions diverge. Each decoded error then adds to a wrong prediction, and the error can grow from sample to sample. Because the quantizer sits inside the closed loop and the same q[n] is added on both sides, the transmitter and receiver predictors hold identical values, so quantizer noise does not accumulate."
+     "text": "Because both predictors see the same x̃, they stay identical, and the error in each output sample is just one quantization error, e[n] − q[n]. If the transmitter predicted from x instead (open loop), the receiver’s predictions would drift away, and quantization errors would add up from sample to sample."
     }
    ]
   },
@@ -47,199 +46,173 @@
    "h3": "Prediction gain and ADPCM",
    "blocks": [
     {
-     "type": "formula",
-     "text": "G_DPCM = 10 log₁₀(σ² / σ_e²) = 10 log₁₀[1 / (2(1−ρ))] dB",
-     "where": "G_DPCM is the improvement over PCM at the same number of bits; σ² is signal variance; σ_e² is prediction-error variance; ρ is adjacent-sample correlation."
+     "type": "p",
+     "text": "<b>G<sub>p</sub> = 10 log<sub>10</sub>(σ²/σ<sub>e</sub>²) dB</b>"
     },
     {
      "type": "p",
-     "text": "A larger ρ gives a larger gain. With ρ = 0, the formula gives −3 dB, so DPCM is worse; the gain is not automatic. The full names are differential pulse-code modulation and adaptive differential pulse-code modulation. Some syllabi use the short forms DPCM and ADPCM."
+     "text": "G<sub>p</sub> is the <b>prediction gain</b>: the SQNR improvement over PCM with the same number of bits, since the quantizer now covers a range set by σ<sub>e</sub>, not σ. With x̂[n] = x̃[n − 1] it is 10 log[1/(2(1 − ρ))]; each 6.02 dB of gain saves one bit."
     },
     {
      "type": "p",
-     "text": "ADPCM changes the quantizer step Δ[n] with short-term signal energy. A loud segment gets a large step to avoid overload; a quiet segment gets a small step to avoid granular noise. The predictor coefficients may also adapt. Standard speech ADPCM at 32 kbit/s carries 4-bit differences at 8 kHz, half the 64 kbit/s PCM rate. This is adaptation, not companding: companding uses a fixed non-uniform curve, while ADPCM changes with time."
+     "text": "The gain is not automatic. For ρ = 0.5 the simple predictor gives 0 dB, and for ρ = 0 it gives −3 dB: subtracting an unrelated sample doubles the variance. Telephone speech sampled at 8 kHz typically has ρ of about 0.85 to 0.9."
+    },
+    {
+     "type": "p",
+     "text": "<b>ADPCM</b> makes the quantizer step Δ[n] follow the short-term level: loud passages get a large step to avoid overload, quiet ones a small step to cut granular noise. The step and often the predictor coefficients are computed from past code words, so the receiver tracks them with no side information. The ITU-T G.726 coder sends 4-bit differences at 8 kHz, 32 kbit/s. This is adaptation over time, not companding, which is a fixed curve."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "The input sample meets a subtractor; the quantized error is encoded and sent. The predictor exists in both transmitter and receiver; the transmitter's copy is fed by its own local adder, so both predictors hold the same values.",
-  "spec": {
-   "type": "blocks",
-   "direction": "down",
-   "title": "DPCM with closed-loop predictor",
-   "nodes": [
-    {
-     "id": "a",
-     "label": "x[n]",
-     "style": "normal"
-    },
-    {
-     "id": "b",
-     "label": "Subtractor",
-     "style": "normal"
-    },
-    {
-     "id": "c",
-     "label": "Quantizer",
-     "note": "small error",
-     "style": "accent"
-    },
-    {
-     "id": "d",
-     "label": "Encoder",
-     "style": "live"
-    },
-    {
-     "id": "e",
-     "label": "Channel",
-     "style": "normal"
-    },
-    {
-     "id": "f",
-     "label": "Decoder",
-     "style": "normal"
-    },
-    {
-     "id": "g",
-     "label": "Adder",
-     "style": "normal"
-    },
-    {
-     "id": "h",
-     "label": "Predictor (in Tx and Rx)",
-     "note": "in: x̃[n−1], out: x̂[n]; Tx copy fed by local adder",
-     "style": "next"
-    },
-    {
-     "id": "i",
-     "label": "x̃[n]",
-     "style": "normal"
-    }
-   ],
-   "edges": [
-    {
-     "from": "a",
-     "to": "b",
-     "style": "solid"
-    },
-    {
-     "from": "b",
-     "to": "c",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "d",
-     "to": "e",
-     "style": "solid"
-    },
-    {
-     "from": "e",
-     "to": "f",
-     "style": "solid"
-    },
-    {
-     "from": "f",
-     "to": "g",
-     "style": "solid"
-    },
-    {
-     "from": "g",
-     "to": "i",
-     "style": "solid"
-    },
-    {
-     "from": "g",
-     "to": "h",
-     "style": "solid"
-    },
-    {
-     "from": "h",
-     "to": "b",
-     "style": "dashed"
-    },
-    {
-     "from": "h",
-     "to": "g",
-     "style": "dashed"
-    }
-   ],
-   "aria": "The DPCM diagram subtracts a prediction from the input, quantizes and encodes the error. The reconstructed sample goes to the predictor, whose output goes to both subtractor and adder. The predictor exists in both transmitter and receiver."
-  }
- },
  "examples": [
   {
-   "question": "A first-order Markov source has variance σ² = 1 V² and adjacent-sample correlation ρ = 0.9. DPCM uses x̂[n] = x̃[n−1]. Find the prediction-error variance and the DPCM gain over PCM at the same number of bits.",
+   "question": "A signal has σ² = 1 V² and adjacent-sample correlation ρ = 0.9. Find the prediction-error variance and the prediction gain for x̂[n] = x̃[n − 1] and for the best coefficient a = ρ. About how many bits does DPCM save?",
    "steps": [
-    "Write the given values: σ² = 1 V² and ρ = 0.9.",
-    "Use σ_e² = 2σ²(1−ρ) = 2 × 1 × (1 − 0.9) = 2 × 0.1 = 0.2 V².",
-    "Use G_DPCM = 10 log₁₀(σ² / σ_e²) = 10 log₁₀(1 / 0.2) = 10 log₁₀(5).",
-    "log₁₀(5) = 0.69897, so G_DPCM = 6.9897 dB ≈ 6.99 dB."
+    "Simple predictor: σ<sub>e</sub>² = 2σ²(1 − ρ) = 2 × 1 × 0.1 = 0.2 V².",
+    "G<sub>p</sub> = 10 log<sub>10</sub>(1/0.2) = 10 log<sub>10</sub> 5 = 6.99 dB.",
+    "Best coefficient: σ<sub>e</sub>² = σ²(1 − ρ²) = 1 − 0.81 = 0.19 V², so G<sub>p</sub> = 10 log<sub>10</sub>(1/0.19) = 7.21 dB.",
+    "Bits saved ≈ G<sub>p</sub>/6.02 = 6.99/6.02 = 1.16, so about one bit per sample."
    ],
-   "answer": "The prediction-error variance is 0.2 V², and the DPCM gain over PCM is 6.99 dB, about 7 dB.",
-   "check": "import math\nsigma2 = 1.0\nrho = 0.9\nsigma_e2 = 2 * sigma2 * (1 - rho)\ngain_db = 10 * math.log10(1 / (2 * (1 - rho)))\nprint(round(sigma_e2, 2))\nprint(round(gain_db, 2))",
-   "values": [
-    0.2,
-    6.99
+   "answer": "σ<sub>e</sub>² = 0.2 V² and G<sub>p</sub> = 6.99 dB (0.19 V² and 7.21 dB with a = 0.9); DPCM saves about one bit per sample, 8 kbit/s at 8 kHz."
+  },
+  {
+   "question": "A DPCM coder uses x̂[n] = x̃[n − 1], starts from x̃[−1] = 0, and quantizes e[n] with a 3-bit quantizer of step 0.5 V (levels ±0.25, ±0.75, ±1.25, ±1.75 V, codes 000 for −1.75 up to 111 for +1.75). Trace the inputs 1.1, 1.7, 2.2, 2.4, 2.1 and 1.4 V.",
+   "dry_run": {
+    "head": [
+     "n",
+     "x[n]",
+     "x̂[n]",
+     "e[n]",
+     "q[n]",
+     "code",
+     "x̃[n]",
+     "x − x̃"
+    ],
+    "rows": [
+     [
+      "0",
+      "1.10",
+      "0.00",
+      "1.10",
+      "1.25",
+      "110",
+      "1.25",
+      "−0.15"
+     ],
+     [
+      "1",
+      "1.70",
+      "1.25",
+      "0.45",
+      "0.25",
+      "100",
+      "1.50",
+      "+0.20"
+     ],
+     [
+      "2",
+      "2.20",
+      "1.50",
+      "0.70",
+      "0.75",
+      "101",
+      "2.25",
+      "−0.05"
+     ],
+     [
+      "3",
+      "2.40",
+      "2.25",
+      "0.15",
+      "0.25",
+      "100",
+      "2.50",
+      "−0.10"
+     ],
+     [
+      "4",
+      "2.10",
+      "2.50",
+      "−0.40",
+      "−0.25",
+      "011",
+      "2.25",
+      "−0.15"
+     ],
+     [
+      "5",
+      "1.40",
+      "2.25",
+      "−0.85",
+      "−0.75",
+      "010",
+      "1.50",
+      "−0.10"
+     ]
+    ]
+   },
+   "steps": [
+    "n = 0: x̂ = 0, e = 1.10, nearest level 1.25 (code 110), x̃ = 0 + 1.25 = 1.25 V.",
+    "n = 1: x̂ = 1.25, e = 1.70 − 1.25 = 0.45, nearest level 0.25 (0.45 is 0.20 from 0.25 and 0.30 from 0.75), x̃ = 1.50 V.",
+    "Each later row repeats the same four steps, always predicting from x̃, so the receiver, which adds the same q[n], gets the same x̃ column.",
+    "Every output error is within ±0.25 V = ±Δ/2 although the input reaches 2.4 V, beyond the ±1.75 V quantizer range: the quantizer sees only differences."
    ],
-   "output": ""
+   "answer": "Codes 110 100 101 100 011 010; reconstructed 1.25, 1.50, 2.25, 2.50, 2.25, 1.50 V; every error is within ±0.25 V."
   }
  ],
  "traps": [
-  "The transmitter predictor must use the same reconstructed past samples as the receiver. Using the true input x[n] instead of x̃[n] causes predictor mismatch and growing error.",
-  "DPCM is not delta modulation. DPCM can send many bits per difference; delta modulation sends one bit per sample with a fixed step, covered in <a href=\"#delta-and-adaptive-delta-modulation\">Chapter 4.6</a>.",
-  "ADPCM adaptation is not companding. Both help small signals, but companding is a fixed non-uniform quantizer curve, while ADPCM changes the step from the short-term signal.",
-  "The DPCM gain formula assumes a first-order predictor and the same bit rate for PCM and DPCM. A weak correlation, or ρ near 0, can make DPCM worse than PCM."
+  "Both predictors must work from the reconstructed x̃, not the true x; predicting from x makes the receiver drift.",
+  "DPCM is not delta modulation: DPCM uses a multi-level quantizer; delta modulation is its 1-bit case (see <a href=\"#delta-and-adaptive-delta-modulation\">Delta and adaptive delta modulation</a>).",
+  "ADPCM adaptation is not companding: companding is a fixed curve, ADPCM changes the step with time.",
+  "With x̂[n] = x̃[n − 1] the gain is positive only for ρ &gt; 0.5; at ρ = 0 it is −3 dB."
  ],
  "quiz": [
   {
    "level": "remember",
    "q": "Define DPCM in one sentence.",
    "marks": 2,
-   "a": "DPCM quantizes and encodes the difference between each sample and a prediction from past reconstructed samples."
+   "a": "DPCM quantizes and sends the difference between each sample and a prediction formed from past reconstructed samples."
   },
   {
    "level": "understand",
-   "q": "Why must both DPCM predictors use the reconstructed sample x̃[n−1] rather than the true sample x[n−1]?",
+   "q": "Why must the transmitter predict from x̃[n − 1] rather than x[n − 1]?",
    "marks": 3,
-   "a": "The receiver has only reconstructed samples. If the transmitter used true samples, the two predictions would differ, and each decoded error would add to a wrong prediction, causing drift or error growth."
+   "a": "The receiver has only x̃. If the transmitter predicted from x, the two predictions would differ, and the receiver’s output would drift as quantization errors accumulate."
   },
   {
    "level": "apply",
-   "q": "A source has σ² = 2 V² and ρ = 0.8. For first-order DPCM, find σ_e² and the gain over PCM in dB.",
+   "q": "A source has σ² = 2 V² and ρ = 0.8. Find σ<sub>e</sub>² and G<sub>p</sub> for x̂[n] = x̃[n − 1].",
    "marks": 4,
-   "a": "σ_e² = 2 × 2 × (1 − 0.8) = 0.8 V². Gain = 10 log₁₀(2 / 0.8) = 10 log₁₀(2.5) = 3.98 dB."
+   "a": "σ<sub>e</sub>² = 2 × 2 × 0.2 = 0.8 V²; G<sub>p</sub> = 10 log(2/0.8) = 10 log 2.5 = 3.98 dB."
+  },
+  {
+   "level": "apply",
+   "q": "ADPCM sends 4-bit differences at 8 kHz. Find the bit rate and the saving over 8-bit PCM.",
+   "marks": 2,
+   "a": "4 × 8000 = 32 kbit/s, half of 64 kbit/s, a saving of 32 kbit/s."
   },
   {
    "level": "analyze",
    "q": "Explain how ADPCM reduces both overload and granular noise.",
    "marks": 4,
-   "a": "It raises the quantizer step in loud segments so large errors are not clipped, and lowers the step in quiet segments so small errors are not rounded too coarsely."
-  },
-  {
-   "level": "apply",
-   "q": "PCM speech is 64 kbit/s. ADPCM uses 4-bit differences at 8 kHz sampling. Find the ADPCM bit rate.",
-   "marks": 2,
-   "a": "Bit rate = fs × R = 8000 samples/s × 4 bits/sample = 32 000 bit/s = 32 kbit/s."
+   "a": "A large step in loud passages lets the quantizer cover big differences without clipping; a small step in quiet passages makes the rounding fine. The step is computed from past codes at both ends."
   },
   {
    "level": "analyze",
-   "q": "Give two differences between DPCM and delta modulation.",
-   "marks": 5,
-   "a": "DPCM uses a multi-level quantizer and can send several bits per prediction error; delta modulation sends one bit per sample. DPCM encodes a quantized difference directly; delta modulation moves a staircase by a fixed step up or down."
-  },
-  {
-   "level": "understand",
-   "q": "Why does a higher adjacent-sample correlation ρ give a higher DPCM gain?",
+   "q": "Show that the simple predictor helps only when ρ &gt; 0.5.",
    "marks": 3,
-   "a": "Higher ρ means x[n] is better predicted by x̃[n−1]. The prediction error variance 2σ²(1−ρ) falls, so the same number of bits gives finer error resolution and a larger gain over PCM."
+   "a": "G<sub>p</sub> = 10 log[1/(2(1 − ρ))] &gt; 0 needs 2(1 − ρ) &lt; 1, that is ρ &gt; 0.5. At ρ = 0.5 the gain is 0 dB."
   }
  ],
- "beyond": "Not for the exam. ADPCM ideas appear in speech codecs, voice storage, VoIP and some wireless audio links. Standards families such as G.726 use adaptive differential coding; search for “G.726 ADPCM” and “speech codec bit rate” to see practical numbers. Modern codecs add better prediction, transform coding and psychoacoustic models, but the closed-loop predictor and adaptive step remain useful building blocks. The same prediction idea also appears in lossless audio and image compression."
+ "beyond": "Not for the exam. Linear prediction with ten or more coefficients is the heart of modern speech coding (CELP), and lossless audio and image formats predict each sample from its neighbours before entropy coding. Search next for linear predictive coding and G.726.",
+ "figure": {
+  "after_section": 2,
+  "caption": "DPCM in full: the transmitter holds its own copy of the receiver (the lower Σ and predictor), so both ends predict x̂[n] from the same reconstructed samples x̃ and only the N-bit code of q[n] crosses the channel.",
+  "spec": {
+   "type": "svg",
+   "h": 336,
+   "body": "<rect x=\"8.0\" y=\"26.0\" width=\"470.0\" height=\"296.0\" rx=\"10\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:1.2;stroke-dasharray:6 4\"/><text x=\"20.0\" y=\"48.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--muted)\" font-weight=\"700\">transmitter</text><rect x=\"492.0\" y=\"26.0\" width=\"220.0\" height=\"296.0\" rx=\"10\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:1.2;stroke-dasharray:6 4\"/><text x=\"504.0\" y=\"48.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--muted)\" font-weight=\"700\">receiver</text><text x=\"24.0\" y=\"90.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">x[n]</text><line x1=\"24.0\" y1=\"100.0\" x2=\"78.0\" y2=\"100.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><circle cx=\"96.0\" cy=\"100.0\" r=\"17\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"96.0\" y=\"106.0\" font-size=\"17\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Σ</text><text x=\"80.0\" y=\"82.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">+</text><text x=\"106.0\" y=\"134.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">−</text><line x1=\"113.0\" y1=\"100.0\" x2=\"160.0\" y2=\"100.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><text x=\"136.0\" y=\"90.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">e[n]</text><rect x=\"160.0\" y=\"76.0\" width=\"104.0\" height=\"48.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"212.0\" y=\"104.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">quantizer</text><line x1=\"264.0\" y1=\"100.0\" x2=\"312.0\" y2=\"100.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><text x=\"288.0\" y=\"90.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">q[n]</text><rect x=\"312.0\" y=\"76.0\" width=\"90.0\" height=\"48.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"357.0\" y=\"104.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">encoder</text><line x1=\"402.0\" y1=\"100.0\" x2=\"540.0\" y2=\"100.0\" style=\"stroke:var(--accent);stroke-width:2.5\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"401.3\" y=\"77.7\" width=\"97.4\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"450.0\" y=\"90.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">code, N bits</text><circle cx=\"288.0\" cy=\"100.0\" r=\"4\" style=\"fill:var(--accent);stroke:var(--fig);stroke-width:2\"/><line x1=\"288.0\" y1=\"100.0\" x2=\"288.0\" y2=\"170.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><circle cx=\"288.0\" cy=\"188.0\" r=\"17\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"288.0\" y=\"194.0\" font-size=\"17\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Σ</text><text x=\"258.0\" y=\"180.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">+</text><text x=\"300.0\" y=\"168.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">+</text><line x1=\"288.0\" y1=\"205.0\" x2=\"288.0\" y2=\"250.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><text x=\"298.0\" y=\"232.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">x̃[n]</text><rect x=\"206.0\" y=\"250.0\" width=\"164.0\" height=\"48.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--next);stroke-width:2\"/><text x=\"288.0\" y=\"270.1\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">predictor</text><text x=\"288.0\" y=\"287.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">stores x̃</text><polyline points=\"206.0,274.0 96.0,274.0 96.0,120.0\" style=\"fill:none;stroke:var(--next);stroke-width:2;stroke-linejoin:round\"/><line x1=\"96.0\" y1=\"130.0\" x2=\"96.0\" y2=\"121.0\" style=\"stroke:var(--next);stroke-width:2\" marker-end=\"url(#ar-UID-x)\"/><text x=\"104.0\" y=\"254.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--next)\" font-weight=\"700\">x̂[n]</text><polyline points=\"96.0,188.0 266.0,188.0\" style=\"fill:none;stroke:var(--next);stroke-width:2;stroke-linejoin:round\"/><line x1=\"258.0\" y1=\"188.0\" x2=\"270.0\" y2=\"188.0\" style=\"stroke:var(--next);stroke-width:2\" marker-end=\"url(#ar-UID-x)\"/><text x=\"150.0\" y=\"180.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">x̂[n]</text><text x=\"380.0\" y=\"192.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">local decoder:</text><text x=\"380.0\" y=\"210.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">same sum as</text><text x=\"380.0\" y=\"228.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">the receiver</text><rect x=\"540.0\" y=\"76.0\" width=\"90.0\" height=\"48.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"585.0\" y=\"104.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">decoder</text><line x1=\"585.0\" y1=\"124.0\" x2=\"585.0\" y2=\"170.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><text x=\"553.0\" y=\"146.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">q[n]</text><circle cx=\"585.0\" cy=\"188.0\" r=\"17\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"585.0\" y=\"194.0\" font-size=\"17\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Σ</text><text x=\"555.0\" y=\"180.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">+</text><text x=\"597.0\" y=\"168.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">+</text><line x1=\"602.0\" y1=\"188.0\" x2=\"690.0\" y2=\"188.0\" style=\"stroke:var(--accent);stroke-width:2.5\" marker-end=\"url(#ar-UID-n)\"/><text x=\"646.0\" y=\"178.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">x̃[n]</text><text x=\"668.0\" y=\"210.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">to filter</text><circle cx=\"616.0\" cy=\"188.0\" r=\"4\" style=\"fill:var(--accent);stroke:var(--fig);stroke-width:2\"/><line x1=\"616.0\" y1=\"188.0\" x2=\"616.0\" y2=\"250.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"530.0\" y=\"250.0\" width=\"120.0\" height=\"48.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--next);stroke-width:2\"/><text x=\"590.0\" y=\"270.1\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">predictor</text><text x=\"590.0\" y=\"287.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">same rule</text><polyline points=\"530.0,274.0 512.0,274.0 512.0,188.0 560.0,188.0\" style=\"fill:none;stroke:var(--next);stroke-width:2;stroke-linejoin:round\"/><line x1=\"556.0\" y1=\"188.0\" x2=\"566.0\" y2=\"188.0\" style=\"stroke:var(--next);stroke-width:2\" marker-end=\"url(#ar-UID-x)\"/><text x=\"520.0\" y=\"232.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--next)\" font-weight=\"700\">x̂</text>",
+   "aria": "Block diagram. Transmitter: x of n minus the prediction gives e of n, quantizer gives q of n, encoder sends the code; q of n plus the prediction gives the reconstructed sample, which feeds the predictor. Receiver: decoder gives q of n, which is added to the same prediction to give the reconstructed sample."
+  }
+ }
 }
