@@ -608,3 +608,9 @@
 - "Test coding" is not defined by the syllabus; it is read as turning patterns into a tester program (STIL, IEEE 1450), with don't-care fill and compression (8).
 - The draft's March C− had the wrong element order (it missed 24 of 80 simulated cell faults); corrected to ⇕(w0); ⇑(r0,w1); ⇑(r1,w0); ⇓(r0,w1); ⇓(r1,w0); ⇕(r0).
 - Packet data: the packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
+## ec-vlsi-u2 (Claude correction pass, 21 Nov 2026)
+- No new subtopics for this unit. EC3552's unit 2 is "Combinational Logic Circuits": only "stick diagram" and "Layout diagrams" belong here (7; a NAND stick-to-layout example with a λ width estimate was added); its delay, Elmore, logic-style and power topics are in the packet's unit 3.
+- EC3552's unit 5 lists "Introduction to wafer to chip fabrication process flow"; it is now a section of 2.3 (crystal growth to final test, with dies per wafer and good dies).
+- One university's `where` list is the whole course placed under unit 1; another lists FinFET technologies here, which the packet keeps in unit 1; one list ends with electron-beam characterisation topics ("Analytical Beams", "Beam Specimen interactions") that are not CMOS fabrication and are not covered.
+- The packet `out` path is stale (03_Books/...); queue.json holds the right one.
