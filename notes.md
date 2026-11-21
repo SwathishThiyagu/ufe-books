@@ -771,3 +771,11 @@
 - Conventions used throughout: overall pulse p(t), channel samples h<sub>m</sub>, equalizer taps c<sub>k</sub>, combined response v<sub>m</sub>; polar duobinary with levels −2, 0, +2 and the |c<sub>k</sub>| < 1 → 1 rule (unipolar mod-2 form mentioned once); M-PAM levels ±d … ±(M − 1)d, P<sub>e</sub> = 2(1 − 1/M)Q(√(6E<sub>s</sub>/((M² − 1)N₀))); duobinary P<sub>e</sub> = 1.5 Q((π/4)√(2E<sub>b</sub>/N₀)) derived for an equal transmit/receive split of the 1 + D response with symbol-by-symbol detection (2.1 dB).
 - Kept but not checked against a source this session: "about 2 dB" soft-decision gain (Beyond the syllabus only), DVB-S2 roll-off menu, PAM4 in 400G Ethernet.
 - MIT OpenCourseWare dropped from the sources (university-hosted).
+
+## ec-antenna-u2 (Antenna Fundamentals and Radiation) correction pass, 21 Nov 2026
+
+- Packet unchanged. Its eight subtopics fit the unit; "Receiving antenna, reciprocity and effective area" and "Radiation resistance, efficiency, effective aperture and polarization" share effective aperture, so 2.3 defines A<sub>e</sub> and 2.7 derives Dλ²/4π on the Hertzian dipole and adds effective length, without repeating each other.
+- Conventions used throughout: η = 120π Ω for the medium and η<sub>rad</sub> for radiation efficiency (the draft's unit sections used e<sub>cd</sub>); R<sub>r</sub> = 80π²(l/λ)² only for uniform current, 20π²(l/λ)² for a centre-fed short dipole with triangular current, both referred to the feed; l<sub>eff</sub> = l, l/2 and λ/π for those two and the half-wave dipole; D in 2D²/λ is the largest physical dimension.
+- Far-field rule for small antennas taken as max(2D²/λ, 1.6λ), justified in the text by βr = 10 (induction term a tenth of the radiation term); the book says it is a working rule, since texts differ.
+- Kept but not checked against a source this session: 0.47λ to 0.48λ resonant dipole length, μ<sub>eff</sub> "tens to a few hundred" for rods, 0.5 to 0.7 dish aperture efficiency, the Wheeler cap method in one model answer.
+- NPTEL dropped from the sources (institute-hosted); the other three web sources are the draft's checked links (no web access this session, so no new links were added).
