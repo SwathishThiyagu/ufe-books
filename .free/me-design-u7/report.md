@@ -1,13 +1,13 @@
 # me-design-u7: free-model run
 
-- Book: `books/mech/me-design/me-design-u7.html`
+- Book: `../draft/books/mech/me-design/me-design-u7.html`
 - Status: ok
-- Model calls so far: 31 (115,769 tokens in, 292,166 out), 8.9 minutes
+- Model calls so far: 31 (115,769 tokens in, 292,166 out), 9.2 minutes
 
 ## Checker
 
 ```
-me-design-u7.html: 9 chapters, 16634 words, 10 figures, 167 KB
+me-design-u7.html: 9 chapters, 25862 words, 10 figures, 238 KB
 OK
 ```
 
