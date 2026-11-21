@@ -1039,7 +1039,7 @@ Bloom levels in 10 lessons (30 lines), and recap pills too long for their cards.
 
 ## Signals and Systems fact review (Nov 2026)
 
-Audited 21 Nov 2026: all 18 lessons on the branches lesson/ec-signals-u1-L1 … u6-L3 (u1 L1–L4, u2–u6 L1–L3), every
+Audited 21 Nov 2026: all 18 lessons on the branches lesson/ec-signals-u1-L1 … u6-L3 (u1 L1–L4, u4 L1–L2, u2, u3, u5, u6 L1–L3), every
 scene's narration and on-screen text against the library books books/ece/ec-signals/ec-signals-u1..u6.html on main, and
 each lesson's lesson_sheet.py sheet once. Recomputed in python every worked example, model answer, trap, picture number and
 recap number: Fourier series (c₁₂ = 4/π, 81 % power share, truncation error 1.190), RC step (y(1) = 0.632, y(2) = 0.865,
@@ -1063,6 +1063,6 @@ ec-signals-u2-L3 | notebook (4) | "a step rises 10–90 % in 2.2τ" said general
 ec-signals-u3-L3 | bookfig (5) | figure fills 43 % of the stage (the sheet's own warning) | cosmetic: later
 
 Count: 0 must fix found (1 wrong fact already fixed before the review), 1 misleading fact and 2 should-fix lines fixed, 1
-cosmetic fixed, 3 cosmetic left. Clean: u1-L2, u1-L4, u2-L1, u2-L2, u3-L1, u3-L2, u4-L1, u4-L2, u4-L3, u5-L2, u6-L2, u6-L3.
+cosmetic fixed, 3 cosmetic left. Clean: u1-L2, u1-L4, u2-L1, u2-L2, u3-L1, u3-L2, u4-L1, u4-L2, u5-L2, u6-L2, u6-L3 (12, with u1-L1 clean after its fix).
 Patterns: a condition dropped from a theorem (causal) or a sufficient condition stated as "when", and one dated
 everyday fact in a hook.
