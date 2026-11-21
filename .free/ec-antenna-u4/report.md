@@ -2,12 +2,12 @@
 
 - Book: `work/claude_figs/ec-antenna-u4/tree/books/ece/ec-antenna/ec-antenna-u4.html`
 - Status: ok
-- Model calls so far: 32 (122,512 tokens in, 302,302 out), 7.6 minutes
+- Model calls so far: 32 (122,512 tokens in, 302,302 out), 7.7 minutes
 
 ## Checker
 
 ```
-ec-antenna-u4.html: 9 chapters, 27660 words, 12 figures, 260 KB
+ec-antenna-u4.html: 9 chapters, 27673 words, 12 figures, 260 KB
 OK
 ```
 
