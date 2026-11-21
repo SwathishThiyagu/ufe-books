@@ -2,12 +2,12 @@
 
 - Book: `books/civil/ce-rcc/ce-rcc-u6.html`
 - Status: ok
-- Model calls so far: 28 (90,957 tokens in, 250,005 out), 9.8 minutes
+- Model calls so far: 29 (90,957 tokens in, 250,005 out), 10.0 minutes
 
 ## Checker
 
 ```
-ce-rcc-u6.html: 9 chapters, 15996 words, 10 figures, 163 KB
+ce-rcc-u6.html: 9 chapters, 22760 words, 10 figures, 216 KB
 OK
 ```
 
@@ -50,3 +50,20 @@ OK
 - ch 8 [low] Figure, node e: The note 'Same reactions if concordant' suggests reactions are preserved only for concordant cables. Linear transformation leaves the existing reactions unchanged for any cable; they are zero only when the cable is concordant.
 - ch 9 [high] Section 2, first design-check bullet: The bullet says to estimate the prestress moment Mp using the effective prestress at the service or ultimate state. Effective prestress is a service-load value; at ultimate the tendon stress is higher and must be found from strain compatibility. Using effective prestress in Mu = Mp + Ms mixes service and ultimate states and gives a wrong ultimate contribution.
 - ch 9 [low] Lead: The phrase 'ordinary reinforced concrete needs larger sections and wider cracks under heavy load' says ordinary RC needs wider cracks. Cracks are not a design need; they are an unwanted result.
+
+## Claude correction pass (21 Nov 2026)
+
+Every chapter was rewritten from the draft with its worked example recomputed, every figure redrawn by hand (pipeline/claude_figs/ce_rcc_u6.py) from the chapter's own numbers, and every long question given a step-by-step model answer (401 to 480 words, each ending in a numerical check). All the review findings above were fixed. Conventions: compression positive; IS 456 E<sub>c</sub>, f<sub>cr</sub> and stress block; IS 1343 for bearing, bursting, crack width and minimum grades.
+
+Changed worked examples:
+- Basic principles: 200 × 400 beam, P = 400 kN at e = 100, M = 56 kN·m; fibre stresses traced before and after load, compared with a concentric tendon and with plain concrete.
+- Materials: loss components for M50 and strand computed (186.8 N/mm²), showing why mild steel loses 93 percent and strand 13 percent.
+- Pre- and post-tensioning: extension and draw-in loss of a 7-strand tendon and a 100 m bed, replacing a description with no numbers.
+- Analysis: one 10 m beam solved by the stress, force (pressure line) and load-balancing methods, all three giving 6.125 and 1.875 N/mm².
+- Losses: anchorage slip now uses the setting length with friction (the draft's E<sub>s</sub>δ/L under-estimated the anchor loss); kN/N slips fixed.
+- Flexure: transfer and service checks with the allowed eccentricity range (137 to 235 mm), and an ultimate check by strain compatibility; flanges now treated as in RC T-beams (draft's 0.36f<sub>ck</sub> over the flange was wrong); Type 1, 2, 3 kept (the IS 1343 terms), with a note that some syllabi write Class.
+- End block: bearing with the 0.8f<sub>ci</sub> cap, bursting from the table ratios in both directions, link spacing; spalling cause corrected.
+- Continuous beams: straight cable shown not concordant (the draft said it was); R = 3Pe/L, secondary moment, pressure line e/2 above the support; linear transformation keeps the pressure line, not the reactions.
+- Partial prestressing: λ and PPR computed; the draft's "effective prestress at ultimate" replaced by strain compatibility.
+
+Not verified against the code text and therefore given as question data or left out: the IS 1343:1980 relaxation table, μ and k values, the Table 11 rows and the transmission length. The M30 minimum for post-tensioned work is from the 1980 edition.
