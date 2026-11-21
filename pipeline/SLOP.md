@@ -1193,3 +1193,52 @@ Count: 5 must fix (3 known from the brief, 2 new in u4-L1) and 4 should-fix fixe
 u4-L2, u5-L2, u5-L4 with one cosmetic line each. Patterns: bookfig scenes copy the book's figure errors verbatim (four
 of the five must-fix items were book errors), an exam question that leans on a worked example the lesson never showed,
 and outro and hook lines that state a rule more broadly than the chapter does.
+
+## Engineering Thermodynamics fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 24 lessons on the branches lesson/me-thermo-u1-L1 … u6-L4 (u1 L1–L3, u2 L1–L4, u3 L1–L5,
+u4 L1–L3, u5 L1–L5, u6 L1–L4), every scene's narration and on-screen text against the library books
+books/mech/me-thermo/me-thermo-u1..u6.html on main, and each lesson's lesson_sheet.py sheet once (all 24 sheets: 0 page
+errors, 0 cue failures, 0 text outside the safe area). Recomputed in python every worked example, model answer, trap,
+picture number and recap number with W by the system positive and Q in positive: cycle 80 − 30 = +50 and Q₂₁ = −70 kJ,
+air R 0.287 and γ 1.3997, tank 28.72 / cylinder 40.20 / gap 11.48 kJ, 8^1.4 = 18.379 and 8^0.4 = 2.2974 (1838 kPa,
+689.2 K, −179.0 / −279.5 kJ), n = 1.3 path 1493 kPa, 559.8 K, −248.6 kJ, Q −62.0 kJ, turbine 570.6 kJ/kg and 1141.2 kW,
+compressor 10.76 m/s and 80.4 kW, tank filling 419.9 K and 0.830 kg, discharge 252.6 K and 1.785 kg, cup 46.0 kJ and
+−0.1415 / +0.1542 kJ/K, Clausius chain 500 kJ, Carnot and COP chains, T-s air 0.6966 kJ/kg·K, mixing 317 K and
++0.08816 kJ/K, exergy 600/660 and 0.909, steam-table rows (1 MPa u 2582.8, v 0.1944, h 2777.1; 10 bar 250 °C h 2943.1;
+x = 0.929, h 2513.7), van der Waals 7.264 MPa, Z charts, psychrometric w 0.01052 and φ 0.397, Otto/Diesel/Dual/Brayton,
+Rankine, reheat, regenerative and R-134a cycles: correct except the lines below. No college names; city and brand names
+only in the books (fixed). Book fixes 075c561 on claude/project-thread-hwtk86 for main (check_book.py --render OK on
+u1 … u6, run with the preinstalled Chromium and Python playwright 1.63.0): u1 Figure 1.3.1 path 1→4→3 W = 10 + 0 = +10 kJ;
+u2 Apply question gives R = 0.287, "Only a few universities teach this" lead removed; u3 Figure 3.2.1 "net: one
+reservoir, all heat → work" in two lines clear of the 200 kJ arrow, Figure 3.6.1 "< 0" escaped, Figure 3.7.1 T axis
+broken below 300 K with a 0 and "area to 0 K = heat = … 301.5 kJ/kg", 3.8 total now −0.90076 + 0.98892 = +0.0882,
+Figure 3.8.1 hot orange and cold blue, Analyze question gives R = 0.287, "Only a few universities ask for this form" →
+"This form is asked less often", two Chennai leads reworded; u4 Figure 4.2.1 "Exergy account" heading raised clear of
+the bracket label; u5 Figure 5.2.1 path (b) arrow stops at 330 and the 100 °C boil point sits on the boiling curve
+("would boil at 100 °C", dashed), Figure 5.5.1 "250 °C" label moved off the 1 bar line, 5.7 van der Waals "1.5 per
+cent low" → 1.4 (1.44 %), two Chennai lines reworded; u6 Brayton Apply gives γ = 1.4 and Analyze gives rp = 8, T₁ = 300 K,
+cp = 1.005, γ = 1.4, "Electrolux" → "three-fluid (diffusion-absorption) refrigerator", "a hotel in Chennai" → "a hotel",
+COP-trend answer drops "the vapour is less dense" (a capacity point, not COP per kg). Fixed lessons rebuilt with
+--revoice (no line re-voiced); each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+me-thermo-u3-L5 | outro (21) | next card put the topic in the second slot; now ["UP NEXT", "Next topic", "Available and unavailable energy", "book"] | must fix: fixed 96b8f32
+me-thermo-u5-L4 | outro (26) | same; now ["NEXT TIME", "Next lesson", "Gas mixtures: Dalton's and Amagat's laws", "book"] | must fix: fixed 08c30a1
+me-thermo-u2-L3 | calc (11, 12) | turbine worked example uses g = 9.81 m/s², given only in the board's hint; the question line now gives it (the book's question already did) | should fix: fixed f8b6633
+me-thermo-u3-L4 | bookfig (3) | Figure 3.7.1 copy shades the area only down to the 250 K floor yet labels it 301.5 kJ/kg (heat to 0 K); axis now broken, label "area to 0 K" (same error in the book) | should fix: fixed 93033dd
+me-thermo-u3-L4 | bookfig (9) | Figure 3.8.1 copy draws the hot water blue and the cold orange; swapped (same error in the book) | should fix: fixed 93033dd
+me-thermo-u5-L1 | bookfig (11) | Figure 5.2.1 copy: the "boils at 100 °C" dot floats in the liquid region off the boiling curve and its label crosses the curve; dot now on the curve, dashed continuation, "would boil at 100 °C" (same in the book) | should fix: fixed 7ab703f
+me-thermo-u5-L3 | bookfig (3) | Figure 5.5.1 copy: "250 °C" label sits on the 1 bar line; moved to the open middle of the isotherm (same in the book) | should fix: fixed 3210f67
+me-thermo-u4-L1 | bookfig (10) | Figure 4.2.1 copy: "Exergy account" heading touches the bracket label; raised 12 px (same in the book) | cosmetic: fixed 9a02ffa
+me-thermo-u5-L3 | pa (Q3) | the answer names 2887 kJ/kg (225 °C line) and 2924 kJ/kg (15 bar) as likely misreads; neither value is shown in the lesson (illustration only, the verdict does not need them) | cosmetic: later
+me-thermo-u6-L2 | pa (Q3) | turbine work 630.27 shown as 630.2 inside a rounded chain; the end values are right | cosmetic: later
+me-thermo-u6-L1 | whole lesson | 888 narration words, over the 880 aim; not rebuilt | cosmetic: later
+
+Count: 2 must fix (both known from the brief) and 5 should-fix fixed in 7 lessons, 1 cosmetic fixed, 3 cosmetic left;
+about 30 book lines fixed. Must checks: u6-L4 next card "Revise from the start" kept; u2-L1 subscript v and p render;
+u5-L2 "Steam and dryness" part title fits; every picture's source note names the right book figure. Clean: u1-L1 … L3,
+u2-L1, u2-L2, u2-L4, u3-L1 … L3, u4-L2, u4-L3, u5-L2, u5-L5, u6-L3, u6-L4 (15), plus u5-L3, u6-L1, u6-L2 with a cosmetic
+line. Patterns: as in the Engines review, bookfig scenes copy the book's figure errors verbatim (all five figure items
+were book errors), and a given that lives only in a hint or a worked example the question leans on.
