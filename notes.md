@@ -644,3 +644,8 @@
 - EC3552's unit 4 also lists interconnect parameters and wire models (covered in the u3 book) and "Logic implementation using programmable devices (ROM, PLA, FPGA)": ROM as logic is in 4.9, PLA and FPGA are in u5.
 - Packet data: one `where` entry (ECPC23, unit 3) has an empty unit title; the packet `out` path is stale (03_Books/...); queue.json holds the right one.
 - The MIT OCW source was dropped from the sources list (university-hosted).
+
+## me-design-u7 (Claude correction pass, 21 Nov 2026)
+- ME3591 (the exam course) has no gears unit, and the packet has no `where` entry for it, so this book follows the universal subtopics only; the bank note does not point to an exam unit.
+- The whole book uses one convention (Lewis S_b = σ_b b m Y with Y = 0.484 − 2.87/z, C_v = 3/(3 + v) for spur and 5.6/(5.6 + √v) for helical, Buckingham F_d with C = 11 400 N/mm², wear S_w = b Q d_1 K with K = 0.16(BHN/100)², bevel (1 − b/R) and 0.75/cos γ_1 forms, worm η with α_n); the draft mixed conventions between chapters.
+- Packet data: three `where` entries give the whole course (failure theories to gears) as unit 1 with an empty unit title, and one more has an empty title; the packet `out` path is stale (03_Books/...).
