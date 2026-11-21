@@ -44,3 +44,19 @@ OK
 - ch 8 [low] Section 1, first paragraph: The text says 'Put an isotropic source at the transmitter', but the very next sentence writes S = P_t G_t/(4πd²), which is the density for a directive antenna. A student may wonder where G_t came from if the source is isotropic.
 - ch 8 [low] Section 3, last bullet, and figure caption: The bullet says doubling frequency adds 6.02 dB 'as the figure shows', but the figure compares 2.4 GHz with 5 GHz. The ratio is 5/2.4 = 2.08, so the gap is 20 log₁₀(2.08) = 6.4 dB, not 6.02 dB. The aria text also says 'about 6 dB', disagreeing with the caption's 6.4 dB.
 - ch 8 [low] Lead: Saying a radar 'is checked this way' is loose: Friis is a one-way link equation, while radar uses the two-way radar range equation (Friis applied out and back with target RCS). A student may think Friis alone sizes a radar.
+
+## Claude correction pass (21 Nov 2026)
+
+Every reviewer note above is fixed, then a full pass: all eight chapters rewritten from the draft, every worked example,
+quiz answer and question-bank number recomputed in Python, eight figures hand-drawn from the worked examples
+(pipeline/claude_figs/ec_antenna_u2.py), and all 14 long questions given "Points to cover" and a numbered model answer.
+
+- 2.1: Hertzian fields derived from A (H<sub>φ</sub>, E<sub>r</sub>, E<sub>θ</sub>), P<sub>rad</sub> = 40π²(I₀l/λ)² and R<sub>r</sub> = 80π²(l/λ)² derived; uniform vs triangular current stated; field-term example at λ/2π, λ, 10λ.
+- 2.2: lobe definitions fixed (main lobe is a region; minor/side/back lobes); θ<sub>E</sub>, θ<sub>H</sub> defined; dBd; second example U = cos²θ (D = 6.00 against the 41 253 estimate 5.09).
+- 2.3: lead counts four quantities; conventions stated once; efficiency numbers (0.14 at λ/50) and caption fixed; PLF cos²ψ with a polarization example; dish gain e<sub>ap</sub>(πd/λ)².
+- 2.4: Q5 reversed (higher frequency needs the longer range); near-field E/H about 3700 Ω at βr = 0.1; far-field rule max(2D²/λ, 1.6λ) explained; DTH dish (1.82 m, 28.8 m) and whip (4.8 m) examples.
+- 2.5: monopole 5.16 dBi (not 5.15) and 36.5 + j21.25 Ω; script output removed from the example; monopole example (84.9 mV/m, +3 dB).
+- 2.6: ferrite-rod example (l<sub>eff</sub> 7.9 mm, 7.9 µV); trimmed under the length limit.
+- 2.7: l<sub>eff</sub> = l/2 for a short dipole; A<sub>em</sub> = Dλ²/4π derived on the Hertzian dipole; reciprocity stated as Z₁₂ = Z₂₁ with equal powers only for identical set-ups; half-wave dipole received-power example by two routes and with a 50 Ω receiver.
+- 2.8: derivation no longer starts from a directive "isotropic" source; 6.4 dB vs 6.02 dB caption fixed; aperture form; 6 GHz 40 km hop example (34.95 dBi dishes, −44.1 dBm, 30.9 dB margin).
+- Unit: e<sub>cd</sub> replaced by the chapters' η<sub>rad</sub>; return-loss glossary entry fixed; bank outlines fixed (λ/50 dipole radiates 0.632 W, not "mW range"; 900 MHz link −75.8 dBm, not "near −80"); NPTEL link dropped; cross-unit references named by topic.
