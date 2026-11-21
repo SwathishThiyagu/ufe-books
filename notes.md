@@ -528,3 +528,10 @@
 - The draft's MIT, NPTEL (university-hosted) and AFDC (off-topic) links were dropped; only SAE remains. The sandbox proxy blocks Wikipedia, so no link could be opened or added.
 - The Hiroyasu–Arai penetration correlation and the GDI pressure range (50–200 bar, up to about 350 bar) are from memory of standard sources and could not be re-checked online.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+## au-elec-u4 (Claude correction pass, 21 Nov 2026)
+
+- The exam course AU3502 does not teach this unit (its unit 4 is automotive electronics, sensors and actuators, which this subject's sensors-and-actuators unit covers); the packet's `where` lists it for the record only. No subtopics were added; the chapters follow the other syllabi (electronic engine control).
+- BS IV and BS VI car limits (Euro 4 and Euro 6 values), the April 2017 and April 2020 dates, the 50 to 10 ppm sulphur step and the April 2023 second BS VI phase are from memory of standard sources and could not be re-checked online.
+- The draft's NPTEL and MIT links were dropped; SAE, AFDC and DieselNet remain.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
