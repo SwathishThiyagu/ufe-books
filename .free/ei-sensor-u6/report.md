@@ -1,13 +1,13 @@
 # ei-sensor-u6: free-model run
 
-- Book: `books/eie/ei-sensor/ei-sensor-u6.html`
+- Book: `work/claude_figs/ei-sensor-u6/tree/books/eie/ei-sensor/ei-sensor-u6.html`
 - Status: ok
-- Model calls so far: 38 (151,304 tokens in, 267,836 out), 7.2 minutes
+- Model calls so far: 38 (151,304 tokens in, 267,836 out), 7.7 minutes
 
 ## Checker
 
 ```
-ei-sensor-u6.html: 10 chapters, 17610 words, 11 figures, 182 KB
+ei-sensor-u6.html: 10 chapters, 27016 words, 11 figures, 293 KB
 OK
 ```
 
