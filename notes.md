@@ -762,3 +762,12 @@
 - Conventions: θ measured from the array axis throughout, ψ = βd cosθ + α with α the lead of the next element; scan angles from broadside are converted (θₛ = 90° − θ₀); Dolph-Chebyshev sidelobe level written as a positive dB number in R = 10^(SLL/20); dish HPBW ≈ 70λ/D (58λ/D stated for uniform illumination); radio horizon 4.12√h km (4/3 earth).
 - Kept but not checked against a source this session: the optimum-horn beamwidth constants 56λ/B and 67λ/A (Kraus), typical Yagi/LPDA gains and dimension ranges, patch bandwidth ranges, and the 0.85 × MUF optimum working frequency rule. Every worked number (array patterns, Chebyshev currents, beamwidths and directivities, LPDA, horn, dish, patch, measurement and ionosphere values) was computed in Python.
 - Sources: four textbooks (Balanis 4th, Kraus and Marhefka 3rd, Pozar 4th, Saunders and Aragón-Zavala 2nd), antenna-theory.com and five Wikipedia pages; no university-hosted pages.
+
+## ec-comm-u5 (Claude correction pass, 21 Nov 2026)
+
+- Packet left unchanged (owner's rule for the communication subjects); it has no `where` list for this unit, so every packet subtopic is covered in full and no chapter was added.
+- "Correlative coding and M-ary PAM" carries the M-PAM symbol error derivation; "Optimum detection and probability of error" keeps binary, the union bound and decision regions and points to it, so the two chapters do not repeat each other.
+- Draft error beyond the reviewer notes: it said the nearest-point rule is ML only for equal energies. Minimum distance is ML in AWGN for any energies; it is the bare largest-correlation rule that needs equal energies. Fixed in the text, a trap and a worked example (r = (1.4, 0.3) against points of energies 1, 2, 2).
+- Conventions used throughout: overall pulse p(t), channel samples h<sub>m</sub>, equalizer taps c<sub>k</sub>, combined response v<sub>m</sub>; polar duobinary with levels −2, 0, +2 and the |c<sub>k</sub>| < 1 → 1 rule (unipolar mod-2 form mentioned once); M-PAM levels ±d … ±(M − 1)d, P<sub>e</sub> = 2(1 − 1/M)Q(√(6E<sub>s</sub>/((M² − 1)N₀))); duobinary P<sub>e</sub> = 1.5 Q((π/4)√(2E<sub>b</sub>/N₀)) derived for an equal transmit/receive split of the 1 + D response with symbol-by-symbol detection (2.1 dB).
+- Kept but not checked against a source this session: "about 2 dB" soft-decision gain (Beyond the syllabus only), DVB-S2 roll-off menu, PAM4 in 400G Ethernet.
+- MIT OpenCourseWare dropped from the sources (university-hosted).
