@@ -1,13 +1,13 @@
 # ec-optical-u3: free-model run
 
-- Book: `books/ece/ec-optical/ec-optical-u3.html`
+- Book: `work/ec-optical-u3/tree/books/ece/ec-optical/ec-optical-u3.html`
 - Status: ok
 - Model calls so far: 25 (81,353 tokens in, 183,308 out), 5.6 minutes
 
 ## Checker
 
 ```
-ec-optical-u3.html: 8 chapters, 12150 words, 9 figures, 140 KB
+ec-optical-u3.html: 8 chapters, 21626 words, 11 figures, 234 KB
 OK
 ```
 
@@ -46,3 +46,12 @@ OK
 - ch 8 [low] Section 1, Vπ definition, and Quiz Q1: The text defines Vπ as "the voltage that gives a phase shift of π radians", but Q1 defines it as the voltage that gives a phase difference of π between the two arms. In push-pull drive each arm only shifts π/2 when V = Vπ, so the two wordings disagree by a factor of two and can lead a student to double the arm phase.
 - ch 8 [low] Section 1, Pockels effect sentence: The sentence "The modulator works by the electro-optic or Pockels effect" is written for all external modulators, yet Section 3 describes the EAM, which works by field-induced absorption, not the Pockels effect. A student may assume every external modulator uses the Pockels effect.
 - ch 8 [low] Section 3 and Beyond: The travelling-wave electrode point (electrical and optical waves travel together, low drive voltage at high bit rates) is stated in full twice, once in Section 3 and again in Beyond.
+
+## Correction pass (Claude, 21 Nov 2026)
+
+- Every worked example, quiz answer and bank number rerun in Python; all draft example answers were right. Fixed: the "1.5 % per °C ... far more temperature sensitive" quiz (replaced by a coated-facet mirror-loss question), the bank LED question that took 2 % of the electrical power as optical power (1.46 mW, not 1.8 mW), the bank radiance question in W m⁻² sr⁻¹ (15.7 nW, unrealistic) and the bank threshold outline without Γ.
+- All 30 reviewer notes checked and fixed where still open (four efficiencies, "turn-on", Burrus/planar categories, LED Q4, carrier vs optical confinement, E<sub>1h</sub>, NA² wording, ST answer, gap symbol, MZM name, Vπ wording, Pockels vs EAM, travelling-wave repeat).
+- Added: λ = 1.24/E; Boltzmann ratio and stimulated/spontaneous ratio (example); LED lifetimes, internal power, flat-chip extraction 1/[n(n+1)²] and electrical vs optical bandwidth (example); round-trip threshold derivation and mode spacing; η<sub>d</sub> from η<sub>s</sub>; AlGaAs and InGaAsP bandgap formulas and the QW photon energy (example); radiance-based launched power and Fresnel loss (example); NA-mismatch, gap and tilt loss formulas (example); Vπ from the Pockels effect and the extinction ratio of an unequal splitter (example).
+- Eight figures hand-drawn from the worked examples (pipeline/claude_figs/ec_optical_u3.py); two drawings in model answers.
+- Question bank: 14 long questions, each with points to cover and a full model answer.
+- Cross-unit references named by topic; underscores and carets set as sub/superscripts; long formulas no longer print raw tags.
