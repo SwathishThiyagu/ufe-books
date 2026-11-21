@@ -1,221 +1,138 @@
 {
- "lead": "An IP core is a pre-designed, pre-verified circuit block that a team reuses inside a larger chip. Instead of designing every function from scratch, a system-on-chip (SoC) team buys or licenses processors, memories, buses and peripherals, then integrates them. IP cores exist because verification and timing closure cost more than drawing logic. They appear in phones, cars, set-top boxes and FPGA boards. The same idea covers a hard memory macro, a firm DSP block and a soft processor written in Verilog.",
- "prereq": "You need: <a href='#vlsi-design-flow-and-methodology'>Chapter 5.1</a> for the design flow and <a href='#programmable-logic-devices-and-fpga-architecture'>Chapter 5.5</a> for FPGA resources.",
+ "lead": "Floorplanning, placement and routing turn a gate netlist (a list of gates and their connections) into physical shapes on the die (the silicon rectangle). Floorplanning sets the core, I/O pins, large blocks and power grid. Placement fixes each standard cell. Clock-tree synthesis adds buffers so the clock reaches registers with small skew. Routing draws wires and vias. Signoff checks design rules, layout versus schematic, timing and power. The result is GDSII (the final layout database) sent to the foundry. Almost every digital standard-cell chip goes through this back-end flow; hand-drawn analog and full-custom blocks skip automatic placement but still end in GDSII and signoff.",
+ "prereq": "You need: <a href=\"#vlsi-design-flow-and-methodology\">the VLSI design flow</a> for where physical design sits, the layout design rules from CMOS fabrication and layout, and wire delay from the Elmore delay model.",
  "sections": [
   {
-   "h3": "IP core classes",
+   "h3": "Floorplanning: core, blocks and power",
    "blocks": [
     {
      "type": "p",
-     "text": "IP cores are classified by what the supplier delivers and how much the buyer can change."
+     "text": "Floorplanning fixes the physical frame before any cell moves. The core is the logic area inside the I/O ring. The floorplan chooses core width W, core height H, aspect ratio H ÷ W, I/O pin positions, hard macro positions and the power grid. A hard macro is a fixed layout block such as an SRAM or PLL. A soft block can change shape. Pins sit on the core edge or die edge, near the signals they serve. The power grid uses wide VDD and VSS straps to limit IR drop, the voltage lost in the resistive supply network."
     },
     {
      "type": "p",
-     "text": "<b>Hard IP</b> arrives as a mask-level layout, often GDSII. Its transistors, wires and pins are fixed for one fabrication process. Hard IP gives predictable speed, power and area, but it cannot be moved to another process without redesign. Memories, PLLs and high-speed SerDes are common examples. The supplier has already verified the layout, so the buyer's risk is lower."
+     "text": "Utilization measures how much core area is occupied. Very high utilization saves die area but can block routing. Whitespace is not waste: routing wires, clock buffers and decoupling cells (local charge stores) need it. Aspect ratio near 1 gives shorter average wires; a tall thin core may suit a memory-heavy block."
     },
     {
-     "type": "p",
-     "text": "<b>Firm IP</b> arrives as a gate-level netlist or a characterized RTL structure for a selected process. Placement may have some freedom, but the structure is largely fixed. Firm IP sits between hard and soft IP in flexibility and predictability."
-    },
-    {
-     "type": "p",
-     "text": "<b>Soft IP</b> arrives as synthesizable register-transfer level (RTL) code, usually Verilog or VHDL. The buyer synthesizes it with its own library, clock and constraints. Soft IP is portable and configurable, but the buyer owns timing closure, power and physical risk. A soft IP block can be optimised for area or speed, but poor constraints can break it."
-    },
-    {
-     "type": "p",
-     "text": "The license matters. An IP license states how many times the block may be used, whether it may be modified, and whether it may be redistributed. A license is not ownership of the source."
+     "type": "formula",
+     "text": "U = A<sub>used</sub> ÷ A<sub>core</sub>,  A<sub>core</sub> = W × H",
+     "where": "U is utilization; A<sub>used</sub> is area of blocks plus standard cells (fixed-height gate layouts); A<sub>core</sub> is core area in mm²; W and H are core width and height in mm."
     }
    ]
   },
   {
-   "h3": "Integrating an IP core",
+   "h3": "Placement and clock-tree synthesis",
    "blocks": [
     {
      "type": "p",
-     "text": "Integration starts with a <b>wrapper</b>. A wrapper is RTL placed around an IP core. It converts the core's native signals to the SoC bus, adds register slices, and isolates the core from the rest of the chip. The wrapper also holds the core's configuration registers."
+     "text": "Placement assigns coordinates to every standard cell inside the core rows. Global placement spreads cells to reduce wirelength and congestion while ignoring exact row sites. Detailed placement then legalizes cells onto legal non-overlapping sites. A common wirelength estimate is half-perimeter wirelength: HPWL = Σ<sub>nets</sub> [(max x − min x) + (max y − min y)]. HPWL is the sum over nets of half the bounding-box perimeter; x and y are pin coordinates. Congestion appears when demanded routing tracks exceed available tracks in a region. Timing-driven placement gives extra weight to nets on critical paths (slowest timing paths), using the wire-delay estimates taught under interconnect parameters and the Elmore delay model."
     },
     {
      "type": "p",
-     "text": "The core connects to an on-chip bus. Common examples are Arm AMBA AXI and AHB. AXI uses separate address and data channels with handshake signals; AHB is a shared bus with an arbiter. Only a few universities teach the cycle-level protocol details; for integration, know that the bus defines how the core is addressed and how transfers complete."
-    },
-    {
-     "type": "p",
-     "text": "Every core needs an address in the <b>memory map</b>. The map lists base address, size and access type. Firmware uses these addresses. Overlapping ranges cause silent corruption."
-    },
-    {
-     "type": "p",
-     "text": "Clock and reset are next. State the clock frequency, source and reset polarity. Check whether reset is synchronous or asynchronous. If a core runs on a different clock from the bus, add <b>clock-domain crossing</b> (CDC) logic: a synchronizer for single-bit control, or an asynchronous FIFO for data. Never pass multi-bit data through a simple two-flop synchronizer."
-    },
-    {
-     "type": "p",
-     "text": "Power domains add isolation cells, level shifters and retention. A core that can be powered off must not drive live signals. Its outputs are clamped by isolation cells."
-    },
-    {
-     "type": "p",
-     "text": "Verify at block level before integration. Run the IP testbench, check bus protocol assertions, then run SoC-level tests. Check the license terms for simulation models and synthesis."
+     "text": "Clock-tree synthesis (CTS) runs after placement. The clock net drives every register, so it is a large load. CTS inserts buffers or inverters in a tree to balance this load. Skew is the difference in clock arrival time between registers. Insertion delay is the time from clock source to a register. Small skew and short insertion delay are the goals; useful skew can deliberately delay some registers to help timing. CTS must precede routing because clock buffers become real cells that routing must connect."
     }
    ]
   },
   {
-   "h3": "Soft-core processors",
+   "h3": "Routing and signoff",
    "blocks": [
     {
      "type": "p",
-     "text": "A <b>soft-core processor</b> is a CPU delivered as synthesizable RTL. It is not software. Synthesis maps its registers, adders and control logic to FPGA lookup tables, flip-flops, block RAM and DSP slices, or to standard cells in an ASIC. The result is real hardware that consumes area and power."
+     "text": "Routing turns connections into metal wires. Global routing assigns each net to a sequence of routing regions (global cells or channels) and estimates congestion; it does not pick tracks. Detailed routing chooses exact tracks, wire widths, spacing and vias. A via is a metal-to-metal connection between layers; each via adds resistance (its capacitance is small next to the wire it joins) and is a possible failure point, so routers use as few as they can. Maze routing searches a grid for a shortest legal path around obstacles. Channel routing orders horizontal and vertical segments inside a channel, often with a left-edge rule. The layout design rules (see CMOS fabrication and layout) set minimum width, spacing and enclosure."
     },
     {
      "type": "p",
-     "text": "Soft cores are configurable. A team may choose cache size, bus width, debug support or custom instructions. They are useful in FPGAs because the CPU can be added after the board is built. In an ASIC, a soft core competes with a hard processor core."
-    },
-    {
-     "type": "p",
-     "text": "A <b>hard processor core</b> is fixed silicon, placed and routed by the vendor for one process. It usually gives higher clock speed, lower power and smaller area than a soft core, but it cannot be changed. A soft core gives flexibility and process portability, but the buyer pays in LUTs, timing effort and power."
-    },
-    {
-     "type": "p",
-     "text": "On-chip buses connect both kinds of core. AMBA AXI and AHB are interface examples, not processor architecture. Processor pipeline design belongs to computer architecture courses."
-    },
-    {
-     "type": "p",
-     "text": "When you count soft cores in an FPGA, count every resource. A core may fit by lookup tables but fail on DSP slices or block RAM. The worked example shows this."
+     "text": "Crosstalk is unwanted coupling between nearby wires: an aggressor switches and injects a glitch or delay into a victim. Shielding, wider spacing and layer choice reduce it. Signoff checks the finished layout. DRC (design rule check) checks geometry. LVS (layout versus schematic) checks that the layout netlist matches the source netlist. Static timing analysis checks setup and hold, and power/IR-drop checks check supply integrity. The final database is GDSII, sent to the foundry."
     }
    ]
   }
  ],
  "figure": {
   "after_section": 1,
-  "caption": "An SoC reuses blocks with different delivery forms: a soft CPU core, a hard memory macro, soft UART IP, firm DSP IP and a bus interconnect. Notice that only the CPU is shown as synthesizable RTL.",
+  "caption": "The worked example’s floorplan drawn to scale: four macros of 2.0, 1.5, 1.0 and 0.5 mm² and 1.8 mm² of standard cells in rows fill 6.8 mm² of the 9.0 mm² core (75.6 %). The 2.2 mm² left over is whitespace for routing, buffers and decoupling cells.",
   "spec": {
-   "type": "tree",
-   "shape": "box",
-   "aria": "A SoC tree connects a CPU soft core, memory hard macro, UART soft IP, DSP firm IP and bus interconnect.",
-   "root": {
-    "label": "SoC",
-    "note": "IP integration",
-    "style": "accent",
-    "children": [
-     {
-      "label": "CPU",
-      "note": "soft core",
-      "children": [
-       {
-        "label": "RTL",
-        "note": "synthesizable",
-        "children": [],
-        "_d": 2,
-        "_x": 136.09279999999998,
-        "_y": 170
-       }
-      ],
-      "_d": 1,
-      "_x": 136.09279999999998,
-      "_y": 106
-     },
-     {
-      "label": "Memory",
-      "note": "hard macro",
-      "children": [],
-      "_d": 1,
-      "_x": 248.0464,
-      "_y": 106
-     },
-     {
-      "label": "UART",
-      "note": "soft IP",
-      "children": [],
-      "_d": 1,
-      "_x": 360.0,
-      "_y": 106
-     },
-     {
-      "label": "DSP",
-      "note": "firm IP",
-      "children": [],
-      "_d": 1,
-      "_x": 471.95360000000005,
-      "_y": 106
-     },
-     {
-      "label": "Bus",
-      "note": "interconnect",
-      "children": [],
-      "_d": 1,
-      "_x": 583.9072000000001,
-      "_y": 106
-     }
-    ],
-    "_d": 0,
-    "_x": 360.0,
-    "_y": 42
-   }
+   "type": "svg",
+   "h": 420,
+   "body": "<rect x=\"28.0\" y=\"24.0\" width=\"344.0\" height=\"344.0\" rx=\"4\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2;stroke-dasharray:6 4\"/><text x=\"200.0\" y=\"18.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">die with I/O ring; core 3.0 mm × 3.0 mm</text><rect x=\"50.0\" y=\"46.0\" width=\"300.0\" height=\"300.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><path d=\"M154,54 H246 M154,68 H246 M154,82 H246 M154,96 H246 M154,110 H246 M154,124 H246 M154,138 H246 M154,152 H246 M154,166 H246 M154,180 H246 M154,194 H246 M154,208 H246 M154,222 H246 M154,236 H246 M154,250 H246 M154,264 H246 M154,278 H246 M154,292 H246 M154,306 H246 M154,320 H246 M154,334 H246\" style=\"fill:none;stroke:var(--live);stroke-width:5;stroke-opacity:0.55;stroke-dasharray:12 8\"/><rect x=\"52.0\" y=\"48.0\" width=\"96.0\" height=\"196.0\" rx=\"4\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"100.0\" y=\"144.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">macro</text><text x=\"100.0\" y=\"162.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">2.0 mm²</text><rect x=\"252.0\" y=\"48.0\" width=\"96.0\" height=\"146.0\" rx=\"4\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"300.0\" y=\"119.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">macro</text><text x=\"300.0\" y=\"137.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1.5 mm²</text><rect x=\"252.0\" y=\"248.0\" width=\"96.0\" height=\"96.0\" rx=\"4\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"300.0\" y=\"294.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">macro</text><text x=\"300.0\" y=\"312.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1.0 mm²</text><rect x=\"52.0\" y=\"298.0\" width=\"96.0\" height=\"46.0\" rx=\"4\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"100.0\" y=\"326.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">0.5 mm²</text><rect x=\"162.2\" y=\"183.7\" width=\"75.5\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"200.0\" y=\"196.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--live)\" font-weight=\"700\">cell rows</text><rect x=\"169.5\" y=\"201.7\" width=\"61.0\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"200.0\" y=\"214.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--live)\" font-weight=\"700\">1.8 mm²</text><text x=\"100.0\" y=\"276.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">spare</text><text x=\"300.0\" y=\"226.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">spare</text><line x1=\"50.0\" y1=\"382.0\" x2=\"150.0\" y2=\"382.0\" style=\"stroke:var(--ink);stroke-width:2\"/><text x=\"100.0\" y=\"400.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1 mm</text><text x=\"418.0\" y=\"70.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">core area = 3.0 × 3.0 = 9.0 mm²</text><text x=\"418.0\" y=\"100.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">macros 2.0 + 1.5 + 1.0 + 0.5 = 5.0 mm²</text><text x=\"418.0\" y=\"130.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--live)\">standard cells 1.8 mm²</text><text x=\"418.0\" y=\"160.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">used = 6.8 mm²</text><text x=\"418.0\" y=\"190.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">U = 6.8 ÷ 9.0 = 75.6 %</text><text x=\"418.0\" y=\"220.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">whitespace = 2.2 mm²</text><text x=\"418.0\" y=\"250.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">with 20 % for routing:</text><text x=\"418.0\" y=\"280.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">6.8 × 1.2 = 8.16 mm² ≤ 9.0 mm²</text><text x=\"418.0\" y=\"310.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">fits, 0.84 mm² spare</text>",
+   "aria": "A 3 mm square core drawn to scale with four macro blocks, standard-cell rows in the middle column, spare areas, a 1 mm scale bar and the utilization worked out beside it."
   }
  },
  "examples": [
   {
-   "question": "An FPGA has 12,000 LUTs, 20 DSP slices and 30 BRAMs. A soft-core processor needs 1,800 LUTs, 4 DSP slices and 6 BRAMs. How many cores fit, and which resource limits the count?",
+   "question": "A core is 3.0 mm × 3.0 mm. Four hard blocks have areas 2.0, 1.5, 1.0 and 0.5 mm². Standard cells occupy 1.8 mm². Find block area, used area, utilization, whitespace, and whether 20% extra area for routing fits.",
    "steps": [
-    "LUT limit: 12000 ÷ 1800 = 6.67 cores, so only 6 complete cores fit by LUT count.",
-    "DSP limit: 20 ÷ 4 = 5 cores.",
-    "BRAM limit: 30 ÷ 6 = 5 cores.",
-    "Take the smallest limit: minimum of 6, 5 and 5 is 5 cores.",
-    "DSP slices and BRAMs give the same limit, so both limit the count."
+    "Core area = 3.0 × 3.0 = 9.0 mm².",
+    "Block area = 2.0 + 1.5 + 1.0 + 0.5 = 5.0 mm².",
+    "Used area = 5.0 + 1.8 = 6.8 mm².",
+    "Utilization = 6.8 ÷ 9.0 = 0.7556 = 75.6%.",
+    "Whitespace = 9.0 − 6.8 = 2.2 mm².",
+    "Extra area at 20% = 0.20 × 6.8 = 1.36 mm². Total = 6.8 + 1.36 = 8.16 mm².",
+    "Spare area = 9.0 − 8.16 = 0.84 mm². Since 8.16 ≤ 9.0, the extra area fits."
    ],
-   "answer": "5 soft cores fit, limited equally by DSP slices and BRAMs.",
-   "check": "print(round(12000/1800, 2))\nprint(12000//1800)\nprint(20//4)\nprint(30//6)\nprint(min(12000//1800, 20//4, 30//6))",
-   "values": [
-    6.67,
-    6,
-    5,
-    5,
-    5
+   "answer": "Block area is 5.0 mm², used area is 6.8 mm², utilization is 75.6%, whitespace is 2.2 mm², and with 20% extra area the total is 8.16 mm², so it fits with 0.84 mm² spare."
+  },
+  {
+   "question": "Four cells sit in four slots of a placement grid: A at (1, 1), B at (5, 1), C at (1, 4) and D at (5, 4), in grid units of 10 µm. Three nets join them: n1 = {A, D}, n2 = {B, C}, n3 = {A, B, C}. Find the total HPWL, then the total after swapping A and B, and say whether a placer should keep the swap.",
+   "steps": [
+    "HPWL of a net = (max x − min x) + (max y − min y) over its pins.",
+    "Before: n1, A(1, 1) to D(5, 4): 4 + 3 = 7. n2, B(5, 1) to C(1, 4): 4 + 3 = 7. n3, A, B, C: x from 1 to 5 and y from 1 to 4, 4 + 3 = 7. Total = 21 units = 210 µm.",
+    "Swap A and B: now A is at (5, 1) and B at (1, 1).",
+    "After: n1, A(5, 1) to D(5, 4): 0 + 3 = 3. n2, B(1, 1) to C(1, 4): 0 + 3 = 3. n3 still spans x 1 to 5 and y 1 to 4: 7. Total = 13 units = 130 µm.",
+    "Change = 21 − 13 = 8 units, a 38 % cut (8 ÷ 21 = 0.381), so the placer keeps the swap; an iterative placer tries many such swaps and keeps the ones that cut the cost."
    ],
-   "output": ""
+   "answer": "HPWL falls from 21 units (210 µm) to 13 units (130 µm) after the swap, a 38 % reduction, so the swap is kept."
   }
  ],
  "traps": [
-  "A soft core is not software. It is synthesizable hardware RTL and still consumes LUTs, memories, DSP slices and power.",
-  "Hard IP is fixed to one fabrication process. You cannot copy GDSII to another foundry node without redesign.",
-  "Soft IP portability does not remove integration work: bus adaptation, clock-domain crossing, reset and timing closure remain.",
-  "Counting cores by lookup tables alone is wrong. Check every resource: DSP slices, block RAM, I/O pins and power.",
-  "A license is not ownership. Check modification, reuse and redistribution rights before shipping."
+  "High utilization is not automatically good: above a point it causes routing congestion, detours and timing loss.",
+  "Placement is not routing: short placement wirelength can still route badly, and legal placement does not prove timing.",
+  "Global routing is not detailed routing: global assigns regions and estimates congestion; detailed picks exact tracks and vias.",
+  "DRC clean is not signoff clean: DRC checks geometry only; LVS, timing, power and IR drop are separate checks.",
+  "Clock skew is not always driven to zero: useful skew can improve timing, and insertion delay matters too."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Define soft IP.",
+   "q": "Define floorplanning in physical design.",
    "marks": 2,
-   "a": "Soft IP is synthesizable RTL source delivered for the buyer to synthesize. The buyer closes timing and meets power and area constraints."
+   "a": "It sets core size, aspect ratio, I/O pin positions, hard macro positions and power grid before placement."
   },
   {
    "level": "understand",
-   "q": "Why is hard IP usually lower integration risk than soft IP?",
+   "q": "Why leave whitespace in a floorplan?",
    "marks": 3,
-   "a": "Hard IP arrives as a fixed, pre-verified layout for one process, so speed, power and area are predictable. Soft IP must be synthesized and timed by the buyer."
+   "a": "For routing tracks, clock buffers, decoupling cells and to reduce congestion; a fully packed core can block wires."
   },
   {
    "level": "apply",
-   "q": "An FPGA has 24,000 LUTs and 40 BRAMs. A soft core needs 3,000 LUTs and 8 BRAMs. How many cores fit?",
+   "q": "A core is 4.0 mm × 4.0 mm and used area is 10.5 mm². Find utilization and whitespace.",
+   "marks": 5,
+   "a": "Core area = 16.0 mm²; U = 10.5 ÷ 16.0 = 0.656 = 65.6%; whitespace = 16.0 − 10.5 = 5.5 mm²."
+  },
+  {
+   "level": "apply",
+   "q": "Three pins of a net are at (1,2), (5,2), (3,6). Find its HPWL in grid units.",
    "marks": 4,
-   "a": "LUT limit: 24000 ÷ 3000 = 8. BRAM limit: 40 ÷ 8 = 5. Minimum is 5, so 5 cores fit."
+   "a": "x span = 5 − 1 = 4; y span = 6 − 2 = 4; HPWL = 4 + 4 = 8 units."
   },
   {
    "level": "analyze",
-   "q": "Why can a soft-core processor be slower than a hard processor core?",
-   "marks": 4,
-   "a": "A soft core is mapped to general FPGA fabric or standard cells with programmable or general routing. A hard core has a custom fixed layout with shorter critical paths, so it usually reaches a higher clock speed."
+   "q": "Explain why very high utilization can worsen timing even if area is saved.",
+   "marks": 5,
+   "a": "Routing must detour, wires lengthen, vias and crosstalk increase, and fewer sites remain for buffers; delay and congestion rise."
+  },
+  {
+   "level": "analyze",
+   "q": "A layout is DRC clean. Name two signoff checks still needed and say what each proves.",
+   "marks": 6,
+   "a": "LVS proves layout connectivity matches the schematic; static timing analysis proves setup/hold; power/IR-drop checks prove supply integrity. Any two."
   },
   {
    "level": "understand",
-   "q": "What does an IP wrapper do during SoC integration?",
-   "marks": 2,
-   "a": "It adapts the core's native signals to the SoC bus, adds registers and isolation, and holds configuration registers."
-  },
-  {
-   "level": "analyze",
-   "q": "A soft IP works in simulation but fails after synthesis. Give two likely causes.",
-   "marks": 4,
-   "a": "It may use non-synthesizable behavioural constructs, or it may have incomplete clock and reset constraints. Missing CDC logic and incomplete sensitivity lists are other causes."
+   "q": "State the difference between global and detailed routing.",
+   "marks": 3,
+   "a": "Global routing assigns each net to routing regions and estimates congestion; detailed routing then chooses the exact tracks, widths, spacing and vias inside those regions."
   }
  ],
- "beyond": "Not for the exam. In industry, SoC teams assemble IP using metadata standards such as IP-XACT and track licenses, versions and integration tests in a central database. RISC-V soft cores have made configurable CPUs common in FPGA prototypes. Formal and semiformal checks are used on bus fabrics and clock-domain crossing paths. Search next for IP-XACT, AMBA AXI, RISC-V soft core and clock-domain crossing verification."
+ "beyond": "Not for the exam. In industry, physical design teams use commercial place-and-route tools and run many signoff corners. At advanced nodes, double patterning, coloring and electromigration checks become part of routing. Research explores machine-learning placement, 3D stacked dies and chiplet routing. Search for physical design flow, clock-tree synthesis, global routing congestion and IR-drop signoff to go deeper."
 }

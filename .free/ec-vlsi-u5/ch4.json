@@ -1,200 +1,195 @@
 {
- "lead": "A test bench is a Verilog module that drives a design under test (DUT) with inputs and checks its outputs in simulation. It exists because a design can compile and still be wrong. The bench supplies clock, reset and data vectors, waits for the DUT to settle, compares each output with a golden value, and reports pass or fail. It also writes a VCD waveform file for inspection. Engineers use test benches before synthesis, during FPGA bring-up, and whenever a block changes and must be rechecked.",
- "prereq": "You need: <a href=\"#verilog-hdl-modules-ports-data-types-operators\">Chapter 5.2</a> for modules and ports, and <a href=\"#gate-level-dataflow-and-behavioural-modelling\">Chapter 5.3</a> for initial and always blocks.",
+ "lead": "A digital circuit can be written in Verilog at three levels. Gate-level modelling instantiates primitive gates and switches. Dataflow modelling writes continuous Boolean equations with assign. Behavioural modelling writes algorithms inside initial and always blocks. All three can describe the same multiplexer, counter or FSM. The level you choose controls how close the code sits to the netlist, how easy it is to read, and what a synthesis tool can accept. Designers use gate level for netlists, dataflow for datapaths, and behavioural for control.",
+ "prereq": "You need: <a href=\"#verilog-hdl-modules-ports-data-types-operators\">Verilog HDL basics</a> for modules, ports, data types and operators, and the switch view of the transistor from MOS transistor theory.",
  "sections": [
   {
-   "h3": "Test bench parts and stimulus",
+   "h3": "Three levels, one circuit",
    "blocks": [
     {
      "type": "p",
-     "text": "A test bench has no ports. It declares reg signals for inputs it drives, wire signals for outputs it observes, and instantiates the DUT by module name. The connection can be by name, as in mux2 uut(.a(a), .b(b), .s(s), .y(y)); here uut is the instance name and y is the observed output. A clock needs three parts. First a timescale directive, <code>`timescale 1ns/1ps</code>, so that #1 means 1 ns. Second, a clock register that starts at 0: <code>reg clk = 0;</code>, or an initial block that sets <code>clk = 0;</code>. Third, the free-running always block: <code>always #5 clk = ~clk;</code>. With a 1 ns/1 ps timescale, #5 is 5 ns, so the half period is 5 ns and the full period is 10 ns. Without the zero start the register holds x, ~x is still x, and the clock line never toggles, so every clocked block in the bench stalls. Reset is driven in an initial block: set rst=1, wait #20, then rst=0. Stimulus is also an initial block. Assign inputs, wait a delay, read outputs, and repeat. A task groups one vector application: drive a, b and s, wait #10, then compare y. $display prints one event; $monitor prints again whenever any listed signal changes. $dumpfile(\"dump.vcd\") names the value change dump (VCD) file and $dumpvars(0, tb) records all signals below the test bench. Some syllabi call this verification by simulation; it uses vectors, not formal proof."
+     "text": "Gate-level modelling is structural. You place gates by name: and, or, not, nand, nor, xor, xnor. Each gate instance has output first, then inputs. A 2-input AND is <code>and g1(y, a, b);</code>. Output y is a wire. Gate primitives have no memory. A user-defined primitive, or UDP, adds a truth-table gate when the built-in set is not enough. A UDP declares a table of input combinations and output values. Switch-level primitives such as nmos, pmos and cmos model transistors as switches. They are used to model MOS circuits such as the CMOS inverter below, and for cell-level simulation, not for ordinary synthesis. How the transistors themselves behave is covered under MOS transistor theory."
+    },
+    {
+     "type": "code",
+     "lang": "Verilog",
+     "code": "module inv_sw (input a, output y);\n  supply1 vdd;  supply0 gnd;\n  pmos p1 (y, vdd, a);   // on when a = 0\n  nmos n1 (y, gnd, a);   // on when a = 1\nendmodule",
+     "output": "a=0 y=1\na=1 y=0"
+    },
+    {
+     "type": "p",
+     "text": "Dataflow modelling is equation-based. A continuous assignment <code>assign y = a & b;</code> drives y whenever a or b changes. The right side is an expression, not a sequence of statements. The conditional operator <code>?:</code> builds a mux. Dataflow suits adders, comparators and multiplexers because the equations match the datapath."
+    },
+    {
+     "type": "p",
+     "text": "Behavioural modelling is algorithmic. An initial block runs once at time zero. An always block repeats forever. The sensitivity list says when it runs: <code>always @(*)</code> for combinational logic, <code>always @(posedge clk)</code> for a clocked register. Inside you write if, case, for and while. Synthesis turns these into gates, but only a subset is synthesizable."
     }
    ]
   },
   {
-   "h3": "Simulation cycle and races",
+   "h3": "Dataflow: equations as hardware",
    "blocks": [
     {
      "type": "p",
-     "text": "At each simulation time, the simulator runs active events, then inactive events, then nonblocking updates. A blocking assignment (=) changes the variable at once. A nonblocking assignment (<=) computes the right side now and updates at the end of the time step, in the nonblocking region. Clocked DUTs should use <= so all flip-flops sample the old values together. The test bench must respect that order. If the bench drives a clocked DUT with blocking assignments at posedge clk, the DUT may see the new value in the same time step and the result depends on event order. This is a race. If the bench samples y with $display at the same posedge, it may print the old y before the nonblocking update. Fix: drive inputs away from the active edge, use nonblocking in sequential logic, and check outputs after a small delay such as #1, or on the opposite edge. A combinational DUT also needs time to settle; a zero-delay compare after changing inputs can catch y while it is still x."
+     "text": "A continuous assignment targets a wire. <code>wire [3:0] y; assign y = sel ? b : a;</code> is a 4-bit 2-to-1 mux. The expression uses bitwise operators &, |, ^, ~, logical operators &&, ||, !, reduction operators such as &a, and concatenation {a,b}. The conditional operator <code>cond ? x : y</code> returns x when cond is 1 and y when cond is 0. For sel=1, the mux gives b; for sel=0, it gives a."
+    },
+    {
+     "type": "formula",
+     "text": "Y = sel ? B : A",
+     "where": "Y is the 4-bit output; sel is the 1-bit select; A and B are 4-bit inputs. sel=1 selects B, and sel=0 selects A."
+    },
+    {
+     "type": "p",
+     "text": "Continuous assignments run in parallel. Order in the file does not matter. A change on any right-side signal schedules a new evaluation. This is why dataflow code reads like hardware. Use one assign per output or per equation. Do not assign the same wire from two different assign statements; that creates multiple drivers and X in simulation."
+    },
+    {
+     "type": "p",
+     "text": "The synthesizable subset allows assign with operators, conditional expressions, concatenation and bit selects. It does not allow delays such as <code>assign #5 y = a;</code> in synthesis, real arithmetic, or assignments to reg. A dataflow mux maps to gates or to a mux cell. The worked example uses the same equation."
     }
    ]
   },
   {
-   "h3": "Self-checking, vectors and VCD",
+   "h3": "Behavioural: processes and always blocks",
    "blocks": [
     {
      "type": "p",
-     "text": "A self-checking test bench holds the expected value for each vector and compares it with the DUT output. It keeps an error count, prints FAIL with the time and vector when y differs, and prints PASS at the end only if errors=0. Golden vectors come from a truth table, a reference model, or a known-good simulation. For long tests, put vectors in a file and load them with $readmemh(\"vectors.hex\", mem); then loop over the array, drive inputs, wait, and compare. This separates data from code and lets you reuse the same bench. Timing checks compare when an output changes, not only its final value; a simple check waits a fixed delay and samples. For clocked logic, sample a short delay after the active edge, for example <code>#1 y_sample = y;</code> after <code>posedge clk</code>, so that the flip-flop's clock-to-Q delay has passed. Setup and hold times are constraints on the DUT inputs relative to that edge; they are not a delay after which the bench samples. $dumpfile and $dumpvars write a VCD file that a waveform viewer can open. The VCD is for debug, not for pass/fail. Coverage closure and production test are in Unit 6."
+     "text": "Behavioural code runs as a process. <code>initial</code> executes once; it is common in test benches and FPGA initialisation, but not in ASIC synthesis. <code>always</code> repeats. A combinational block uses <code>always @(*)</code>. A clocked block uses <code>always @(posedge clk)</code>. The star means every signal read in the block is in the sensitivity list. An incomplete list can simulate but synthesis assumes all reads, so hardware and simulation drift apart."
+    },
+    {
+     "type": "p",
+     "text": "Use blocking <code>=</code> in combinational always blocks: statements execute in order, like gates settling. Use nonblocking <code>&lt;=</code> in sequential always blocks: all right sides are sampled at the clock edge, then left sides update together. Mixing them in one clocked block creates races and can infer different registers."
+    },
+    {
+     "type": "p",
+     "text": "<code>if</code> and <code>case</code> are synthesizable. A <code>case</code> must cover all input patterns or have a default. A <code>for</code> loop with a constant bound is unrolled into parallel hardware. A <code>while</code> loop with a nonconstant bound is not synthesizable. A combinational always block must assign every output on every path, or synthesis infers a latch."
+    },
+    {
+     "type": "p",
+     "text": "An FSM uses two common styles. The two-block style has one clocked always block for the state register and one combinational always block for next state and outputs. The one-block style puts state register, next-state and output logic in a single clocked always block. Two-block code separates sequential and combinational logic clearly. One-block code is shorter but easier to make a mistake with blocking and nonblocking."
     }
    ]
   },
   {
-   "h3": "Compile and run",
+   "h3": "Choosing the level",
    "blocks": [
     {
      "type": "p",
-     "text": "Simulation is a two-step job: compile the DUT and test bench together, then run the top test-bench module. With Icarus Verilog, a common command is iverilog -o tb.out tb.v mux2.v; the first file can be the bench and the second the DUT. Run it with vvp tb.out. The $display and $monitor lines appear on the terminal. The $dumpfile and $dumpvars calls create dump.vcd; open it with gtkwave dump.vcd. Other simulators use different commands, such as vlog and vsim, but the idea is the same. Always end the stimulus with $finish so the simulator stops. If the transcript shows PASS and no FAIL lines, the vectors passed. Read the first FAIL line, note the time, inputs and expected value, then open the VCD near that time. That is the normal debug loop."
+     "text": "Use gate level for a netlist from synthesis or a cell library. Use dataflow for an equation: adder, comparator, mux, bitwise unit. Use behavioural for control: FSM, handshake, counter, register file. A D flip-flop is a clocked always block; at gate level it is a library cell. Most RTL mixes dataflow and behavioural code in one module."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Level",
+      "Best for",
+      "Typical statement"
+     ],
+     "rows": [
+      [
+       "Gate-level",
+       "Netlist, cell library",
+       "and g1(y, a, b);"
+      ],
+      [
+       "Dataflow",
+       "Datapath equation",
+       "assign y = sel ? b : a;"
+      ],
+      [
+       "Behavioural",
+       "Control, FSM, registers",
+       "always @(*) if (sel) y = b; else y = a;"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "Synthesis accepts a subset: modules, assign, always with @(*) or @(posedge clk), if, case and constant-bound for loops. It rejects delays, real variables, initial blocks for ASIC hardware and loops with a nonconstant bound."
+    },
+    {
+     "type": "p",
+     "text": "The same 4-bit mux can be written at all three levels. At gate level it is four instances of a 1-bit mux module that is itself built from not, and and or primitives. Dataflow uses one conditional assign. Behavioural uses an if in always @(*). The simulation results must agree; <a href=\"#test-benches-and-simulation\">the test bench chapter</a> builds the bench that checks them, and <a href=\"#programmable-logic-devices-and-fpga-architecture\">the FPGA chapter</a> maps the same logic into lookup tables."
     }
    ]
   }
  ],
  "figure": {
   "after_section": 1,
-  "caption": "The test bench drives a=1, b=0, s=0, waits 10 ns, reads y=1, and the checker returns pass. Notice the compare happens after the delay, not at the instant the inputs change.",
+  "caption": "The worked example’s 4-bit multiplexer at three levels: gate primitives for one bit (used four times), one continuous assign, and an always block with if and else. With A = 1010 and B = 0110 all three give Y = 0110 for sel = 1 and Y = 1010 for sel = 0.",
   "spec": {
-   "type": "sequence",
-   "aria": "A test bench sends a=1 b=0 s=0 to the DUT, waits 10 time units, receives y=1, sends expect y=1 to the checker, and the checker replies pass.",
-   "actors": [
-    "Test bench",
-    "DUT",
-    "Checker"
-   ],
-   "messages": [
-    {
-     "from": "Test bench",
-     "to": "DUT",
-     "label": "a=1 b=0 s=0",
-     "dashed": false
-    },
-    {
-     "from": "Test bench",
-     "to": "DUT",
-     "label": "wait #10",
-     "dashed": true
-    },
-    {
-     "from": "DUT",
-     "to": "Test bench",
-     "label": "y=1",
-     "dashed": false
-    },
-    {
-     "from": "Test bench",
-     "to": "Checker",
-     "label": "expect y=1",
-     "dashed": false
-    },
-    {
-     "from": "Checker",
-     "to": "Test bench",
-     "label": "pass",
-     "dashed": false
-    }
-   ]
+   "type": "svg",
+   "h": 326,
+   "body": "<rect x=\"20.0\" y=\"34.0\" width=\"300.0\" height=\"200.0\" rx=\"6\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"170.0\" y=\"24.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Gate level (one bit; four copies)</text><rect x=\"340.0\" y=\"34.0\" width=\"160.0\" height=\"200.0\" rx=\"6\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"420.0\" y=\"24.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Dataflow</text><rect x=\"520.0\" y=\"34.0\" width=\"180.0\" height=\"200.0\" rx=\"6\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"610.0\" y=\"24.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Behavioural</text><path d=\"M80,80 l26,12 l-26,12 z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><circle cx=\"110\" cy=\"92\" r=\"4\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><path d=\"M150,50 h20 a20,20 0 0 1 0,40 h-20 z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><path d=\"M150,130 h20 a20,20 0 0 1 0,40 h-20 z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><path d=\"M222,92 q14,20 0,40 q34,0 50,-20 q-16,-20 -50,-20 z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><polyline points=\"46.0,60.0 150.0,60.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"46.0,140.0 150.0,140.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"46.0,196.0 66.0,196.0 66.0,92.0 80.0,92.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"66.0,160.0 150.0,160.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><circle cx=\"66.0\" cy=\"160.0\" r=\"3.5\" style=\"fill:var(--ink);stroke:var(--fig);stroke-width:2\"/><polyline points=\"114.0,92.0 130.0,92.0 130.0,80.0 150.0,80.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"190.0,70.0 206.0,70.0 206.0,102.0 226.0,102.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"190.0,150.0 206.0,150.0 206.0,122.0 226.0,122.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"272.0,112.0 300.0,112.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><text x=\"40.0\" y=\"65.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--ink)\">a</text><text x=\"40.0\" y=\"145.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--ink)\">b</text><text x=\"40.0\" y=\"201.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--ink)\">sel</text><text x=\"116.0\" y=\"112.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">nsel</text><text x=\"196.0\" y=\"62.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">t0</text><text x=\"196.0\" y=\"170.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">t1</text><text x=\"304.0\" y=\"117.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">y</text><text x=\"420.0\" y=\"58.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">assign Y =</text><text x=\"420.0\" y=\"76.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">sel ? B : A;</text><polyline points=\"390.0,92.0 440.0,112.0 440.0,180.0 390.0,200.0 390.0,92.0\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><text x=\"400.0\" y=\"133.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">0</text><text x=\"400.0\" y=\"173.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">1</text><polyline points=\"356.0,128.0 390.0,128.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"356.0,168.0 390.0,168.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"440.0,146.0 470.0,146.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><polyline points=\"415.0,190.0 415.0,212.0\" style=\"fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round\"/><text x=\"352.0\" y=\"123.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">A</text><text x=\"352.0\" y=\"163.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">B</text><text x=\"474.0\" y=\"151.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">Y</text><text x=\"422.0\" y=\"224.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">sel</text><text x=\"534\" y=\"84\" font-size=\"14\" style=\"fill:var(--ink);font-family:var(--mono);white-space:pre\" xml:space=\"preserve\">always @(*)</text><text x=\"534\" y=\"110\" font-size=\"14\" style=\"fill:var(--ink);font-family:var(--mono);white-space:pre\" xml:space=\"preserve\">  if (sel)</text><text x=\"534\" y=\"136\" font-size=\"14\" style=\"fill:var(--ink);font-family:var(--mono);white-space:pre\" xml:space=\"preserve\">    Y = B;</text><text x=\"534\" y=\"162\" font-size=\"14\" style=\"fill:var(--ink);font-family:var(--mono);white-space:pre\" xml:space=\"preserve\">  else</text><text x=\"534\" y=\"188\" font-size=\"14\" style=\"fill:var(--ink);font-family:var(--mono);white-space:pre\" xml:space=\"preserve\">    Y = A;</text><rect x=\"20.0\" y=\"250.0\" width=\"680.0\" height=\"62.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"360.0\" y=\"275.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">A = 1010, B = 0110, sel = 1:  Y = 0110 at all three levels</text><text x=\"360.0\" y=\"298.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">sel = 0:  Y = 1010 (simulated, the three models agree)</text>",
+   "aria": "A 2-to-1 multiplexer drawn as NOT, AND and OR gates, as a multiplexer symbol for the assign statement, and as an always block, with the simulated result for both values of sel."
   }
  },
  "examples": [
   {
-   "question": "Write a self-checking test bench for a 2:1 mux with y = (~s & a) | (s & b). Apply four vectors at #0, #10, #20 and #30: (a,b,s)=(1,0,0), (1,0,1), (0,1,0), (0,1,1). Find the expected y values and state when the checker compares.",
-   "steps": [
-    "The mux equation selects a when s=0 and b when s=1: y = a if s=0, else y = b.",
-    "Vector 1 at 0 ns: a=1, b=0, s=0, so y=a=1.",
-    "Vector 2 at 10 ns: a=1, b=0, s=1, so y=b=0.",
-    "Vector 3 at 20 ns: a=0, b=1, s=0, so y=a=0.",
-    "Vector 4 at 30 ns: a=0, b=1, s=1, so y=b=1.",
-    "The initial (stimulus) block drives each vector, then waits #10 for the DUT to settle. After that delay the checker compares y with the expected value, increments errors on a mismatch, and PASS is printed only when errors=0."
-   ],
-   "answer": "Expected y values are 1, 0, 0, 1 for the four vectors; each compare happens 10 ns after its vector is applied.",
-   "check": "vectors = [(1,0,0),(1,0,1),(0,1,0),(0,1,1)]\nfor a,b,s in vectors:\n    y = ((1-s) & a) | (s & b)\n    print(y)",
-   "values": [
-    1,
-    0,
-    0,
-    1
-   ],
-   "dry_run": {
-    "head": [
-     "apply_ns",
-     "a",
-     "b",
-     "s",
-     "expected_y"
-    ],
-    "rows": [
-     [
-      "0",
-      "1",
-      "0",
-      "0",
-      "1"
-     ],
-     [
-      "10",
-      "1",
-      "0",
-      "1",
-      "0"
-     ],
-     [
-      "20",
-      "0",
-      "1",
-      "0",
-      "0"
-     ],
-     [
-      "30",
-      "0",
-      "1",
-      "1",
-      "1"
-     ]
-    ]
+   "question": "A 4-bit 2-to-1 multiplexer selects A when sel = 0 and B when sel = 1. Write it at gate level, in dataflow and in behavioural style, and find Y for A = 4'b1010, B = 4'b0110 with sel = 1 and with sel = 0.",
+   "code": {
+    "lang": "Verilog",
+    "code": "// gate level: one bit, then four instances\nmodule mux2_gate (input a, input b, input sel, output y);\n  wire nsel, t0, t1;\n  not g0 (nsel, sel);\n  and g1 (t0, a, nsel);\n  and g2 (t1, b, sel);\n  or  g3 (y, t0, t1);\nendmodule\nmodule mux4b_gate (input [3:0] A, B, input sel, output [3:0] Y);\n  mux2_gate m0 (A[0], B[0], sel, Y[0]);\n  mux2_gate m1 (A[1], B[1], sel, Y[1]);\n  mux2_gate m2 (A[2], B[2], sel, Y[2]);\n  mux2_gate m3 (A[3], B[3], sel, Y[3]);\nendmodule\n// dataflow\nmodule mux4b_df (input [3:0] A, B, input sel, output [3:0] Y);\n  assign Y = sel ? B : A;\nendmodule\n// behavioural\nmodule mux4b_beh (input [3:0] A, B, input sel, output reg [3:0] Y);\n  always @(*)\n    if (sel) Y = B;\n    else     Y = A;\nendmodule"
    },
-   "output": ""
+   "steps": [
+    "Inputs: A = 4'b1010 (decimal 10), B = 4'b0110 (decimal 6).",
+    "Gate level, sel = 1: nsel = 0, so t0 = a AND 0 = 0 and t1 = b AND 1 = b in every bit; y = t0 OR t1 = b. Y = 0110.",
+    "Dataflow, sel = 1: the condition is true, so the ?: expression returns B. Y = 0110.",
+    "Behavioural, sel = 1: the if branch runs, Y = B = 0110.",
+    "sel = 0: nsel = 1, so every bit gives y = a, and the dataflow and behavioural forms take A. All three give Y = 1010.",
+    "Check: 0110 is 0×8 + 1×4 + 1×2 + 0×1 = 6, the value of B, and 1010 is 10, the value of A."
+   ],
+   "output": "sel=1: gate 0110  dataflow 0110  behavioural 0110\nsel=0: gate 1010  dataflow 1010  behavioural 1010",
+   "answer": "Y = 4'b0110 (6, from B) when sel = 1 and Y = 4'b1010 (10, from A) when sel = 0, the same at all three levels."
   }
  ],
  "traps": [
-  "Comparing y at the same instant you change a, b or s. The DUT may still hold x or the old value. Wait for the delay first.",
-  "Driving a clocked DUT with blocking assignments at posedge. The bench and the DUT race; use nonblocking in the DUT and sample away from the edge.",
-  "Calling $dumpfile but never $dumpvars. The VCD file stays empty or incomplete.",
-  "Trusting a waveform by eye when the bench has no checker. A long dump can hide a wrong bit; add expected values and an error count.",
-  "Forgetting $finish. The clock keeps running and the batch simulation does not end."
+  "Mixing <code>=</code> and <code>&lt;=</code> in one clocked always block. Use <code>&lt;=</code> for every state register update.",
+  "An incomplete sensitivity list. Use <code>@(*)</code> for combinational blocks, or list every signal the block reads.",
+  "Assigning a reg in a continuous assign or a wire in an always block. Wires take assign; regs take procedural assignment.",
+  "A combinational always block with if but no else, or case with no default, infers a latch instead of gates.",
+  "Using an initial block for ASIC synthesis. Initial blocks are for test benches and for some FPGA power-up states."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "What does DUT mean in a test bench?",
+   "q": "Name four gate primitives and one switch-level primitive in Verilog.",
    "marks": 2,
-   "a": "Design under test: the module being driven and checked."
-  },
-  {
-   "level": "understand",
-   "q": "Why does a test bench wait #10 after changing inputs before reading a combinational output?",
-   "marks": 3,
-   "a": "To let the DUT settle and avoid sampling x or an old value."
+   "a": "and, or, nand, xor are gate primitives; nmos is a switch-level primitive."
   },
   {
    "level": "apply",
-   "q": "For y=(~s & a) | (s & b), find y for a=0, b=1, s=1.",
+   "q": "For A=4'b1100, B=4'b1010 and sel=0, find Y for <code>assign Y = sel ? B : A;</code>.",
    "marks": 4,
-   "a": "s=1 selects b, so y=1."
+   "a": "sel=0 selects A. A=1100 in binary, which is decimal 12. So Y=4'b1100=12."
   },
   {
    "level": "analyze",
-   "q": "A DUT uses q<=d at posedge clk. The bench uses blocking assignment and reads q at the same posedge. Explain the risk.",
+   "q": "Why is nonblocking <code>&lt;=</code> used in a clocked always block?",
    "marks": 5,
-   "a": "Race: the bench may read old q before the nonblocking update. Drive away from the edge and sample after #1 or on the opposite edge."
+   "a": "It samples all right sides at the clock edge, then updates all left sides together. This matches register behaviour and avoids order-dependent races."
   },
   {
-   "level": "remember",
-   "q": "Which two system tasks write a VCD file?",
-   "marks": 2,
-   "a": "$dumpfile names it; $dumpvars records signals."
-  },
-  {
-   "level": "understand",
-   "q": "What is a golden vector?",
-   "marks": 3,
-   "a": "A known-correct input-output pair used as the expected value in a checker."
+   "level": "analyze",
+   "q": "A combinational <code>always @(*)</code> contains <code>if (en) y = d;</code> with no else. What may synthesis infer and why?",
+   "marks": 4,
+   "a": "It may infer a latch, because y must keep its old value when en=0. Combinational logic must assign y on every path."
   },
   {
    "level": "apply",
-   "q": "A self-checking bench has errors=0. Four vectors are checked, and only vector 3 mismatches. What final message and count?",
+   "q": "Write the behavioural form of a 4-bit 2-to-1 mux with output Y, inputs A and B, and select sel.",
+   "marks": 5,
+   "a": "Declare <code>reg [3:0] Y;</code>. Then write <code>always @(*) if (sel) Y = B; else Y = A;</code>. sel=1 selects B, and sel=0 selects A."
+  },
+  {
+   "level": "understand",
+   "q": "What is a user-defined primitive in Verilog?",
+   "marks": 3,
+   "a": "A UDP is a custom gate defined by a truth table of input combinations and output values. It extends the built-in gate set."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can an incomplete sensitivity list pass simulation but fail after synthesis?",
    "marks": 4,
-   "a": "errors=1; print FAIL count=1, not PASS."
+   "a": "Simulation may keep old values until some listed signal changes. Synthesis assumes the block reads all signals used in its expressions, so the hardware can differ from the simulation."
   }
  ],
- "beyond": "Not for the exam. In industry, test benches grow into verification environments with constrained-random stimulus, scoreboards and functional coverage. UVM is a common methodology for this. Emulation and FPGA prototyping run long tests at near-real speed. Formal verification proves properties without vectors; coverage closure and production test are covered in Unit 6. Search for UVM scoreboard, functional coverage, and simulation-based verification."
+ "beyond": "Not for the exam. SystemVerilog adds <code>always_comb</code> and <code>always_ff</code>, which let tools check that a block is purely combinational or clocked. RTL lint tools flag incomplete sensitivity lists, latches and blocking assignments in clocked blocks before synthesis. Formal equivalence checks compare the RTL with the gate netlist after synthesis. High-level synthesis moves behavioural code into C/C++ style descriptions, but the synthesizable subset idea remains. Search next for SystemVerilog <code>always_ff</code>, RTL lint, and synthesizable Verilog subset."
 }

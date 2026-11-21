@@ -38,3 +38,12 @@ OK
 - ch 6 [low] Lead: "Every CMOS chip uses this backend flow" is too strong. Hand-drawn analog, RF and small full-custom chips skip standard-cell floorplanning and placement, even though they still end in GDSII and signoff.
 - ch 7 [low] Figure caption: The caption says "only the CPU is shown as synthesizable RTL". Students can read this as saying the UART soft IP is not synthesizable RTL, which contradicts Section 1, where soft IP is defined as synthesizable RTL. The diagram simply does not print the RTL note under the UART box.
 - ch 7 [low] Section 2, address paragraph: "Every core needs an address in the memory map" is too strong. Blocks such as a PLL, a SerDes lane or a purely streaming datapath may have no memory-mapped registers, and a hard memory macro is addressed as memory, not as a core register space.
+
+## Claude correction pass (21 Nov 2026)
+
+Checker: `ec-vlsi-u5.html: 8 chapters, 23473 words, 10 figures, 243 KB` then `OK` (with --render).
+
+- New ch 5.2 Introduction to ASICs (exam subtopic): ASIC types table, full-custom, standard cells, gate arrays (channelled, sea of gates, structured), NRE and break-even with a four-option cost example; later chapters moved to 5.3 to 5.8.
+- 5.1 rewritten for the EC3552 topics: tapeout is only the handoff, wafer-to-chip flow, SoC verification and test issues, scan, boundary scan, test coding; second example on scan test time and cost.
+- 5.3 second example (concatenation, sign extension, shifts, reductions, x, widths); 5.4 gate-level and switch-level code; 5.5 full self-checking bench with real output and a faulty-DUT run; 5.6 ROM/PAL/PLA example, Actel and Xilinx blocks, switching technologies; 5.7 HPWL swap example, global routing and via wording; 5.8 memory-map example, IEEE 1500 core test, soft-core names. All Verilog compiled and run with Icarus Verilog 12.
+- Every figure redrawn by hand from its chapter's example; 13 full model answers; cross-unit references named by topic.

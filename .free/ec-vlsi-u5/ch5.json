@@ -1,152 +1,168 @@
 {
- "lead": "A programmable logic device (PLD) is an IC whose logic function you set after manufacture. Instead of drawing new masks, you store connections or truth tables in programmable cells. This makes PLDs useful for prototypes, low-volume products, education and glue logic. FPGA (field-programmable gate array) is the largest PLD family: it builds arbitrary logic from lookup tables, flip-flops, routing and I/O blocks. This chapter explains the PLD families, the blocks inside an FPGA, and how SRAM, flash and antifuse programming differ at block level.",
- "prereq": "You need <a href=\"#gate-level-dataflow-and-behavioural-modelling\">Chapter 5.3</a> for the synthesizable Verilog subset, and basic Boolean algebra from Unit 4.",
+ "lead": "A test bench is a Verilog module that drives a design under test (DUT) with inputs and checks its outputs in simulation. It exists because a design can compile and still be wrong. The bench supplies clock, reset and data vectors, waits for the DUT to settle, compares each output with a golden value, and reports pass or fail. It also writes a VCD waveform file for inspection. Engineers use test benches before synthesis, during FPGA bring-up, and whenever a block changes and must be rechecked.",
+ "prereq": "You need: <a href=\"#verilog-hdl-modules-ports-data-types-operators\">Verilog HDL basics</a> for modules and ports, and <a href=\"#gate-level-dataflow-and-behavioural-modelling\">modelling styles</a> for initial and always blocks.",
  "sections": [
   {
-   "h3": "PLD families and programmable cells",
+   "h3": "Test bench parts and stimulus",
    "blocks": [
     {
      "type": "p",
-     "text": "Programmable logic devices (PLDs) let you set a logic function after the chip is made. A fixed gate array cannot change; a PLD stores connections in programmable elements. In a programmable logic array (PLA), both the AND plane and the OR plane are programmable, so each output is an OR of selected product terms. A product term is one AND of input literals, where a literal is a variable or its complement. A programmable array logic (PAL) keeps the AND plane programmable and fixes the OR plane; it is simpler and faster. Programmable inversion lets an input or output be used in true or complemented form. Expander logic feeds extra product terms into a macrocell without using output pins. A macrocell is the programmable logic cell of a complex PLD (CPLD); it contains product-term logic, a register and polarity control. A CPLD joins several PAL-like blocks with a central interconnect. A mask-programmable gate array (MPGA) is programmed by custom wiring masks, so its function is fixed at fabrication. An FPGA is field-programmable: the user loads a configuration after packaging."
+     "text": "A test bench has no ports. It declares reg signals for inputs it drives, wire signals for outputs it observes, and instantiates the DUT by module name. The connection can be by name, as in mux2 uut(.a(a), .b(b), .s(s), .y(y)); here uut is the instance name and y is the observed output. A clock needs three parts. First a timescale directive, <code>`timescale 1ns/1ps</code>, so that #1 means 1 ns. Second, a clock register that starts at 0: <code>reg clk = 0;</code>, or an initial block that sets <code>clk = 0;</code>. Third, the free-running always block: <code>always #5 clk = ~clk;</code>. With a 1 ns/1 ps timescale, #5 is 5 ns, so the half period is 5 ns and the full period is 10 ns. Without the zero start the register holds x, ~x is still x, and the clock line never toggles, so every clocked block in the bench stalls. Reset is driven in an initial block: set rst=1, wait #20, then rst=0. Stimulus is also an initial block. Assign inputs, wait a delay, read outputs, and repeat. A task groups one vector: drive a, b and s, wait #10, then compare y. $display prints one event; $monitor prints again whenever any listed signal changes. $dumpfile(\"dump.vcd\") names the value change dump (VCD) file and $dumpvars(0, tb) records all signals below the test bench. Some syllabi call this verification by simulation; it uses vectors, not formal proof."
     }
    ]
   },
   {
-   "h3": "FPGA logic, I/O and routing",
+   "h3": "Simulation cycle and races",
    "blocks": [
     {
      "type": "p",
-     "text": "An FPGA logic cell is built around a lookup table (LUT) and a flip-flop. An n-input LUT stores 2ⁿ truth-table bits; a multiplexer chosen by the n inputs selects one bit. A 4-input LUT has 16 bits and can implement any 4-variable Boolean function. The flip-flop after the LUT stores the result for sequential logic; a bypass multiplexer selects combinational or registered output. A logic block (CLB or LAB in vendor names) packs several LUTs, flip-flops and carry logic. Input/output blocks (IOBs) connect pads to the array with registers and drive strength. Routing runs through horizontal and vertical channels; a switch box at each crossing connects wire segments. Routing delay often dominates. Block RAM (BRAM) gives on-chip memory. DSP slices give fast multiply-accumulate. Clock management blocks such as phase-locked loops (PLLs) clean and multiply clocks. All these choices are set by configuration memory."
-    },
-    {
-     "type": "formula",
-     "text": "N<sub>LUT</sub> = 2<sup>n</sup>",
-     "where": "N<sub>LUT</sub> is the number of configuration bits in an n-input LUT; n is the number of LUT inputs."
+     "text": "At each simulation time, the simulator runs active events, then inactive events, then nonblocking updates. A blocking assignment (=) changes the variable at once. A nonblocking assignment (<=) computes the right side now and updates at the end of the time step, in the nonblocking region. Clocked DUTs should use <= so all flip-flops sample the old values together. The test bench must respect that order. If the bench drives a clocked DUT with blocking assignments at posedge clk, the DUT may see the new value in the same time step and the result depends on event order. This is a race. If the bench samples y with $display at the same posedge, it may print the old y before the nonblocking update. Fix: drive inputs away from the active edge, use nonblocking in sequential logic, and check outputs after a small delay such as #1, or on the opposite edge. A combinational DUT also needs time to settle; a zero-delay compare after changing inputs can catch y while it is still x."
     }
    ]
   },
   {
-   "h3": "Configuration memory and mapping",
+   "h3": "Self-checking, vectors and VCD",
    "blocks": [
     {
      "type": "p",
-     "text": "FPGA programming is stored in configuration memory. SRAM-based FPGAs use volatile SRAM cells that drive pass transistors. They lose configuration at power-off, so a bitstream must be reloaded from flash or a host. Their advantage is unlimited reprogramming and standard CMOS fabrication. Flash-based FPGAs store charge on a floating gate; they keep configuration without power and can be reprogrammed, but need special process steps. Antifuse FPGAs blow a one-time link; they are non-volatile and hard to reverse, used where radiation or security matters. At block level, an SRAM cell, a floating-gate transistor or a blown antifuse controls a switch. Synthesis maps Verilog to LUTs; packing groups them; placement and routing choose sites and wires; bitstream generation writes the memory. See <a href=\"#chapter-5.6\">Chapter 5.6</a> for ASIC placement and routing, and <a href=\"#chapter-5.7\">Chapter 5.7</a> for reusing soft cores."
+     "text": "A self-checking test bench holds the expected value for each vector and compares it with the DUT output. It keeps an error count, prints FAIL with the time and vector when y differs, and prints PASS at the end only if errors=0. Golden vectors come from a truth table, a reference model, or a known-good simulation. For long tests, put vectors in a file and load them with $readmemh(\"vectors.hex\", mem); then loop over the array, drive inputs, wait, and compare. This separates data from code and lets you reuse the same bench. For clocked logic, sample a short delay after the active edge, for example <code>#1 y_sample = y;</code> after <code>posedge clk</code>, so that the flip-flop's clock-to-Q delay has passed. Setup and hold times are constraints on the DUT inputs relative to that edge; they are not a delay after which the bench samples. $dumpfile and $dumpvars write a VCD file that a waveform viewer can open. The VCD is for debug, not for pass/fail. Production test of the finished chip is a separate job, covered under VLSI testing and design for testability."
+    }
+   ]
+  },
+  {
+   "h3": "Compile and run",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Simulation is a two-step job: compile the DUT and test bench together, then run the top test-bench module. With Icarus Verilog, a common command is iverilog -o tb.out tb.v mux2.v; the first file can be the bench and the second the DUT. Run it with vvp tb.out. The $display and $monitor lines appear on the terminal. The $dumpfile and $dumpvars calls create dump.vcd; open it with gtkwave dump.vcd. Other simulators use different commands, such as vlog and vsim, but the idea is the same. Always end the stimulus with $finish so the simulator stops. If the transcript shows PASS and no FAIL lines, the vectors passed. Read the first FAIL line, note the time, inputs and expected value, then open the VCD near that time. That is the normal debug loop."
     }
    ]
   }
  ],
  "figure": {
-  "after_section": 1,
-  "caption": "Index 13 is binary address 1101: A=1, B=1, C=0, D=1 gives f=1. The LUT stores one output bit for each of the 16 input addresses.",
+  "after_section": 3,
+  "caption": "The worked example’s four vectors as waveforms. Each vector is applied at 0, 10, 20 and 30 ns, and the checker compares y with the expected 1, 0, 0, 1 at the dashed lines, 10 ns later, never at the instant the inputs change.",
   "spec": {
-   "type": "array",
-   "title": "4-input LUT for f = A·B + C·D",
-   "show_index": true,
-   "index_from": 0,
-   "aria": "A 16-entry LUT truth table for f = A·B + C·D, with entry index 13 highlighted as 1.",
-   "rows": [
-    {
-     "label": "f",
-     "cells": [
-      "0",
-      "0",
-      "0",
-      "1",
-      "0",
-      "0",
-      "0",
-      "1",
-      "0",
-      "0",
-      "0",
-      "1",
-      "1",
-      "1",
-      "1",
-      "1"
-     ],
-     "marks": {
-      "13": "accent"
-     }
-    }
-   ],
-   "pointers": [
-    {
-     "row": 0,
-     "cell": 13,
-     "label": "13"
-    }
-   ]
+   "type": "svg",
+   "h": 318,
+   "body": "<polyline points=\"110.0,54.0 245.0,54.0 245.0,54.0 380.0,54.0 380.0,82.0 515.0,82.0 515.0,82.0 650.0,82.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round\"/><text x=\"96.0\" y=\"73.0\" font-size=\"15\" text-anchor=\"end\" style=\"fill:var(--ink)\" font-weight=\"700\">a</text><polyline points=\"110.0,132.0 245.0,132.0 245.0,132.0 380.0,132.0 380.0,104.0 515.0,104.0 515.0,104.0 650.0,104.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round\"/><text x=\"96.0\" y=\"123.0\" font-size=\"15\" text-anchor=\"end\" style=\"fill:var(--ink)\" font-weight=\"700\">b</text><polyline points=\"110.0,182.0 245.0,182.0 245.0,154.0 380.0,154.0 380.0,182.0 515.0,182.0 515.0,154.0 650.0,154.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round\"/><text x=\"96.0\" y=\"173.0\" font-size=\"15\" text-anchor=\"end\" style=\"fill:var(--ink)\" font-weight=\"700\">s</text><polyline points=\"110.0,204.0 245.0,204.0 245.0,232.0 380.0,232.0 380.0,232.0 515.0,232.0 515.0,204.0 650.0,204.0\" style=\"fill:none;stroke:var(--live);stroke-width:2.5;stroke-linejoin:round\"/><text x=\"96.0\" y=\"223.0\" font-size=\"15\" text-anchor=\"end\" style=\"fill:var(--ink)\" font-weight=\"700\">y</text><text x=\"177.5\" y=\"30.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">1 0 0</text><text x=\"312.5\" y=\"30.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">1 0 1</text><text x=\"447.5\" y=\"30.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0 1 0</text><text x=\"582.5\" y=\"30.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0 1 1</text><text x=\"96.0\" y=\"30.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">a b s</text><line x1=\"245.0\" y1=\"40.0\" x2=\"245.0\" y2=\"240.0\" style=\"stroke:var(--next);stroke-width:1.6;stroke-dasharray:5 4\"/><text x=\"245.0\" y=\"260.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">y = 1 ok</text><line x1=\"380.0\" y1=\"40.0\" x2=\"380.0\" y2=\"240.0\" style=\"stroke:var(--next);stroke-width:1.6;stroke-dasharray:5 4\"/><text x=\"380.0\" y=\"260.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">y = 0 ok</text><line x1=\"515.0\" y1=\"40.0\" x2=\"515.0\" y2=\"240.0\" style=\"stroke:var(--next);stroke-width:1.6;stroke-dasharray:5 4\"/><text x=\"515.0\" y=\"260.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">y = 0 ok</text><line x1=\"650.0\" y1=\"40.0\" x2=\"650.0\" y2=\"240.0\" style=\"stroke:var(--next);stroke-width:1.6;stroke-dasharray:5 4\"/><text x=\"650.0\" y=\"260.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">y = 1 ok</text><line x1=\"110.0\" y1=\"276.0\" x2=\"650.0\" y2=\"276.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><line x1=\"110.0\" y1=\"276.0\" x2=\"110.0\" y2=\"281.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"110.0\" y=\"296.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0 ns</text><line x1=\"245.0\" y1=\"276.0\" x2=\"245.0\" y2=\"281.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"245.0\" y=\"296.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">10 ns</text><line x1=\"380.0\" y1=\"276.0\" x2=\"380.0\" y2=\"281.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"380.0\" y=\"296.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">20 ns</text><line x1=\"515.0\" y1=\"276.0\" x2=\"515.0\" y2=\"281.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"515.0\" y=\"296.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">30 ns</text><line x1=\"650.0\" y1=\"276.0\" x2=\"650.0\" y2=\"281.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"650.0\" y=\"296.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">40 ns</text><text x=\"110.0\" y=\"260.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--next)\">compare:</text>",
+   "aria": "Timing diagram of a, b, s and y over 40 ns, with the input vector written above each 10 ns slot and dashed compare lines at 10, 20, 30 and 40 ns showing the expected y."
   }
  },
  "examples": [
   {
-   "question": "A 4-input LUT implements f = A·B + C·D. (a) How many configuration bits does it need? (b) Find f for A=1, B=1, C=0, D=1. (c) How many LUTs are needed for 3,000 such functions if 15% of LUTs are lost to packing?",
+   "question": "Write a self-checking test bench for a 2:1 mux with y = (~s &amp; a) | (s &amp; b). Apply four vectors at 0, 10, 20 and 30 ns: (a, b, s) = (1, 0, 0), (1, 0, 1), (0, 1, 0), (0, 1, 1). Find the expected y values, state when the checker compares, and show what the bench prints when the DUT is right and when the s &amp; b term is wrongly written s &amp; a.",
+   "code": {
+    "lang": "Verilog",
+    "code": "module mux2 (input a, input b, input s, output y);\n  assign y = (~s & a) | (s & b);\nendmodule\n\n`timescale 1ns/1ns\nmodule tb_mux2;\n  reg a, b, s;\n  wire y;\n  integer errors = 0;\n  mux2 uut (.a(a), .b(b), .s(s), .y(y));\n  task check(input va, input vb, input vs, input exp);\n    begin\n      a = va; b = vb; s = vs;\n      #10;\n      if (y !== exp) begin\n        errors = errors + 1;\n        $display(\"FAIL t=%0t a=%b b=%b s=%b y=%b expected %b\", $time, a, b, s, y, exp);\n      end else\n        $display(\"ok   t=%0t a=%b b=%b s=%b y=%b\", $time, a, b, s, y);\n    end\n  endtask\n  initial begin\n    $dumpfile(\"dump.vcd\");\n    $dumpvars(0, tb_mux2);\n    check(1, 0, 0, 1);\n    check(1, 0, 1, 0);\n    check(0, 1, 0, 0);\n    check(0, 1, 1, 1);\n    if (errors == 0) $display(\"PASS: 4 vectors\");\n    else $display(\"FAIL: %0d errors\", errors);\n    $finish;\n  end\nendmodule"
+   },
    "steps": [
-    "A 4-input LUT has 2⁴ = 16 truth-table entries. Each entry stores one configuration bit. Configuration bits = 16.",
-    "For A=1, B=1: A·B = 1. For C=0, D=1: C·D = 0. f = 1 OR 0 = 1.",
-    "Useful fraction after packing = 1 − 0.15 = 0.85. Required LUTs = 3000 ÷ 0.85 = 3529.4. Round up because LUT count is an integer: 3530 LUTs."
+    "The equation selects a when s = 0 and b when s = 1.",
+    "Vector 1 at 0 ns: a = 1, b = 0, s = 0, so y = a = 1.",
+    "Vector 2 at 10 ns: a = 1, b = 0, s = 1, so y = b = 0.",
+    "Vector 3 at 20 ns: a = 0, b = 1, s = 0, so y = a = 0.",
+    "Vector 4 at 30 ns: a = 0, b = 1, s = 1, so y = b = 1.",
+    "Each call of the task drives a vector, waits #10, then compares with !== so that an x on y also counts as a mismatch. The compares happen at 10, 20, 30 and 40 ns, 10 ns after each vector.",
+    "With the faulty DUT, y = (~s &amp; a) | (s &amp; a) = a for every vector. Vectors 1 and 3 still pass (y = a was expected), but vector 2 gives 1 instead of 0 and vector 4 gives 0 instead of 1, so errors = 2 and the bench prints FAIL."
    ],
-   "answer": "The LUT needs 16 configuration bits, f = 1 for A=1, B=1, C=0, D=1, and 3530 LUTs are needed after 15% packing loss.",
-   "check": "import math\nlut_bits = 2**4\na, b, c, d = 1, 1, 0, 1\nf = int((a*b + c*d) > 0)\ntotal = math.ceil(3000 / 0.85)\nprint(lut_bits)\nprint(f)\nprint(total)",
-   "values": [
-    16,
-    1,
-    3530
-   ],
-   "output": ""
+   "dry_run": {
+    "head": [
+     "applied at (ns)",
+     "a",
+     "b",
+     "s",
+     "expected y",
+     "compared at (ns)"
+    ],
+    "rows": [
+     [
+      "0",
+      "1",
+      "0",
+      "0",
+      "1",
+      "10"
+     ],
+     [
+      "10",
+      "1",
+      "0",
+      "1",
+      "0",
+      "20"
+     ],
+     [
+      "20",
+      "0",
+      "1",
+      "0",
+      "0",
+      "30"
+     ],
+     [
+      "30",
+      "0",
+      "1",
+      "1",
+      "1",
+      "40"
+     ]
+    ]
+   },
+   "output": "ok   t=10 a=1 b=0 s=0 y=1\nok   t=20 a=1 b=0 s=1 y=0\nok   t=30 a=0 b=1 s=0 y=0\nok   t=40 a=0 b=1 s=1 y=1\nPASS: 4 vectors\n\nwith the faulty DUT:\nok   t=10 a=1 b=0 s=0 y=1\nFAIL t=20 a=1 b=0 s=1 y=1 expected 0\nok   t=30 a=0 b=1 s=0 y=0\nFAIL t=40 a=0 b=1 s=1 y=0 expected 1\nFAIL: 2 errors",
+   "answer": "Expected y = 1, 0, 0, 1. Each compare happens 10 ns after its vector (at 10, 20, 30 and 40 ns). The correct DUT prints PASS; the faulty one fails vectors 2 and 4 and prints FAIL: 2 errors."
   }
  ],
  "traps": [
-  "An n-input LUT is not an n-input gate; it stores 2ⁿ truth-table bits and behaves like a small memory.",
-  "An n-input LUT needs 2ⁿ configuration bits, not n bits; a 4-input LUT needs 16 bits.",
-  "In a PAL the OR plane is fixed, so each output gets a fixed number of product terms — count them per output, not as a shared pool. In a PLA the product terms are shared, and each output ORs a programmable subset of them.",
-  "SRAM FPGA configuration memory is volatile like user SRAM, but it holds the logic configuration, not program data.",
-  "Routing and switch-box delay can dominate, so equal LUT counts do not guarantee equal speed."
+  "Comparing y at the same instant you change a, b or s. The DUT may still hold x or the old value. Wait for the delay first.",
+  "Driving a clocked DUT with blocking assignments at posedge. The bench and the DUT race; use nonblocking in the DUT and sample away from the edge.",
+  "Calling $dumpfile but never $dumpvars. The VCD file stays empty or incomplete.",
+  "Trusting a waveform by eye when the bench has no checker. A long dump can hide a wrong bit; add expected values and an error count.",
+  "Forgetting $finish. The clock keeps running and the batch simulation does not end."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "What is a product term in a PLA?",
+   "q": "What does DUT mean in a test bench?",
    "marks": 2,
-   "a": "A product term is an AND of selected input literals, true or complemented; each PLA output is an OR of selected product terms."
+   "a": "Design under test: the module being driven and checked."
   },
   {
    "level": "understand",
-   "q": "Why does an n-input LUT need 2ⁿ configuration bits?",
+   "q": "Why does a test bench wait #10 after changing inputs before reading a combinational output?",
    "marks": 3,
-   "a": "It must store one output bit for every one of the 2ⁿ input combinations, and a multiplexer selects the addressed bit."
+   "a": "To let the DUT settle and avoid sampling x or an old value."
   },
   {
    "level": "apply",
-   "q": "A 5-input LUT implements a Boolean function. How many configuration bits does it store?",
+   "q": "For y=(~s & a) | (s & b), find y for a=0, b=1, s=1.",
    "marks": 4,
-   "a": "2⁵ = 32 configuration bits."
-  },
-  {
-   "level": "apply",
-   "q": "An FPGA has 4,800 6-input LUTs. 20% are lost to packing. How many useful LUTs remain?",
-   "marks": 5,
-   "a": "4800 × 0.80 = 3840 useful LUTs."
+   "a": "s=1 selects b, so y=1."
   },
   {
    "level": "analyze",
-   "q": "Why can two FPGAs with the same number of LUTs run at different clock speeds?",
+   "q": "A DUT uses q<=d at posedge clk. The bench uses blocking assignment and reads q at the same posedge. Explain the risk.",
    "marks": 5,
-   "a": "Routing architecture, switch-box delays, wire lengths, clock networks and placement affect the critical-path delay; LUT count alone does not fix speed."
-  },
-  {
-   "level": "analyze",
-   "q": "Contrast SRAM and antifuse configuration at block level.",
-   "marks": 4,
-   "a": "SRAM uses a volatile memory cell driving a pass transistor, is reloaded at power-up and is reprogrammable. Antifuse blows a one-time link, is non-volatile and is not reprogrammable."
+   "a": "Race: the bench may read old q before the nonblocking update. Drive away from the edge and sample after #1 or on the opposite edge."
   },
   {
    "level": "remember",
-   "q": "Name four blocks inside an FPGA logic fabric.",
+   "q": "Which two system tasks write a VCD file?",
    "marks": 2,
-   "a": "LUT, flip-flop, carry logic and routing/switch box."
+   "a": "$dumpfile names it; $dumpvars records signals."
+  },
+  {
+   "level": "understand",
+   "q": "What is a golden vector?",
+   "marks": 3,
+   "a": "A known-correct input-output pair used as the expected value in a checker."
+  },
+  {
+   "level": "apply",
+   "marks": 4,
+   "q": "A self-checking bench starts with errors = 0 and checks four vectors. Only vector 3 mismatches. What is the final error count and what does the bench print?",
+   "a": "errors = 1 after vector 3 and stays 1, so the bench prints the FAIL line for vector 3 and ends with FAIL: 1 errors, not PASS."
   }
  ],
- "beyond": "Not for the exam. Modern FPGAs add high-speed transceivers, memory controllers, AI DSP arrays and hardened processor cores, so the fabric is only part of the chip. Partial reconfiguration lets one region change while the rest runs. Open-source toolchains now synthesize and place small FPGA designs. Search for FPGA bitstream format, LUT mapping and partial reconfiguration."
+ "beyond": "Not for the exam. In industry, test benches grow into verification environments with constrained-random stimulus, scoreboards and functional coverage. UVM is a common methodology for this. Emulation and FPGA prototyping run long tests at near-real speed. Formal verification proves properties without vectors; production test of the chip is covered under VLSI testing and design for testability. Search for UVM scoreboard, functional coverage, and simulation-based verification."
 }
