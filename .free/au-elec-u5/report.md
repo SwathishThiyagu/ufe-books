@@ -1,13 +1,13 @@
 # au-elec-u5: free-model run
 
-- Book: `books/auto/au-elec/au-elec-u5.html`
+- Book: `work/au-elec-u5/tree/books/auto/au-elec/au-elec-u5.html`
 - Status: ok
 - Model calls so far: 26 (89,850 tokens in, 204,661 out), 5.6 minutes
 
 ## Checker
 
 ```
-au-elec-u5.html: 9 chapters, 15202 words, 10 figures, 161 KB
+au-elec-u5.html: 9 chapters, 24477 words, 11 figures, 258 KB
 OK
 ```
 
