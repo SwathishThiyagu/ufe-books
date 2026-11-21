@@ -1,13 +1,13 @@
 # bm-instr-u2: free-model run
 
-- Book: `books/bme/bm-instr/bm-instr-u2.html`
+- Book: `work/bm-instr-u2/tree/books/bme/bm-instr/bm-instr-u2.html`
 - Status: ok
-- Model calls so far: 27 (101,576 tokens in, 221,995 out), 5.5 minutes
+- Model calls so far: 27 (101,576 tokens in, 221,995 out), 5.6 minutes
 
 ## Checker
 
 ```
-bm-instr-u2.html: 8 chapters, 15078 words, 9 figures, 162 KB
+bm-instr-u2.html: 8 chapters, 22703 words, 10 figures, 250 KB
 OK
 ```
 
