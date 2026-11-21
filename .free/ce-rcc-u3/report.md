@@ -2,12 +2,12 @@
 
 - Book: `books/civil/ce-rcc/ce-rcc-u3.html`
 - Status: ok
-- Model calls so far: 22 (80,125 tokens in, 222,769 out), 6.1 minutes
+- Model calls so far: 23 (80,125 tokens in, 222,769 out), 6.4 minutes
 
 ## Checker
 
 ```
-ce-rcc-u3.html: 7 chapters, 13098 words, 8 figures, 139 KB
+ce-rcc-u3.html: 7 chapters, 19982 words, 9 figures, 201 KB
 OK
 ```
 
