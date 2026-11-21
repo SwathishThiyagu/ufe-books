@@ -548,3 +548,8 @@
 - SRM's unit lists liquid level control, light dimmers and electronic timers; the draft had no liquid level control, now a section of the process control chapter (on-off probes, level transmitter, VFD and pump affinity laws).
 - Draft errors fixed: CC-CV charge time double-counted the taper charge (now 4.44 h CC + 1.85 h CV = 6.30 h), skin depths of steel at 50 Hz and 10 kHz (cold 3.2 / 0.23 mm, hot 78 / 5.5 mm), STATCOM current direction, UPFC shunt-converter role, anti-islanding time (about 2 s, not a few cycles), thyristor loss in the heater controller, crane quadrant, CC-CV and backup-time key terms, a bank outline that called the pump power law quadratic.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+## au-elec-u5 (Claude correction pass, 21 Nov 2026)
+- The exam course AU3502 has no vehicle-motion-control unit (pipeline/EXAM_ND2026.md: u4 and u5 go beyond AU3502), so no exam subtopic was added; the book follows the packet.
+- Manipal's `where` entry for this unit (Autotronics, unit 2 "Ignition systems") lists ignition, fuel injection, sensors and CAN topics that belong to au-elec-u2, u3, u4 and u6; only its last items (traction control, cruise control, automatic transmission, ABS) belong here. Its unit mapping looks wrong.
+- Draft errors fixed: ACC "average deceleration" 0.42 m/s² that did not settle the gap (now 1.25 m/s² for 4 s), EPS assist of 8 N·m at parking (about a fifth of a real pinion load), ABS "hold" at λ = 0.10 on the band edge, ESP chapter number pointing to the ABS chapter, semi-active damper limit not given in the question, PI quiz answer that could not be computed (b missing).
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
