@@ -539,7 +539,8 @@ def u2L4():
     o.append(module(1.8, 3.8, 1.4, 1.2, .8, 'RF', top='#2F6B5E', left='#173A33', right='#1F4D43', size=16))
     o.append(lab(2.5, 4.4, .8, 'Q = 100', '#BFF5E8', 11, 20))
     o.append(chip(3.9, 3.6, 1.4, 1.4, 'mixer', size=13))
-    o.append(crystal(4.0, 1.2, '1455 kHz', w=1.3))
+    o.append(crystal(4.0, 1.2, '', w=1.3))
+    o.append(lab(6.25, 1.5, 0, 'LO 1455 kHz', '#F1F4F7', 13, 5))
     o.append(module(5.9, 3.8, 1.3, 1.2, .7, 'IF 455', size=13))
     return spec('ec-comm-u2-L4', 'Superheterodyne<br>Receiver<br>&amp; FDM', 'Superheterodyne Receiver &amp; FDM',
                 'Which stage rejects the image?',
@@ -926,7 +927,7 @@ def u5L1():
     for k in range(-4, 5):
         if k:
             s += b.dot(k, 0, ACC2, 4.5)
-    s += b.xt(0, '0') + b.xt(1, 'T') + b.xt(4.2, 't', anchor='end') + b.tx(2.2, .55, 'T = 208.3 µs', ACC2)
+    s += b.xt(0, '0') + b.xt(1, 'T') + b.xt(4.2, 't', anchor='end') + b.tx(4.2, .62, 'T = 208.3 µs', ACC2, anchor='end')
     setup()
     o = [trace([(3.0, 2.4), (3.0, 3.2)]), trace([(4.6, 4.0), (5.4, 4.0)]), pad(5.4, 4.0)]
     for k, b_ in enumerate([1, 0, 1, 1, 0, 1]):
