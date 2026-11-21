@@ -7,9 +7,15 @@
 ## Checker
 
 ```
-ec-comm-u2.html: 8 chapters, 14407 words, 9 figures, 150 KB
+ec-comm-u2.html: 8 chapters, 22647 words, 9 figures, 298 KB
 OK
 ```
+
+## Correction pass (Claude, 21 Nov 2026)
+
+- Every chapter rewritten from the draft; every worked example, quiz answer and trap recomputed in Python.
+- All 25 reviewer notes below fixed (the five [high] ones first); eight figures hand-drawn from the worked examples
+  (pipeline/claude_figs/ec_comm_u2.py); 13 question-bank items with full model answers; cross-unit references named by topic.
 
 ## For the reviewer
 
