@@ -1114,7 +1114,7 @@ COVimep, delay 10.8° and 17.3 mg, flame 14.4° against delay 17.3°, S/V 2.06 c
 FP 7.54 kW and ηm 74.9 %, Willans FP 3.75 kW and ηmech 84.2/57.1 %, density correction 34.27 kW, Otto ratio 1.039,
 NOx 0.078 g/km (30 % over), CO₂ 0.0701/0.0549 kg/MJ (22 % less), CNG 504 MJ = 15.5 L petrol, dual fuel 75 %/75.6 %/72.5 %
 and 33.9/33.0 %, λ 1.39, pumping 1375/250 W (7.5 %), coating ΔT 250/33 K, τ900/τ950 = 2.40, τ900/τ930 = 1.71, PRF 80/90,
-flame 40 m/s at 0.9°: all correct. No college names, unit, chapter or lesson numbers. Book fixes on
+flame 40 m/s at 0.9°: all correct. No college names, unit, chapter or lesson numbers. Book fixes 98850bb on
 claude/project-thread-f4sac2 for main (check_book.py --render OK on u1 … u6, run with the preinstalled Chromium):
 u1 1.7 trap reworded so "80.4" is named as the flat-written error, Figure 1.3.1 crankcase wall broken at the inlet port;
 u2 Figures 2.2.1 and 2.11.1 stroke-dasharray:True → 6 4, Figure 2.11.1 "72°: impossible advance" → "72° from spark to
@@ -1134,15 +1134,15 @@ each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, play
 
 lesson | scene | what's wrong | severity
 --- | --- | --- | ---
-me-ic-u4-L1 | pq/pa (Q3) | the answer uses 35 °C air, 160 °C fins and 55 °C shed air, which the question never gave (they come from the book's fin example, not in this lesson); the question card and narration now give them, and the picture's "duct outside air in" label moved inside the panel | must fix: fixed
-me-ic-u4-L1 | bookfig (16) | "motoring test at 3000 rev/min: indicated power 30 kW": the IP comes from the firing test; now "motoring torque 24 N·m; firing-test IP 30 kW" (same error in the book) | must fix: fixed
-me-ic-u2-L5 | bookfig (16) | "72°: impossible advance" reads as a 72° advance; the advance is 58°; now "72° from spark to peak" (same error in the book) | must fix: fixed
-me-ic-u6-L2 | bookfig (3) | the EGR loop shows "200 kW", a figure of the SCR example (same error in the book) | must fix: fixed
-me-ic-u6-L5 | outro (22) | next card "Next lesson: Engine performance parameters and efficiencies" on the subject's last lesson; now "Revise from the start: History and classification of IC engines", as ec-signals-u6-L3 | must fix: fixed
-me-ic-u5-L1 | pa (Q3), line 3 | "light load also means a weaker mixture" holds for the diesel, not a throttled petrol engine; now "In a diesel, like this one", picture label too (book line fixed) | should fix: fixed
-me-ic-u6-L1 | outro (23) | "every limit is grams per kilowatt hour": cars are limited in g/km; now "every limit comes with its unit and its test", card "g/km OR g/kWh, PER ITS TEST" | should fix: fixed
-me-ic-u1-L3 | hookArt (0) | swapped plug leads: "the engine will not start" is not in the chapter and overstates it (two cylinders still fire); now "the engine shakes and stumbles" | should fix: fixed
-me-ic-u1-L2 | bookfig | Figure 1.3.1 copy draws the crankcase wall unbroken across the inlet port (same error in the book) | should fix: fixed
+me-ic-u4-L1 | pq/pa (Q3) | the answer uses 35 °C air, 160 °C fins and 55 °C shed air, which the question never gave (they come from the book's fin example, not in this lesson); the question card and narration now give them, and the picture's "duct outside air in" label moved inside the panel | must fix: fixed c889d8b
+me-ic-u4-L1 | bookfig (16) | "motoring test at 3000 rev/min: indicated power 30 kW": the IP comes from the firing test; now "motoring torque 24 N·m; firing-test IP 30 kW" (same error in the book) | must fix: fixed c889d8b
+me-ic-u2-L5 | bookfig (16) | "72°: impossible advance" reads as a 72° advance; the advance is 58°; now "72° from spark to peak" (same error in the book) | must fix: fixed 328756c
+me-ic-u6-L2 | bookfig (3) | the EGR loop shows "200 kW", a figure of the SCR example (same error in the book) | must fix: fixed 1869d61
+me-ic-u6-L5 | outro (22) | next card "Next lesson: Engine performance parameters and efficiencies" on the subject's last lesson; now "Revise from the start: History and classification of IC engines", as ec-signals-u6-L3 | must fix: fixed 8489c8a
+me-ic-u5-L1 | pa (Q3), line 3 | "light load also means a weaker mixture" holds for the diesel, not a throttled petrol engine; now "In a diesel, like this one", picture label too (book line fixed) | should fix: fixed b341777
+me-ic-u6-L1 | outro (23) | "every limit is grams per kilowatt hour": cars are limited in g/km; now "every limit comes with its unit and its test", card "g/km OR g/kWh, PER ITS TEST" | should fix: fixed acde05e
+me-ic-u1-L3 | hookArt (0) | swapped plug leads: "the engine will not start" is not in the chapter and overstates it (two cylinders still fire); now "the engine shakes and stumbles" | should fix: fixed 7ab86a2
+me-ic-u1-L2 | bookfig | Figure 1.3.1 copy draws the crankcase wall unbroken across the inlet port (same error in the book) | should fix: fixed f0d3f5d
 me-ic-u3-L1 | notebook | "the lag is chemistry": the book says chemical and physical | cosmetic: later
 me-ic-u3-L3 | hookArt (0) | "a petrol car knocks" where the chapter says may knock | cosmetic: later
 me-ic-u3-L2 / u5-L4 | notebook | COV stability limit 10 % in one, 5 % in the other; both conventions exist and no answer changes | cosmetic: later
