@@ -1,13 +1,13 @@
 # ae-struct-u3: free-model run
 
-- Book: `books/aero/ae-struct/ae-struct-u3.html`
+- Book: `work/ae-struct-u3/tree/books/aero/ae-struct/ae-struct-u3.html`
 - Status: ok
 - Model calls so far: 30 (129,696 tokens in, 282,006 out), 6.8 minutes
 
 ## Checker
 
 ```
-ae-struct-u3.html: 9 chapters, 14963 words, 10 figures, 173 KB
+ae-struct-u3.html: 9 chapters, 21346 words, 10 figures, 234 KB
 OK
 ```
 
