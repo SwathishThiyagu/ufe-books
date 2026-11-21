@@ -779,6 +779,13 @@
 - Conventions: P<sub>b</sub> against E<sub>b</sub>/N<sub>0</sub> throughout, with E<sub>s</sub> = E<sub>b</sub>log<sub>2</sub>M for M-ary schemes; Gray coding with P<sub>b</sub> ≈ P<sub>s</sub>/log<sub>2</sub>M; DPSK P<sub>b</sub> = ½e<sup>−E<sub>b</sub>/N<sub>0</sub></sup>, non-coherent BFSK ½e<sup>−E<sub>b</sub>/2N<sub>0</sub></sup>; MSK tone spacing 1/(2T<sub>b</sub>); DSSS processing gain T<sub>b</sub>/T<sub>c</sub> and jamming margin G<sub>p</sub> − (E<sub>b</sub>/N<sub>0</sub>)<sub>req</sub> − L; OFDM Δf = 1/T<sub>u</sub> with the guard interval added to the symbol time.
 - Kept but not checked against a source this session: the rules of thumb B<sub>c</sub> ≈ 1/(5σ<sub>τ</sub>) and T<sub>c</sub> ≈ 0.423/f<sub>d</sub>; the 99 % bandwidths (about 20.6R<sub>b</sub>, 10.3R<sub>b</sub>, 1.18R<sub>b</sub>) were found by numerical integration, not quoted. The web links were kept from the draft's checked list because the container could not open pages.
 - MIT OpenCourseWare dropped from the sources (university-hosted); pysdr.org and gnuradio.org kept.
+## ec-antenna-u2 (Antenna Fundamentals and Radiation) correction pass, 21 Nov 2026
+
+- Packet unchanged. Its eight subtopics fit the unit; "Receiving antenna, reciprocity and effective area" and "Radiation resistance, efficiency, effective aperture and polarization" share effective aperture, so 2.3 defines A<sub>e</sub> and 2.7 derives Dλ²/4π on the Hertzian dipole and adds effective length, without repeating each other.
+- Conventions used throughout: η = 120π Ω for the medium and η<sub>rad</sub> for radiation efficiency (the draft's unit sections used e<sub>cd</sub>); R<sub>r</sub> = 80π²(l/λ)² only for uniform current, 20π²(l/λ)² for a centre-fed short dipole with triangular current, both referred to the feed; l<sub>eff</sub> = l, l/2 and λ/π for those two and the half-wave dipole; D in 2D²/λ is the largest physical dimension.
+- Far-field rule for small antennas taken as max(2D²/λ, 1.6λ), justified in the text by βr = 10 (induction term a tenth of the radiation term); the book says it is a working rule, since texts differ.
+- Kept but not checked against a source this session: 0.47λ to 0.48λ resonant dipole length, μ<sub>eff</sub> "tens to a few hundred" for rods, 0.5 to 0.7 dish aperture efficiency, the Wheeler cap method in one model answer.
+- NPTEL dropped from the sources (institute-hosted); the other three web sources are the draft's checked links (no web access this session, so no new links were added).
 ## ec-antenna-u5 (RF Circuits and Transceivers) correction pass, 21 Nov 2026
 
 - Packet left unchanged (owner's rule for the communication subjects); no `where` list, so every packet subtopic is covered in full; no chapter added.
