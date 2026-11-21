@@ -49,6 +49,10 @@ def denumber(book, cut):
         t = re.sub(r'\bfor the whole unit\b', 'for the lessons that follow', t)
         t = re.sub(r'\b(covers?|match(?:es)?) this unit\b', r'\1 these lessons', t)
         t = re.sub(r'\b(in|across|of|from|for|throughout) this unit\b', r'\1 these lessons', t)
+        t = re.sub(r'\bthe rest of the unit\b', 'the lessons that follow', t)
+        t = re.sub(r'\bthis unit (assume|use|treat|take)s\b', r'these notes \1', t)   # 'the one this unit assumes' (Microwave)
+        # bare chapter numbers after 'formula of', 'route of', 'guide of' ... (Microwave: 'the formula answer of 1.4')
+        t = re.sub(r'\b(formula|route|answer|guide|example|method|result|design) of (' + NUM + r')\b(?!\.\d)', lambda m: m.group(1) + ' of the chapter ' + q(m.group(2)) if m.group(2) in titles else m.group(0), t)
         t = re.sub(r'\b(?:in|see)\s+' + NUM + r'\b', lambda m: m.group(0).split()[0] + ' ' + q(re.search(NUM, m.group(0)).group(0)) if re.search(NUM, m.group(0)).group(0) in titles else m.group(0), t)
         return t
     cut = re.sub(r'(<a href="#[^"]*">)(' + NUM + r')(</a>)', lambda m: m.group(1) + (q(m.group(2)) if m.group(2) in titles else m.group(2)) + m.group(3), cut)
