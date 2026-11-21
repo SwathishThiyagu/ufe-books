@@ -113,13 +113,13 @@ const SC=[
     +tpW('340,612 380,612')+tpRh(380,520,612)+tpW('520,612 560,612')+tpRv(380,612,658)+tpRv(520,612,658)+tpW('340,658 560,658')+`<circle cx="380" cy="612" r="5" fill="${INK}"/><circle cx="520" cy="612" r="5" fill="${INK}"/><circle cx="380" cy="658" r="5" fill="${INK}"/><circle cx="520" cy="658" r="5" fill="${INK}"/>`
     +tpO(340,612)+tpO(340,658)+tpO(560,612)+tpO(560,658)+tpT(596,650,'Y',{fs:36,c:ORG}))},
 /* worked example, first half */
-{s:2,k:'calc',term:"Worked example",title:"Worked example",say:'Same T network. Open port two: two plus four, so z one one is six ohms, and z two one is four. Open port one: z two two is seven, and z one two is four. The determinant: forty two minus sixteen, twenty six ohms squared.',
+{s:2,k:'calc',term:"Worked example 2",title:"Worked example 2",say:'Same T network. Open port two: two plus four, so z one one is six ohms, and z two one is four. Open port one: z two two is seven, and z one two is four. The determinant: forty two minus sixteen, twenty six ohms squared.',
  cues:{fk:'Same T network',k1a:'Open port two',k1b:'and z two one',k2a:'Open port one',k2b:'and z one two',k3a:'The determinant',k3b:'twenty six ohms'},
  q:['T network: Z₁ = 2 Ω, Z₂ = 3 Ω, Z₃ = 4 Ω (the same one).','Find Z by open-circuit tests, then Δz and Y.'],f:['z₁₁ = V₁/I₁, z₂₁ = V₂/I₁ (I₂ = 0)','Δz = z₁₁z₂₂ − z₁₂z₂₁','y₁₁ = z₂₂/Δz, y₁₂ = −z₁₂/Δz'],hint:'Open for Z; invert the matrix for Y.',fk:'fk',rh:84,fs:32,
  steps:[["Port 2 open",['z₁₁ = 2 + 4 = 6 Ω','z₁₁ = 6 Ω, z₂₁ = 4 Ω'],['k1a','k1b']],["Port 1 open",['z₂₂ = 3 + 4 = 7 Ω','z₂₂ = 7 Ω, z₁₂ = 4 Ω'],['k2a','k2b']],["Determinant",['Δz = 6 × 7 − 4 × 4','Δz = 42 − 16 = 26 Ω²'],['k3a','k3b']],
   ["Diagonal terms",['y₁₁ = 7 / 26 = 0.2692 S','y₁₁ = 0.2692 S, y₂₂ = 6 / 26 = 0.2308 S'],['k4a','k4b']],["Off-diagonal terms",'y₁₂ = y₂₁ = −4 / 26 = −0.1538 S','k5'],["Short-circuit check",['2 + 3 ∥ 4 = 3.7143 Ω','I₁ = 1 / 3.7143 = 0.2692 A = y₁₁ × 1 V ✓'],['k6a','k6b']]],live:[0,1,2]},
 /* worked example, second half */
-{s:2,k:'calc',term:"Worked example (Y)",title:"Worked example",pause:.8,say:'Now invert. y one one is seven over twenty six, zero point two six nine two siemens, and y two two is zero point two three zero eight. Both off-diagonals flip sign: minus zero point one five three eight. The short test agrees.',
+{s:2,k:'calc',term:"Worked example 2 (Y)",title:"Worked example 2",pause:.8,say:'Now invert. y one one is seven over twenty six, zero point two six nine two siemens, and y two two is zero point two three zero eight. Both off-diagonals flip sign: minus zero point one five three eight. The short test agrees.',
  cues:{fk:'Now invert',k4a:'y one one is',k4b:'and y two two',k5:'Both off-diagonals',k6a:'The short test',k6b:'test agrees',a:'test agrees'},
  q:['T network: Z₁ = 2 Ω, Z₂ = 3 Ω, Z₃ = 4 Ω (the same one).','Find Z by open-circuit tests, then Δz and Y.'],f:['z₁₁ = V₁/I₁, z₂₁ = V₂/I₁ (I₂ = 0)','Δz = z₁₁z₂₂ − z₁₂z₂₁','y₁₁ = z₂₂/Δz, y₁₂ = −z₁₂/Δz'],hint:'Swap the diagonal, flip both signs.',fk:'fk',rh:84,fs:32,
  steps:[["Port 2 open",['z₁₁ = 2 + 4 = 6 Ω','z₁₁ = 6 Ω, z₂₁ = 4 Ω'],['k1a','k1b']],["Port 1 open",['z₂₂ = 3 + 4 = 7 Ω','z₂₂ = 7 Ω, z₁₂ = 4 Ω'],['k2a','k2b']],["Determinant",['Δz = 6 × 7 − 4 × 4','Δz = 42 − 16 = 26 Ω²'],['k3a','k3b']],
@@ -160,5 +160,5 @@ const SC=[
  figs:[["The T network as a two-port", "12 V source, 1 Ω load: both arrows point in, so I₂ = −1.5 A."], ["The Z and Y tests", "Port 2 open: z₁₁ = 6 Ω. Port 2 shorted: y₂₁ = −0.1538 S."]],
  note:"Sources your free notes draw on: M. E. Van Valkenburg, Network Analysis; William H. Hayt, Engineering Circuit Analysis (the chapter on two-port networks)."},
 {s:OUT,k:'outro',term:'Outro',say:'So remember: both currents point in, open a port for Z, and short a port for Y. Next time, hybrid and inverse hybrid parameters. See you there!',cues:{f:'So remember',w1:'both currents point',w2:'open a port',w3:'short a port',n:'Next time',s:'See you there'},
- words:[['BOTH ARROWS IN','BLU','w1'],['OPEN FOR Z','ORG','w2'],['SHORT FOR Y','GRN','w3']],next:["NEXT TIME", "Hybrid parameters", "Hybrid (h) and inverse hybrid (g) parameters", "book"],end:'See you there!'}
+ words:[['BOTH ARROWS IN','BLU','w1'],['OPEN FOR Z','ORG','w2'],['SHORT FOR Y','GRN','w3']],next:["NEXT TIME", "Next lesson", "Hybrid (h) and inverse hybrid (g) parameters", "book"],end:'See you there!'}
 ];
