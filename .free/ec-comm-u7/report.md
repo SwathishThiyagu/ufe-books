@@ -1,13 +1,13 @@
 # ec-comm-u7: free-model run
 
-- Book: `books/ece/ec-comm/ec-comm-u7.html`
+- Book: `work/ec-comm-u7/tree/books/ece/ec-comm/ec-comm-u7.html`
 - Status: ok
 - Model calls so far: 38 (157,720 tokens in, 331,328 out), 8.7 minutes
 
 ## Checker
 
 ```
-ec-comm-u7.html: 9 chapters, 16980 words, 10 figures, 171 KB
+ec-comm-u7.html: 9 chapters, 24295 words, 10 figures, 249 KB
 OK
 ```
 
@@ -40,3 +40,11 @@ OK
 - ch 9 [high] Lead: The lead says all three codes 'sit within a fraction of a decibel of the Shannon limit'. BCH codes are a few dB from capacity, as the chapter's own table in Section 4 states, so the lead contradicts the table and overstates BCH.
 - ch 9 [high] Section 1, second paragraph: The superscripts are lost, so the text reads 'GF(2m), a field with 2m elements' and 'α, α², …, α2t'. A field with 2m elements is not what the construction gives; the field has 2^m elements, and the roots run to α^(2t). A student would misread both.
 - ch 9 [low] Section 1, third paragraph: 'Two standard codes exist here' is not true: with m = 4 the length-15 BCH family also contains the t = 1 code (15,11), which is the Hamming code, and the (15,1) code.
+
+## Claude correction pass (21 Nov 2026)
+
+- Every worked example, quiz answer and bank answer recomputed in Python (entropy, Huffman and Shannon-Fano lengths and efficiencies, BSC mutual information and capacity, Shannon-Hartley, repetition error rates, Hamming (7,4) encode and syndromes, cyclic division and shift register, convolutional encoding and full Viterbi trellises, union bound).
+- All reviewer notes checked; the exponent, garbled-inequality and wrong-hardware notes were already fixed in the revision; the remaining ones (capacity "error-free", missing power constraint, BEC derivation pointer, lead claims, wrong-sign trap) fixed here.
+- Formulas longer than one line showed raw sub/sup tags in the draft book; rewritten in Unicode.
+- New worked examples: Nyquist-sampled 4-level source (1.811 bits, 14.5 kbit/s); Shannon-Fano vs Huffman (2.31 vs 2.30 bits/symbol); BSC with unequal input (0.456 bit); bandwidth vs power (4.00, 6.17, 4.95, 21.6 Mbit/s). Cyclic example now decodes a concrete received word; Viterbi example has the full trellis table.
+- All 9 figures redrawn by hand from each chapter's own example; 13 bank questions have model answers.
