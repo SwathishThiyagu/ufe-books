@@ -1,4 +1,4 @@
-# Correction queue: three ECE communication subjects (DeepSeek drafts started 21 Nov 2026, 11:09 IST)
+# Correction queue: three ECE communication subjects (DeepSeek drafts finished 21 Nov 2026, 11:39 IST: all 19 ok, chapters match the packets)
 
 One Opus-high thread per line, in this order (most needed first). Each follows `pipeline/CORRECTION_BRIEF.md` exactly, with the unit, branch and out path below, and these differences:
 
@@ -6,6 +6,7 @@ One Opus-high thread per line, in this order (most needed first). Each follows `
 - Students take these as Analog Communication (ec-comm units 1 to 4), Microwave (ec-antenna unit 4, then unit 1) and Optical Communication (all of ec-optical). Never write a course code, college or university name in a book.
 - Run every number in the "Calculations to run" column in Python (show nothing of the script in the book), and fix the text, the figure and the question bank wherever a value differs.
 - Model answers: until `pipeline/topicbook_sample/answers.py` is on main, use the standard already used for the Signals books: "Points to cover" (the old outline), then a numbered "Model answer" with full working tables, the book's own notation, a closing numeric check, 360 to 990 words by marks, every number computed; give the question-bank item an `"answer"` list (render.py supports it).
+- Every draft's `.free/<unit>/report.md` has no "serious" flag but carries 19 to 36 reviewer notes, several marked [high] (wrong numbers in worked examples, quiz answers and exam traps). Fix every reviewer note, [high] first, then do the full pass: the notes are a start, not the whole list.
 - If the draft branch is missing or its `.free/<unit>/report.md` says the run failed, write the whole book to `pack/WRITER.md` from the packet, using any chapter states only as material.
 
 | Unit | Draft branch | Out path | Calculations to run |
