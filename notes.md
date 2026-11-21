@@ -772,6 +772,13 @@
 - Kept but not checked against a source this session: "about 2 dB" soft-decision gain (Beyond the syllabus only), DVB-S2 roll-off menu, PAM4 in 400G Ethernet.
 - MIT OpenCourseWare dropped from the sources (university-hosted).
 
+## ec-comm-u6 (Claude correction pass, 21 Nov 2026)
+
+- Packet left unchanged (owner's rule for the communication subjects); every packet subtopic is covered in full and no chapter was added. Spectral density comparison, m-sequences, FH processing gain, coherence bandwidth and time, Rayleigh fading and diversity were added inside the existing chapters.
+- Packet note: one of the unit's `where` entries lists the topics of a whole first communication-systems course (unit 1 of that course) rather than passband modulation topics, so it gives no useful coverage signal for this unit.
+- Conventions: P<sub>b</sub> against E<sub>b</sub>/N<sub>0</sub> throughout, with E<sub>s</sub> = E<sub>b</sub>log<sub>2</sub>M for M-ary schemes; Gray coding with P<sub>b</sub> ≈ P<sub>s</sub>/log<sub>2</sub>M; DPSK P<sub>b</sub> = ½e<sup>−E<sub>b</sub>/N<sub>0</sub></sup>, non-coherent BFSK ½e<sup>−E<sub>b</sub>/2N<sub>0</sub></sup>; MSK tone spacing 1/(2T<sub>b</sub>); DSSS processing gain T<sub>b</sub>/T<sub>c</sub> and jamming margin G<sub>p</sub> − (E<sub>b</sub>/N<sub>0</sub>)<sub>req</sub> − L; OFDM Δf = 1/T<sub>u</sub> with the guard interval added to the symbol time.
+- Kept but not checked against a source this session: the rules of thumb B<sub>c</sub> ≈ 1/(5σ<sub>τ</sub>) and T<sub>c</sub> ≈ 0.423/f<sub>d</sub>; the 99 % bandwidths (about 20.6R<sub>b</sub>, 10.3R<sub>b</sub>, 1.18R<sub>b</sub>) were found by numerical integration, not quoted. The web links were kept from the draft's checked list because the container could not open pages.
+- MIT OpenCourseWare dropped from the sources (university-hosted); pysdr.org and gnuradio.org kept.
 ## ec-antenna-u2 (Antenna Fundamentals and Radiation) correction pass, 21 Nov 2026
 
 - Packet unchanged. Its eight subtopics fit the unit; "Receiving antenna, reciprocity and effective area" and "Radiation resistance, efficiency, effective aperture and polarization" share effective aperture, so 2.3 defines A<sub>e</sub> and 2.7 derives Dλ²/4π on the Hertzian dipole and adds effective length, without repeating each other.
