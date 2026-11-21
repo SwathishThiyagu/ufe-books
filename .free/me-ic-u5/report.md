@@ -1,13 +1,13 @@
 # me-ic-u5: free-model run
 
-- Book: `books/mech/me-ic/me-ic-u5.html`
+- Book: `work/me-ic-u5/tree/books/mech/me-ic/me-ic-u5.html`
 - Status: ok
-- Model calls so far: 33 (127,469 tokens in, 271,784 out), 6.1 minutes
+- Model calls so far: 33 (127,469 tokens in, 271,784 out), 6.3 minutes
 
 ## Checker
 
 ```
-me-ic-u5.html: 8 chapters, 15511 words, 9 figures, 156 KB
+me-ic-u5.html: 8 chapters, 22936 words, 10 figures, 223 KB
 OK
 ```
 
