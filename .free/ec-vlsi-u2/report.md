@@ -2,14 +2,18 @@
 
 - Book: `books/ece/ec-vlsi/ec-vlsi-u2.html`
 - Status: ok
-- Model calls so far: 29 (110,320 tokens in, 242,396 out), 7.0 minutes
+- Model calls so far: 29 (110,320 tokens in, 242,396 out), 7.2 minutes
 
 ## Checker
 
 ```
-ec-vlsi-u2.html: 8 chapters, 14752 words, 9 figures, 154 KB
+ec-vlsi-u2.html: 8 chapters, 24714 words, 10 figures, 237 KB
 OK
 ```
+
+## Correction pass (21 Nov 2026, Claude)
+
+- Every example, quiz and bank answer traced; every reviewer flag below checked and fixed in the text; figures redrawn by hand; 14 full model answers.
 
 ## For the reviewer
 
