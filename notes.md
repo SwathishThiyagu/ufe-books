@@ -951,3 +951,11 @@
 - Facts corrected from the draft: capacity now includes the volume below the lowest contour; HE doubling statement tied to the gradient, not the angle; valley floor (not sides) rises upstream; HI booking check extended to the intermediate sights; the arithmetic checks no longer claimed to catch misread readings; prismoidal rule given in its standard contour form (odd number of contours).
 - Kept but not checked against a source this session: the 1/7 refraction factor and 6370 km radius (standard textbook values); the permissible-error constant is given only as C√K with the value set by the specification.
 - Sources: four Wikipedia pages and the Survey of India note on the vertical datum, all opened this session; Punmia, Duggal, Basak, Subramanian and Ghilani and Wolf as textbooks.
+
+## ae-struct-u1 (correction pass, 21 Nov 2026)
+
+- Packet unchanged; all 10 subtopics were in the draft, so no chapter was added. queue.json says 9 subtopics for this unit; the packet has 10 (stress analysis of fuselage and tail unit was added for AE3501).
+- AE3501 exam topics covered: loading and analysis of wing, fuselage and tail unit (shear and moment on the wing, pressure plus bending on the fuselage, tail balancing load, fin torque); use of the V-n diagram for sizing wing, fuselage and tail. The subtopic id still reads "v-n-diagram-and-its-use-in-wing-sizing" though the chapter now covers fuselage and tail sizing too.
+- Facts corrected from the draft: n<sub>max</sub> is flat from V<sub>A</sub> to V<sub>D</sub> for transport aircraft (the draft's reviewer said it falls to 2.0 at V<sub>D</sub>, which is wrong); n<sub>min</sub> is −1 to V<sub>C</sub> then rises to 0 at V<sub>D</sub>; taper lowers the root bending moment; the torsion box resists twist through its enclosed area; leading and trailing edge order; stringer and longeron roles.
+- Kept but not looked up this session (well known, from memory): CS-25 limit load factors 2.5 (or 2.1 + 24 000/(W+10 000) lb) and −1.0; design gust velocities about 20/15/7.5 m/s EAS at V<sub>B</sub>/V<sub>C</sub>/V<sub>D</sub>; material property values in the specific-strength table.
+- Sources: MIT OpenCourseWare link dropped (university-hosted); FAA, EASA and NASA kept.
