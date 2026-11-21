@@ -1,0 +1,63 @@
+# ei-sensor-u6: free-model run
+
+- Book: `books/eie/ei-sensor/ei-sensor-u6.html`
+- Status: ok
+- Model calls so far: 38 (151,304 tokens in, 267,836 out), 7.2 minutes
+
+## Checker
+
+```
+ei-sensor-u6.html: 10 chapters, 17610 words, 11 figures, 182 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [low] Section 1, formula block: The attenuation formula Vout = Vin × R₂/(R₁+R₂) is dropped into the amplification formula set before attenuation is introduced in the text, and it never says the output is taken across R₂. A student can misread it as part of the amplifier gain.
+- ch 1 [low] Section 2, second paragraph: "That removes 50 Hz hum" overstates what a 15.9 Hz first-order filter does; the same section later shows the hum is only cut to 0.303 of its value (about -10.4 dB).
+- ch 1 [low] Figure, chain and output node: The chain is 2 mV × gain 500 = 1.0 V, then filter, lineariser and isolator, yet the output node is labelled 0-5 V. No block in the drawn chain supplies the extra gain of about 5, so the numbers do not close.
+- ch 1 [low] Section 3, opening lines: "Attenuation and impedance matching also belong here" contradicts Section 1, which already covered both; the reader is left unsure which section owns them.
+- ch 2 [high] Section 2, last sentence: The Nyquist sentence is broken: 'the highest frequency present in that channel must stay below half its own sample rate: f_max Chapter 6.10.' A formula is missing and a chapter reference has been pasted into the sentence, so the student never sees the actual condition.
+- ch 2 [high] Exam traps, fourth bullet: It says the sample-and-hold 'removes aperture error'. It cannot: the aperture uncertainty belongs to the sample switch itself, and Section 3 and Q6 both say a changing input still gives an error of (rate of change) × (aperture time). The trap contradicts the chapter's own definition.
+- ch 2 [low] Section 3, flash ADC bullet: 'One comparator per code level' is loose: an n-bit flash converter needs one comparator per decision level, which is 2ⁿ − 1 comparators, not 2ⁿ.
+- ch 2 [low] Exam traps, second bullet: 'it doubles the resolution figure' is ambiguous — the reader cannot tell whether this refers to the wrong 5 V span or to the correct 10 V span, and which figure is doubled.
+- ch 2 [low] Section 3, first paragraph: 'Slow converters on fast signals make this compulsory.' is unclear about what 'this' is and in which direction the rule runs.
+- ch 2 [low] Section 3, architecture paragraph: 'Three architectures carry these blocks into the field' comes straight after three converter architectures (SAR, flash, sigma-delta), so the reader briefly expects more converter types rather than system packaging.
+- ch 3 [high] Figure (node 'Cable', note 'up to 700 Ω'): The figure labels the cable block as 'up to 700 Ω', but 700 Ω is the maximum total loop resistance and it includes the 250 Ω sense resistor that appears as the next block. As drawn, a student reads that the cable alone may be 700 Ω, which contradicts the worked example and the exam trap saying R_loop,max counts cable both ways plus the sense resistor. The aria text ('up to 700 ohms total') also disagrees with the node note.
+- ch 3 [low] Exam traps, item 5: 'Do not treat 4 mA as a measurement offset in the wire; the subtraction happens in software at the receiver' reads as if 4 mA is not an offset at all, while the section just defined live zero as exactly that. A student can carry away the wrong idea.
+- ch 3 [low] Beyond: 'Burden voltage' is listed in the industry searches but is never defined anywhere in the chapter, so a reader meeting the term cold has nothing to attach it to.
+- ch 4 [low] Section 2, hydraulic cylinder comparison: The claim 'about 28 times the pneumatic force at the same bore' only appears if you divide the hydraulic theoretical force (29.4 kN) by the pneumatic usable force after 0.9 efficiency (1060 N). Comparing theoretical with usable force is not fair, and the clean pressure ratio is 150/6 = 25.
+- ch 4 [low] Section 3 table, hydraulic force row: The table gives 'about 20 kN' for a 50 mm bore hydraulic cylinder, but the worked calculation in Section 2 gives 29.4 kN at 150 bar. 20 kN is the value only at the bottom of the range (100 bar). A student checking the table against the example sees a mismatch.
+- ch 4 [low] Section 1, description of the 5/2 valve: The text says an electrical signal shifts the spool 'so it is an electro-pneumatic actuator'. The valve is the control element; the cylinder is the actuator. Section 3 and the figure caption call the valve an 'interface', which contradicts this sentence.
+- ch 4 [low] Section 3 table, cleanliness row: The row compares unlike things: 'clean' is a property of air, while 'leakage risk' is a hazard of oil. It also hides that air systems produce condensate and oil mist.
+- ch 5 [high] Section 1 (solenoid, force-stroke curve): The force-stroke relation is stated backwards. A solenoid's magnetic force is largest when the air gap is small, that is when the plunger is nearly or fully seated, and falls as the gap opens. The chapter says force is largest with the open gap, which contradicts standard machine theory and also contradicts the Q2 answer, where holding needs less current because the seated gap is small.
+- ch 5 [low] Section 3 (DC motor, opening sentences): "Current in the field flux produces torque" is unclear; current flows in the armature, not in the flux, and a student may not see which current is meant.
+- ch 5 [low] Section 2 (relay, solid-state relay): "replaces the armature with an LED and a light-sensitive triac" suggests the LED and triac sit where the armature was. In an SSR the LED is the input side and the photo-triac is the output side, coupled by light.
+- ch 6 [low] Section 3 (lead screw) and Exam trap 4: The chapter defines pitch as the linear distance travelled in one revolution. Standard textbooks define pitch as the axial distance between corresponding points on adjacent threads; the distance travelled in one revolution is the lead (lead = pitch × number of starts). The numbers are right only because a single-start screw is assumed, but a student can carry the wrong definition to a multi-start screw.
+- ch 6 [low] Section 3 and Exam trap 3 (speed formula): The speed formula n = f/N and v = f p/N is used without saying that N must be the steps per revolution of the drive mode actually used. In half-step mode a 1.8° motor has 400 steps per revolution, so using N = 200 with the same pulse rate gives double the true speed. A student can lose marks here.
+- ch 6 [low] Quiz Q4 (model answer): "At low speed the available torque exceeds pull-in torque, so it starts" compares the motor's own torque with a torque limit. Pull-in torque is the load limit at that pulse rate; the correct comparison is between the load torque and the pull-in torque. As written, the answer can be reproduced by students as a wrong statement.
+- ch 7 [high] Section 3 (electrostatic actuation), pull-in paragraph: The pull-in condition is stated backwards. For a linear spring the instability occurs when the plate has moved one third of the initial gap, so the remaining gap is two thirds of the initial gap, not one third.
+- ch 7 [high] Worked example 1, step 5 and answer: Step 5 uses the wrong pull-in rule: g/3 = 0.667 µm. With g0 = 2 µm the plate pulls in after moving 1/3 of the gap, leaving 2/3 of the gap.
+- ch 7 [high] Exam traps, fourth trap: Trap says pull-in is at one third of the initial gap, not half. Wrong number: pull-in displacement is one third; the remaining gap at pull-in is two thirds.
+- ch 7 [high] Quiz Q4 answer: The answer states the threshold as 'past g/3', i.e. remaining gap one third, which contradicts the standard pull-in result.
+- ch 7 [high] Figure (note and aria text): The figure states 'pull-in at g/3' and 'pull-in at one third of the gap', which is the wrong threshold.
+- ch 7 [low] Section 3, energy sentence: 'The force is the derivative of energy with gap' is loose: at constant voltage the force is +∂U/∂x (the source supplies work); at constant charge it is −∂U/∂x. Students meeting this for the first time can get the sign wrong.
+- ch 7 [low] Section 3 and Quiz Q4 answer, spring comparison: Saying the spring force 'rises as g' is confusing: the spring force rises as the gap falls, i.e. with displacement x = g0 − g, not with g itself.
+- ch 7 [low] Section 4, last line of first paragraph: The cross-reference 'for coils at macro scale see 6.5' is written as plain text, so it will not be a working link in the book.
+- ch 7 [low] Lead: Accelerometers are listed among the applications of micro actuators, but an accelerometer is a sensor; only its electrostatic self-test uses an actuator. On a phone screen a student may read it as an actuator application.
+- ch 8 [high] Section 1, sensitivity paragraph: The claim "A 1% change in Rx gives about 1% of the full bridge voltage" is wrong by about a factor of four. With one active arm, a small fractional change ΔR/R gives a detector output of roughly (V/4)·(ΔR/R). For the equal-arm case, a 1% change in Rx gives about 0.25% of the supply voltage, not 1%. Even with the chapter's own worked-example values (R1=100, R2=200, R3=150, Rx=300 changed to 303) the shift is only 0.24% of the supply.
+- ch 8 [low] Section 4, choosing the bridge: "A Wheatstone bridge cannot measure an inductor because its balance is real" is too terse. A student can read "its balance is real" as meaning the bridge is accurate, rather than that the balance equation contains only real terms.
+- ch 8 [low] Section 3 (Hay bridge) and Quiz Q5: The chapter never states the Hay-bridge relation Q = 1/(ωR1C1). Without it, the statements "for Q > 10 the correction term is small" and "1/(1 + ω²R1²C1²) is close to 1 at high Q" cannot be checked by the student.
+- ch 8 [low] Figure 6.8 (bridge diagram): The caption and aria say the source drives A and D, but the graph has no source edge or source label between A and D, so the drawn figure shows only the four arms and the detector.
+- ch 9 [high] Section 2, pre-amplifiers, third and fourth sentences: The text first says the pre-amplifier must have high input impedance so it does not load the sensor, then says 'It should match the source impedance and the cable impedance to reduce reflections and pickup'. Impedance matching means the input impedance equals the source impedance, which loads the sensor, halves its output, and destroys the high-impedance rule just stated. Impedance matching is an RF/cable-termination idea, not a general sensor pre-amplifier rule.
+- ch 9 [high] Section 3, second paragraph, definition of isolation voltage: The text calls isolation voltage 'the highest voltage the barrier can withstand continuously' and then says it is tested with 'a much higher transient voltage for a short time'. This is backwards, and it contradicts the chapter's own exam trap. In datasheets the isolation voltage is the short-duration proof/test voltage (commonly quoted for 1 minute, for example 2500 V rms); the continuous limit is the working voltage, which is much lower.
+- ch 9 [low] Section 1, notch filter sentence: 'used to remove 50 Hz mains pickup picked up by long sensor leads' repeats 'pickup' and reads awkwardly.
+- ch 9 [low] Lead paragraph, second sentence: 'a large unwanted component' is vague; a student may not know whether this means offset, drift or mains interference.
+- ch 10 [high] Section 2 (CRO), ×10 probe sentence: The sentence says the ×10 probe "multiplies the input by ten before the attenuator", which is backwards: a ×10 probe attenuates the signal, dividing it by ten, so the scope sees one tenth of the true voltage. As written it contradicts the later exam trap and would make a student divide instead of multiply.
+- ch 10 [low] Section 2 (CRO), plate description: "The vertical pair moves the beam up and down" can confuse a student, because the plates that deflect the beam vertically are physically mounted one above the other, not vertically.
+- ch 10 [low] Section 3 (DSO) and Worked example 1, step 5: "Record" is used for the captured time in seconds, while "record length" in standard scope usage means the number of stored samples N. The same chapter uses "memory of depth N samples" and "record length follows from the setting", so the naming shifts under the student.
+- ch 10 [low] Exam traps, fourth trap: "Volts per division includes the probe" reads as if the V/div setting already accounts for the probe, which is the opposite of what the calculation that follows does.
