@@ -1,13 +1,13 @@
 # ch-thermo-u6: free-model run
 
-- Book: `books/chem/ch-thermo/ch-thermo-u6.html`
+- Book: `work/wt-u6/books/chem/ch-thermo/ch-thermo-u6.html`
 - Status: ok
-- Model calls so far: 20 (90,103 tokens in, 207,067 out), 6.3 minutes
+- Model calls so far: 20 (90,103 tokens in, 207,067 out), 6.4 minutes
 
 ## Checker
 
 ```
-ch-thermo-u6.html: 7 chapters, 15357 words, 8 figures, 166 KB
+ch-thermo-u6.html: 7 chapters, 23066 words, 8 figures, 238 KB
 OK
 ```
 
