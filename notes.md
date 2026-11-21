@@ -650,6 +650,11 @@
 - The whole book uses one convention (Lewis S_b = σ_b b m Y with Y = 0.484 − 2.87/z, C_v = 3/(3 + v) for spur and 5.6/(5.6 + √v) for helical, Buckingham F_d with C = 11 400 N/mm², wear S_w = b Q d_1 K with K = 0.16(BHN/100)², bevel (1 − b/R) and 0.75/cos γ_1 forms, worm η with α_n); the draft mixed conventions between chapters.
 - Packet data: three `where` entries give the whole course (failure theories to gears) as unit 1 with an empty unit title, and one more has an empty title; the packet `out` path is stale (03_Books/...).
 
+## ee-pe-u5 (Claude correction pass, 21 Nov 2026)
+- The packet has the same six subtopics as the draft, so no chapter was added.
+- Matrix converters are tagged for two courses whose `where` entries do not list them: EE3591 unit 5 ("Ac Phase Controllers") covers only TRIAC triggering, TRIAC phase controllers and SCR controller configurations, and the 21EIC402J entry is its converters unit, which is mostly rectifier topics from the controlled-rectifier unit plus the cycloconverter.
+- Packet data: the EEPC19 `where` entry has an empty unit title; the ECE 4464 entry is the whole course listed as unit 1 with the title "Total Number of contact hours"; the packet `out` path is stale (03_Books/...); queue.json holds the right one.
+- The two MIT OCW sources were dropped from the further-reading list (university-hosted).
 ## ee-pe-u2 (Claude correction pass, 21 Nov 2026)
 - The packet now has 10 subtopics; the two new ones (voltage doubler and three-phase diode bridge rectifiers; inversion mode and the inverter angle limit) are chapters 2.3 and 2.8. The draft's chapters moved: 2.3 to 2.4, 2.4 to 2.5, 2.5 to 2.6, 2.6 to 2.7, 2.7 to 2.9, 2.8 to 2.10.
 - EE3591 puts this material in its unit 4 "Controlled Rectifiers" (1, 2, 3 and 6-pulse converters, displacement factor, ripple and harmonic factor, power factor mitigation, performance parameters, source inductance, inverter angle limit, dual converter). That unit's list also starts with "SCR two transistor analogy based turn-ON, turn ON losses, thermal protection", which are device topics taught in the u1 book, not here. Power factor mitigation is covered with extinction angle, symmetrical angle, PWM and sequence control.
