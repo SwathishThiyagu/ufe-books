@@ -50,3 +50,9 @@ OK
 - ch 9 [low] Section 3: 'The estimate drifts because current offset and capacity fade accumulate' mixes two different effects: current offset and gain error cause accumulating drift, while capacity fade is a scale error from a stale C_n, not drift.
 - ch 9 [low] Quiz Q4: The question says the counter reads 0 A at rest, which rules out a static offset at rest, yet the answer gives 'current offset' as a cause; the premise and the answer do not fit together cleanly.
 - ch 9 [low] Section 3 and Quiz Q7: SOF is defined using only present SOC and temperature. Power capability also falls as the pack ages, so SOH belongs in the definition; as written, a student can miss that dependence.
+
+## Correction pass (Claude, 21 Nov 2026)
+
+- Chapters renumbered to the exam packet (12): new 3.1 automotive microelectronics, 3.10 fluid-mechanical actuators, 3.11 electrical machines and duty types; the draft's 1–8 are now 2–9 and its 9 is 12.
+- Every example and quiz answer traced; second worked examples in 3.3–3.9; reviewer flags fixed; all 12 figures hand-drawn (pipeline/claude_figs/au_elec_u3.py).
+- 16 long questions with full model answers; cross-chapter references named by topic; NPTEL and Arduino links dropped.
