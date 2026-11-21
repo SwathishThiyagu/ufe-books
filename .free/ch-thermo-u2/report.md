@@ -1,8 +1,15 @@
 # ch-thermo-u2: free-model run
 
-- Book: `books/chem/ch-thermo/ch-thermo-u2.html`
-- Status: error
+- Book: `work/ch-thermo-u2/tree/books/chem/ch-thermo/ch-thermo-u2.html`
+- Status: ok
 - Model calls so far: 24 (102,177 tokens in, 193,748 out), 7.9 minutes
+
+## Checker
+
+```
+ch-thermo-u2.html: 5 chapters, 17908 words, 7 figures, 190 KB
+OK
+```
 
 ## For the reviewer
 
