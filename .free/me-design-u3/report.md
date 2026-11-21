@@ -1,13 +1,13 @@
 # me-design-u3: free-model run
 
-- Book: `books/mech/me-design/me-design-u3.html`
+- Book: `work/me-design-u3/tree/books/mech/me-design/me-design-u3.html`
 - Status: ok
 - Model calls so far: 20 (77,438 tokens in, 198,964 out), 6.6 minutes
 
 ## Checker
 
 ```
-me-design-u3.html: 5 chapters, 11193 words, 6 figures, 110 KB
+me-design-u3.html: 6 chapters, 19367 words, 7 figures, 176 KB
 OK
 ```
 
@@ -45,3 +45,11 @@ OK
 - ch 5 [high] Section 2 (uniform wear and uniform pressure): The sentence says the lining wears fastest where pressure × sliding speed is largest, 'which is at the inner radius'. Sliding speed is ωr, so pressure × sliding speed grows with radius. A new, nearly uniformly loaded face wears fastest at the OUTER radius. That is exactly why the face redistributes until p × r is constant, leaving the highest pressure at the inner radius. The sentence also contradicts the chapter's own Quiz Q2 answer, so a student gets two opposite statements.
 - ch 5 [high] Worked example 1, step 9 (and the answer 11.8 kJ): Step 9 says 'the torque falls from its peak to zero as the speeds equalise'. Under a constant spring force the friction torque stays roughly constant; it is the relative speed Δω that falls from 600 rpm to zero. With constant torque the fall in Δω is linear, so the mean Δω is Δω₀/2 and the heat per engagement is about half the quoted value. The stated 11.8 kJ is therefore roughly double the correct estimate, and the reason given for calling it an estimate is wrong.
 - ch 5 [low] Section 1 (plate counting) versus Section 2 (n = 2): Section 1 says 'p plates give p − 1 rubbing pairs', which read literally gives zero pairs for a single-plate clutch, while Section 2 and the example say a single-plate clutch has n = 2 rubbing pairs. The p − 1 rule only holds when the flywheel and pressure-plate faces are counted as plates too.
+
+## Correction pass (21 Nov 2026, Claude)
+
+- Every chapter rewritten from the draft for the ME3591 exam course; every worked example, quiz and bank number recomputed in Python.
+- Reviewer flags all closed: ch 1 design point on the side where bending and axial compression add; ch 2 unbalance response y = e r²/(1 − r²) and the mm-trap direction; ch 3 top clearance, splines that slide only with a sliding fit, hub keyway crushing; ch 4 flange coupling wording, bushed-pin bending check, no fixed 3000 rpm threshold; ch 5 outer-edge wear, mean slip speed (5.9 kJ, not 11.8 kJ), pair counting.
+- Added: shaft/axle, belt and gear loads, equivalent bending moment, ASME shock factors and allowable stress (ch 1); torsional rigidity design and Dunkerley with the shaft's own mass (ch 2); key types, key proportions, key as strong as the shaft, Moore's factor, spline torque (ch 3); muff, clamp and protected flange proportions, full flange coupling design, bushed-pin design (ch 4); new ch 6 connecting rods and crankshafts (exam subtopic).
+- Six hand-drawn figures from the chapters' own examples; 15 long questions with full model answers.
+- Unit numbers of other units, carets, underscores, MIT and NPTEL links removed; web reading list limited to pages opened.
