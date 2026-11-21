@@ -3,7 +3,7 @@
 const PR={dB:'dˌiˈbi', dBm:'dˌibˌiˈɛm', CNR:'sˌiˌɛnˈɑɹ', RIN:'ˌɑɹˌIˈɛn', APD:'ˌAˌpiˈdi', LED:'ˌɛlˌiˈdi'};
 const P=k=>`[${k}](/${PR[k]}/)`;
 const BOOKVARS="--bg:#f6f7fb;--panel:#ffffff;--ink:#18203a;--muted:#5b6482;--line:#dde1ec;--line2:#b9c0d4;--accent:#2f3fa8;--accent-ink:#ffffff;--accent-soft:#e6e9fb;--live:#b35c00;--live-soft:#fff1df;--next:#1f7a5a;--next-soft:#e2f4ec;--fig:#fbfbfe;--ring:rgba(24,32,58,.18);--display:\"Bricolage Grotesque\",\"Segoe UI\",system-ui,sans-serif;--body:\"IBM Plex Sans\",\"Segoe UI\",system-ui,sans-serif;--mono:\"IBM Plex Mono\",ui-monospace,\"Cascadia Mono\",Consolas,monospace";
-const META={n:1, subject:"ec-optical", title:'Point-to-point links and the power budget', badge:'Lesson', kick:"OPTICAL FIBER COMMUNICATION",
+const META={n:1, subject:"ec-optical", title:'Point-to-point links and the power budget', badge:'Lesson', kick:"OPTICAL FIBER COMMUNICATION · POINT-TO-POINT LINKS AND POWER BUDGET",
   series:'University free n easy', big:'BUDGET', star:'Starring: the spare margin!',
   parts:["Point-to-point links", "Link power budget"],
   chips:[["POINT-TO-POINT", "LINKS"], ["LINK POWER", "BUDGET"]]};
