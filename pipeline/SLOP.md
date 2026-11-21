@@ -1400,3 +1400,39 @@ figures); u5-L3 Q2 has its givens; u6-L3 next card kept. Clean: u1-L1, u2-L2, u2
 u5-L1, u6-L2. Patterns: split bookfig halves cut a circuit or block diagram where the split line runs through a loop
 (u1-L3, u5-L3, u6-L3); the figs-note generator cut source titles at commas and kept chapter notes; an example's target
 value is printed where the chosen design's value belongs (12.5 against 12.3 mm).
+
+## Antennas, RF and Microwave Engineering fact review (Nov 2026)
+
+Audited 21 Nov 2026: the 7 lessons on the branches lesson/ec-antenna-u4-L1 … L3 and lesson/ec-antenna-u1-L1 … L4, every
+scene's narration and on-screen text against the library books books/ece/ec-antenna/ec-antenna-u4.html and
+ec-antenna-u1.html on main, each lesson's sheet once. Recomputed in python every worked example, model answer, trap, picture
+number and recap number: RL 13.98 dB, IL 0.92 dB, magic tee 9 W / 1 W, coupler 19.54 dBm, 6.02 dB, 74 %; 25.12 mW,
+10.99 dBm, circulator 9.5 / −15 dBm, duplexer 45.5 / 45.0 / 35 dBm, klystron v0 2.054e7 m/s, βi 0.939, θ0 36.70 rad,
+V1 128.2 V, 21 W; Gunn L 10 µm, n0L > 1e12 cm⁻², η 2.5 %, slotted line S 2.5, |Γ| 0.429, λg 39.8 mm, f 9.99 GHz,
+tan 54.27° = 1.390, zL 0.896 − j0.892, MIM 6024 µm²; Z0 50 Ω, vp 2e8 m/s, WE2 50.0∠−0.14°, 1.09 dB, Γ 0.4 + j0.2,
+VSWR 2.62, Vmax 0.037λ, Vmin 0.287λ; Zin 50 − j50, +j68.8 Ω / 10.95 nH, −j36.3 Ω / 4.38 pF, 70.71 Ω, band 1.46–3.34 GHz,
+stub d 0.1988λ / 0.375λ; Smith WTG 0.463 / 0.162 / 0.199, εeff 3.32, Z0 50.8 Ω, W 3.06 mm, W/h = 2 bracket 4.218,
+48.9 Ω; fc10 6.56 GHz, λg 3.98 cm, 5 modes at 18 GHz, f101 9.965 GHz, Rs 0.0260 Ω, Q0 7821, QL 100, Qe 125. Every "Don't
+write" is false under each common convention and every stated wrong result is what the mistake gives. Book fixes 3ef3b65
+(check_book --render OK on both): u4 4.8 WE1 tan 54.27° = 1.390 (was 1.392) and j3.475; u1 1.6 bracket 0.825 / 4.218
+(the denominator stays 7.709 = √3.34 × 4.218 as printed; 7.711 only with the unrounded εeff 3.3425; Z0 48.9 Ω either
+way); u1 1.1 trap now says the total L with the per-metre C gives √20 too large; u1 1.1 duplicate "An infinite line has
+no backward wave…" paragraph removed; u1 Fig 1.4.1 label backgrounds made taller so the f0 subscripts sit inside them
+(the width was already enough). Fixed lessons rebuilt with --revoice (u4, one line each) or --reuse (u1-L2); each --check
+OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text outside the safe area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-antenna-u4-L1 | notebook (Three kinds of tee) | "No lossless three-port is matched everywhere": drops "reciprocal", and the circulator is a lossless three-port matched at every port; now "No lossless reciprocal three-port", as the book and the card say | must fix: fixed 529378d
+ec-antenna-u4-L2 | hookArt (1) | "A ferrite part keeps it out of the receiver": the lesson's own duplexer page leaks 35 dBm and reflects 45.0 dBm into the receiver, and the book adds a limiter; now "A ferrite circulator steers it to the antenna" | should fix: fixed db8781f
+ec-antenna-u4-L3 | hookArt (1) | "A police speed gun needs a steady ten gigahertz signal… no vacuum tube": true of the classic X-band gun, not of today's K/Ka-band transistor guns; now "A classic police speed gun" | should fix: fixed 0c3f385
+ec-antenna-u4-L2 | calc (klystron, row 4) | "J₁(1.841) of V₀I₀ = 36 W" reads as J₁ times 36 W; now "J₁(1.841) = 58.2 % of V₀I₀ = 36 W" | cosmetic: fixed db8781f
+ec-antenna-u1-L2 | bookfig (quarter-wave, bottom) | label backgrounds behind "VSWR ≤ 1.5 …" and "matched again at 3f0" end above the f0 subscripts (same in the book) | cosmetic: fixed be6e7bb
+ec-antenna-u1-L2 | bookfig (quarter-wave, bottom) | sheet flags "text past its card" on the two labels; the "card" is the shaded VSWR band they sit over, and the labels are on their own backgrounds | cosmetic: no change
+ec-antenna-u4-L3 | bookfig (15) | sheet notes the figure fills 45 % of the stage | cosmetic: later
+
+Count: 1 must fix and 2 should-fix fixed in 3 lessons, 2 cosmetic fixed, 2 cosmetic left; 5 book lines fixed. Must checks:
+u4 4.8 WE1 tan 1.390 already right in u4-L3; u1 W/h = 2 already 0.825 / 4.218 / 48.9 in u1-L3 Q2; u1 1.1 per-metre trap
+not used in u1-L1. Clean: u1-L1, u1-L3, u1-L4 (and u1-L2 on facts). Patterns: a hook line that states more than the
+lesson later shows (a ferrite "keeps it out", any speed gun "has no tube"); a theorem quoted without one of its conditions
+(lossless reciprocal three-port).
