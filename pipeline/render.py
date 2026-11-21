@@ -78,7 +78,7 @@ def block(b, ids):
     if t == 'bullets': return '<ul>' + ''.join(f'<li>{inline(x, ids)}</li>' for x in b.get('items') or []) + '</ul>'
     if t == 'formula':
         f = str(b.get('text', ''))
-        out = f'<pre>{html.escape(f, quote=False)}</pre>' if ('\n' in f or len(f) > 46) else f'<p class="lead"><b>{inline(f)}</b></p>'
+        out = ('<pre>' + '\n'.join(r[:len(r) - len(r.lstrip())] + inline(r) for r in f.rstrip().split('\n')) + '</pre>') if ('\n' in f or len(f) > 46) else f'<p class="lead"><b>{inline(f)}</b></p>'
         if b.get('where'): out += f'<p>{inline(b["where"], ids)}</p>'
         return out
     if t == 'code':
