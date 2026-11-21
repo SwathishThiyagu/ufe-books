@@ -32,6 +32,8 @@ Steps:
    (match only "BITS" in capitals or "BITS Pilani"), and key moments carry raw SVG <tspan> markup from trap lines: strip the
    tags (write a superscript as ^(...) and a subscript as _x) and unescape &amp;amp;. Check the sheet for "tspan" and "&amp;amp;".
    A third, found on Machine Design: key moments titled "Worked example: 2" should read "Worked example 2".
+   A fourth, found on Optical: strip tspans written with baseline-shift="-0.2em" (as an attribute or in style) and the
+   zero-width-space tspan too.
 
 Lesson notes promise "free notes, no sign-up"; students never see a college name, a unit number or a lesson number.
 Git: fetch single branches with --depth 1 (a full fetch stalls on the lesson branches).

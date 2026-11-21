@@ -46,6 +46,8 @@ def denumber(book, cut):
         t = re.sub(r'\bthe rest of this unit is\b', 'the lessons that follow are', t)
         t = re.sub(r'\bthe rest of this unit\b', 'the lessons that follow', t)
         t = re.sub(r"\bthis unit(['’])s\b", r"these lessons\1", t)
+        t = re.sub(r'\bfor the whole unit\b', 'for the lessons that follow', t)
+        t = re.sub(r'\b(covers?|match(?:es)?) this unit\b', r'\1 these lessons', t)
         t = re.sub(r'\b(in|across|of|from|for|throughout) this unit\b', r'\1 these lessons', t)
         t = re.sub(r'\b(?:in|see)\s+' + NUM + r'\b', lambda m: m.group(0).split()[0] + ' ' + q(re.search(NUM, m.group(0)).group(0)) if re.search(NUM, m.group(0)).group(0) in titles else m.group(0), t)
         return t
