@@ -1,22 +1,19 @@
 # ei-sensor-u3: free-model run
 
-- Book: `books/eie/ei-sensor/ei-sensor-u3.html`
-- Status: problems
-- Model calls so far: 36 (143,549 tokens in, 279,615 out), 10.1 minutes
+- Book: `work/ei-sensor-u3/tree/books/eie/ei-sensor/ei-sensor-u3.html`
+- Status: ok
+- Model calls so far: 36 (143,549 tokens in, 279,615 out), 10.2 minutes
 
 ## Checker
 
 ```
-ei-sensor-u3.html: 7 chapters, 14041 words, 8 figures, 152 KB
-PROBLEMS:
- - chapter "induction-potentiometer-synchros-and-microsyn": needs a <div class="example"> worked example
+ei-sensor-u3.html: 7 chapters, 22023 words, 10 figures, 229 KB
+OK
 ```
 
 ## For the reviewer
 
-- chapter 3: the figure cannot be drawn: tree label "Induction potentiometer" is too long; shorten it
-- chapter 3: the figure could not be drawn; a plain box diagram stands in for it
-- checker: chapter "induction-potentiometer-synchros-and-microsyn": needs a <div class="example"> worked example
+- nothing flagged
 
 ## Reviewer notes (after any revision)
 
