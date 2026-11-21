@@ -1,13 +1,13 @@
 # ae-avionics-u2: free-model run
 
-- Book: `books/aero/ae-avionics/ae-avionics-u2.html`
+- Book: `work/ae-avionics-u2/tree/books/aero/ae-avionics/ae-avionics-u2.html`
 - Status: ok
-- Model calls so far: 48 (170,330 tokens in, 318,850 out), 10.8 minutes
+- Model calls so far: 48 (170,330 tokens in, 318,850 out), 11.2 minutes
 
 ## Checker
 
 ```
-ae-avionics-u2.html: 11 chapters, 19396 words, 12 figures, 196 KB
+ae-avionics-u2.html: 11 chapters, 29473 words, 13 figures, 278 KB
 OK
 ```
 
@@ -68,3 +68,11 @@ OK
 - ch 11 [low] Section 3, list of protected areas: Angle-of-attack vanes (and, on some types, the ice detector probe itself) are electrically heated, but they are left out of the list and out of the Q2 answer. The list claims to cover the air-data probes and does not.
 - ch 11 [low] Section 3, rain removal: 'the blade is held against it by air pressure' is unclear: the arm is spring-loaded against the glass, and the airflow adds to or relieves that load; 'air pressure' also suggests a pneumatic motor, which is a different part of the system.
 - ch 11 [low] Quiz Q4 answer: 'The tail also works at small or negative angles of attack in cruise, where any roughness hurts' explains nothing: it repeats the claim instead of saying why. The marks are in the thin section, the short chord and the fact that the tail is trimmed close to its own critical angle in some flight conditions.
+
+## Claude correction pass (21 Nov 2026)
+
+- Every worked example, quiz and bank number recomputed in Python; all 50 reviewer notes addressed (the 8 [high] ones: APU bleed routing, brake "22 MJ" claim, downlock wording, FADEC vs metering unit, hot-start trap, engine bottle location, stall-speed law and quiz).
+- Fixed facts: 8000 ft is 75.3 kPa (not 75.6), Fenwal/Kidde/pneumatic loops, start schedule values, boot cycling guidance, oxygen regulator and mask drop-out wording, simple-cycle ACM.
+- Added for the exam course (AE25301) and AS3302: high-pressure pneumatic power and emergency bottles, shock absorber classes and retraction, brake metering, electric start circuit and exciter energy, combustion heaters, cargo fire classes, gear/flap control units and wing-tip brakes, light-aircraft stall warning, rain removal.
+- New worked examples: accumulator usable fluid, emergency bottle, oleo pressure, exciter energy and start timeline, cooling turbine, stall speed by flap, stall speed with ice.
+- Eleven figures hand-drawn (pipeline/claude_figs/ae_avionics_u2.py); 13 full model answers; MIT OCW link dropped.
