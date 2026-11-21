@@ -1,13 +1,13 @@
 # ee-pe-u3: free-model run
 
-- Book: `books/eee/ee-pe/ee-pe-u3.html`
+- Book: `work/ee-pe-u3/tree/books/eee/ee-pe/ee-pe-u3.html`
 - Status: ok
-- Model calls so far: 31 (135,821 tokens in, 341,945 out), 12.5 minutes
+- Model calls so far: 31 (135,821 tokens in, 341,945 out), 12.7 minutes
 
 ## Checker
 
 ```
-ee-pe-u3.html: 8 chapters, 16118 words, 9 figures, 163 KB
+ee-pe-u3.html: 8 chapters, 23135 words, 13 figures, 277 KB
 OK
 ```
 
@@ -57,3 +57,11 @@ OK
 - ch 8 [low] Section 1, air-gap paragraph: "An ungapped ferrite core saturates at a small current however few turns you use" overstates the case. For an ungapped core the saturation current is Isat = Bmax·Ae·Rc/N, so it rises as the turns fall. What really fails is that a low turn count also makes L far too small.
 - ch 8 [low] Section 2, core loss paragraph: "Keep the peak below about 0.3 T at 100 kHz" presents 0.3 T as a working limit at that frequency. 0.3 T is the ferrite saturation limit at any frequency; at 100 kHz, core loss usually forces the peak flux well below it, often 0.10 to 0.15 T.
 - ch 8 [low] Quiz Q7 (flyback on an ungapped core): "The primary current ramps slowly and the core saturates early" mixes two ideas: a large magnetising inductance makes the ramp slow, which delays saturation in time. The real failure is that with no gap the saturation current Isat = Bmax·Ae·Rc/N is very small, so the core saturates at a low current.
+
+## Correction pass (Claude, 21 Nov 2026)
+
+- Every worked example rerun from its check code; all draft answers were right. Added: heat-sink limit (3.2), diode-drop output and duty (3.3), minimum CCM inductance (3.5); boost ripple rounded to 15.3 mV.
+- Facts fixed: Cuk off-state current path (L1 and L2 currents both return through the diode), Cuk on-state wording, SEPIC/Zeta sentence, buck lead (chargers), ½ in the switching-loss formula, LLC gain below resonance, forward reset stress 2V_s, flyback diode answer, flyback switch rating with the leakage spike, transformer-shrink quiz answer, broken PFC/solar links, key-term n = N1/N2.
+- Added for the exam course: chopper classes A to E, push-pull/half-bridge/full-bridge gains, boost gain with winding resistance, junction-temperature check.
+- Every figure redrawn by hand from its example (pipeline/claude_figs/ee_pe_u3.py); 13 full model answers (three with circuit drawings).
+- Cross-unit and chapter numbers replaced by topic names; underscores set as subscripts; MIT link dropped.
