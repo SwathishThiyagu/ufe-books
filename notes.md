@@ -562,3 +562,9 @@
 - New ch 5.8 Seals and gaskets from the exam course ME3591 ("Design of Seals and Gaskets"); packet order kept.
 - Draft errors fixed: Raimondi and Boyd readings that contradict the L/D = 1 table (ε = 0.62 and (r/c)f = 1.9 at S = 0.031; ε = 0.45 at S = 0.15), a bank chart question with no load or length given, two friction ranges for the same full film, "cylindrical roller takes axial load if flanges are added", the static-load formula given for roller bearings, a projected-area trap that described the wrong view, inconsistent e and Y in the selection example, and old ISO 281 reliability factors.
 - Packet: SRM's `where` topics include a lab line ("Experiments: screw jack Modeling Simulation and Analysis ...") that is not syllabus content; NITK's and Manipal's entries list their whole course (unit 1) rather than this unit. The packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
+## au-elec-u3 (Claude correction pass, 21 Nov 2026)
+- The exam course AU3502 lists "Automotive Electronics: overview and demands ... Glossary for automotive microelectronics", "Fluid-mechanical actuators" and "Electrical machines ... Duty-type ratings" in this unit; the packet's three new subtopics carry them (new chapters 3.1, 3.10, 3.11). Its "Single-phase alternating-current machines" sits inside 3.11.
+- NITT's list keeps LIDAR and the flex-fuel sensor in this unit although they are motion-control and fuel topics; they stay short in 3.8.
+- Manipal's `where` entry is its ignition and engine-control unit (most topics belong to au-elec u2 and u4), not a sensors unit.
+- The packet `out` path is stale (03_Books/...); queue.json holds the right one.
