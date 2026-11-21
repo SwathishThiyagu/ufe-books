@@ -489,3 +489,10 @@
 - The Gibbs phase rule (new in the packet) is chapter 5.3; the draft's chapters 5.3–5.9 moved to 5.4–5.10.
 - Draft errors fixed: v_g at 1 atm 1.673 m³/kg (not 1.694), the 0 °C / 0.5 kPa triple-point example, the steam calorimeter limits, and the psychrometry bank answer (30 °C DBT, 20 °C WBT gives w 0.0105, φ 40 %, dew point 14.8 °C).
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+## me-ic-u4 (Claude correction pass, 21 Nov 2026)
+- The exam course AU25301 holds this material in its unit 5 (cooling system types, coolant properties, crankcase ventilation, lubrication, supercharging and turbocharging) together with stratified charge, LHR, HCCI and RCCI engines, which the universal syllabus keeps in the emissions and advanced combustion unit.
+- Crankcase ventilation (new in the packet) is chapter 4.5; the draft's chapters 4.5–4.8 moved to 4.6–4.9.
+- "Thermosyphon, forced circulation and pressure cooling; coolants" is still tagged advanced (one university), but the exam course lists cooling system types and coolant properties, so the tag no longer fits; consider removing it.
+- Draft errors fixed: thermosyphon densities (992.2 and 971.8 kg/m³, Δp 80 Pa), physically impossible blower outlet temperatures (340 K at ratio 1.6, 320 K at 1.5), turbo mechanical efficiency 0.65 (now 0.95), pressure-cap "3 °C per 10 kPa", roots blower description, SAE grade definition.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
