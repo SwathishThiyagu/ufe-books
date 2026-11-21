@@ -1,13 +1,13 @@
 # ce-survey-u7: free-model run
 
-- Book: `books/civil/ce-survey/ce-survey-u7.html`
+- Book: `work/ce-survey-u7/tree/books/civil/ce-survey/ce-survey-u7.html`
 - Status: ok
-- Model calls so far: 19 (64,364 tokens in, 131,448 out), 4.7 minutes
+- Model calls so far: 19 (64,364 tokens in, 131,448 out), 4.9 minutes
 
 ## Checker
 
 ```
-ce-survey-u7.html: 6 chapters, 11246 words, 7 figures, 123 KB
+ce-survey-u7.html: 6 chapters, 17413 words, 7 figures, 167 KB
 OK
 ```
 
@@ -40,3 +40,18 @@ OK
 - ch 6 [low] Section 2, local operation: 'Local computes each cell from the same cell' can be read as 'a cell computed from itself', which would change nothing. The intended meaning is the same cell position across input layers.
 - ch 6 [low] Section 3, spatial correlation: Moran's I measures spatial autocorrelation of one variable (whether nearby units have similar values), not whether high values of one layer sit with high values of a different layer. Listing it beside 'plot the pairs and use correlation' blurs the two ideas.
 - ch 6 [low] Section 3, examples of correlation: 'high population with many children is positive' is close to a tautology, since children are part of the population, so it teaches nothing about reading the sign of a correlation.
+
+## Claude correction pass (21 Nov 2026)
+
+Every chapter was checked against the draft review notes above and every worked example, quiz and bank number was rerun in Python. All six chapter figures were redrawn by hand (pipeline/claude_figs/ce_survey_u7.py) from the chapters' own numbers, and every long question has a step-by-step model answer (366 to 415 words, each ending in a numerical check). The unit is outside CE25C03 (no exam topics to add); the packet's six subtopics each have a chapter, and the application topics in its `where` (drought, rural school planning, building attributes, zonal planning) are covered in the chapters and the bank.
+
+Changed or added worked examples:
+- GIS definition and components: the metro-station example now has real street distances (0, 80, 150, 190, 240, 320 m) and computes the new pipe from chord lengths 2√(R² − d²): Market Street 366.6 m + Lake Road 124.9 m = 491.5 m; buffer 125 664 m².
+- Spatial and attribute data: the wells example tests "inside ward 7" on the coordinates (E 400 to 416 m), so the spatial and attribute queries return different wells (W1, W2 against W3, W4).
+- Raster and vector: second example added, vector pipeline 16 016 B against a 5 m raster 4 MB (ratio 250).
+- Data input and verification: affine fit corrected (3 points exact, 4 or more by least squares, second order needs 6 or more); dangle, undershoot and overshoot wording fixed; RMS 2.24 m example kept and drawn.
+- Projections: Everest and WGS84 described correctly; grid length now reduces to the ellipsoid before the scale factor (1000 m at h = 100 m gives 999.584 m); datum shift stated as "a hundred metres or more"; easting about 391 600 m.
+- Spatial analysis: gradient defined; example numbers rounded; second example added (slope 13.5°, 24.0 %, aspect 213.7°).
+- Cross-unit references ("Unit N", "7.k" links) replaced by topic names; em dashes removed; two web links that were not reference sources dropped.
+
+Not verified and therefore left out: none beyond the textbook's own figures; all numbers are computed in the text.
