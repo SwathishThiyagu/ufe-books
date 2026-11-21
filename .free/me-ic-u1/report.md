@@ -46,3 +46,9 @@ OK
 - ch 7 [low] Figure caption and plot: The Diesel series with ρ = 2 is drawn from r = 1, where the cycle is impossible (the cut-off volume V3 = 2V2 exceeds V1 once r < ρ). The plot therefore shows negative and zero efficiencies at low r, which cannot happen in a real cycle.
 - ch 8 [high] Section 3, figure spec (nested sets): The figure labels the fuel-air cycle item as 'Variable cp' and the air-standard item as 'Constant cp'. The rest of the chapter defines c_v and the table says 'constant c_v', so the figure names the wrong specific heat for an Otto cycle, where the constant-volume value c_v governs. A student memorising the figure will attach the wrong property to the cycle.
 - ch 8 [low] Section 1, first and third paragraphs: The section says the fuel-air cycle 'keeps the same cycle shape' and then also says combustion is finite and the pressure rise is not instantaneous. Finite heat release is not constant-volume heat addition, so the cycle shape is not exactly the same as the air-standard Otto; the two statements pull against each other.
+
+## Claude correction pass (21 Nov 2026)
+
+- Every chapter rewritten from the draft for the AU25301 exam course; every reviewer flag above fixed; every example, quiz and bank answer traced (calculations in Python).
+- Eight figures redrawn by hand (pipeline/claude_figs/me_ic_u1.py), each from its chapter's worked example.
+- Question bank: 14 questions, each with points to cover and a full model answer.
