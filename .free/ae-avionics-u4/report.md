@@ -61,3 +61,7 @@ OK
 - ch 11 [low] Section 2, differential amplifier sentence: 'With four equal resistors it has gain Rf/Rin' is misleading. If all four resistors are equal then Rf = Rin and the gain is exactly 1; a student may think four equal resistors can give a gain other than 1.
 - ch 11 [low] Section 2, buffer sentence: 'Rin open' is unclear; an open resistor is the same as no resistor at all, and the student may think a resistor is still fitted.
 - ch 11 [low] Section 3, ADC paragraph: The code formula has no upper limit: for Vin at or above Vref it gives 2^N, a code that does not fit in N bits.
+
+## Correction pass (21 Nov 2026)
+
+Every chapter rewritten from the draft; every worked example, quiz answer and model answer computed in Python. All reviewer notes above are resolved (the 1553B "receive message has an extra status word" claim in the draft and in the reviewer note was itself wrong: both directions carry one command, one status and n data words). Eleven figures hand-drawn from the worked examples (pipeline/claude_figs/ae_avionics_u4.py), twelve full model answers, exam course AE25301 topics covered in 4.1, 4.10 and 4.11, MIT OCW link dropped (university-hosted). check_book.py --render: OK.

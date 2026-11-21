@@ -1,53 +1,88 @@
 {
- "lead": "A data bus is a shared set of wires and rules that carries digital words between avionics units. It replaces bundles of point-to-point wires with a defined word format, timing and error check. ARINC 429 is the civil one-way bus; MIL-STD-1553B is the military command/response bus. Both are still found in aircraft and helicopters, often beside newer Ethernet. This chapter shows how each word is built, how fast it moves, and why direction and topology change the design.",
- "prereq": "You need: <a href=\"#avionics-system-architecture-ima-and-lrus\">Chapter 4.2, LRUs and IMA</a>, for what an LRU is and why units exchange data.",
+ "lead": "A data bus is a set of wires plus rules (word format, timing, addressing and error check) that lets avionics boxes exchange digital data. ARINC 429 is the civil bus: one transmitter sends 32-bit labelled words to up to 20 receivers, in one direction only. MIL-STD-1553B is the military bus: one bus controller commands up to 31 remote terminals on a shared, dual-redundant cable at 1 Mbit/s. Both are decades old and still fitted, because they are simple, predictable and easy to certify.",
+ "prereq": "You need: <a href=\"#avionics-system-architecture-ima-and-lrus\">Avionics system architecture, IMA and LRUs</a>.",
  "sections": [
   {
-   "h3": "ARINC 429: one-way civil bus",
+   "h3": "ARINC 429: one transmitter, many listeners",
    "blocks": [
     {
      "type": "p",
-     "text": "ARINC 429 is a one-way serial bus used on civil aircraft. One transmitter drives a twisted pair, and up to 20 receivers listen. The pair carries a balanced differential signal: one wire goes positive while the other goes negative, and the receiver reads the difference. This rejects common-mode noise from nearby cables and motors."
+     "text": "ARINC 429 runs on a shielded twisted pair. The signal is <b>bipolar return-to-zero</b>: for a 1 the line goes to HI (+10 V between the wires) for the first half of the bit and returns to NULL (0 V); for a 0 it goes to LO (−10 V) and returns to NULL. Every bit returns to zero, so the receiver finds the clock from the data itself."
     },
     {
      "type": "p",
-     "text": "Every transmission is a 32-bit word. Bits 1–8 are the label, an octal code that names the parameter. Bits 9–10 are the SDI, the source/destination identifier, used when two similar units send the same label. Bits 11–29 carry the data. Bits 30–31 are the SSM, the sign/status/matrix, which says whether the data is valid, No Computed Data, a test value, or a sign. Bit 32 is odd parity over the other 31 bits."
+     "text": "Only one transmitter may drive a pair, and up to 20 receivers listen. A box that must reply needs its own transmitter and its own pair, so a two-way link needs two pairs. One pair still carries many parameters: the transmitter sends a stream of words, each tagged with a label, and each receiver keeps the labels it needs. Two speeds are used: high speed at 100 kbit/s and low speed at 12 to 14.5 kbit/s (12.5 kbit/s is common). Words are separated by a gap of at least 4 bit times."
+    },
+    {
+     "type": "table",
+     "head": [
+      "Bits",
+      "Field",
+      "Meaning"
+     ],
+     "rows": [
+      [
+       "1–8",
+       "Label",
+       "which parameter this is, written in octal (for example 203); sent first"
+      ],
+      [
+       "9–10",
+       "SDI",
+       "source/destination identifier: which of two similar units sent it, or who should use it"
+      ],
+      [
+       "11–29",
+       "Data",
+       "19 bits: binary (BNR, bit 29 is the sign), BCD digits or discrete bits"
+      ],
+      [
+       "30–31",
+       "SSM",
+       "sign/status matrix; for BNR data: 11 normal, 01 no computed data, 10 functional test, 00 failure warning"
+      ],
+      [
+       "32",
+       "Parity",
+       "set so the whole word has an odd number of 1s"
+      ]
+     ]
     },
     {
      "type": "formula",
-     "text": "T_word = n / R",
-     "where": "T_word is one word time in seconds; n is the word length in bits (32 for ARINC 429); R is the bit rate in bits per second."
-    },
-    {
-     "type": "p",
-     "text": "ARINC 429 has two standard speeds: high speed at 100 kbps and low speed at 12.5 kbps. The bus is simple, deterministic and well understood. Its weakness is wiring: each direction needs its own pair, because a 429 pair has only one transmitter. One pair can carry many parameters as a stream of labelled words; a dedicated transmitter is a design choice made when a parameter needs a high, independent update rate."
+     "text": "T<sub>w</sub> = (32 + 4) ÷ R",
+     "where": "T<sub>w</sub> is the time per word including the minimum 4-bit gap, in seconds; R is the bit rate in bit/s. The maximum word rate is 1 ÷ T<sub>w</sub>."
     }
    ]
   },
   {
-   "h3": "MIL-STD-1553B: command/response bus",
+   "h3": "MIL-STD-1553B: command and response",
    "blocks": [
     {
      "type": "p",
-     "text": "MIL-STD-1553B is a bidirectional serial bus used on military aircraft, helicopters and spacecraft. It runs at 1 Mbps and uses Manchester II encoding: each bit is a low-to-high or high-to-low transition in the middle of the bit period. The transition carries the clock, so no separate clock wire is needed."
+     "text": "MIL-STD-1553B runs at 1 Mbit/s on a shielded twisted pair, with each box joined to the main cable by a transformer-coupled stub. Bits are <b>Manchester II</b> coded: a 1 is a high-to-low change in the middle of the bit and a 0 is low-to-high, so the clock travels with the data. The bus is normally dual redundant: cables A and B, and the controller retries on the other if a message fails."
     },
     {
      "type": "p",
-     "text": "A 1553B word is 20 bits: 3 sync bits, 16 information bits and 1 parity bit. There are three word types. A command word comes from the bus controller and gives the remote terminal address, transmit/receive bit, subaddress and word count. A data word carries 16 data bits. A status word comes back from the remote terminal and reports address, message error, busy, subsystem flag and terminal flag."
+     "text": "One <b>bus controller (BC)</b> starts every transfer. Up to 31 <b>remote terminals (RTs)</b> speak only when commanded. A <b>bus monitor</b> listens and records traffic but never replies. Every word is 20 bit times: a 3-bit sync, 16 bits and an odd parity bit."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Command word</b> (from the BC): RT address (5 bits), transmit/receive bit, subaddress (5 bits) and word count (5 bits, 1 to 32 data words).",
+      "<b>Data word:</b> 16 bits of data.",
+      "<b>Status word</b> (from the RT): its own address plus flags such as message error, busy, subsystem flag and terminal flag."
+     ]
     },
     {
      "type": "p",
-     "text": "One bus controller controls all traffic; up to 31 remote terminals answer. The controller sends a command, the addressed terminal replies with status, data moves, and a final status may confirm. 1553B is usually dual redundant: two independent buses, A and B, so one cable or transceiver failure does not stop the exchange. The controller decides which bus is active."
+     "text": "In a <b>receive</b> transfer (BC to RT) the BC sends the command and the data words, and the RT answers with its status word. In a <b>transmit</b> transfer (RT to BC) the BC sends the command, and the RT answers with its status word followed by the data. Both carry one command, one status and n data words. The RT must reply within 4 to 12 µs. An RT-to-RT transfer uses two commands and two status words."
     }
    ]
   },
   {
    "h3": "Choosing between them",
    "blocks": [
-    {
-     "type": "p",
-     "text": "ARINC 429 suits civil systems that send many separate parameters from one unit to many listeners: air data computers to displays, inertial reference units to flight management, radio altimeters to warning computers. It is one-way, so a reply needs a second 429 channel. 1553B suits military systems that need many units on one shared bus and need confirmation that a command was received. It is command/response, not a free-running broadcast."
-    },
     {
      "type": "table",
      "head": [
@@ -57,202 +92,183 @@
      ],
      "rows": [
       [
-       "Topology",
-       "one transmitter, many receivers",
-       "bus controller, up to 31 RTs"
-      ],
-      [
        "Direction",
-       "one-way",
-       "bidirectional command/response"
+       "one way",
+       "two way, half duplex"
       ],
       [
-       "Speed",
-       "100 kbps high, 12.5 kbps low",
-       "1 Mbps"
+       "Access",
+       "one transmitter, up to 20 receivers",
+       "one bus controller, up to 31 remote terminals"
+      ],
+      [
+       "Bit rate",
+       "100 or 12.5 kbit/s",
+       "1 Mbit/s"
+      ],
+      [
+       "Coding",
+       "bipolar return-to-zero",
+       "Manchester II"
       ],
       [
        "Word",
-       "32 bits: label, SDI, data, SSM, parity",
-       "20 bits: command, status or data"
+       "32 bits",
+       "20 bits (16 of data)"
       ],
       [
-       "Use",
+       "Redundancy",
+       "separate buses from duplicated units",
+       "dual cables A and B"
+      ],
+      [
+       "Typical use",
        "civil LRUs",
-       "military, helicopters, spacecraft"
+       "military aircraft, helicopters, spacecraft"
       ]
      ]
     },
     {
      "type": "p",
-     "text": "Modern civil aircraft add switched Ethernet such as AFDX for higher bandwidth; see <a href=\"#afdx-and-fibre-optic-communication\">Chapter 4.8</a>. ARINC 429 and 1553B remain common because they are simple, proven and easy to certify or qualify."
+     "text": "ARINC 429 suits one box broadcasting many values to many users, such as an air data computer feeding displays. 1553B suits many boxes that must talk both ways with confirmation, such as the mission computer, radar and stores management of a fighter. Newer airliners add switched Ethernet for higher rates (see <a href=\"#afdx-and-fibre-optic-communication\">AFDX and fibre-optic communication</a>)."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 2,
-  "caption": "A bus controller sends a command word; the remote terminal answers with a status word; data then flows and a final status confirms. Every exchange is controlled by the bus controller.",
-  "spec": {
-   "type": "sequence",
-   "aria": "Sequence diagram of MIL-STD-1553B command, status and data words between bus controller and remote terminal.",
-   "actors": [
-    "Bus controller",
-    "1553 bus",
-    "Remote terminal"
-   ],
-   "messages": [
-    {
-     "from": "Bus controller",
-     "to": "1553 bus",
-     "label": "command word",
-     "dashed": false
-    },
-    {
-     "from": "1553 bus",
-     "to": "Remote terminal",
-     "label": "command word",
-     "dashed": false
-    },
-    {
-     "from": "Remote terminal",
-     "to": "1553 bus",
-     "label": "status word",
-     "dashed": false
-    },
-    {
-     "from": "1553 bus",
-     "to": "Bus controller",
-     "label": "status word",
-     "dashed": false
-    },
-    {
-     "from": "Bus controller",
-     "to": "1553 bus",
-     "label": "data word",
-     "dashed": false
-    },
-    {
-     "from": "1553 bus",
-     "to": "Remote terminal",
-     "label": "data word",
-     "dashed": false
-    },
-    {
-     "from": "Remote terminal",
-     "to": "1553 bus",
-     "label": "status word",
-     "dashed": false
-    },
-    {
-     "from": "1553 bus",
-     "to": "Bus controller",
-     "label": "status word",
-     "dashed": false
-    }
-   ]
-  }
- },
  "examples": [
   {
-   "question": "An ARINC 429 transmitter runs at 100 kbps and sends a 32-bit word. A MIL-STD-1553B bus runs at 1 Mbps and sends a 20-bit word. Find each word time. For a 1553B transmit message (remote terminal to controller) with one command, one data and one status word, find total time ignoring gaps.",
+   "question": "An air data computer sends on one ARINC 429 bus: 12 labels at 50 times a second and 20 labels at 10 times a second. Each word is followed by the minimum 4-bit gap. (a) Find the word time and the maximum word rate at high speed (100 kbit/s). (b) Find the bus load. (c) Would the same traffic fit at low speed (12.5 kbit/s)? (d) The first 31 bits of one word contain fourteen 1s. What is bit 32?",
    "steps": [
-    "ARINC 429: R1 = 100,000 bit/s and n1 = 32 bits. T1 = n1 / R1 = 32 / 100,000 = 0.00032 s = 0.32 ms.",
-    "MIL-STD-1553B: R2 = 1,000,000 bit/s and n2 = 20 bits. T2 = n2 / R2 = 20 / 1,000,000 = 0.00002 s = 20 µs.",
-    "A transmit message is command + status + data words, so count = 1 command + 1 status + 1 data = 3 words. Tmsg = 3 × 20 µs = 60 µs.",
-    "A receive message would be command + status + data + final status, so the same one data word would give 4 words = 80 µs."
+    "High speed: T<sub>w</sub> = 36 ÷ 100 000 = 0.36 ms. Maximum rate = 1 ÷ 0.00036 = 2778 words/s.",
+    "Traffic: 12 × 50 + 20 × 10 = 600 + 200 = 800 words/s.",
+    "Load at high speed: 800 ÷ 2778 = 0.288, that is 28.8 % (check: 800 × 0.36 ms = 288 ms in each second).",
+    "Low speed: T<sub>w</sub> = 36 ÷ 12 500 = 2.88 ms; maximum rate = 347 words/s. 800 words/s is 800 ÷ 347 = 2.3 times the capacity, so it does not fit.",
+    "Parity: fourteen 1s is even, so bit 32 must be 1 to make fifteen, an odd number."
    ],
-   "answer": "ARINC 429 word time is 0.32 ms; MIL-STD-1553B word time is 20 µs, and the three-word transmit message takes 60 µs ignoring gaps.",
-   "check": "r1 = 100000\nn1 = 32\nt1_ms = n1 / r1 * 1000\nr2 = 1000000\nn2 = 20\nt2_us = n2 / r2 * 1e6\ntmsg_us = 3 * t2_us\nprint(t1_ms)\nprint(t2_us)\nprint(tmsg_us)",
-   "values": [
-    0.32,
-    20.0,
-    60.0
-   ],
+   "answer": "0.36 ms per word and 2778 words/s maximum; the load is 28.8 % at high speed; at low speed it would need 230 % of the bus, so it does not fit; the parity bit is 1.",
    "dry_run": {
     "head": [
      "Quantity",
-     "Value",
-     "Unit"
+     "High speed",
+     "Low speed"
     ],
     "rows": [
      [
-      "ARINC word time",
-      "0.32",
-      "ms"
+      "Bit time",
+      "10 µs",
+      "80 µs"
      ],
      [
-      "1553 word time",
-      "20",
-      "µs"
+      "Word plus gap",
+      "0.36 ms",
+      "2.88 ms"
      ],
      [
-      "Transmit message time",
-      "60",
-      "µs"
+      "Maximum words/s",
+      "2778",
+      "347"
+     ],
+     [
+      "Load for 800 words/s",
+      "28.8 %",
+      "230 % (does not fit)"
      ]
     ]
-   },
-   "output": ""
+   }
+  },
+  {
+   "question": "On a 1553B bus the BC asks an RT to transmit 4 data words (RT to BC). The RT replies after 8 µs, and the BC leaves 4 µs before the next message. (a) Find the message time. (b) Show that a receive message with 4 data words takes the same time. (c) The BC polls 8 such RTs every 10 ms. Find the bus load.",
+   "steps": [
+    "Word time: 20 bits ÷ 1 Mbit/s = 20 µs.",
+    "Transmit message: command 20 µs, response gap 8 µs, status 20 µs, 4 data words 80 µs, then 4 µs to the next message: 20 + 8 + 20 + 80 + 4 = 132 µs.",
+    "Receive message: command 20 µs, 4 data words 80 µs, response gap 8 µs, status 20 µs, gap 4 µs: also 132 µs. Both have one command, n data and one status word.",
+    "Load: 8 × 132 µs = 1056 µs in each 10 000 µs, that is 10.6 %."
+   ],
+   "answer": "Each message takes 132 µs either way; eight of them every 10 ms load the bus to about 10.6 %.",
+   "dry_run": {
+    "head": [
+     "Time (µs)",
+     "Event"
+    ],
+    "rows": [
+     [
+      "0–20",
+      "command word (BC)"
+     ],
+     [
+      "20–28",
+      "RT response gap"
+     ],
+     [
+      "28–48",
+      "status word (RT)"
+     ],
+     [
+      "48–128",
+      "4 data words (RT)"
+     ],
+     [
+      "128–132",
+      "gap before next message"
+     ]
+    ]
+   }
   }
  ],
  "traps": [
-  "ARINC 429 is one-way. Reversing the same pair does not make a reply channel.",
-  "1553B is command/response. It is not a free-running broadcast; a remote terminal speaks only when commanded.",
-  "Do not count the 1553B word as 16 bits when finding word time; the line word is 20 bits, of which 16 are data.",
-  "ARINC 429 label is 8 bits and parity is 1 bit; the data field is 19 bits, not 32.",
-  "Manchester II carries its own clock; a separate clock wire is not part of 1553B.",
-  "A 1553B transmit message is command + status + n data words. A receive message adds a final status word, so the same data costs one more word."
+  "Saying ARINC 429 needs one pair per parameter. It needs one pair per transmitter; one pair carries many labels.",
+  "Turning an ARINC 429 pair round for a reply. Only one transmitter may drive a pair.",
+  "Using 16 bits for the 1553B word time. The word on the wire is 20 bit times.",
+  "Giving a 1553B receive message an extra status word. Transmit and receive messages each have one status word.",
+  "Forgetting the 4-bit gap in ARINC 429 loading. A word occupies 36 bit times, not 32."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "How many bits are in an ARINC 429 word, and what are the two standard bit rates?",
    "marks": 2,
-   "a": "32 bits; high speed 100 kbps and low speed 12.5 kbps."
-  },
-  {
-   "level": "understand",
-   "q": "Why does an ARINC 429 reply need a separate channel?",
-   "marks": 3,
-   "a": "ARINC 429 is one-way; the transmitter pair only sends from one source to receivers, so the other unit needs its own transmitter pair."
-  },
-  {
-   "level": "apply",
-   "q": "An ARINC 429 low-speed channel sends a 32-bit word at 12.5 kbps. Find the word time.",
-   "marks": 4,
-   "a": "T = 32 / 12,500 = 0.00256 s = 2.56 ms."
-  },
-  {
-   "level": "analyze",
-   "q": "20 parameters must go from LRU A to LRU B, and 20 must come back from B to A. Compare the wiring of ARINC 429 with one 1553B bus.",
-   "marks": 5,
-   "a": "429 needs one transmitter pair per direction per transmitter, so 20 pairs each way if every parameter gets its own transmitter; fewer pairs if many labelled words are multiplexed on shared pairs. 1553B uses one shared bus (two cables if dual redundant) plus a bus controller; all 40 transfers share 1 Mbps and each costs command and status overhead."
+   "q": "Give the bit fields of an ARINC 429 word.",
+   "a": "Label 1–8, SDI 9–10, data 11–29, SSM 30–31, parity 32."
   },
   {
    "level": "remember",
-   "q": "Name the three MIL-STD-1553B word types.",
    "marks": 2,
-   "a": "Command, status and data words."
+   "q": "Name the three 1553B word types and the three kinds of terminal.",
+   "a": "Command, data and status words; bus controller, remote terminal and bus monitor."
   },
   {
    "level": "understand",
-   "q": "Describe the command/response sequence for a 1553B receive message.",
    "marks": 3,
-   "a": "Controller sends a receive command; RT sends status; controller sends data word(s); RT sends final status."
+   "q": "How does an ARINC 429 receiver find its clock?",
+   "a": "Every bit returns to NULL in its second half, so each bit gives a timing edge (bipolar return-to-zero)."
+  },
+  {
+   "level": "understand",
+   "marks": 3,
+   "q": "Why is 1553B called a command/response bus?",
+   "a": "Remote terminals never speak on their own; every transfer starts with a command from the bus controller, and the addressed terminal replies with a status word."
   },
   {
    "level": "apply",
-   "q": "A 1553B transmit message (RT to controller) has one command, four data and one status word. Each word is 20 µs. Find total time ignoring gaps. How much does the same data take as a receive message?",
    "marks": 4,
-   "a": "Transmit: 1 command + 1 status + 4 data = 6 words × 20 µs = 120 µs. Receive: command + status + 4 data + final status = 7 words × 20 µs = 140 µs."
+   "q": "A 1553B transmit message carries 10 data words; the RT responds in 6 µs and the next message follows 4 µs later. Find the message time.",
+   "a": "20 + 6 + 20 + 10 × 20 + 4 = 250 µs."
   },
   {
    "level": "analyze",
-   "q": "Why is dual redundancy useful on 1553B?",
-   "marks": 3,
-   "a": "A cable or transceiver fault on bus A can be bypassed by using bus B; the controller can retry, so a single failure does not stop communication."
+   "marks": 5,
+   "q": "Units A and B must exchange 20 parameters each way. Compare the wiring with ARINC 429 and with 1553B.",
+   "a": "ARINC 429: one pair from A to B and one pair from B to A, each carrying 20 labels: two pairs. 1553B: both units become terminals on the existing dual bus, and the BC schedules both directions; no new point-to-point pairs, but each transfer costs a command and a status word."
   }
  ],
- "beyond": "Not for the exam. ARINC 429 is still designed into small civil units, while 1553B continues in military upgrades and spacecraft. Newer civil architectures move to AFDX (ARINC 664) switched Ethernet, covered in <a href=\"#afdx-and-fibre-optic-communication\">Chapter 4.8</a>. Search for ARINC 429 word format, 1553B command word, and dual redundant bus."
+ "beyond": "Not for the exam. On military aircraft, faster buses and Fibre Channel are added beside 1553B, which stays for control traffic. Search for 'ARINC 429 label list', 'MIL-STD-1553B mode codes' and 'ARINC 629'.",
+ "figure": {
+  "after_section": 2,
+  "caption": "Top: the five fields of an ARINC 429 word, with the bit numbers where each field starts and ends. Bottom: the second worked example's 1553B transmit message: command, an 8 µs response gap, the status word and four data words, 132 µs with the 4 µs gap that follows.",
+  "spec": {
+   "type": "svg",
+   "h": 314,
+   "body": "<text x=\"20.0\" y=\"30.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">ARINC 429 word: 32 bits, then a 4-bit gap (36 × 10 µs = 0.36 ms at 100 kbit/s)</text><rect x=\"40.0\" y=\"46.0\" width=\"160.0\" height=\"40.0\" rx=\"3\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"120.0\" y=\"71.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Label (octal)</text><text x=\"50.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">1</text><text x=\"190.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">8</text><rect x=\"200.0\" y=\"46.0\" width=\"40.0\" height=\"40.0\" rx=\"3\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"220.0\" y=\"71.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">SDI</text><text x=\"210.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">9</text><text x=\"230.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">10</text><rect x=\"240.0\" y=\"46.0\" width=\"380.0\" height=\"40.0\" rx=\"3\" style=\"fill:var(--panel);stroke:var(--ink);stroke-width:2\"/><text x=\"430.0\" y=\"71.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Data, 19 bits</text><text x=\"250.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">11</text><text x=\"610.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">29</text><rect x=\"620.0\" y=\"46.0\" width=\"40.0\" height=\"40.0\" rx=\"3\" style=\"fill:var(--live-soft);stroke:var(--live);stroke-width:2\"/><text x=\"640.0\" y=\"71.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">SSM</text><text x=\"630.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">30</text><text x=\"650.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">31</text><rect x=\"660.0\" y=\"46.0\" width=\"20.0\" height=\"40.0\" rx=\"3\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"670.0\" y=\"71.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">P</text><text x=\"670.0\" y=\"104.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">32</text><line x1=\"60.0\" y1=\"80.0\" x2=\"60.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"80.0\" y1=\"80.0\" x2=\"80.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"100.0\" y1=\"80.0\" x2=\"100.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"120.0\" y1=\"80.0\" x2=\"120.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"140.0\" y1=\"80.0\" x2=\"140.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"160.0\" y1=\"80.0\" x2=\"160.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"180.0\" y1=\"80.0\" x2=\"180.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"200.0\" y1=\"80.0\" x2=\"200.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"220.0\" y1=\"80.0\" x2=\"220.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"240.0\" y1=\"80.0\" x2=\"240.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"260.0\" y1=\"80.0\" x2=\"260.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"280.0\" y1=\"80.0\" x2=\"280.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"300.0\" y1=\"80.0\" x2=\"300.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"320.0\" y1=\"80.0\" x2=\"320.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"340.0\" y1=\"80.0\" x2=\"340.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"360.0\" y1=\"80.0\" x2=\"360.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"380.0\" y1=\"80.0\" x2=\"380.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"400.0\" y1=\"80.0\" x2=\"400.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"420.0\" y1=\"80.0\" x2=\"420.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"440.0\" y1=\"80.0\" x2=\"440.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"460.0\" y1=\"80.0\" x2=\"460.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"480.0\" y1=\"80.0\" x2=\"480.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"500.0\" y1=\"80.0\" x2=\"500.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"520.0\" y1=\"80.0\" x2=\"520.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"540.0\" y1=\"80.0\" x2=\"540.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"560.0\" y1=\"80.0\" x2=\"560.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"580.0\" y1=\"80.0\" x2=\"580.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"600.0\" y1=\"80.0\" x2=\"600.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"620.0\" y1=\"80.0\" x2=\"620.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"640.0\" y1=\"80.0\" x2=\"640.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><line x1=\"660.0\" y1=\"80.0\" x2=\"660.0\" y2=\"86.0\" style=\"stroke:var(--line2);stroke-width:1\"/><text x=\"360.0\" y=\"126.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">bit number (bit 1 is sent first); bit 32 makes the number of 1s odd</text><text x=\"20.0\" y=\"176.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">MIL-STD-1553B transmit message (RT to BC, 4 data words), 20 µs per word</text><rect x=\"40.0\" y=\"192.0\" width=\"97.0\" height=\"44.0\" rx=\"3\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"88.5\" y=\"211.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Command</text><text x=\"88.5\" y=\"228.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">BC</text><rect x=\"175.8\" y=\"192.0\" width=\"97.0\" height=\"44.0\" rx=\"3\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"224.2\" y=\"211.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Status</text><text x=\"224.2\" y=\"228.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">RT</text><rect x=\"272.7\" y=\"192.0\" width=\"97.0\" height=\"44.0\" rx=\"3\" style=\"fill:var(--panel);stroke:var(--ink);stroke-width:2\"/><text x=\"321.2\" y=\"211.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Data 1</text><text x=\"321.2\" y=\"228.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">RT</text><rect x=\"369.7\" y=\"192.0\" width=\"97.0\" height=\"44.0\" rx=\"3\" style=\"fill:var(--panel);stroke:var(--ink);stroke-width:2\"/><text x=\"418.2\" y=\"211.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Data 2</text><text x=\"418.2\" y=\"228.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">RT</text><rect x=\"466.7\" y=\"192.0\" width=\"97.0\" height=\"44.0\" rx=\"3\" style=\"fill:var(--panel);stroke:var(--ink);stroke-width:2\"/><text x=\"515.2\" y=\"211.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Data 3</text><text x=\"515.2\" y=\"228.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">RT</text><rect x=\"563.6\" y=\"192.0\" width=\"97.0\" height=\"44.0\" rx=\"3\" style=\"fill:var(--panel);stroke:var(--ink);stroke-width:2\"/><text x=\"612.1\" y=\"211.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Data 4</text><text x=\"612.1\" y=\"228.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">RT</text><text x=\"156.4\" y=\"219.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--live)\" font-weight=\"700\">8</text><line x1=\"40.0\" y1=\"236.0\" x2=\"40.0\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"40.0\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0</text><line x1=\"137.0\" y1=\"236.0\" x2=\"137.0\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"137.0\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">20</text><line x1=\"175.8\" y1=\"236.0\" x2=\"175.8\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"175.8\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">28</text><line x1=\"272.7\" y1=\"236.0\" x2=\"272.7\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"272.7\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">48</text><line x1=\"369.7\" y1=\"236.0\" x2=\"369.7\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"369.7\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">68</text><line x1=\"466.7\" y1=\"236.0\" x2=\"466.7\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"466.7\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">88</text><line x1=\"563.6\" y1=\"236.0\" x2=\"563.6\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"563.6\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">108</text><line x1=\"660.6\" y1=\"236.0\" x2=\"660.6\" y2=\"242.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"660.6\" y=\"258.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">128</text><text x=\"156.4\" y=\"280.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--live)\">response gap 8 µs</text><text x=\"680.0\" y=\"280.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\" font-weight=\"700\">+ 4 µs gap = 132 µs per message</text><text x=\"360.0\" y=\"302.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">time (µs)</text>",
+   "aria": "Top, a row of 32 bit cells grouped as label bits 1 to 8, SDI bits 9 and 10, data bits 11 to 29, SSM bits 30 and 31 and parity bit 32. Bottom, a timeline in microseconds: command word from the bus controller 0 to 20, response gap to 28, status word from the remote terminal 28 to 48, then four data words ending at 128, and a 4 microsecond gap, 132 microseconds in all."
+  }
+ }
 }
