@@ -2,12 +2,12 @@
 
 - Book: `books/mech/me-ic/me-ic-u2.html`
 - Status: ok
-- Model calls so far: 25 (82,998 tokens in, 242,784 out), 6.8 minutes
+- Model calls so far: 25 (82,998 tokens in, 242,784 out), 7.0 minutes
 
 ## Checker
 
 ```
-me-ic-u2.html: 11 chapters, 20457 words, 12 figures, 231 KB
+me-ic-u2.html: 11 chapters, 29860 words, 12 figures, 289 KB
 OK
 ```
 
@@ -52,3 +52,10 @@ OK
 - ch 11 [low] Section 2, vacuum advance paragraph: The reason given for vacuum advance is loose. At part load the air-fuel ratio is often close to stoichiometric; the flame is slow mainly because the charge is diluted by leftover exhaust gas and its density is low. Calling it simply 'the lean mixture' can mislead a student. Also, the source of the vacuum is not distinguished: many engines take ported vacuum, which is near zero at idle and at wide-open throttle, not manifold vacuum that is highest at idle.
 - ch 11 [low] Figure and sample schedule: 40° of advance at 4000 rpm is at the extreme end; production engines usually top out near 30°–35° of total advance. A student may take this as a typical value rather than an illustration.
 - ch 11 [low] Section 2, timing-light check: The procedure is missing two steps a student needs: identifying the fixed pointer and the matching mark on the crank pulley, and remembering that the light must be triggered by number one cylinder's lead and the reading taken with the engine idling at the specified speed.
+
+## Claude correction pass (21 Nov 2026)
+
+- New chapters from the packet: 2.6 Gasoline direct injection (GDI) and 2.10 Electronic ignition and laser ignition; later chapters renumbered (reviews moved with them).
+- Every worked example traced; second examples added (simple carburettor sizing, injection lag, pump fuel rate, rail pressure and open time, EFI pulse width, governor force and droop, dwell and coil energy, CDI energy, laser intensity, spark advance from burn time).
+- Air filters, throttle and the simple carburettor added to 2.1; the reviewer notes above fixed; long formulas no longer print raw tags.
+- 11 figures redrawn by hand (pipeline/claude_figs/me_ic_u2.py); 16 bank questions with full model answers; MIT, NPTEL and AFDC links dropped.
