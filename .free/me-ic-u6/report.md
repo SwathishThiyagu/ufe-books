@@ -1,20 +1,19 @@
 # me-ic-u6: free-model run
 
-- Book: `books/mech/me-ic/me-ic-u6.html`
+- Book: `work/me-ic-u6/tree/books/mech/me-ic/me-ic-u6.html`
 - Status: ok
-- Model calls so far: 33 (123,498 tokens in, 265,786 out), 8.6 minutes
+- Model calls so far: 33 (123,498 tokens in, 265,786 out), 8.8 minutes
 
 ## Checker
 
 ```
-me-ic-u6.html: 9 chapters, 16742 words, 10 figures, 178 KB
+me-ic-u6.html: 10 chapters, 26271 words, 11 figures, 255 KB
 OK
 ```
 
 ## For the reviewer
 
-- chapter 6: the figure cannot be drawn: tree is too wide (6 leaves); use fewer leaves or shorter labels
-- chapter 6: the figure could not be drawn; a plain box diagram stands in for it
+- nothing flagged
 
 ## Reviewer notes (after any revision)
 
@@ -49,11 +48,11 @@ OK
 - ch 7 [high] Section 4, multi-fuel engines, compression ratio sentence: The sentence is self-contradictory: if the compression ratio were set for the least friendly fuel (the petrol-like, low-cetane fuel), that fuel would be the one protected from knock, not the one that knocks. In a compression-ignition multi-fuel engine the ratio is a compromise, held high for diesel ignition but capped because petrol-like fuels knock.
 - ch 7 [low] Section 2, list of steps, second bullet: 'A diesel compression ratio is too cold to ignite methane' is loose and does not match the quiz answer in Q3. At a compression ratio near 17 the charge reaches roughly 500–550 °C, which is around methane's auto-ignition temperature; the real reason methane fails is the very long ignition delay, not simply a cold charge.
 - ch 7 [low] Section 3, first line: 'High substitution at high load is where dual fuel knocks' is awkward and ambiguous; a student may read it as saying high substitution prevents knock.
-- ch 8 [high] Section 1 (paragraph 2, last sentence) and the figure caption and figure aria text: The text says the figure shows that NOx climbs above 1900 K 'while soot falls, so both are low only below that temperature', and the caption says 'NOx is low only below about 1900 K, where soot has already fallen'. The plotted data contradict this: soot is 0.9 at 1500 K, 0.85 at 1700 K and 0.6 at 1900 K, so in the whole 'below 1900 K' range soot is high, not low. A student reading the sentence and then the graph will be confused, and the sentence misstates the physics: a temperature cut alone cannot give a low-soot, low-NOx window; soot is low only at high temperature, so the lean φ condition is what closes the window.
-- ch 8 [low] Section 1, paragraph 2: 'The high-soot region sits at φ > 1.' In the standard φ–T map the soot island is centred at much richer mixtures, roughly 2 < φ < 4 for 1500 K < T < 2500 K, with φ > 1 only the start of the rich, oxygen-poor side.
-- ch 8 [low] Figure axis and caption: The φ–T map is drawn in terms of local, in-cylinder equivalence ratio and local temperature, but the figure x-axis is labelled 'peak cycle temperature'. The two are not the same quantity and the section switches between them without saying so.
-- ch 8 [low] Lead: 'They are used in research engines and in a few production petrol engines as a lean-burn mode' covers both HCCI and RCCI. HCCI has appeared in a small number of production petrol engines, but RCCI has not gone into production.
-- ch 9 [low] Section 1, Bowditch extended piston: Saying the camera 'looks along the cylinder axis' hides the folding: the light travels down the axis through the crown window, then the 45° mirror turns it out sideways, so the camera itself sits beside the engine looking horizontally.
-- ch 9 [low] Section 1, last paragraph: The sentence 'it fires only a few cycles, so cycle-to-cycle variation is large' gives the wrong cause. Firing few cycles makes the variation hard to measure; the variation itself comes from the low compression ratio, non-production chamber and uneven wall temperatures.
-- ch 9 [low] Section 2, lasers sentence: 532 nm is not the natural output of Nd:YAG; it is the frequency-doubled second harmonic. A student may quote 532 nm as the fundamental wavelength.
-- ch 9 [low] Section 2, LDA sentence: LDA measures velocity at one point; swirl or tumble is obtained only by traversing the measurement volume across the cylinder, which the sentence does not say.
+- ch 9 [high] Section 1 (paragraph 2, last sentence) and the figure caption and figure aria text: The text says the figure shows that NOx climbs above 1900 K 'while soot falls, so both are low only below that temperature', and the caption says 'NOx is low only below about 1900 K, where soot has already fallen'. The plotted data contradict this: soot is 0.9 at 1500 K, 0.85 at 1700 K and 0.6 at 1900 K, so in the whole 'below 1900 K' range soot is high, not low. A student reading the sentence and then the graph will be confused, and the sentence misstates the physics: a temperature cut alone cannot give a low-soot, low-NOx window; soot is low only at high temperature, so the lean φ condition is what closes the window.
+- ch 9 [low] Section 1, paragraph 2: 'The high-soot region sits at φ > 1.' In the standard φ–T map the soot island is centred at much richer mixtures, roughly 2 < φ < 4 for 1500 K < T < 2500 K, with φ > 1 only the start of the rich, oxygen-poor side.
+- ch 9 [low] Figure axis and caption: The φ–T map is drawn in terms of local, in-cylinder equivalence ratio and local temperature, but the figure x-axis is labelled 'peak cycle temperature'. The two are not the same quantity and the section switches between them without saying so.
+- ch 9 [low] Lead: 'They are used in research engines and in a few production petrol engines as a lean-burn mode' covers both HCCI and RCCI. HCCI has appeared in a small number of production petrol engines, but RCCI has not gone into production.
+- ch 10 [low] Section 1, Bowditch extended piston: Saying the camera 'looks along the cylinder axis' hides the folding: the light travels down the axis through the crown window, then the 45° mirror turns it out sideways, so the camera itself sits beside the engine looking horizontally.
+- ch 10 [low] Section 1, last paragraph: The sentence 'it fires only a few cycles, so cycle-to-cycle variation is large' gives the wrong cause. Firing few cycles makes the variation hard to measure; the variation itself comes from the low compression ratio, non-production chamber and uneven wall temperatures.
+- ch 10 [low] Section 2, lasers sentence: 532 nm is not the natural output of Nd:YAG; it is the frequency-doubled second harmonic. A student may quote 532 nm as the fundamental wavelength.
+- ch 10 [low] Section 2, LDA sentence: LDA measures velocity at one point; swirl or tumble is obtained only by traversing the measurement volume across the cylinder, which the sentence does not say.
