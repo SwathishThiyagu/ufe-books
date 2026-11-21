@@ -1,13 +1,13 @@
 # bm-instr-u4: free-model run
 
-- Book: `books/bme/bm-instr/bm-instr-u4.html`
+- Book: `work/bm-instr-u4/tree/books/bme/bm-instr/bm-instr-u4.html`
 - Status: ok
 - Model calls so far: 22 (79,936 tokens in, 190,128 out), 5.8 minutes
 
 ## Checker
 
 ```
-bm-instr-u4.html: 7 chapters, 12802 words, 8 figures, 144 KB
+bm-instr-u4.html: 7 chapters, 20118 words, 8 figures, 215 KB
 OK
 ```
 
