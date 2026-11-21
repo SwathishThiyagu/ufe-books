@@ -982,3 +982,10 @@
 - Exam topics added: bonded and unbonded gauges, half and exact quarter-bridge formulas, cantilever displacement and diaphragm pressure transducers, the disposable blood-pressure transducer, Seebeck/Peltier/Thomson effects stated correctly, and biomedical uses (electrogoniometer, ventilator and spirometer flow, incubator humidity, needle thermocouples, hospital weighing).
 - Facts fixed: unit references by number replaced with topic names; underscore and caret maths; key terms for CVD, thermistor β, hot-wire, LDR, Seebeck S and load cell; Webster and Khandpur added to the textbooks; MIT and NPTEL links dropped.
 - Not verified this session: the 5 µV/V/mmHg transducer rating (same as unit 1); thermistor dissipation constants (1–2 mW/°C) and the 5 mW/°C RTD figure are typical values.
+
+## ae-struct-u2 (correction pass, 21 Nov 2026)
+
+- Packet unchanged; all 8 subtopics were in the draft, so no chapter was added. The unit is AE25C02 (Structures I) and outside the AE3501 exam, so no exam topics were added. The AE25C02 line "basic computational analysis and validation" is covered by a short paragraph in the truss chapter on checking a matrix program by hand.
+- Facts corrected from the draft: the propped cantilever's largest sagging moment is 9wL²/128 (6.75 kN·m in the example), not R_A²/(2w) (18.75), which ignored the fixing moment; distribution-factor key term said k = I/L (now 4EI/L or 3EI/L); fixed end moment key term pointed at the wrong chapter.
+- Reviewer notes on the draft that were already fixed in the draft text (sudden load four times the energy, fixed-fixed contraflexure at 0.211L, the moment-distribution sign sentence, the wL⁴/(4EI) quiz) were checked and kept.
+- Sources: MIT OpenCourseWare, NPTEL and OpenStax links dropped (university-hosted); Megson, Hibbeler and Timoshenko kept as textbooks.
