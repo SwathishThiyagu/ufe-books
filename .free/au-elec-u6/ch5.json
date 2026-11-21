@@ -1,186 +1,157 @@
 {
- "lead": "MISRA C is a coding standard that removes risky C constructs—recursion, hidden conversions, pointer arithmetic outside arrays—so embedded software behaves predictably. ISO 26262 is a functional-safety standard: it starts from a hazard, assigns an ASIL level from severity, exposure and controllability, then demands documented evidence across a safety lifecycle. Suppliers use both together: MISRA keeps the code clean, ISO 26262 proves the item is safe enough. Only a few universities teach this material in depth.",
- "prereq": "You need: <a href=\"#can-and-can-fd-protocols\">Chapter 6.2</a> for how ECUs exchange safety-relevant frames, and <a href=\"#on-board-diagnostics-obd-ii\">Chapter 6.4</a> for diagnostic monitors that feed fault detection.",
+ "lead": "Infotainment traffic is different from control traffic: audio and video must flow without a break, at megabits per second, between the head unit, amplifier, navigation, phone and displays. MOST (Media Oriented Systems Transport) was built for this. It is a ring, usually of plastic optical fibre, in which a timing master sends frames at the audio sample rate and every device takes its stream out of the frame and puts its own in. The ring is joined to the car's CAN, LIN and FlexRay buses by a gateway. This chapter explains MOST, the ways networks are coupled and what a central gateway does, with channel and delay numbers worked out.",
+ "prereq": "You need the ring topology and OSI layers from <a href=\"#network-topology-osi-model-and-classification-of-bus-systems\">topology, OSI model and classification</a>, and the CAN frame time from <a href=\"#can-and-can-fd-protocols\">CAN and CAN FD</a>.",
  "sections": [
   {
-   "h3": "MISRA C: rules and deviations",
+   "h3": "MOST: a synchronous ring for media",
    "blocks": [
     {
      "type": "p",
-     "text": "MISRA C is a coding standard for C in embedded systems. MISRA C:2012 classifies each guideline as mandatory, required or advisory. A required guideline must be followed or formally deviated; a deviation is a written permit with justification and risk analysis, not a silent exception."
+     "text": "In a MOST network up to 64 devices are joined in a <b>ring</b>: each device receives from the one before and sends to the one after. MOST25 uses <b>plastic optical fibre</b> (POF) with a 1 mm core and a red LED: light, cheap and immune to electrical noise. MOST50 and MOST150 can also run on copper wires."
     },
     {
      "type": "p",
-     "text": "The rules remove risky constructs. Common rules: no recursion; no use of the dynamic memory allocation and deallocation functions (malloc, calloc, realloc, free) at all; no implicit conversion that loses a value; braces on every if and else body; no pointer arithmetic outside an array; and check every return value that reports an error. If a project needs a one-off start-up allocation, that is a documented deviation, not a MISRA rule. MISRA also limits features that are hard to analyse statically, such as macros with side effects."
+     "text": "One device, usually the head unit, is the <b>timing master</b>. It sends frames round the ring without a pause at the system frequency, 44.1 kHz (the CD sample rate) or 48 kHz. Every other device is a <b>timing slave</b>: it recovers the clock from the arriving frames, takes the bytes meant for it, puts its own bytes into the free places and passes the frame on. Because every device runs on the master's clock, audio arrives one sample per frame with no buffering and no lost samples."
     },
     {
      "type": "p",
-     "text": "A static-analysis tool checks the source. The team fixes each violation or records a deviation. Passing MISRA gives disciplined code, not proof of functional safety. Generated code must pass the same checks or the generator must be qualified."
+     "text": "At the application layer each device is described by <b>function blocks</b> (for example an amplifier block or a tuner block) that other devices control with short control messages. Because the ring passes through every device, one broken fibre or one dead device stops the whole ring; MOST therefore has a <b>ring break diagnosis</b> that finds the position of the break, and the gateway reports it to the workshop tester."
     }
    ]
   },
   {
-   "h3": "ISO 26262: hazard to ASIL to evidence",
+   "h3": "The MOST25 frame and its three channels",
    "blocks": [
     {
      "type": "p",
-     "text": "ISO 26262:2018 is the functional-safety standard for road vehicles. It has parts 1–12 and follows a V-model: requirements, implementation, then verification. Part 3 is the concept phase; part 6 covers software."
+     "text": "A MOST25 frame is 64 bytes (512 bits): 1 byte of header (preamble and boundary descriptor), 60 bytes of data, 2 bytes of control data and 1 byte of trailer (frame control and parity). The 60 data bytes are split, by the boundary descriptor, between two channels:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Synchronous channel:</b> byte positions reserved for one stream for as long as it plays. A 16-bit stereo audio stream sends one sample of each side per frame, so it needs 4 bytes in every frame.",
+      "<b>Asynchronous channel:</b> the rest of the 60 bytes, shared by packet data such as map tiles, address books and pictures, which can wait a little.",
+      "<b>Control channel:</b> the 2 control bytes of each frame. A control message is spread over a block of 16 frames, and the channel carries commands (\"amplifier, volume up\"), status and network management."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "R = bytes per frame × 8 × f",
+     "where": "R is the data rate of a channel in bit/s; f is the frame rate, equal to the system frequency (44 100 frames per second at 44.1 kHz). The whole 64-byte frame gives 64 × 8 × 44 100 = 22.58 Mbit/s, often quoted as about 23 Mbit/s for MOST25."
     },
     {
      "type": "p",
-     "text": "The item definition fixes the boundary: which ECUs, sensors, actuators and functions are inside. HARA (hazard analysis and risk assessment) studies each hazardous event. It rates severity S0–S3, exposure E0–E4 and controllability C0–C3. The combination gives an ASIL: A, B, C or D, with D the highest, or QM when no safety requirement applies."
+     "text": "MOST50 doubles the frame to 1024 bits and MOST150 makes it 3072 bits, about 150 Mbit/s at 48 kHz; MOST150 also adds a channel that carries Ethernet packets and one for isochronous video. Many new cars now use Ethernet with AVB/TSN for media instead."
+    }
+   ]
+  },
+  {
+   "h3": "Coupling networks: repeaters, bridges, routers and gateways",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Two networks can be joined at different OSI layers. A <b>repeater</b> (layer 1) only regenerates the signal, so both sides are one network. A <b>bridge</b> (layer 2) joins two segments of the same protocol and passes only frames that must cross. A <b>router</b> (layer 3) chooses a path between networks by address. A <b>gateway</b> works up to layer 7 and joins networks with different protocols, rates and frame formats. In a car, the buses are of different kinds, so they are coupled through gateways, most often one <b>central gateway</b> with a port on every domain bus."
     },
     {
      "type": "p",
-     "text": "Each hazardous event produces a safety goal, such as 'no unintended full braking at speed'. The safety goal inherits the ASIL. The technical safety concept names safety mechanisms: plausibility checks, watchdog timers, redundant sensors and safe states. ASIL decomposition can split a requirement into two independent lower-ASIL requirements, but independence must be demonstrated."
+     "text": "The central gateway does six jobs:"
+    },
+    {
+     "type": "steps",
+     "items": [
+      "<b>Message routing:</b> a routing table says which identifiers received on one bus are sent on which other buses; the rest are dropped.",
+      "<b>Signal routing:</b> it unpacks signals from incoming frames and packs them into new frames for the other bus, for example engine speed and coolant temperature into one body-bus frame for the cluster.",
+      "<b>Rate adaptation:</b> it buffers frames between a 500 kbit/s bus and a 125 kbit/s bus, or between CAN and MOST, and may send a fast-changing signal less often on the slow side.",
+      "<b>Filtering and protection:</b> it blocks frames that must not cross, so the infotainment side can never send a brake or steering message.",
+      "<b>Diagnostic routing:</b> the OBD socket is wired to the gateway, which passes the tester's requests to every ECU on every bus.",
+      "<b>Network management:</b> it wakes the buses when a door opens or a key is used and lets them sleep when the car is parked."
+     ]
     },
     {
      "type": "p",
-     "text": "The fault tolerant time interval (FTTI) is the minimum time from the occurrence of a fault to the possible occurrence of a hazardous event. The safety mechanism must detect the fault and finish the safe reaction inside that interval. Detection budget = FTTI − sensor sampling − confirmation − actuator."
-    },
-    {
-     "type": "p",
-     "text": "Hardware metrics judge the architecture using failure rates and diagnostic coverage. SPFM = 1 − (λ<sub>SPF</sub> + λ<sub>RF</sub>)/λ<sub>total</sub>, where λ<sub>SPF</sub> is single-point fault rate, λ<sub>RF</sub> residual fault rate, λ<sub>total</sub> total failure rate; the diagnostic coverage of each safety mechanism is an input to these numbers. LFM judges how well latent (hidden) faults are covered. Verification includes tests, fault injection and independent assessment. MISRA supports the software part, but it does not replace HARA or metrics."
+     "text": "A networked car of today is an example: a 500 kbit/s powertrain CAN (engine, gearbox), a chassis CAN or FlexRay (ABS and ESP, steering, suspension), a 125 kbit/s body CAN with LIN sub-buses (doors, seats, climate), a MOST ring or Ethernet for infotainment, and the OBD socket, all meeting at the gateway. A frame that crosses waits for its turn in the gateway, so the delay of a crossing message is the sum of its frame time on the input bus, the gateway's processing time, any wait for the output bus and its frame time on the output bus."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 2,
-  "caption": "The safety lifecycle moves from item definition to hazard analysis, safety goals with ASIL, technical concept, implementation and verification. The safety-goal step fixes the ASIL, and every later step must supply evidence for it.",
-  "spec": {
-   "type": "blocks",
-   "direction": "down",
-   "title": "ISO 26262 safety lifecycle",
-   "nodes": [
-    {
-     "id": "a",
-     "label": "Item definition",
-     "note": "boundary and function",
-     "style": "normal"
-    },
-    {
-     "id": "b",
-     "label": "Hazard analysis",
-     "note": "HARA",
-     "style": "normal"
-    },
-    {
-     "id": "c",
-     "label": "Safety goals",
-     "note": "ASIL A-D",
-     "style": "accent"
-    },
-    {
-     "id": "d",
-     "label": "Technical concept",
-     "note": "safety mechanisms",
-     "style": "normal"
-    },
-    {
-     "id": "e",
-     "label": "Implementation",
-     "note": "software and hardware",
-     "style": "normal"
-    },
-    {
-     "id": "f",
-     "label": "Verification",
-     "note": "tests and metrics",
-     "style": "live"
-    }
-   ],
-   "edges": [
-    {
-     "from": "a",
-     "to": "b",
-     "style": "solid"
-    },
-    {
-     "from": "b",
-     "to": "c",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "d",
-     "to": "e",
-     "style": "solid"
-    },
-    {
-     "from": "e",
-     "to": "f",
-     "style": "solid"
-    }
-   ],
-   "aria": "Block diagram of the ISO 26262 safety lifecycle from item definition to verification."
-  }
- },
  "examples": [
   {
-   "question": "A safety goal has FTTI = 200 ms. Sensor sampling takes 20 ms, two-frame confirmation takes 40 ms, and the actuator needs 30 ms. Find the time left for fault detection.",
+   "question": "A MOST25 ring runs at 44.1 kHz. The head unit plays a 16-bit stereo radio stream to the amplifier, and the DVD player sends 6-channel 16-bit surround sound. (a) What is the rate of one stereo stream and how many bytes per frame does it need? (b) How many bytes do the two streams use, and what asynchronous rate is left in the 60 data bytes? (c) How many stereo streams could the frame carry at most? (d) What is the control channel rate?",
    "steps": [
-    "Write the budget: detection time = FTTI − sampling − confirmation − actuation.",
-    "Substitute: 200 ms − 20 ms − 40 ms − 30 ms.",
-    "Add the three delays: 20 + 40 + 30 = 90 ms.",
-    "Subtract: 200 ms − 90 ms = 110 ms."
+    "(a) Stereo rate = 44 100 samples/s × 16 bits × 2 sides = 1 411 200 bit/s = 1.41 Mbit/s. Per frame: 2 sides × 16 bits = 32 bits = 4 bytes.",
+    "(b) Surround: 6 channels × 2 bytes = 12 bytes per frame. Both streams: 4 + 12 = 16 synchronous bytes.",
+    "Bytes left for the asynchronous channel: 60 − 16 = 44 bytes. Rate = 44 × 8 × 44 100 = 15 523 200 bit/s ≈ 15.5 Mbit/s.",
+    "(c) Most stereo streams: 60 ÷ 4 = 15 if every data byte were synchronous.",
+    "(d) Control channel: 2 bytes × 8 × 44 100 = 705 600 bit/s = 705.6 kbit/s."
    ],
-   "answer": "The detection logic has 110 ms after sampling and confirmation, so the fault must be flagged by 20 + 40 + 110 = 170 ms after it occurs; the actuator then brings the item to the safe state by 200 ms.",
-   "check": "ftti_ms = 200\nsampling_ms = 20\nconfirmation_ms = 40\nactuator_ms = 30\ndetection_ms = ftti_ms - sampling_ms - confirmation_ms - actuator_ms\nprint(detection_ms)",
-   "values": [
-    110
+   "answer": "(a) 1.41 Mbit/s, 4 bytes per frame; (b) 16 bytes used, about 15.5 Mbit/s left for packet data; (c) 15 stereo streams at most; (d) 705.6 kbit/s for control."
+  },
+  {
+   "question": "The central gateway forwards a standard 8-data-byte frame (111 bits with the interframe space, no stuffing) from the 500 kbit/s powertrain CAN to the 125 kbit/s body CAN. Its processing takes 0.20 ms and the body bus is free. (a) Find the delay from the start of the frame on the powertrain bus to the end of its copy on the body bus. (b) The gateway forwards 10 such frames every 20 ms. What load do they put on the body bus?",
+   "steps": [
+    "Input frame time: 111 bits ÷ 500 000 bit/s = 0.000222 s = 0.222 ms.",
+    "Output frame time: 111 bits ÷ 125 000 bit/s = 0.000888 s = 0.888 ms.",
+    "Total delay = 0.222 + 0.20 + 0 + 0.888 = 1.31 ms.",
+    "Bits per second on the body bus: 10 × 111 bits ÷ 0.020 s = 1110 ÷ 0.020 = 55 500 bit/s.",
+    "Load: 55 500 ÷ 125 000 = 0.444, that is 44.4 per cent of the body bus from forwarded frames alone."
    ],
-   "output": ""
+   "answer": "(a) 1.31 ms; (b) 44.4 per cent, so the gateway must forward only the frames the body bus really needs, or send them less often."
   }
  ],
  "traps": [
-  "Passing MISRA checks proves ISO 26262 compliance — false; MISRA is coding evidence only.",
-  "ASIL D is the highest integrity level, not a component grade you can buy.",
-  "FTTI is not the same as detection time; it includes sensing, confirmation and actuation.",
-  "ASIL decomposition does not lower the safety goal; it splits it into independent requirements.",
-  "QM is not ASIL 0; it means quality management with no ASIL safety requirement."
+  "MOST is not arbitrated like CAN. Synchronous streams own fixed byte positions in every frame; only the asynchronous and control channels are shared.",
+  "One broken fibre stops the whole MOST ring, not just the next device; this is why the ring break diagnosis exists.",
+  "A gateway is not a repeater or a bridge: it translates between different protocols and decides which signals cross, up to OSI layer 7.",
+  "Forwarding is not free: the crossing message pays its frame time on both buses plus the gateway's processing, and the slow bus pays its load.",
+  "The MOST frame rate equals the audio sample rate (44.1 or 48 kHz), so a stream uses bytes per frame, not bits per second, in the frame budget."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "What is a MISRA deviation?",
+   "q": "What do the letters MOST stand for, and what topology and medium does MOST25 use?",
    "marks": 2,
-   "a": "A documented permit to break a required guideline, with justification and risk analysis."
+   "a": "Media Oriented Systems Transport. A ring of up to 64 devices on plastic optical fibre with a red LED."
   },
   {
    "level": "understand",
-   "q": "Why does MISRA C ban recursion?",
+   "q": "What does the timing master do in a MOST ring?",
    "marks": 3,
-   "a": "Stack depth becomes hard to bound, so worst-case memory use cannot be proved."
+   "a": "It sends frames continuously at the system frequency (44.1 or 48 kHz). The other devices recover their clock from these frames, so every stream is in step with one clock."
   },
   {
    "level": "apply",
-   "q": "An FTTI is 150 ms. Sampling is 10 ms, confirmation is 20 ms, actuator is 20 ms. Find the detection budget.",
-   "marks": 4,
-   "a": "150 − 10 − 20 − 20 = 100 ms."
+   "q": "A mono 16-bit navigation voice stream runs on MOST25 at 44.1 kHz. How many bytes per frame and what rate does it use?",
+   "marks": 3,
+   "a": "One 16-bit sample per frame = 2 bytes. Rate = 2 × 8 × 44 100 = 705.6 kbit/s."
+  },
+  {
+   "level": "apply",
+   "q": "A gateway forwards a 111-bit frame from 500 kbit/s CAN to 250 kbit/s CAN with 0.1 ms processing. Find the delay.",
+   "marks": 3,
+   "a": "0.222 ms + 0.1 ms + 111 ÷ 250 000 = 0.444 ms, total 0.766 ms."
+  },
+  {
+   "level": "understand",
+   "q": "Explain the difference between a bridge and a gateway.",
+   "marks": 3,
+   "a": "A bridge joins two segments of the same protocol at layer 2 and passes frames unchanged. A gateway joins different protocols, rates and formats, and can unpack, repack, filter and re-time signals up to layer 7."
   },
   {
    "level": "analyze",
-   "q": "A team passes MISRA but has no HARA. Can it claim ASIL B compliance?",
-   "marks": 5,
-   "a": "No. MISRA is coding evidence only; ASIL B also needs HARA, safety goals, technical concept and confirmation measures."
-  },
-  {
-   "level": "understand",
-   "q": "ASIL D versus QM?",
-   "marks": 3,
-   "a": "ASIL D is the highest safety integrity level; QM means normal quality management with no ASIL requirement."
-  },
-  {
-   "level": "apply",
-   "q": "An ASIL D safety requirement is split into two requirements. What ASILs may they take, and what must be shown?",
+   "q": "Why should the gateway block messages from the infotainment bus to the chassis bus?",
    "marks": 4,
-   "a": "ASIL B(D) + ASIL B(D), or ASIL C(D) + ASIL A(D); the two must be sufficiently independent, each keeps the D tag, and together they must meet the original ASIL D requirement."
+   "a": "The infotainment side runs large software and is connected to phones, USB and the internet, so it is the easiest part to attack or to crash. If it could send chassis frames, a fault or attacker there could command brakes or steering. Filtering keeps safety domains separate."
   }
  ],
- "beyond": "Not for the exam. In industry, teams use static analysers with MISRA rule sets and keep a traceable safety case in requirements tools. ISO 21448 (SOTIF) extends safety thinking to performance limits of sensors and ADAS. Search for 'MISRA C:2012 Amendment 2', 'ISO 26262-6 software', 'ASIL decomposition' and 'SPFM LFM calculation'."
+ "beyond": "Not for the exam. Gateways are turning into central computers or zone controllers with Ethernet backbones, and media links are moving from MOST to Ethernet AVB/TSN. Search for central gateway ECU, AVB audio and AUTOSAR PDU router.",
+ "figure": {
+  "after_section": 3,
+  "caption": "A central gateway joins the powertrain, chassis and body buses, a MOST ring for media and the OBD socket. A frame crossing from the powertrain bus to the body bus takes 1.31 ms in the worked example.",
+  "spec": {
+   "type": "svg",
+   "h": 410,
+   "body": "<rect x=\"286.0\" y=\"14.0\" width=\"100.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--live-soft);stroke:var(--live);stroke-width:2\"/><text x=\"336.0\" y=\"35.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">OBD socket</text><line x1=\"336.0\" y1=\"48.0\" x2=\"336.0\" y2=\"74.0\" style=\"stroke:var(--live);stroke-width:2\"/><rect x=\"286.0\" y=\"74.0\" width=\"100.0\" height=\"270.0\" rx=\"10\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"336.0\" y=\"114.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Central</text><text x=\"336.0\" y=\"134.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">gateway</text><text x=\"336.0\" y=\"154.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\"></text><text x=\"336.0\" y=\"174.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">routing</text><text x=\"336.0\" y=\"194.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">table,</text><text x=\"336.0\" y=\"214.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">filter,</text><text x=\"336.0\" y=\"234.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">buffers</text><line x1=\"20.0\" y1=\"112.0\" x2=\"286.0\" y2=\"112.0\" style=\"stroke:var(--accent);stroke-width:3\"/><line x1=\"80.0\" y1=\"98.0\" x2=\"80.0\" y2=\"112.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"34.0\" y=\"68.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"80.0\" y=\"87.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Engine</text><line x1=\"202.0\" y1=\"98.0\" x2=\"202.0\" y2=\"112.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"156.0\" y=\"68.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"202.0\" y=\"87.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Gearbox</text><text x=\"24.0\" y=\"132.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">Powertrain CAN 500 kbit/s</text><line x1=\"20.0\" y1=\"212.0\" x2=\"286.0\" y2=\"212.0\" style=\"stroke:var(--accent);stroke-width:3\"/><line x1=\"80.0\" y1=\"198.0\" x2=\"80.0\" y2=\"212.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"34.0\" y=\"168.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"80.0\" y=\"187.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">ABS/ESP</text><line x1=\"202.0\" y1=\"198.0\" x2=\"202.0\" y2=\"212.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"156.0\" y=\"168.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"202.0\" y=\"187.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Steering</text><text x=\"24.0\" y=\"232.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">Chassis CAN or FlexRay</text><line x1=\"20.0\" y1=\"312.0\" x2=\"286.0\" y2=\"312.0\" style=\"stroke:var(--accent);stroke-width:3\"/><line x1=\"80.0\" y1=\"298.0\" x2=\"80.0\" y2=\"312.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"34.0\" y=\"268.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"80.0\" y=\"287.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Body ECU</text><line x1=\"202.0\" y1=\"298.0\" x2=\"202.0\" y2=\"312.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"156.0\" y=\"268.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"202.0\" y=\"287.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Cluster</text><text x=\"24.0\" y=\"332.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">Body CAN 125 kbit/s</text><line x1=\"80.0\" y1=\"342.0\" x2=\"80.0\" y2=\"368.0\" style=\"stroke:var(--next);stroke-width:2;stroke-dasharray:5 4\"/><text x=\"92.0\" y=\"366.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--next)\">LIN: doors, seats</text><circle cx=\"572\" cy=\"208\" r=\"84\" style=\"fill:none;stroke:var(--next);stroke-width:3\"/><path d=\"M639.1,258.6 A84,84 0 0 1 622.6,275.1\" style=\"fill:none;stroke:var(--next);stroke-width:3\" marker-end=\"url(#ar-UID-x)\"/><path d=\"M521.4,275.1 A84,84 0 0 1 504.9,258.6\" style=\"fill:none;stroke:var(--next);stroke-width:3\" marker-end=\"url(#ar-UID-x)\"/><path d=\"M504.9,157.4 A84,84 0 0 1 521.4,140.9\" style=\"fill:none;stroke:var(--next);stroke-width:3\" marker-end=\"url(#ar-UID-x)\"/><path d=\"M622.6,140.9 A84,84 0 0 1 639.1,157.4\" style=\"fill:none;stroke:var(--next);stroke-width:3\" marker-end=\"url(#ar-UID-x)\"/><rect x=\"438.0\" y=\"187.0\" width=\"100.0\" height=\"42.0\" rx=\"8\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"488.0\" y=\"204.1\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Head unit</text><text x=\"488.0\" y=\"221.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">timing master</text><rect x=\"526.0\" y=\"109.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--next);stroke-width:2\"/><text x=\"572.0\" y=\"128.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Amplifier</text><rect x=\"610.0\" y=\"193.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--next);stroke-width:2\"/><text x=\"656.0\" y=\"212.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Navigation</text><rect x=\"526.0\" y=\"277.0\" width=\"92.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--next);stroke-width:2\"/><text x=\"572.0\" y=\"296.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Rear display</text><line x1=\"386.0\" y1=\"208.0\" x2=\"438.0\" y2=\"208.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><text x=\"572.0\" y=\"338.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\">MOST ring: frames at 44.1 kHz</text><text x=\"360.0\" y=\"394.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Engine frame to the body bus: 0.222 ms in + 0.20 ms gateway + 0.888 ms out = 1.31 ms</text>",
+   "aria": "Gateway box with three CAN buses on the left, the OBD socket on top and a four-device MOST ring on the right with the head unit as timing master."
+  }
+ }
 }

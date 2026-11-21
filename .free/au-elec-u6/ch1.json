@@ -1,209 +1,162 @@
 {
- "lead": "A vehicle network lets many electronic control units (ECUs) talk over one shared medium instead of one wire per signal. A bus cuts harness weight, cost and connector count. It also makes new functions possible, because one sensor value can reach the engine, brake and dashboard computers at once. This chapter explains nodes, gateways, topologies, bandwidth, latency and determinism, and shows why a protocol must decide who talks when. The same ideas run from a cheap body bus for door switches to a high-speed bus for engine and brake control.",
- "prereq": "You need Unit 1 power distribution and harness basics, and Unit 3 sensor and actuator signal conditioning.",
+ "lead": "A modern car has tens of electronic control units (ECUs), and most of them need data that another ECU measures. Running one copper wire for every signal between every pair of units makes a harness that is heavy, costly and full of connectors that can fail. A <b>data bus</b> solves this: all the units share one pair of wires and send their data as short numbered messages. This chapter explains how data moves between automotive electronic systems, why one signal is used by many systems at once, and what a vehicle bus must guarantee before it can carry engine, brake or door data.",
+ "prereq": "You need the vehicle power supply, wire sizing and circuit diagrams, and the idea of a sensor that gives an electrical signal.",
  "sections": [
   {
-   "h3": "Nodes, ECUs and the wiring problem",
+   "h3": "Data transfer between ECUs: wires, signals and messages",
    "blocks": [
     {
      "type": "p",
-     "text": "A <b>node</b> is any device that can send or receive messages on the network. An <b>electronic control unit (ECU)</b> is a small computer that reads sensors and drives actuators; each ECU is a node. A <b>gateway</b> is a node that joins two buses and forwards selected messages between them."
+     "text": "An <b>electronic control unit (ECU)</b> is a small computer: a microcontroller with memory, input circuits for sensors, output drivers for actuators and a communication interface. A <b>node</b> is anything that sends or receives on a network; every ECU is a node, and so is the diagnostic socket when a scan tool is plugged in. A <b>signal</b> is one quantity, such as engine speed or a door-open switch. A <b>message</b> (or frame) is one packet on the bus; one message usually carries several signals packed side by side."
     },
     {
      "type": "p",
-     "text": "In early cars, each switch, sensor and lamp had its own copper wire back to a fuse box. That bundle is the <b>harness</b>. Adding one feature meant adding wires, connectors and weight. A <b>data bus</b> replaces most of that web with one shared medium, usually a twisted pair. Every node hears the same signal, and a protocol decides who may transmit. A <b>transceiver</b> is the transmit and receive circuit at each node that drives the pair."
+     "text": "In the older <b>point-to-point</b> method, each signal has its own wire from the unit that measures it to every unit that uses it. If engine speed is needed by the instrument cluster, the gearbox ECU and the air-conditioning ECU, three wires carry the same value. With a <b>serial data bus</b>, the engine ECU puts engine speed into one message, sends it once, and every unit that needs it reads it. Sending many signals over one medium in turn is called <b>multiplexing</b>."
     },
     {
      "type": "formula",
      "text": "L = n(n − 1) / 2",
-     "where": "L is the number of links for full point-to-point connection; n is the number of nodes. A bus needs one medium and n transceivers, one per node."
+     "where": "L is the number of links needed to join every one of n units directly to every other one. A bus needs one shared pair of wires and one transceiver (the transmit-receive circuit) per unit, so its cost grows only as n."
     },
     {
      "type": "p",
-     "text": "With three ECUs, point-to-point needs 3 × 2 / 2 = 3 links; the bus needs one medium and three transceivers. The figure shows engine, brake and door ECUs on one CAN bus, with a gateway to a slower LIN body bus. For n = 12 ECUs, full point-to-point wiring needs 66 links, so 66 twisted pairs and 132 transceiver ends. One bus needs one medium and 12 transceivers. The saving grows quickly with n."
+     "text": "Inside one ECU, chips talk over short board-level links, which some syllabi call communication protocols in embedded systems: <b>UART</b> (start and stop bits; also the basis of LIN), <b>SPI</b> (a fast clocked link to memory or driver chips) and <b>I²C</b> (two wires shared by sensors). They work over centimetres; a vehicle bus must work over metres of harness, in electrical noise, between units from different suppliers."
     }
    ]
   },
   {
-   "h3": "Topologies and the electrical medium",
+   "h3": "Cross-system functions and shared signals",
    "blocks": [
     {
      "type": "p",
-     "text": "<b>Topology</b> is the arrangement of nodes and links. In a <b>bus</b> topology, all nodes tap the same medium. In a <b>star</b>, each node has its own link to a central hub or switch. In a <b>ring</b>, nodes form a closed loop and each node connects to two neighbours. A vehicle often uses a bus inside a domain and a star-like switched backbone between domains."
+     "text": "A <b>cross-system function</b> is a vehicle feature that no single ECU can perform alone. It is the strongest reason for networking. Some everyday examples:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Traction control:</b> the ABS ECU sees a driven wheel spinning faster than the others and sends a torque-reduction request; the engine ECU retards ignition or closes the throttle.",
+      "<b>Wheel speed:</b> measured once by the ABS ECU, it is used by the speedometer, the odometer, the navigation unit, the electric power steering (lighter steering at low speed) and the gearbox ECU.",
+      "<b>Automatic gear shift:</b> the gearbox ECU asks the engine ECU for a short torque dip during each shift, so the shift is smooth.",
+      "<b>Crash unlock:</b> the airbag ECU sends a crash message; the body ECU unlocks the doors and switches on the hazard lamps."
+     ]
     },
     {
      "type": "p",
-     "text": "The physical medium matters. A twisted pair carries the two signal wires close together, so external noise adds almost equally to both wires. The receiver reads the difference, so <b>common-mode noise</b> cancels. A CAN bus uses 120 Ω termination at each end of the pair. The termination absorbs reflections and keeps the differential signal clean. Missing or extra termination causes ringing and errors, not extra speed."
-    },
-    {
-     "type": "p",
-     "text": "Fault diagnosis starts at the physical layer: open wire, short to ground, short to battery, or a node holding the bus dominant. A gateway can report which bus is faulty, but it cannot repair a broken wire. The protocol must also detect errors and stop a bad node from blocking everyone."
+     "text": "Car makers group ECUs into <b>domains</b> by the kind of data they exchange: powertrain (engine, gearbox), chassis (ABS, ESP, steering, suspension), body and comfort (doors, seats, lamps, climate), infotainment (radio, navigation, phone, displays) and diagnostics. Each domain has its own bus, chosen for its needs, and a <b>gateway</b> ECU joins the domains and forwards only the messages that must cross."
     }
    ]
   },
   {
-   "h3": "Bandwidth, latency, determinism and bus classes",
+   "h3": "Requirements for a vehicle bus",
    "blocks": [
     {
      "type": "p",
-     "text": "<b>Bandwidth</b> is the maximum bit rate, in bit/s. <b>Latency</b> is the delay from a node starting a message to another node receiving it, in ms or µs. <b>Determinism</b> means the worst-case delay is bounded and known, not just small on average. Brake and steering messages need determinism; a door-lock message can tolerate more delay."
+     "text": "A vehicle bus is judged on a short list of requirements. The examiner expects you to name them and to say which systems need which."
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Data rate (bandwidth):</b> the bits per second the bus can carry, from about 20 kbit/s for a door module to 100 Mbit/s for a camera.",
+      "<b>Latency:</b> the delay from a unit deciding to send a value to the receiver having it, in milliseconds or microseconds.",
+      "<b>Determinism:</b> the worst-case delay is known and guaranteed, not just small on average. Brakes and steering need this; a seat motor does not.",
+      "<b>Reliability:</b> errors must be detected (check sums, acknowledgement) and a faulty node must not block the others.",
+      "<b>Fault tolerance:</b> some functions must keep working after a broken wire or a failed node.",
+      "<b>EMC:</b> the bus must not radiate interference and must survive ignition and motor noise.",
+      "<b>Cost per node, sleep and wake-up:</b> cheap enough for dozens of small units, and able to sleep in a parked car and wake on a message.",
+      "<b>Expandability and diagnosis:</b> new units can be added without rewiring, and a workshop tester can reach every unit."
+     ]
     },
     {
      "type": "p",
-     "text": "Some syllabi group buses into classes. Class A is body and comfort, below 10 kbit/s. Class B is low-speed data, often 10 kbit/s to 125 kbit/s. Class C is high-speed powertrain, often 125 kbit/s to 1 Mbit/s. Class D is safety and time-triggered, with strict timing. These are labels, not fixed law; always check the standard for exact rates."
+     "text": "Because the bus is shared, its time is a limited resource. The <b>bus load</b> U is the fraction of time the bus is busy:"
     },
     {
-     "type": "p",
-     "text": "One medium means shared bandwidth. If two nodes transmit together, their signals collide. The protocol must decide who talks when. CAN uses bit-wise arbitration: a dominant 0 beats a recessive 1, and the lowest identifier wins without losing data. See <a href=\"#can-and-can-fd-protocols\">6.2</a> for the frame details. The trade-off is simple: fewer wires, but a shared resource that needs rules."
+     "type": "formula",
+     "text": "U = (Σ bits per message ÷ period of that message) ÷ bit rate",
+     "where": "the sum runs over every periodic message; bits per message is the frame length on the wire; the period is how often the message is sent (s); the bit rate is in bit/s. A common design target is to keep U below about 60 to 70 per cent, so that retries after errors and messages added later still fit."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "Three ECUs share one two-wire CAN bus; a gateway joins that bus to a slower LIN body bus. Notice that every ECU has one connection to the shared medium, not one link to every other ECU.",
-  "spec": {
-   "type": "blocks",
-   "direction": "down",
-   "title": "ECUs sharing one bus through a gateway",
-   "nodes": [
-    {
-     "id": "a",
-     "label": "ECU 1",
-     "note": "engine",
-     "style": "normal"
-    },
-    {
-     "id": "b",
-     "label": "ECU 2",
-     "note": "brake",
-     "style": "normal"
-    },
-    {
-     "id": "c",
-     "label": "ECU 3",
-     "note": "door",
-     "style": "normal"
-    },
-    {
-     "id": "d",
-     "label": "CAN bus",
-     "note": "twisted pair, 2 wires",
-     "style": "accent"
-    },
-    {
-     "id": "e",
-     "label": "Gateway",
-     "note": "routes between buses",
-     "style": "next"
-    },
-    {
-     "id": "f",
-     "label": "Body bus",
-     "note": "LIN",
-     "style": "muted"
-    }
-   ],
-   "edges": [
-    {
-     "from": "a",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "b",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "d",
-     "to": "e",
-     "style": "solid"
-    },
-    {
-     "from": "e",
-     "to": "f",
-     "style": "solid"
-    }
-   ],
-   "aria": "Block diagram: three ECUs share one two-wire bus, which reaches other buses through a gateway."
-  }
- },
  "examples": [
   {
-   "question": "A car has 12 ECUs. Each ECU must exchange one signal with every other ECU. Compare full point-to-point wiring with one shared bus. Find the number of links, transceiver ends, and bus transceivers.",
+   "question": "A car has 12 ECUs, and each must exchange data with every other ECU. (a) How many links does full point-to-point wiring need, and how many line driver circuits at the link ends? (b) How many transceivers does one shared bus need? (c) How many fewer driver circuits is that?",
    "steps": [
-    "Let n = 12 ECUs.",
-    "Full point-to-point links: L = n(n − 1) / 2 = 12 × 11 / 2 = 132 / 2 = 66 links.",
-    "Each link has two ends, so transceiver ends = 2L = 2 × 66 = 132.",
-    "One bus needs one medium and one transceiver per node: 12 transceivers.",
-    "Saving in transceiver ends = 132 − 12 = 120."
+    "Number of units: n = 12.",
+    "Links for full point-to-point wiring: L = n(n − 1) / 2 = 12 × 11 / 2 = 132 / 2 = 66 links.",
+    "Each link has a driver at each end: 2L = 2 × 66 = 132 driver circuits.",
+    "A bus needs one transceiver per unit: 12 transceivers, on one shared twisted pair.",
+    "Saving: 132 − 12 = 120 driver circuits, and 66 separate cable runs become one."
    ],
-   "answer": "Point-to-point wiring needs 66 links and 132 transceiver ends; the bus needs 12 transceivers, a saving of 120 transceiver ends.",
-   "check": "n = 12\nlinks = n * (n - 1) // 2\nends = 2 * links\nbus_trx = n\nsaving = ends - bus_trx\nprint(links)\nprint(ends)\nprint(bus_trx)\nprint(saving)",
-   "values": [
-    66,
-    132,
-    12,
-    120
+   "answer": "Point-to-point wiring needs 66 links with 132 line drivers; one bus needs 12 transceivers, 120 fewer."
+  },
+  {
+   "question": "A powertrain CAN bus runs at 500 kbit/s. Twenty messages are sent every 10 ms and eight more every 20 ms. Each message takes 125 bits on the wire. (a) Find the bus load. (b) Can four new messages of 125 bits every 10 ms be added if the load must stay under 70 per cent?",
+   "steps": [
+    "Bits per second from the 10 ms group: 20 × 125 bits ÷ 0.010 s = 2500 ÷ 0.010 = 250 000 bit/s.",
+    "Bits per second from the 20 ms group: 8 × 125 bits ÷ 0.020 s = 1000 ÷ 0.020 = 50 000 bit/s.",
+    "Total demand: 250 000 + 50 000 = 300 000 bit/s.",
+    "Bus load: U = 300 000 ÷ 500 000 = 0.60, that is 60 per cent.",
+    "New messages: 4 × 125 ÷ 0.010 = 50 000 bit/s, so the demand becomes 350 000 bit/s.",
+    "New load: 350 000 ÷ 500 000 = 0.70, exactly 70 per cent, which is not under the limit."
    ],
-   "output": ""
+   "answer": "The load is 60 per cent now; the four new messages would raise it to 70 per cent, so they do not fit under the 70 per cent limit. Send them every 20 ms (load 65 per cent) or move some messages to another bus."
   }
  ],
  "traps": [
-  "Counting every pair twice: 12 ECUs need 66 links, not 132. A bus is one shared medium, not a star with a separate link per node.",
-  "Confusing bandwidth with latency and determinism: a high bit rate does not by itself guarantee a bounded worst-case delay.",
-  "Forgetting termination: a CAN twisted pair needs 120 Ω at each end. Missing termination causes reflections, not more bandwidth.",
-  "Swapping bus classes: Class A is low-rate body control, while Class C is high-speed powertrain. Do not treat the letters as order of speed without checking."
+  "Counting each pair twice: 12 units need 66 point-to-point links, not 132. The 132 is the number of link ends.",
+  "A signal is not a message: one message usually carries several signals, so \"one wire per signal\" becomes \"one message for several signals\", not one message per signal.",
+  "High bandwidth is not determinism. A fast bus can still have an unknown worst-case delay if messages queue; determinism means the worst case is guaranteed.",
+  "Bus load uses the period of each message, not the number of messages alone: 20 messages every 10 ms load the bus twice as much as 20 messages every 20 ms.",
+  "A gateway is not a junction box: it is an ECU that decides which messages cross, and it can change their rate or format."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Define node and ECU.",
+   "q": "Define ECU, node and signal.",
    "marks": 2,
-   "a": "A node is any device that sends or receives messages on the network. An ECU is an electronic control unit, a small computer that reads sensors and drives actuators; each ECU is a node."
-  },
-  {
-   "level": "understand",
-   "q": "Why does a shared bus reduce harness weight?",
-   "marks": 3,
-   "a": "It replaces many point-to-point wires with one medium. Each node needs one transceiver and one tap, so wire count and connector count fall as node count rises."
-  },
-  {
-   "level": "apply",
-   "q": "Eight ECUs need full point-to-point links. How many links are needed?",
-   "marks": 3,
-   "a": "L = n(n − 1) / 2 = 8 × 7 / 2 = 56 / 2 = 28 links."
-  },
-  {
-   "level": "analyze",
-   "q": "Why not connect every ECU to every other ECU in a car?",
-   "marks": 4,
-   "a": "Link count grows as n(n − 1) / 2, so wiring, weight, cost and fault points grow too fast. A bus shares one medium and uses protocol rules instead."
+   "a": "An ECU is a small computer that reads sensors and drives actuators. A node is any device that sends or receives on the network. A signal is one quantity, such as engine speed, carried inside a message."
   },
   {
    "level": "remember",
-   "q": "Name bus classes A to D and their typical use.",
-   "marks": 4,
-   "a": "Class A is body control below 10 kbit/s; Class B is low-speed data; Class C is high-speed powertrain; Class D is safety and time-triggered."
+   "q": "List five requirements for a vehicle bus system.",
+   "marks": 3,
+   "a": "Any five of: data rate, latency, determinism, error detection and reliability, fault tolerance, EMC, low cost per node, sleep and wake-up, expandability, diagnostic access."
   },
   {
    "level": "understand",
-   "q": "What does determinism mean and why does braking need it?",
+   "q": "What is a cross-system function? Give two examples.",
    "marks": 3,
-   "a": "Determinism means the worst-case delay is bounded and known. Braking cannot wait for an unknown queue delay, so the protocol must guarantee a maximum time."
+   "a": "A feature that needs data or actions from more than one ECU. Examples: traction control (ABS ECU asks the engine ECU to cut torque); crash unlock (airbag ECU tells the body ECU to unlock the doors)."
+  },
+  {
+   "level": "apply",
+   "q": "Eight ECUs must all be joined point to point. How many links are needed?",
+   "marks": 3,
+   "a": "L = n(n − 1)/2 = 8 × 7/2 = 56/2 = 28 links."
+  },
+  {
+   "level": "apply",
+   "q": "A 125 kbit/s body bus carries 30 messages of 110 bits every 50 ms. Find the bus load.",
+   "marks": 4,
+   "a": "30 × 110 = 3300 bits per 0.050 s = 66 000 bit/s. U = 66 000 ÷ 125 000 = 0.528, about 53 per cent."
   },
   {
    "level": "analyze",
-   "q": "A gateway joins a CAN bus and a LIN bus. Give one benefit and one cost.",
-   "marks": 5,
-   "a": "Benefit: slow body devices do not load the fast bus; messages are forwarded only when needed. Cost: the gateway adds delay and software complexity, and it is a single point of failure that must be diagnosed."
+   "q": "A gateway joins the powertrain bus and the body bus. Give one benefit and one cost of putting them on separate buses instead of one.",
+   "marks": 4,
+   "a": "Benefit: body traffic and faults cannot load or block the powertrain bus, and the body bus can be slower and cheaper. Cost: messages that cross wait in the gateway, which adds delay and software, and the gateway itself must be diagnosed and protected."
   }
  ],
- "beyond": "Not for the exam. In production, harness cost and weight push cars toward zonal architectures, where a few domain controllers and an Ethernet backbone replace long CAN runs. Gateways become security and diagnostic borders, so they must filter messages as well as route them. Search next for CAN transceiver, 120 Ω termination, AUTOSAR, zonal architecture and time-sensitive networking."
+ "beyond": "Not for the exam. Car makers are moving from one ECU per function to a few powerful domain or zone controllers joined by an Ethernet backbone, which shortens the harness further. The gateway also becomes a security border that filters messages from the internet-connected units. Search for zonal E/E architecture and AUTOSAR.",
+ "figure": {
+  "after_section": 1,
+  "caption": "Six ECUs wired point to point need 15 links; on a bus they share one twisted pair, each with its own transceiver and a 120 Ω terminator at each end. The worked example makes the same count for 12 ECUs.",
+  "spec": {
+   "type": "svg",
+   "h": 368,
+   "body": "<text x=\"180.0\" y=\"24.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Point to point: 15 links</text><text x=\"550.0\" y=\"24.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">One shared bus: 1 pair</text><line x1=\"180.0\" y1=\"63.0\" x2=\"277.0\" y2=\"119.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"180.0\" y1=\"63.0\" x2=\"277.0\" y2=\"231.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"180.0\" y1=\"63.0\" x2=\"180.0\" y2=\"287.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"180.0\" y1=\"63.0\" x2=\"83.0\" y2=\"231.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"180.0\" y1=\"63.0\" x2=\"83.0\" y2=\"119.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"277.0\" y1=\"119.0\" x2=\"277.0\" y2=\"231.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"277.0\" y1=\"119.0\" x2=\"180.0\" y2=\"287.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"277.0\" y1=\"119.0\" x2=\"83.0\" y2=\"231.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"277.0\" y1=\"119.0\" x2=\"83.0\" y2=\"119.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"277.0\" y1=\"231.0\" x2=\"180.0\" y2=\"287.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"277.0\" y1=\"231.0\" x2=\"83.0\" y2=\"231.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"277.0\" y1=\"231.0\" x2=\"83.0\" y2=\"119.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"180.0\" y1=\"287.0\" x2=\"83.0\" y2=\"231.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"180.0\" y1=\"287.0\" x2=\"83.0\" y2=\"119.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><line x1=\"83.0\" y1=\"231.0\" x2=\"83.0\" y2=\"119.0\" style=\"stroke:var(--line2);stroke-width:1.6\"/><rect x=\"142.0\" y=\"48.0\" width=\"76.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"180.0\" y=\"67.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Engine</text><rect x=\"239.0\" y=\"104.0\" width=\"76.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"277.0\" y=\"123.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Gearbox</text><rect x=\"239.0\" y=\"216.0\" width=\"76.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"277.0\" y=\"235.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">ABS</text><rect x=\"142.0\" y=\"272.0\" width=\"76.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"180.0\" y=\"291.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Cluster</text><rect x=\"45.0\" y=\"216.0\" width=\"76.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"83.0\" y=\"235.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Body</text><rect x=\"45.0\" y=\"104.0\" width=\"76.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"83.0\" y=\"123.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Airbag</text><text x=\"180.0\" y=\"322.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--muted)\">n(n − 1)/2 = 6 × 5/2 = 15 links</text><line x1=\"384.0\" y1=\"174.0\" x2=\"706.0\" y2=\"174.0\" style=\"stroke:var(--accent);stroke-width:2.5\"/><line x1=\"384.0\" y1=\"182.0\" x2=\"706.0\" y2=\"182.0\" style=\"stroke:var(--accent);stroke-width:2.5\"/><rect x=\"372.0\" y=\"164.0\" width=\"12.0\" height=\"28.0\" rx=\"2\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><rect x=\"706.0\" y=\"164.0\" width=\"12.0\" height=\"28.0\" rx=\"2\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"400.0\" y=\"214.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\">120 Ω</text><text x=\"690.0\" y=\"214.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\">120 Ω</text><line x1=\"440.0\" y1=\"98.0\" x2=\"440.0\" y2=\"174.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"398.0\" y=\"68.0\" width=\"84.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"440.0\" y=\"87.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Engine</text><line x1=\"440.0\" y1=\"182.0\" x2=\"440.0\" y2=\"258.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"398.0\" y=\"258.0\" width=\"84.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"440.0\" y=\"277.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Cluster</text><line x1=\"545.0\" y1=\"98.0\" x2=\"545.0\" y2=\"174.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"503.0\" y=\"68.0\" width=\"84.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"545.0\" y=\"87.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Gearbox</text><line x1=\"545.0\" y1=\"182.0\" x2=\"545.0\" y2=\"258.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"503.0\" y=\"258.0\" width=\"84.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"545.0\" y=\"277.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Body</text><line x1=\"650.0\" y1=\"98.0\" x2=\"650.0\" y2=\"174.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"608.0\" y=\"68.0\" width=\"84.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"650.0\" y=\"87.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">ABS</text><line x1=\"650.0\" y1=\"182.0\" x2=\"650.0\" y2=\"258.0\" style=\"stroke:var(--accent);stroke-width:2\"/><rect x=\"608.0\" y=\"258.0\" width=\"84.0\" height=\"30.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"650.0\" y=\"277.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Airbag</text><rect x=\"468.8\" y=\"153.7\" width=\"46.4\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"492.0\" y=\"166.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">CAN_H</text><rect x=\"574.8\" y=\"187.7\" width=\"46.4\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"598.0\" y=\"200.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">CAN_L</text><text x=\"545.0\" y=\"322.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--muted)\">6 transceivers on one twisted pair</text><text x=\"360.0\" y=\"352.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Worked example, 12 ECUs: 66 links and 132 line drivers, or 1 bus and 12 transceivers</text>",
+   "aria": "Left: six ECUs joined by 15 crossing links. Right: the same six ECUs tapping one two-wire bus with a terminator at each end."
+  }
+ }
 }

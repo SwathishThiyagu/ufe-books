@@ -48,3 +48,10 @@ OK
 - ch 8 [low] Section 1: The US band is given as 5.85–5.925 GHz without noting the 2020 FCC reallocation, in which the lower 45 MHz went to unlicensed use, so the figure is out of date for a student reading current material.
 - ch 8 [low] Figure: The text lists IEEE 1609.2 security as one of the four 1609 standards, but the stack diagram leaves it out, so a student may think security sits outside the stack.
 - ch 8 [low] Quiz Q5: 1609.1 is a resource manager for applications, not a protocol layer in the stack, so calling all four 'IEEE 1609 layers' is loose and conflicts with the Figure.
+
+## Correction pass (Claude, 21 Nov 2026)
+
+- Packet on main now has 10 chapters: new 6.2 Network topology, OSI model and classification of bus systems and new 6.5 MOST and coupling of networks through gateways; the draft's chapters 2 to 8 moved to 3, 4, 6, 7, 8, 9, 10 (review files renamed to match).
+- Every chapter rewritten from the draft against the exam course topics; every example and quiz answer traced; every reviewer flag above fixed.
+- Every figure hand-drawn (pipeline/claude_figs/au_elec_u6.py); 15 long questions with full model answers.
+- Checker: OK with --render.

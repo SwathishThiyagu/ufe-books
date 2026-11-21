@@ -1,247 +1,212 @@
 {
- "lead": "OBD-II, short for On-Board Diagnostics second generation, is a standard that lets one scan tool plug into almost any car made after the late 1990s and read emissions-related faults. It fixes the 16-pin connector, the electrical pins, the message services and the fault-code format. A mechanic, a fleet owner or an inspection centre uses it to find why the malfunction indicator lamp is on, to read live sensor data, and to check that the engine control unit has finished its self-tests. The same socket also gives the vehicle identification number.",
- "prereq": "You need: <a href=\"#can-and-can-fd-protocols\">Chapter 6.2</a> for CAN frames, identifiers and the physical layer, because most OBD-II messages travel on CAN.",
+ "lead": "A car needs more than one kind of bus. A door switch sends a few bits now and then; steering and damping need messages at exactly known times; cameras and maps need very high bandwidth. LIN (Local Interconnect Network) is a cheap single-wire master-slave bus for body switches and motors. FlexRay is a dual-channel, time-triggered bus for chassis and x-by-wire control. Automotive Ethernet is a switched, single-pair network for cameras, infotainment and the backbone. This chapter shows how each one works, with frame timing and rates you can calculate, and where each fits beside CAN.",
+ "prereq": "You need <a href=\"#can-and-can-fd-protocols\">CAN and CAN FD</a> for the comparison, and the bus classes from <a href=\"#network-topology-osi-model-and-classification-of-bus-systems\">topology, OSI model and classification</a>.",
  "sections": [
   {
-   "h3": "The 16-pin socket and its pins",
+   "h3": "LIN: one wire, one master",
    "blocks": [
     {
      "type": "p",
-     "text": "OBD-II began as an emissions rule. Before it, each maker had its own connector and its own codes, so a workshop needed many adapters. The standard, often called J1962 for the connector, makes the socket shape and pin functions common. The socket sits under the dashboard near the steering column, within reach of the driver. Pins 4 and 5 are chassis and signal ground. Pin 16 is battery positive, usually through a fuse. Pins 6 and 14 are CAN high and CAN low. Pins 7 and 15 are the older K-line and L-line pair. Pins 2 and 10 carry the older J1850 bus. Other pins are left for manufacturer use or left blank."
-    },
-    {
-     "type": "table",
-     "head": [
-      "Pin",
-      "Function"
-     ],
-     "rows": [
-      [
-       "4",
-       "Chassis ground"
-      ],
-      [
-       "5",
-       "Signal ground"
-      ],
-      [
-       "16",
-       "Battery positive, fused"
-      ],
-      [
-       "6",
-       "CAN high"
-      ],
-      [
-       "14",
-       "CAN low"
-      ],
-      [
-       "7",
-       "K-line"
-      ],
-      [
-       "15",
-       "L-line"
-      ],
-      [
-       "2",
-       "J1850 bus positive"
-      ],
-      [
-       "10",
-       "J1850 bus negative"
-      ]
-     ]
+     "text": "LIN links small body modules: window lifters, mirrors, seat motors and climate flaps. It uses one signal wire plus ground, at battery voltage: the master has a 1 kΩ pull-up resistor and each slave about 30 kΩ, and a node pulls the wire low for a dominant 0. A cluster has one <b>master</b> (usually a body ECU that is also on CAN) and up to 15 <b>slaves</b>, at 1 to 20 kbit/s; 19.2 kbit/s is common."
     },
     {
      "type": "p",
-     "text": "The scan tool powers up from pin 16 and pin 4 or 5. It then listens on the bus pins. A tool that finds no reply on pins 6 and 14 can try the older pins. This fallback lets one tool serve cars from different bus generations."
-    }
-   ]
-  },
-  {
-   "h3": "Services and parameter identifiers",
-   "blocks": [
-    {
-     "type": "p",
-     "text": "A scan tool sends a request service, and an ECU replies. A service is a one-byte command number inside a diagnostic message. Service 01 reads current data. Service 02 reads the freeze frame, a snapshot of data stored when a fault was set. Service 03 reads stored diagnostic trouble codes (DTCs). Service 04 clears codes. Service 05 reads oxygen sensor test results. Service 06 reads on-board test results. Service 09 reads the vehicle identification number (VIN). Service 0A reads permanent codes. A parameter identifier (PID) names one measured value. A reply to service 01 has service 0x41, then the PID, then data bytes A, B and so on."
-    },
-    {
-     "type": "formula",
-     "text": "RPM = ((A × 256) + B) ÷ 4",
-     "where": "RPM is engine speed in revolutions per minute; A is the first data byte (0 to 255); B is the second data byte (0 to 255); 256 combines the two bytes into a 16-bit raw count; 4 converts the raw count to rpm because one count is 0.25 rpm."
-    },
-    {
-     "type": "p",
-     "text": "PID 0C is engine speed. Many PIDs use one data byte, some use two, and a few use four. The scan tool must apply the scaling for that PID; the raw bytes alone are not the physical value. PID 0D, vehicle speed, uses one byte A in km/h. PID 05, coolant temperature, uses one byte A and the formula A − 40 in °C."
-    }
-   ]
-  },
-  {
-   "h3": "Fault codes, monitors and the lamp",
-   "blocks": [
-    {
-     "type": "p",
-     "text": "A DTC has one letter, then four hexadecimal digits. Hexadecimal means base-16 digits 0-9 and A-F. The letter gives the system: P is powertrain, C is chassis, B is body, and U is network. In P0301, P means powertrain, the first digit 0 means a generic code defined by the standard, the second digit 3 means ignition system or misfire, and 01 means cylinder 1. A first digit 1 would mean a manufacturer-specific code. P0301 is a generic misfire code for cylinder 1."
-    },
-    {
-     "type": "p",
-     "text": "Readiness monitors are self-tests inside the ECU, such as catalyst, oxygen sensor, evaporative emission control and misfire checks. A drive cycle is a prescribed sequence of start, warm-up, speeds and stops that lets the monitors run. The malfunction indicator lamp (MIL) is the dashboard lamp. When a fault is confirmed, the ECU stores the DTC and lights the MIL. Service 04 can clear the codes and turn the lamp off, but the fault remains if the cause is not repaired. Permanent codes in service 0A stay until the relevant self-test passes."
+     "text": "The master owns a <b>schedule table</b>, a fixed list of frames and the time slot for each. For every slot it sends a <b>header</b>; the one node that publishes that frame (a slave, or the master itself) sends the <b>response</b>, and any node that needs the data reads it. Only the master starts frames, so there are no collisions and the timing is known."
     },
     {
      "type": "bullets",
      "items": [
-      "CAN runs at 500 kbit/s with 11-bit identifiers, or at 250 kbit/s with 29-bit identifiers, for OBD-II messages.",
-      "OBD-II is emissions-focused: generic services expose engine and emission data.",
-      "Manufacturer enhanced diagnostics go deeper into ABS, airbag, body and other modules."
+      "<b>Break:</b> at least 13 dominant bits and a recessive delimiter. It marks the start of a frame, so every slave knows a header is coming. (Waking a sleeping cluster is a separate wake-up pulse.)",
+      "<b>Sync:</b> the byte 0x55 (alternating bits), from which slaves measure the bit time.",
+      "<b>Protected identifier (PID):</b> a 6-bit frame identifier (0 to 63) plus 2 parity bits, P0 = ID0 ⊕ ID1 ⊕ ID2 ⊕ ID4 and P1 = NOT(ID1 ⊕ ID3 ⊕ ID4 ⊕ ID5). It names the frame, not a slave.",
+      "<b>Data:</b> 1 to 8 bytes in the response.",
+      "<b>Checksum:</b> the classic checksum covers the data bytes; the enhanced checksum (LIN 2.x) covers the PID as well. Diagnostic frames 0x3C and 0x3D always use the classic one."
+     ]
+    },
+    {
+     "type": "formula",
+     "text": "T = (34 + 10 × (n + 1)) × τ",
+     "where": "T is the nominal frame time; 34 bits is the nominal header (break and delimiter 14, sync 10, PID 10); every byte on the wire takes 10 bits (start bit, 8 data bits, stop bit); n data bytes plus 1 checksum byte make the response; τ is one bit time (1 ÷ bit rate)."
+    },
+    {
+     "type": "formula",
+     "text": "Tₘₐₓ = 1.4 × T",
+     "where": "Tₘₐₓ is the longest time the frame may take; the 40 per cent margin allows for gaps between bytes. The schedule slot must be at least Tₘₐₓ."
+    }
+   ]
+  },
+  {
+   "h3": "FlexRay: fixed slots on two channels",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "FlexRay is for systems where a late message is itself a fault: active suspension, chassis control, brake-by-wire and steer-by-wire. It has two independent channels, A and B, each at up to 10 Mbit/s. A node may send the same frame on both channels for redundancy or different frames to double the rate. The wiring can be a passive bus, an active star (a star coupler that cuts off a faulty branch) or a mix."
+    },
+    {
+     "type": "p",
+     "text": "Time is divided into repeating <b>communication cycles</b>, typically 1 to 5 ms long and numbered 0 to 63. Every node keeps a synchronised clock. Each cycle has four parts:"
+    },
+    {
+     "type": "bullets",
+     "items": [
+      "<b>Static segment:</b> time-division multiple access (TDMA). Equal slots, each owned by one node, repeat in the same order every cycle. No arbitration and no collisions, so the worst-case delay of a static message is one cycle.",
+      "<b>Dynamic segment:</b> flexible TDMA (FTDMA) on <b>minislots</b>. A slot counter steps through the minislots; a node whose turn comes and has data starts its frame and stretches its slot to the frame length, which leaves less time for later numbers. A node with nothing to send uses just one short minislot. Low numbers therefore have priority.",
+      "<b>Symbol window:</b> carries short symbols such as the collision avoidance symbol (CAS) and the media access test symbol (MTS). Start-up frames travel in static slots, and wake-up uses its own wake-up pattern.",
+      "<b>Network idle time (NIT):</b> no traffic; nodes correct their clocks."
+     ]
+    },
+    {
+     "type": "p",
+     "text": "A FlexRay frame has a 5-byte header (frame ID equal to the slot number, payload length, header CRC, cycle count), 0 to 254 payload bytes and a 24-bit CRC."
+    }
+   ]
+  },
+  {
+   "h3": "Automotive Ethernet: switched and service-ready",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "Office Ethernet uses two pairs (100BASE-TX) or four pairs (1000BASE-T) and heavy connectors. Automotive Ethernet sends full duplex over one unshielded twisted pair: <b>100BASE-T1</b> at 100 Mbit/s and <b>1000BASE-T1</b> at 1 Gbit/s, using echo cancellation so both ends can talk at once. Each link joins exactly two devices, so the network is a star of switches with no collisions. A switch forwards a frame only to the port that leads to its destination, so many transfers run in parallel. <b>10BASE-T1S</b> (10 Mbit/s) is the exception: several nodes can share one short multidrop pair, which suits zonal links that used to be CAN."
+    },
+    {
+     "type": "p",
+     "text": "Ethernet carries camera and radar streams, infotainment, software downloads and the backbone. <b>VLAN</b> tags keep safety, body and infotainment traffic apart on one switch. Above IP, <b>SOME/IP</b> (scalable service-oriented middleware over IP) lets an ECU call a service by name, and <b>DoIP</b> (diagnostics over IP) speeds up flashing. Plain Ethernet is not deterministic; <b>AVB/TSN</b> (audio video bridging, time-sensitive networking) adds clock synchronisation and scheduled traffic for bounded latency."
+    },
+    {
+     "type": "table",
+     "head": [
+      "",
+      "LIN",
+      "CAN",
+      "FlexRay",
+      "Automotive Ethernet"
+     ],
+     "rows": [
+      [
+       "Wires",
+       "1 + ground",
+       "2 (twisted pair)",
+       "2 per channel, 2 channels",
+       "2 (one pair) per link"
+      ],
+      [
+       "Rate",
+       "up to 20 kbit/s",
+       "up to 1 Mbit/s (FD data 2 to 5 Mbit/s)",
+       "10 Mbit/s per channel",
+       "10, 100 or 1000 Mbit/s"
+      ],
+      [
+       "Access",
+       "master polls",
+       "CSMA with bit-wise arbitration",
+       "TDMA static, FTDMA dynamic",
+       "switched, full duplex"
+      ],
+      [
+       "Timing",
+       "fixed by schedule",
+       "priority-based",
+       "deterministic (static)",
+       "best effort, bounded with TSN"
+      ],
+      [
+       "Cost per node",
+       "lowest",
+       "low",
+       "high",
+       "medium to high"
+      ]
      ]
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "A scan tool reaches the engine ECU through the J1962 connector and CAN bus. The ECU stores the fault code and freeze frame, and it drives the dashboard lamp.",
-  "spec": {
-   "type": "blocks",
-   "direction": "down",
-   "title": "Path from scan tool to fault code",
-   "nodes": [
-    {
-     "id": "a",
-     "label": "Scan tool",
-     "note": "generic or OEM",
-     "style": "normal"
-    },
-    {
-     "id": "b",
-     "label": "J1962 connector",
-     "note": "pins 6 and 14",
-     "style": "accent"
-    },
-    {
-     "id": "c",
-     "label": "CAN bus",
-     "note": "500 kbit/s",
-     "style": "normal"
-    },
-    {
-     "id": "d",
-     "label": "Engine ECU",
-     "note": "monitors sensors",
-     "style": "normal"
-    },
-    {
-     "id": "e",
-     "label": "DTC + freeze frame",
-     "note": "stored fault data",
-     "style": "accent"
-    },
-    {
-     "id": "f",
-     "label": "MIL",
-     "note": "dashboard lamp",
-     "style": "live"
-    }
-   ],
-   "edges": [
-    {
-     "from": "a",
-     "to": "b",
-     "style": "solid"
-    },
-    {
-     "from": "b",
-     "to": "c",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "d",
-     "to": "e",
-     "style": "solid"
-    },
-    {
-     "from": "d",
-     "to": "f",
-     "style": "solid"
-    }
-   ],
-   "aria": "Block diagram: a scan tool plugs into the 16-pin connector, reaches the ECU over CAN, reads stored fault codes and freeze-frame data, and the ECU drives the malfunction lamp."
-  }
- },
  "examples": [
   {
-   "question": "A scan tool requests PID 0C, engine speed. The reply gives data bytes A = 0x1A and B = 0xF0. Find the engine speed in rpm.",
+   "question": "A LIN window-lifter slave sends a response of 8 data bytes at 19.2 kbit/s. (a) Find the nominal and maximum frame times. (b) The master's schedule has five frames, each given a 10 ms slot. Is 10 ms long enough for this frame, and how often is each frame sent?",
    "steps": [
-    "Convert A from hexadecimal: A = 0x1A = 1×16 + 10 = 26.",
-    "Convert B from hexadecimal: B = 0xF0 = 15×16 + 0 = 240.",
-    "Combine the two bytes: A × 256 + B = 26 × 256 + 240 = 6656 + 240 = 6896.",
-    "Divide by 4 because each count is 0.25 rpm: 6896 ÷ 4 = 1724 rpm."
+    "Bit time: τ = 1 ÷ 19 200 s = 52.08 µs.",
+    "Bits on the wire: header 34 + response 10 × (8 + 1) = 34 + 90 = 124 bits.",
+    "Nominal frame time: 124 × 52.08 µs = 6458 µs = 6.46 ms.",
+    "Maximum frame time: 1.4 × 6.46 ms = 9.04 ms.",
+    "9.04 ms is less than the 10 ms slot, so the slot is long enough.",
+    "Schedule cycle: 5 slots × 10 ms = 50 ms, so each frame is sent every 50 ms, 20 times a second."
    ],
-   "answer": "The engine speed is 1724 rpm.",
-   "check": "a = 0x1A\nb = 0xF0\nraw = a * 256 + b\nrpm = raw // 4\nprint(rpm)",
-   "values": [
-    1724
+   "answer": "Nominal 6.46 ms, maximum 9.04 ms; a 10 ms slot fits, and each of the five frames repeats every 50 ms."
+  },
+  {
+   "question": "A 1000-byte block (a camera thumbnail, say) must cross the car. Ignoring protocol overhead, how long does it take on 19.2 kbit/s LIN, 500 kbit/s CAN, one 10 Mbit/s FlexRay channel and 100 Mbit/s Ethernet?",
+   "steps": [
+    "Bits to send: 1000 × 8 = 8000 bits.",
+    "LIN: 8000 ÷ 19 200 = 0.4167 s = 416.7 ms.",
+    "CAN: 8000 ÷ 500 000 = 0.016 s = 16 ms.",
+    "FlexRay: 8000 ÷ 10 000 000 = 0.0008 s = 0.8 ms.",
+    "Ethernet: 8000 ÷ 100 000 000 = 0.00008 s = 80 µs.",
+    "Ratio LIN to Ethernet: 416.7 ms ÷ 0.08 ms ≈ 5208."
    ],
-   "output": ""
+   "answer": "416.7 ms on LIN, 16 ms on CAN, 0.8 ms on FlexRay and 80 µs on Ethernet; real times are longer because of headers, stuffing and gaps, but the ratio of about 5000 between LIN and Ethernet stands."
   }
  ],
  "traps": [
-  "The P in P0301 means powertrain, not petrol. C is chassis, B is body, U is network.",
-  "P0301 is a generic misfire code for cylinder 1. A code such as P1xxx is manufacturer-specific and needs enhanced diagnostics beyond the standard services.",
-  "Pins 4 and 5 are ground, and pin 16 is battery positive. Do not treat pin 16 as a signal pin.",
-  "Freeze frame is stored data from the moment a fault was set, not live data. Use service 02, not service 01, to read it.",
-  "Clearing codes with service 04 turns off the MIL but does not repair the fault; permanent codes may remain until a self-test passes."
+  "LIN is not multi-master: only the master sends headers. A slave sends only a response, and only for the frame identifiers it publishes.",
+  "The LIN header names a frame, not a slave. One frame can be read by many nodes, and the master can publish a frame itself.",
+  "FlexRay is not purely event-driven: the static segment is TDMA and gives the guarantee; only the dynamic segment is FTDMA.",
+  "Automotive Ethernet uses one pair, not the two pairs of 100BASE-TX or the four of 1000BASE-T. In a LIN frame time every byte is 10 bits, and the checksum byte counts too."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "In the DTC P0301, what does the letter P mean?",
+   "q": "State the maximum number of LIN slaves under one master and LIN's bit-rate range.",
    "marks": 2,
-   "a": "P means powertrain. The other letters are C for chassis, B for body and U for network."
-  },
-  {
-   "level": "remember",
-   "q": "Which service reads stored diagnostic trouble codes?",
-   "marks": 2,
-   "a": "Service 03 reads stored DTCs. Service 01 reads current data and service 02 reads the freeze frame."
+   "a": "Up to 15 slaves under one master; 1 to 20 kbit/s, often 19.2 kbit/s."
   },
   {
    "level": "understand",
-   "q": "Why does OBD-II define both ground pins and a battery pin on the J1962 connector?",
+   "q": "Why does LIN use a schedule table instead of arbitration?",
    "marks": 3,
-   "a": "The ground pins give the scan tool a common reference, and pin 16 supplies fused battery positive so the tool can power up before the car is started. The signal pins then carry bus messages."
+   "a": "The master starts every frame in a fixed order, so frames cannot collide, slaves need no arbitration hardware and each frame's repeat time is known."
   },
   {
    "level": "apply",
-   "q": "PID 0C returns A = 0x0C and B = 0x80. Calculate the engine speed in rpm.",
+   "q": "Find the protected identifier for LIN frame ID 0x3D.",
    "marks": 4,
-   "a": "A = 12 and B = 128. Raw count = 12 × 256 + 128 = 3072 + 128 = 3200. RPM = 3200 ÷ 4 = 800 rpm."
+   "a": "0x3D = 11 1101, so ID0 = 1, ID1 = 0, ID2 = 1, ID3 = 1, ID4 = 1, ID5 = 1. P0 = 1 ⊕ 0 ⊕ 1 ⊕ 1 = 1. P1 = NOT(0 ⊕ 1 ⊕ 1 ⊕ 1) = NOT 1 = 0. PID = P1 P0 ID5…ID0 = 0111 1101 = 0x7D."
   },
   {
    "level": "apply",
-   "q": "Decode the generic DTC P0301 into its letter, first digit, second digit and last two digits.",
+   "q": "A LIN frame with 2 data bytes runs at 19.2 kbit/s. Find its nominal and maximum times.",
+   "marks": 4,
+   "a": "Bits = 34 + 10 × 3 = 64. Nominal = 64 ÷ 19 200 = 3.33 ms. Maximum = 1.4 × 3.33 = 4.67 ms."
+  },
+  {
+   "level": "understand",
+   "q": "In the FlexRay dynamic segment, why do low slot numbers have priority?",
    "marks": 3,
-   "a": "P means powertrain. The first digit 0 means a generic code. The second digit 3 means ignition system or misfire. The last two digits 01 mean cylinder 1."
+   "a": "The slot counter steps through the minislots in order. A node that sends stretches its slot, using up dynamic-segment time, so a high-numbered node may find no time left in this cycle."
   },
   {
    "level": "analyze",
-   "q": "A driver clears the codes with a scan tool. The MIL goes off, but it returns the next day. Explain what happened.",
+   "q": "A steer-by-wire signal must arrive within 5 ms. Compare CAN and FlexRay for it.",
    "marks": 5,
-   "a": "Service 04 cleared the stored codes and turned off the lamp, but the physical fault remained. When the ECU completed the relevant monitor and confirmed the fault again, it stored the DTC and lit the MIL. Permanent codes may also have stayed until a self-test passed."
+   "a": "On CAN a frame can wait behind higher-priority frames and repeated error frames, so its worst case depends on bus load and faults. On FlexRay, a static slot in a 5 ms cycle (or shorter) arrives once every cycle on both channels, so the 5 ms bound is guaranteed and one broken channel is survived. FlexRay fits."
   },
   {
    "level": "analyze",
-   "q": "Why can a generic OBD-II scan tool fail to read an ABS fault on some cars?",
+   "q": "Why use 10BASE-T1S rather than 100BASE-T1 for a cluster of small door nodes?",
    "marks": 4,
-   "a": "OBD-II generic services are emissions-focused and cover the engine and emission-related modules. ABS may sit on a different module and use manufacturer-specific services and codes. A tool needs enhanced diagnostics for that maker to reach it."
+   "a": "10BASE-T1S lets several nodes share one short pair, so no switch port per node is needed, and 10 Mbit/s is plenty for doors. 100BASE-T1 is point to point and needs a switch port for every node, which costs more."
   }
  ],
- "beyond": "Not for the exam. In industry, OBD-II data feeds fleet telematics, insurance dongles and inspection apps through the same J1962 socket. Engineers build enhanced diagnostic layers on top of the generic services to reach body, braking and safety modules. Search next for J1979 service definitions, PID scaling tables, readiness monitor drive cycles and 29-bit CAN OBD-II. Newer work connects diagnostic data to over-the-air updates and remote fault prediction."
+ "beyond": "Not for the exam. The industry is moving to a zonal layout: a few zone controllers near groups of sensors, joined by a gigabit Ethernet backbone with TSN, while LIN and CAN stay at the edges. Search for IEEE 802.1AS time sync, TSN scheduled traffic and 10BASE-T1S PLCA.",
+ "figure": {
+  "after_section": 2,
+  "caption": "Top: the LIN frame of the worked example to scale in its 10 ms slot; even the maximum frame time fits. Bottom: an example 5 ms FlexRay cycle with static slots, minislots, symbol window and idle time on both channels.",
+  "spec": {
+   "type": "svg",
+   "h": 376,
+   "body": "<text x=\"16.0\" y=\"22.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">LIN frame, 8 data bytes at 19.2 kbit/s (1 bit = 52.08 µs)</text><rect x=\"30.0\" y=\"40.0\" width=\"48.1\" height=\"34.0\" rx=\"8\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"54.1\" y=\"61.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Break</text><rect x=\"78.1\" y=\"40.0\" width=\"34.4\" height=\"34.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"95.3\" y=\"61.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Sync</text><rect x=\"112.5\" y=\"40.0\" width=\"34.4\" height=\"34.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"129.7\" y=\"61.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">PID</text><rect x=\"146.9\" y=\"40.0\" width=\"275.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"284.4\" y=\"61.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Data: 8 bytes × 10 bits</text><rect x=\"421.9\" y=\"40.0\" width=\"34.4\" height=\"34.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"439.1\" y=\"61.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Chk</text><text x=\"112.5\" y=\"92.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">header 34 bits</text><text x=\"342.1\" y=\"92.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">response 90 bits</text><line x1=\"30.0\" y1=\"128.0\" x2=\"690.0\" y2=\"128.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><line x1=\"30.0\" y1=\"128.0\" x2=\"30.0\" y2=\"133.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"30.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0 ms</text><line x1=\"162.0\" y1=\"128.0\" x2=\"162.0\" y2=\"133.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"162.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">2 ms</text><line x1=\"294.0\" y1=\"128.0\" x2=\"294.0\" y2=\"133.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"294.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">4 ms</text><line x1=\"426.0\" y1=\"128.0\" x2=\"426.0\" y2=\"133.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"426.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">6 ms</text><line x1=\"558.0\" y1=\"128.0\" x2=\"558.0\" y2=\"133.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"558.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">8 ms</text><line x1=\"690.0\" y1=\"128.0\" x2=\"690.0\" y2=\"133.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"690.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">10 ms</text><line x1=\"456.2\" y1=\"34.0\" x2=\"456.2\" y2=\"124.0\" style=\"stroke:var(--accent);stroke-width:2;stroke-dasharray:5 4\"/><line x1=\"626.8\" y1=\"34.0\" x2=\"626.8\" y2=\"124.0\" style=\"stroke:var(--next);stroke-width:2;stroke-dasharray:5 4\"/><line x1=\"690.0\" y1=\"34.0\" x2=\"690.0\" y2=\"124.0\" style=\"stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4\"/><rect x=\"396.6\" y=\"159.7\" width=\"119.2\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"456.2\" y=\"172.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">nominal 6.46 ms</text><rect x=\"552.6\" y=\"159.7\" width=\"90.1\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"597.6\" y=\"172.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">max 9.04 ms</text><rect x=\"608.2\" y=\"17.6\" width=\"82.8\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"686.0\" y=\"30.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">slot 10 ms</text><text x=\"16.0\" y=\"212.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">FlexRay communication cycle (example: 5 ms on channels A and B)</text><text x=\"22.0\" y=\"252.0\" font-size=\"14\" text-anchor=\"end\" style=\"fill:var(--ink)\" font-weight=\"700\">A</text><rect x=\"30.0\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"69.6\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"109.2\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"148.8\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"188.4\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"228.0\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"267.6\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"307.2\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"346.8\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"386.4\" y=\"228.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"153.8\" y=\"237.7\" width=\"148.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"228.0\" y=\"250.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">static slots 1 … 60</text><rect x=\"426.0\" y=\"228.0\" width=\"198.0\" height=\"34.0\" rx=\"2\" style=\"fill:var(--fig);stroke:var(--next);stroke-width:1.5\"/><line x1=\"439.2\" y1=\"254.0\" x2=\"439.2\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"452.4\" y1=\"254.0\" x2=\"452.4\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"465.6\" y1=\"254.0\" x2=\"465.6\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"478.8\" y1=\"254.0\" x2=\"478.8\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"492.0\" y1=\"254.0\" x2=\"492.0\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"505.2\" y1=\"254.0\" x2=\"505.2\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"518.4\" y1=\"254.0\" x2=\"518.4\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"531.6\" y1=\"254.0\" x2=\"531.6\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"544.8\" y1=\"254.0\" x2=\"544.8\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"558.0\" y1=\"254.0\" x2=\"558.0\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"571.2\" y1=\"254.0\" x2=\"571.2\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"584.4\" y1=\"254.0\" x2=\"584.4\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"597.6\" y1=\"254.0\" x2=\"597.6\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"610.8\" y1=\"254.0\" x2=\"610.8\" y2=\"262.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><rect x=\"452.4\" y=\"232.0\" width=\"72.6\" height=\"20.0\" rx=\"2\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:1.5\"/><text x=\"488.7\" y=\"247.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\">frame</text><rect x=\"624.0\" y=\"228.0\" width=\"13.2\" height=\"34.0\" rx=\"1\" style=\"fill:var(--live-soft);stroke:var(--live);stroke-width:1.5\"/><rect x=\"637.2\" y=\"228.0\" width=\"52.8\" height=\"34.0\" rx=\"2\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:1.5;stroke-dasharray:4 3\"/><text x=\"22.0\" y=\"296.0\" font-size=\"14\" text-anchor=\"end\" style=\"fill:var(--ink)\" font-weight=\"700\">B</text><rect x=\"30.0\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"69.6\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"109.2\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"148.8\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"188.4\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"228.0\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"267.6\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"307.2\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"346.8\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"386.4\" y=\"272.0\" width=\"39.6\" height=\"34.0\" rx=\"2\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5\"/><rect x=\"153.8\" y=\"281.6\" width=\"148.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"228.0\" y=\"294.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">static slots 1 … 60</text><rect x=\"426.0\" y=\"272.0\" width=\"198.0\" height=\"34.0\" rx=\"2\" style=\"fill:var(--fig);stroke:var(--next);stroke-width:1.5\"/><line x1=\"439.2\" y1=\"298.0\" x2=\"439.2\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"452.4\" y1=\"298.0\" x2=\"452.4\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"465.6\" y1=\"298.0\" x2=\"465.6\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"478.8\" y1=\"298.0\" x2=\"478.8\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"492.0\" y1=\"298.0\" x2=\"492.0\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"505.2\" y1=\"298.0\" x2=\"505.2\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"518.4\" y1=\"298.0\" x2=\"518.4\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"531.6\" y1=\"298.0\" x2=\"531.6\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"544.8\" y1=\"298.0\" x2=\"544.8\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"558.0\" y1=\"298.0\" x2=\"558.0\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"571.2\" y1=\"298.0\" x2=\"571.2\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"584.4\" y1=\"298.0\" x2=\"584.4\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"597.6\" y1=\"298.0\" x2=\"597.6\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><line x1=\"610.8\" y1=\"298.0\" x2=\"610.8\" y2=\"306.0\" style=\"stroke:var(--next);stroke-width:1.2\"/><rect x=\"452.4\" y=\"276.0\" width=\"72.6\" height=\"20.0\" rx=\"2\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:1.5\"/><text x=\"488.7\" y=\"291.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\">frame</text><rect x=\"624.0\" y=\"272.0\" width=\"13.2\" height=\"34.0\" rx=\"1\" style=\"fill:var(--live-soft);stroke:var(--live);stroke-width:1.5\"/><rect x=\"637.2\" y=\"272.0\" width=\"52.8\" height=\"34.0\" rx=\"2\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:1.5;stroke-dasharray:4 3\"/><text x=\"228.0\" y=\"340.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--accent)\">static 3.0 ms (TDMA)</text><text x=\"525.0\" y=\"340.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\">dynamic 1.5 ms (minislots)</text><text x=\"712.0\" y=\"362.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">symbol window 0.1 ms, idle time 0.4 ms</text><line x1=\"630.6\" y1=\"318.0\" x2=\"630.6\" y2=\"346.0\" style=\"stroke:var(--live);stroke-width:1.5\"/>",
+   "aria": "A time bar of a LIN frame with break, sync, PID, eight data bytes and checksum against 0 to 10 ms, and two rows of a FlexRay cycle."
+  }
+ }
 }

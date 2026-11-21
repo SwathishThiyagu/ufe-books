@@ -1,179 +1,114 @@
 {
- "lead": "A VANET (vehicular ad hoc network) is a wireless network of moving vehicles. Links form as cars meet each other; roadside units (RSUs) beside the road are optional fixed access points, and the network still works without them. Road-constrained motion lets position and maps replace stable links. Safety warnings, tolling and traffic updates use it. Only a few universities teach this in depth. This chapter covers domains, applications and routing; the radio is in <a href=\"#dsrc-ieee-802-11p-and-wave-protocol-stack\">6.8</a>.",
- "prereq": "You need: <a href=\"#vehicle-networking-and-need-for-data-buses\">6.1</a> for the in-vehicle bus, <a href=\"#v2x-communication-connected-vehicles-and-infotainment\">6.6</a> for V2X (vehicle-to-everything) messages, and basic IP routing.",
+ "lead": "Networked ECUs run software that can brake, steer or deploy an airbag, so a software fault can hurt people. Two standards deal with this. MISRA C is a set of coding guidelines that removes the risky parts of the C language, so embedded code behaves predictably and can be checked by tools. ISO 26262 is the functional-safety standard for road vehicles: it starts from a hazard, assigns an ASIL (automotive safety integrity level) from severity, exposure and controllability, and then demands documented evidence through a safety lifecycle. MISRA keeps the code clean; ISO 26262 shows the whole item is safe enough. Only a few universities teach this in depth.",
+ "prereq": "You need the idea of determinism and fault confinement from <a href=\"#can-and-can-fd-protocols\">CAN and CAN FD</a>, and some C programming.",
  "sections": [
   {
-   "h3": "Ad hoc links and VANET domains",
+   "h3": "MISRA C: guidelines and deviations",
    "blocks": [
     {
      "type": "p",
-     "text": "An ad hoc wireless network has no fixed infrastructure. Every node forwards packets for others, so distant nodes communicate in multiple hops. In a VANET each vehicle carries an on-board unit (OBU): a radio plus computer that sends and receives messages. A roadside unit (RSU) is a fixed access point beside the road. Multi-hop matters when an RSU is out of range: a warning can pass car to car until it reaches a highway patrol or a connected ambulance."
+     "text": "MISRA C:2012 sorts its guidelines as <b>mandatory</b> (never broken), <b>required</b> (broken only with a formal deviation) and <b>advisory</b>. A <b>deviation</b> is a written, reviewed permit with a reason and a risk analysis, not a silent exception. Typical rules: no recursion (stack depth must be provable); no use of malloc, calloc, realloc or free at all (Rule 21.3); no implicit conversion that can lose a value; braces round every if, else and loop body; pointer arithmetic only inside an array; every switch has a default; check every error return. A static-analysis tool checks the source, and the team fixes each violation or records a deviation."
     },
     {
      "type": "p",
-     "text": "Three domains fit together. The in-vehicle domain is the electronic control unit (ECU) network on the car's buses (see <a href=\"#vehicle-networking-and-need-for-data-buses\">6.1</a>). The OBU joins it to the ad hoc domain, where OBUs talk to OBUs and RSUs. RSUs connect to the infrastructure domain: Internet and cloud servers. Safety messages need the ad hoc path; a toll server can use infrastructure. The same OBU can also use cellular data, but ad hoc links work without a tower and add low delay locally."
+     "text": "Passing MISRA gives disciplined code; it is not proof of functional safety. Code generated from models must pass the same checks, or the generator must be qualified as a tool."
     }
    ]
   },
   {
-   "h3": "Applications and road-driven design",
+   "h3": "ISO 26262: hazard, ASIL, safety goal and evidence",
    "blocks": [
     {
      "type": "p",
-     "text": "Road traffic deaths exceed one million a year worldwide; most occur in low- and middle-income countries. VANET safety applications aim at this: collision warning ahead, hazard warning after a crash, and intersection warning at blind corners. Connected autonomous vehicles also need V2X because cameras and radar cannot see through buildings. Non-safety uses include traffic information, electronic tolling (FASTag in India), parking payment and infotainment. Safety messages are short and repeated; non-safety messages can tolerate delay."
+     "text": "ISO 26262:2018 has 12 parts and follows a V-model: requirements down the left side, implementation at the bottom, and verification and validation back up the right. Part 3 is the concept phase and part 6 covers software. The <b>item definition</b> fixes what is inside: which ECUs, sensors, actuators and functions. <b>HARA</b> (hazard analysis and risk assessment) studies each hazardous event and rates <b>severity</b> S0 to S3, <b>exposure</b> E0 to E4 and <b>controllability</b> C0 to C3. The standard's table gives the ASIL; for the classes S1 to S3, E1 to E4 and C1 to C3, it matches a simple sum: S + E + C = 10 gives ASIL D, 9 gives C, 8 gives B, 7 gives A, and 6 or less gives QM (quality management, no ASIL requirement)."
     },
     {
      "type": "p",
-     "text": "The radio design differs from generic mobile ad hoc networks (MANETs). Vehicles move at high speed, so a 200 m link between cars closing at 240 km/h lasts about 3 s. Contacts are short, yet paths are predictable because cars follow roads; the Global Positioning System (GPS) gives position. Vehicles have no energy limit, and the network can be very large. The message rate rises in dense traffic, so channel load is a design limit. These facts drive position-based routing."
-    }
-   ]
-  },
-  {
-   "h3": "Routing families and their failure modes",
-   "blocks": [
-    {
-     "type": "p",
-     "text": "Topology-based routing stores routes to addresses. AODV (ad hoc on-demand distance vector) floods a route request, learns a route, and repairs broken links; DSR (dynamic source routing) carries the whole route in each packet. At highway speed links break before repair finishes. Routing chooses the next radio hop, not the whole road trip."
+     "text": "Each hazardous event gets a <b>safety goal</b> that inherits its ASIL, such as \"no unintended full braking at speed\". The technical safety concept names <b>safety mechanisms</b>: plausibility checks, watchdog timers, redundant sensors, end-to-end protection of bus messages and a <b>safe state</b>. <b>ASIL decomposition</b> may split a requirement into two independent ones of lower ASIL, each still tagged with the original, for example ASIL B(D) + ASIL B(D), but the independence must be shown."
     },
     {
      "type": "p",
-     "text": "Position-based routing uses GPS coordinates. Greedy perimeter stateless routing (GPSR) first uses greedy forwarding: send to the neighbour closest to the destination. At a local maximum no neighbour is closer, so perimeter mode forwards the packet around the void by face routing on a planarized graph of the radio neighbours, using positions taken from GPS. The faces come from where the neighbours are, not from the road layout. The worked example applies the greedy rule."
-    },
-    {
-     "type": "p",
-     "text": "Geocast sends a message to all vehicles in a target region, useful for a hazard zone. Simple flooding causes the broadcast storm problem: many vehicles rebroadcast the same alert and congest the channel. Suppression, such as waiting a random time or selecting one forwarder, reduces this. Where no next vehicle exists, store-and-forward carries the packet until a car or RSU appears."
+     "text": "The <b>fault tolerant time interval (FTTI)</b> is the minimum time from a fault to a possible hazardous event. The safety mechanism must detect the fault and reach the safe state within it. Hardware is judged by architectural metrics computed from failure rates and the diagnostic coverage of the safety mechanisms: the single-point fault metric SPFM = 1 − (λ<sub>SPF</sub> + λ<sub>RF</sub>) ÷ λ, where λ<sub>SPF</sub> is the rate of single-point faults, λ<sub>RF</sub> the rate of residual faults and λ the total failure rate of the safety-related hardware, and the latent fault metric (LFM) for hidden faults. ASIL D asks for SPFM of at least 99 per cent."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "The three domains: ECUs feed the OBU, which joins the ad hoc domain and reaches infrastructure through an RSU.",
-  "spec": {
-   "type": "blocks",
-   "direction": "down",
-   "title": "Three VANET domains",
-   "nodes": [
-    {
-     "id": "a",
-     "label": "In-vehicle domain",
-     "note": "ECUs on CAN",
-     "style": "normal"
-    },
-    {
-     "id": "b",
-     "label": "OBU",
-     "note": "on-board unit",
-     "style": "accent"
-    },
-    {
-     "id": "c",
-     "label": "Ad hoc domain",
-     "note": "OBU-OBU, OBU-RSU",
-     "style": "accent"
-    },
-    {
-     "id": "d",
-     "label": "RSU",
-     "note": "roadside unit",
-     "style": "normal"
-    },
-    {
-     "id": "e",
-     "label": "Infrastructure",
-     "note": "Internet and cloud",
-     "style": "muted"
-    }
-   ],
-   "edges": [
-    {
-     "from": "a",
-     "to": "b",
-     "style": "solid"
-    },
-    {
-     "from": "b",
-     "to": "c",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "d",
-     "style": "solid"
-    },
-    {
-     "from": "d",
-     "to": "e",
-     "style": "solid"
-    }
-   ],
-   "aria": "Block diagram of the three VANET domains: in-vehicle, ad hoc and infrastructure."
-  }
- },
  "examples": [
   {
-   "question": "A packet at (0,0) must reach a destination at (100,0). Neighbours are A at (40,10), B at (70,−20) and C at (20,30). Which neighbour does greedy forwarding choose?",
+   "question": "A brake-by-wire safety goal has FTTI = 200 ms. Sensor sampling takes 20 ms, a two-frame confirmation takes 40 ms and the actuator needs 30 ms to reach the safe state. How much time is left for the detection logic, and by when must the fault be flagged?",
    "steps": [
-    "For each neighbour compute distance to the destination with d = √((100−x)² + (0−y)²), where (x,y) is the neighbour position in metres.",
-    "A(40,10): 100−40 = 60, 0−10 = −10, so d = √(60²+10²) = √3700 ≈ 60.8 m.",
-    "B(70,−20): 100−70 = 30, 0−(−20) = 20, so d = √(30²+20²) = √1300 ≈ 36.1 m.",
-    "C(20,30): 100−20 = 80, 0−30 = −30, so d = √(80²+30²) = √7300 ≈ 85.4 m.",
-    "The smallest distance is for B, about 36.1 m, so greedy forwarding sends to B."
+    "Budget: detection time = FTTI − sampling − confirmation − actuation.",
+    "Delays other than detection: 20 + 40 + 30 = 90 ms.",
+    "Detection time: 200 − 90 = 110 ms.",
+    "The fault must be flagged by 20 + 40 + 110 = 170 ms after it occurs.",
+    "The actuator then has 200 − 170 = 30 ms, so the safe state is reached at 200 ms, just inside the FTTI."
    ],
-   "answer": "Greedy forwarding sends the packet to neighbour B, about 36.1 m from the destination.",
-   "check": "import math\n\npoints = {'A': (40, 10), 'B': (70, -20), 'C': (20, 30)}\nfor name, (x, y) in points.items():\n    d = math.hypot(100 - x, 0 - y)\n    print(round(d, 1))",
-   "values": [
-    60.8,
-    36.1,
-    85.4
+   "answer": "The detection logic has 110 ms; the fault must be flagged within 170 ms, and the actuator uses the last 30 ms."
+  },
+  {
+   "question": "HARA rates unintended steering at motorway speed as S3 (life-threatening), E4 (high exposure) and C3 (hard to control), and a second hazard as S1 (light injuries), E4 and C2. Find the ASILs.",
+   "steps": [
+    "Steering: S + E + C = 3 + 4 + 3 = 10, so ASIL D, the highest level.",
+    "Second hazard: 1 + 4 + 2 = 7, so ASIL A.",
+    "If the steering controllability were C2 instead, the sum would be 9 and the ASIL C."
    ],
-   "output": ""
+   "answer": "Unintended steering is ASIL D; the second hazard is ASIL A."
   }
  ],
  "traps": [
-  "VANET nodes are not energy-limited and move on roads; generic MANET assumptions such as random motion and battery limits fail.",
-  "AODV link repair cannot keep up with 120 km/h traffic, so 'topology routing always works' is false.",
-  "Greedy forwarding can stop at a local maximum; perimeter mode then recovers, and delivery is guaranteed only if the neighbour graph is connected and planarized, as GPSR assumes.",
-  "Flooding a hazard alert is not free: it causes the broadcast storm problem.",
-  "GPSR sends to the neighbour closest to the destination, not closest to the source; a common exam slip."
+  "MISRA compliance alone does not give ISO 26262 compliance: MISRA is coding evidence, while ISO 26262 also needs HARA, safety goals, a safety concept, metrics and verification.",
+  "ASIL D is the highest level, A the lowest; QM is not \"ASIL 0\" but means ordinary quality management with no ASIL requirement.",
+  "FTTI is not the detection time: it must hold sensing, confirmation, detection and actuation together.",
+  "ASIL decomposition does not lower the safety goal: each part keeps the original tag, such as B(D), and independence must be proved.",
+  "MISRA C:2012 bans the heap functions of stdlib.h outright (Rule 21.3); \"no allocation after start-up\" is a deviation some projects write, not the rule."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Define OBU and RSU.",
+   "q": "What is a MISRA deviation?",
    "marks": 2,
-   "a": "OBU: on-board unit in a vehicle; RSU: fixed roadside unit."
-  },
-  {
-   "level": "remember",
-   "q": "Name two safety and two non-safety VANET applications.",
-   "marks": 2,
-   "a": "Safety: collision warning, hazard warning. Non-safety: tolling, infotainment."
+   "a": "A documented, reviewed permit to break a required guideline, with a justification and a risk analysis."
   },
   {
    "level": "understand",
-   "q": "Why is road-constrained motion useful for routing?",
+   "q": "Why does MISRA C ban recursion?",
    "marks": 3,
-   "a": "Vehicle paths are predictable and GPS gives position, so a packet can be forwarded toward a map position instead of a stored route."
+   "a": "The depth of recursion, and so the stack use, is hard to bound, so the worst-case memory use cannot be proved."
   },
   {
    "level": "apply",
-   "q": "A neighbour is at (60,80) and the destination at (100,0). Compute its distance to the destination.",
-   "marks": 4,
-   "a": "Δx = 40, Δy = −80, so d = √(40²+80²) = √8000 ≈ 89.4 m."
+   "q": "FTTI is 150 ms; sampling 10 ms, confirmation 20 ms, actuator 20 ms. Find the detection budget.",
+   "marks": 3,
+   "a": "150 − 10 − 20 − 20 = 100 ms."
+  },
+  {
+   "level": "apply",
+   "q": "A hazard is rated S2, E3, C3. Find the ASIL.",
+   "marks": 3,
+   "a": "2 + 3 + 3 = 8, so ASIL B."
   },
   {
    "level": "analyze",
-   "q": "Why can AODV fail at 120 km/h?",
-   "marks": 5,
-   "a": "A link can break before route repair completes; new route discovery adds delay and overhead, so packets drop."
+   "q": "A team's code passes MISRA but it has done no HARA. Can it claim ASIL B?",
+   "marks": 4,
+   "a": "No. Without HARA there is no safety goal or ASIL to meet. ASIL B also needs a safety concept, verification and confirmation measures; MISRA is only part of the software evidence."
   },
   {
-   "level": "analyze",
-   "q": "How does store-and-forward help on a sparse highway?",
+   "level": "apply",
+   "q": "An ASIL D requirement is decomposed. Give two allowed splits and what must be shown.",
    "marks": 4,
-   "a": "A vehicle keeps the packet and forwards when another vehicle or RSU enters range, bridging a gap that has no end-to-end path now."
+   "a": "ASIL B(D) + ASIL B(D), or ASIL C(D) + ASIL A(D). The two parts must be sufficiently independent, with no common-cause failure, and together meet the ASIL D requirement."
   }
  ],
- "beyond": "Not for the exam. Industry is testing cellular V2X (C-V2X) alongside IEEE 802.11p, and RSUs increasingly run edge computing for local warnings. Search 'ETSI ITS-G5', 'C-V2X sidelink' and 'SUMO VANET simulation' for standards and mobility models. Security and privacy of beacon messages remain active research."
+ "beyond": "Not for the exam. ISO 21448 (SOTIF) covers hazards from the limits of sensors and algorithms with no fault at all, and ISO/SAE 21434 covers cybersecurity. Industry keeps a traceable safety case in requirements tools and runs MISRA checkers in every build. Search for SOTIF, ISO/SAE 21434 and MISRA C:2023.",
+ "figure": {
+  "after_section": 2,
+  "caption": "Top: the 200 ms budget of the first worked example; the fault must be flagged by 170 ms so the actuator can reach the safe state in time. Bottom: the two ASILs of the second worked example.",
+  "spec": {
+   "type": "svg",
+   "h": 360,
+   "body": "<text x=\"16.0\" y=\"22.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">Fault tolerant time interval: 200 ms</text><rect x=\"40.0\" y=\"44.0\" width=\"64.0\" height=\"40.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"72.0\" y=\"68.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">sample</text><rect x=\"104.0\" y=\"44.0\" width=\"128.0\" height=\"40.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"168.0\" y=\"68.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">confirm 40</text><rect x=\"232.0\" y=\"44.0\" width=\"352.0\" height=\"40.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"408.0\" y=\"68.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">detection logic: 110 ms</text><rect x=\"584.0\" y=\"44.0\" width=\"96.0\" height=\"40.0\" rx=\"8\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"632.0\" y=\"68.5\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">act 30</text><line x1=\"40.0\" y1=\"100.0\" x2=\"680.0\" y2=\"100.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><line x1=\"40.0\" y1=\"100.0\" x2=\"40.0\" y2=\"105.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"40.0\" y=\"120.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0 ms</text><line x1=\"104.0\" y1=\"100.0\" x2=\"104.0\" y2=\"105.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"104.0\" y=\"120.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">20 ms</text><line x1=\"232.0\" y1=\"100.0\" x2=\"232.0\" y2=\"105.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"232.0\" y=\"120.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">60 ms</text><line x1=\"584.0\" y1=\"100.0\" x2=\"584.0\" y2=\"105.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"584.0\" y=\"120.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">170 ms</text><line x1=\"680.0\" y1=\"100.0\" x2=\"680.0\" y2=\"105.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"680.0\" y=\"120.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">200 ms</text><rect x=\"39.0\" y=\"135.7\" width=\"97.4\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"44.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">fault occurs</text><rect x=\"517.1\" y=\"135.7\" width=\"133.8\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"584.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">flagged at 170 ms</text><rect x=\"527.4\" y=\"157.7\" width=\"155.6\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"678.0\" y=\"170.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--next)\" font-weight=\"700\">safe state by 200 ms</text><text x=\"16.0\" y=\"214.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">ASIL from severity + exposure + controllability</text><rect x=\"16.0\" y=\"232.0\" width=\"220.0\" height=\"36.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"126.0\" y=\"254.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Unintended steering</text><rect x=\"250.0\" y=\"232.0\" width=\"220.0\" height=\"36.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"360.0\" y=\"254.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">S3 + E4 + C3 = 10</text><line x1=\"474.0\" y1=\"250.0\" x2=\"500.0\" y2=\"250.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"506.0\" y=\"232.0\" width=\"120.0\" height=\"36.0\" rx=\"8\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"566.0\" y=\"254.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">ASIL D</text><rect x=\"16.0\" y=\"278.0\" width=\"220.0\" height=\"36.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"126.0\" y=\"300.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Second hazard</text><rect x=\"250.0\" y=\"278.0\" width=\"220.0\" height=\"36.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"360.0\" y=\"300.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">S1 + E4 + C2 = 7</text><line x1=\"474.0\" y1=\"296.0\" x2=\"500.0\" y2=\"296.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"506.0\" y=\"278.0\" width=\"120.0\" height=\"36.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"566.0\" y=\"300.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">ASIL A</text><text x=\"16.0\" y=\"344.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--muted)\">Sum 10 → D, 9 → C, 8 → B, 7 → A, 6 or less → QM</text>",
+   "aria": "Time bar from 0 to 200 ms split into sampling, confirmation, detection and actuation, and two rows adding S, E and C ratings to give ASIL D and ASIL A."
+  }
+ }
 }

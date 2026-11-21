@@ -1,219 +1,276 @@
 {
- "lead": "V2X means Vehicle-to-Everything: a car exchanges short radio messages with other cars, roadside units, pedestrians' phones, the cloud and the grid. It exists because radar and cameras see only line of sight and cannot know intent; a V2V message can say 'I am braking' before the brake lights are visible. The same electronics unit, the telematics control unit, also feeds navigation, music and over-the-air updates into the cabin. You meet V2X in collision warnings at blind corners and in connected infotainment.",
- "prereq": "You need: <a href=\"#vehicle-networking-and-need-for-data-buses\">Chapter 6.1</a> for in-car networks, <a href=\"#lin-flexray-and-automotive-ethernet\">Chapter 6.3</a> for Ethernet backbones, and Unit 5 ADAS sensors for radar, camera and LiDAR context.",
+ "lead": "OBD-II (on-board diagnostics, second generation) is the standard that lets one scan tool plug into any compliant car and read its emissions-related faults and live engine data. It fixes the 16-pin connector and its pins, the bus protocols, the request services, the parameter numbers and the format of the fault codes. It became law for petrol cars in the USA from 1996 and in Europe (as EOBD) from 2001; in India the BS-VI Phase 2 rules of April 2023 brought full OBD-II monitoring. A workshop uses it to find why the malfunction lamp is on, to read sensor values while the engine runs and to check that the engine computer has finished its self-tests.",
+ "prereq": "You need <a href=\"#can-and-can-fd-protocols\">CAN frames</a> and the transport layer from <a href=\"#network-topology-osi-model-and-classification-of-bus-systems\">the OSI model</a>, and hexadecimal numbers.",
  "sections": [
   {
-   "h3": "V2X links and safety messages",
+   "h3": "The 16-pin connector and the bus protocols",
    "blocks": [
     {
      "type": "p",
-     "text": "V2X means Vehicle-to-Everything. It is a set of short radio messages between a vehicle and the world around it. The vehicle carries an on-board unit (OBU), a radio plus a small computer. A fixed roadside unit (RSU) is the infrastructure box at a junction, toll plaza or highway gantry."
+     "text": "Before OBD-II each maker had its own socket and its own codes. The standard connector (SAE J1962) has 16 pins in two rows of eight and must sit within reach of the driver's seat, usually under the dashboard near the steering column. The pins with fixed jobs are:"
+    },
+    {
+     "type": "table",
+     "head": [
+      "Pin",
+      "Function"
+     ],
+     "rows": [
+      [
+       "2",
+       "SAE J1850 bus positive"
+      ],
+      [
+       "4",
+       "Chassis ground"
+      ],
+      [
+       "5",
+       "Signal ground"
+      ],
+      [
+       "6",
+       "CAN high (ISO 15765-4)"
+      ],
+      [
+       "7",
+       "K-line (ISO 9141-2, ISO 14230)"
+      ],
+      [
+       "10",
+       "SAE J1850 bus negative"
+      ],
+      [
+       "14",
+       "CAN low (ISO 15765-4)"
+      ],
+      [
+       "15",
+       "L-line (ISO 9141-2, ISO 14230)"
+      ],
+      [
+       "16",
+       "Battery positive, fused"
+      ]
+     ]
     },
     {
      "type": "p",
-     "text": "The five links are: V2V, vehicle to vehicle; V2I, vehicle to infrastructure; V2P, vehicle to pedestrian, usually a phone app; V2N, vehicle to network, meaning the cellular cloud; and V2G, vehicle to grid, for an electric vehicle that charges or sends power back. V2V and V2I can work without a SIM or tower. Only V2N and cloud services need cellular coverage. Routing among moving vehicles is covered in <a href=\"#vanet-architecture-applications-and-routing\">Chapter 6.7</a>."
-    },
-    {
-     "type": "p",
-     "text": "A safety message carries position, speed, heading, brake status and a time stamp. From these, the receiving OBU predicts a path. Common warnings are: forward collision warning (the car ahead brakes hard); intersection movement assist (a car is about to cross your path at a blind junction); emergency vehicle warning (an ambulance is approaching); road-hazard alert (a pothole, crash or slippery patch); and green light optimal speed advisory (GLOSA), which tells the driver a speed to reach the next green light. GLOSA advises; it does not control the signal."
-    },
-    {
-     "type": "formula",
-     "text": "d = v<sub>rel</sub> × t",
-     "where": "d is distance in metres (m); v<sub>rel</sub> is closing speed in metres per second (m/s); t is warning time in seconds (s)."
-    },
-    {
-     "type": "p",
-     "text": "At 40 m/s closing speed and 2.5 s, d = 100 m. Radio latency adds v<sub>rel</sub> × Δt, where Δt is latency in seconds; 100 ms adds 4 m."
+     "text": "The other pins are left to the maker. Five protocols were allowed: SAE J1850 PWM, SAE J1850 VPW, ISO 9141-2, ISO 14230 (KWP2000) and ISO 15765-4 (CAN). Cars sold in the USA from model year 2008 must use CAN, and so do new cars elsewhere. On CAN, OBD-II allows 11-bit or 29-bit identifiers, each at 500 kbit/s or 250 kbit/s; most cars use 11-bit at 500 kbit/s, and 29-bit at 250 kbit/s is common on heavy vehicles. The tool takes power from pins 16 and 4 or 5, tries CAN on pins 6 and 14, and falls back to the older pins if no ECU answers."
     }
    ]
   },
   {
-   "h3": "Radio choices, TCU and cloud services",
+   "h3": "Services and parameter identifiers",
    "blocks": [
     {
      "type": "p",
-     "text": "Two radio families dominate. IEEE 802.11p is a Wi-Fi-derived link in the 5.9 GHz band. It works ad hoc: an OBU sends a safety packet directly to nearby OBUs without a base station. It has no SIM and no subscription. Its stack is in <a href=\"#dsrc-ieee-802-11p-and-wave-protocol-stack\">Chapter 6.8</a>. LTE-V2X is the cellular family. It defines a sidelink, a direct device-to-device radio path, so V2V can run without a tower. When coverage exists, the network can schedule resources. 5G-V2X extends this with lower latency and more capacity, but the safety idea is the same: send small, frequent, authenticated messages. 802.11p is mature and independent of cellular coverage. C-V2X can reuse cellular timing and security, and it can also use the network for V2N."
+     "text": "The tool sends a request whose first byte is a <b>service</b> (or mode) number; the ECU answers with the service number plus 0x40. The standard services are:"
+    },
+    {
+     "type": "table",
+     "head": [
+      "Service",
+      "What it does"
+     ],
+     "rows": [
+      [
+       "01",
+       "Current (live) data"
+      ],
+      [
+       "02",
+       "Freeze frame: data stored at the moment a fault was set"
+      ],
+      [
+       "03",
+       "Stored (confirmed) trouble codes"
+      ],
+      [
+       "04",
+       "Clear codes and stored test results, switch the lamp off"
+      ],
+      [
+       "05",
+       "Oxygen sensor test results (not used on CAN cars, which use service 06)"
+      ],
+      [
+       "06",
+       "Results of on-board monitoring tests"
+      ],
+      [
+       "07",
+       "Pending codes: faults seen in the current or last drive cycle but not yet confirmed"
+      ],
+      [
+       "08",
+       "Control of an on-board test or component"
+      ],
+      [
+       "09",
+       "Vehicle information, such as the VIN"
+      ],
+      [
+       "0A",
+       "Permanent codes, which a scan tool cannot clear"
+      ]
+     ]
     },
     {
      "type": "p",
-     "text": "The telematics control unit (TCU) is the car's cellular gateway. It holds a modem, a GNSS receiver for position and time, and an eSIM. It connects to the in-car network through a gateway. The TCU carries V2N services: live traffic, remote diagnostics, emergency call, stolen-vehicle tracking, tolling and over-the-air (OTA) updates. OTA means the manufacturer sends new software or calibration over the cellular link, so the car need not visit a workshop. A toll plaza may read a tag over DSRC or RFID; the money message goes to the toll backend. The TCU is not the same as the safety OBU, though some cars combine both in one box. A gateway keeps infotainment traffic away from safety-critical CAN or Ethernet domains."
+     "text": "A <b>parameter identifier (PID)</b> names one value. The reply to service 01 is 0x41, the PID, then data bytes A, B and so on. The tool must apply the scaling for that PID:"
+    },
+    {
+     "type": "table",
+     "head": [
+      "PID",
+      "Value",
+      "Bytes",
+      "Formula"
+     ],
+     "rows": [
+      [
+       "04",
+       "Calculated engine load",
+       "A",
+       "A × 100 ÷ 255 %"
+      ],
+      [
+       "05",
+       "Coolant temperature",
+       "A",
+       "A − 40 °C"
+      ],
+      [
+       "0C",
+       "Engine speed",
+       "A, B",
+       "(256A + B) ÷ 4 rpm"
+      ],
+      [
+       "0D",
+       "Vehicle speed",
+       "A",
+       "A km/h"
+      ],
+      [
+       "11",
+       "Throttle position",
+       "A",
+       "A × 100 ÷ 255 %"
+      ]
+     ]
+    },
+    {
+     "type": "p",
+     "text": "OBD-II reaches only the emissions-related data. A workshop's own tester goes further with the maker's <b>enhanced diagnostics</b>, today usually UDS (unified diagnostic services, ISO 14229): read data by identifier, read trouble-code information, security access, routine control and reprogramming, for the ABS, airbag, body and every other ECU, routed through the gateway."
     }
    ]
   },
   {
-   "h3": "Infotainment, security and connected autonomy",
+   "h3": "Fault codes, monitors and the lamp",
    "blocks": [
     {
      "type": "p",
-     "text": "The head unit is the cabin computer behind the dashboard screen. It plays audio and video, runs navigation with live traffic, and projects a phone through Android Auto or Apple CarPlay. Smartphone projection places the phone's apps on the car screen, so the head unit supplies the display, touch and audio while the phone does the computing. Navigation uses GNSS plus map data; the TCU adds traffic and charging-station updates. A head-up display (HUD) may show speed, a turn arrow or a warning on the windscreen. Some syllabi list HUD here; its optics and combiner belong to Unit 2."
+     "text": "A <b>diagnostic trouble code (DTC)</b> is a letter and four digits. The letter is the system: P powertrain, C chassis, B body, U network. The first digit is 0 for a generic code defined by the standard and 1 for a maker-specific one (2 and 3 are split between the two). For P codes the second digit is the subsystem (1 and 2 fuel and air metering, 3 ignition and misfire, 4 emission controls, 5 speed and idle control, 6 computer and outputs, 7 and 8 transmission), and the last two digits name the fault. P0301 is a generic misfire in cylinder 1. On the bus each DTC is two bytes: the top 2 bits give the letter (00 P, 01 C, 10 B, 11 U), the next 2 bits the first digit, and the remaining three groups of 4 bits the last three digits."
     },
     {
      "type": "p",
-     "text": "The connected cabin widens the attack surface. Attack points include the cellular link, Wi-Fi, Bluetooth, USB ports, the OTA server and the diagnostic connector. A malicious message could fake a brake warning or unlock a door. Message authentication is the main defence for V2X: each safety packet carries a signature and a certificate, so a receiver can check that the sender is a real OBU and that the packet was not altered. Authentication proves origin and integrity; it does not by itself hide the content, and it needs a public-key infrastructure (PKI) to issue and revoke certificates. A gateway, message filtering and separate safety domains add defence in depth."
-    },
-    {
-     "type": "p",
-     "text": "A connected autonomous vehicle uses V2X as one more input beside radar, camera and LiDAR. Radar measures range and speed; camera reads lanes and signs; LiDAR builds a point cloud. V2X adds information beyond line of sight and, more importantly, intent: 'I am braking' or 'I am turning left'. The fusion unit must weigh a delayed or false V2X message against its own sensors."
+     "text": "<b>Monitors</b> are self-tests the ECU runs: misfire, fuel system and comprehensive components run all the time; catalyst, oxygen sensor, oxygen sensor heater, evaporative system and EGR run only when their conditions are met during a <b>drive cycle</b> (cold start, warm-up, steady cruise, idle). The <b>readiness status</b> (service 01, PID 01) shows which monitors have completed since the codes were last cleared. When a monitor first fails, the ECU stores a <b>pending code</b>. Most faults are <b>two-trip</b> faults: if the same fault is found in the next drive cycle, the code is confirmed, a freeze frame is stored and the <b>malfunction indicator lamp (MIL)</b> comes on. A misfire bad enough to damage the catalyst lights the MIL at once, and flashes it. After three good drive cycles in a row the lamp goes off, and the code is erased after about 40 warm-up cycles without the fault. Service 04 clears codes, but a fault that is still there returns, and a permanent code stays until its monitor passes."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "The central car sends V2V, V2I and V2P messages; dashed links show optional paths that use a roadside unit or the cellular cloud. Notice that no link needs the cloud for a direct safety warning.",
-  "spec": {
-   "type": "graph",
-   "directed": true,
-   "title": "V2X links around one vehicle",
-   "nodes": [
-    {
-     "id": "V1",
-     "label": "Car 1",
-     "x": 1,
-     "y": 2,
-     "note": "OBU",
-     "style": "accent"
-    },
-    {
-     "id": "V2",
-     "label": "Car 2",
-     "x": 3,
-     "y": 2,
-     "note": "OBU",
-     "style": "normal"
-    },
-    {
-     "id": "RSU",
-     "label": "RSU",
-     "x": 2,
-     "y": 1,
-     "note": "roadside unit",
-     "style": "next"
-    },
-    {
-     "id": "Ped",
-     "label": "Pedestrian",
-     "x": 1,
-     "y": 3,
-     "note": "phone app",
-     "style": "normal"
-    },
-    {
-     "id": "Cloud",
-     "label": "Cloud",
-     "x": 4,
-     "y": 1,
-     "note": "backend",
-     "style": "muted"
-    }
-   ],
-   "edges": [
-    {
-     "from": "V1",
-     "to": "V2",
-     "label": "V2V",
-     "style": "solid"
-    },
-    {
-     "from": "V1",
-     "to": "RSU",
-     "label": "V2I",
-     "style": "solid"
-    },
-    {
-     "from": "V2",
-     "to": "RSU",
-     "label": "V2I",
-     "style": "dashed"
-    },
-    {
-     "from": "Ped",
-     "to": "V1",
-     "label": "V2P",
-     "style": "solid"
-    },
-    {
-     "from": "RSU",
-     "to": "Cloud",
-     "label": "backhaul",
-     "style": "solid"
-    },
-    {
-     "from": "V2",
-     "to": "Cloud",
-     "label": "V2N",
-     "style": "dashed"
-    }
-   ],
-   "aria": "Graph of V2X links: vehicle to vehicle, vehicle to roadside unit, vehicle to pedestrian, and roadside unit to cloud."
-  }
- },
  "examples": [
   {
-   "question": "Two cars close at 40 m/s relative speed. A warning is useful 2.5 s before a possible collision. How far ahead must it arrive, and how much does 100 ms of V2X latency add?",
+   "question": "A scan tool sends 01 0C (live engine speed). The ECU replies 41 0C 1A F0. Find the engine speed.",
    "steps": [
-    "Warning distance without latency: d = v_rel × t = 40 m/s × 2.5 s = 100 m.",
-    "Convert latency to seconds: 100 ms = 0.100 s.",
-    "Extra distance caused by latency: d_latency = 40 m/s × 0.100 s = 4 m.",
-    "Required arrival distance: 100 m + 4 m = 104 m."
+    "The reply starts 41 (service 01 + 0x40) and 0C (the PID), so the data bytes are A = 0x1A and B = 0xF0.",
+    "A = 0x1A = 1 × 16 + 10 = 26; B = 0xF0 = 15 × 16 + 0 = 240.",
+    "Raw count = 256A + B = 256 × 26 + 240 = 6656 + 240 = 6896.",
+    "Each count is 0.25 rpm, so speed = 6896 ÷ 4 = 1724 rpm."
    ],
-   "answer": "The warning must arrive by 104 m; latency adds 4 m to the ideal 100 m.",
-   "check": "v = 40.0\nt = 2.5\nlatency_ms = 100.0\nd = v * t\nextra = v * (latency_ms / 1000.0)\ntotal = d + extra\nprint(d)\nprint(extra)\nprint(total)",
-   "values": [
-    100.0,
-    4.0,
-    104.0
+   "answer": "The engine is running at 1724 rpm."
+  },
+  {
+   "question": "Service 03 on a CAN car returns 43 02 03 01 01 33. A freeze frame for the first code gives PID 05 = 0x7B, PID 0D = 0x3E and PID 04 = 0x59. Decode the codes and the freeze frame.",
+   "steps": [
+    "43 is the reply to service 03; 02 says two codes follow; the codes are 03 01 and 01 33.",
+    "0x0301: first byte 0000 0011. Top two bits 00 → P; next two bits 00 → first digit 0; low four bits 0011 → 3; second byte 0x01 → digits 0 and 1. Code P0301, misfire in cylinder 1.",
+    "0x0133: first byte 0000 0001 → P, 0, 1; second byte 0x33 → 3 and 3. Code P0133, oxygen sensor slow response, bank 1 sensor 1.",
+    "Coolant: A = 0x7B = 123, so 123 − 40 = 83 °C (engine warm).",
+    "Vehicle speed: A = 0x3E = 62, so 62 km/h.",
+    "Engine load: A = 0x59 = 89, so 89 × 100 ÷ 255 = 34.9 per cent."
    ],
-   "code": null,
-   "dry_run": null,
-   "output": null
+   "answer": "Codes P0301 (cylinder 1 misfire) and P0133 (slow oxygen sensor, bank 1 sensor 1); the misfire was set with the engine warm at 83 °C, at 62 km/h and about 35 per cent load."
   }
  ],
  "traps": [
-  "V2X is radio communication, not a radar or camera. A car with V2X still needs its own sensors; V2X adds messages beyond line of sight.",
-  "V2V and V2I do not need cellular coverage. Only V2N and cloud services stop when the tower is down.",
-  "Do not mix 802.11p and LTE-V2X. 802.11p is ad hoc Wi-Fi in 5.9 GHz; LTE-V2X has a direct sidelink plus an optional network mode.",
-  "Authentication is not encryption. A signature proves sender and integrity; it may leave the message readable.",
-  "Convert 100 ms to 0.1 s before multiplying by m/s. Using 100 gives a 100-times error."
+  "The P in P0301 means powertrain, not petrol. C is chassis, B body, U network.",
+  "A generic scan tool does read P1xxx codes through service 03; what it lacks is the maker's table that says what each one means.",
+  "Pins 4 and 5 are grounds and pin 16 is battery positive; CAN is on pins 6 and 14, not 6 and 16.",
+  "A freeze frame is stored data from the moment the fault was confirmed, read with service 02; live data is service 01.",
+  "Clearing codes with service 04 switches the lamp off but does not repair the fault, and it resets the readiness monitors, so the car fails an inspection that checks them."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Define V2I and V2G.",
+   "q": "Which J1962 pins carry battery positive, the two grounds and CAN?",
    "marks": 2,
-   "a": "V2I is vehicle-to-infrastructure: an OBU talks to a roadside unit. V2G is vehicle-to-grid: an electric vehicle exchanges power or data with the grid."
+   "a": "Pin 16 battery positive; pins 4 (chassis) and 5 (signal) ground; pins 6 CAN high and 14 CAN low."
+  },
+  {
+   "level": "remember",
+   "q": "Which services read stored, pending and permanent codes?",
+   "marks": 2,
+   "a": "Service 03 stored (confirmed) codes, service 07 pending codes, service 0A permanent codes."
   },
   {
    "level": "understand",
-   "q": "Why can V2V work with no cellular coverage?",
+   "q": "Explain the two-trip rule for lighting the MIL.",
    "marks": 3,
-   "a": "V2V uses a direct radio link between the two on-board units. It does not need a base station or SIM. Coverage matters only for V2N cloud services."
+   "a": "When a monitor first fails, the ECU stores only a pending code. If the same fault is found again in the next drive cycle, the code is confirmed, a freeze frame is stored and the MIL comes on. This avoids lighting the lamp for a one-off glitch."
   },
   {
    "level": "apply",
-   "q": "Car A closes on Car B at 25 m/s. A warning is needed 2.0 s ahead. V2X latency is 80 ms. Find the ideal distance, the extra distance from latency, and the required arrival distance.",
-   "marks": 4,
-   "a": "Ideal: 25 × 2.0 = 50 m. Latency: 80 ms = 0.08 s, extra = 25 × 0.08 = 2 m. Required arrival: 50 + 2 = 52 m."
-  },
-  {
-   "level": "analyze",
-   "q": "Give two reasons V2X needs message authentication and one limit of authentication.",
-   "marks": 5,
-   "a": "It stops a fake emergency-braking message and a spoofed position that could cause a wrong warning. Limit: a signature proves origin and integrity but does not hide the content, and the system needs a PKI to issue and revoke certificates."
-  },
-  {
-   "level": "understand",
-   "q": "List three safety V2X use cases and say what each warns about.",
+   "q": "PID 0C returns A = 0x0C, B = 0x80. Find the engine speed.",
    "marks": 3,
-   "a": "Forward collision warning warns of a hard-braking car ahead. Intersection movement assist warns of a crossing path at a blind junction. Emergency vehicle warning warns of an approaching ambulance or fire engine."
+   "a": "A = 12, B = 128. Count = 12 × 256 + 128 = 3200. Speed = 3200 ÷ 4 = 800 rpm."
+  },
+  {
+   "level": "apply",
+   "q": "PID 05 returns 0x28. What is the coolant temperature, and what does it tell you?",
+   "marks": 3,
+   "a": "0x28 = 40, so 40 − 40 = 0 °C. The engine is stone cold (or the sensor is reading wrongly), so warm-up monitors have not run."
+  },
+  {
+   "level": "apply",
+   "q": "Decode the DTC bytes 0x41 0x23.",
+   "marks": 4,
+   "a": "0x41 = 0100 0001: top bits 01 → C; next bits 00 → 0; low nibble 1 → 1; 0x23 → 2 and 3. Code C0123, a generic chassis code."
   },
   {
    "level": "analyze",
-   "q": "Compare 802.11p and LTE-V2X on coverage dependency, direct link, and one advantage.",
-   "marks": 6,
-   "a": "802.11p is ad hoc and independent of cellular coverage; it gives a direct OBU-to-OBU link. LTE-V2X has a direct sidelink for V2V and can also use network scheduling; its advantage is managed cellular resources and a path to 5G-V2X. 802.11p's advantage is maturity and no subscription."
+   "q": "A driver clears the codes; the MIL goes off but returns two days later. Explain.",
+   "marks": 4,
+   "a": "Service 04 erased the codes and the lamp, but the fault was not repaired. When the monitor ran again it failed, set a pending code, failed again on the next drive cycle, confirmed the code and lit the MIL."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a generic OBD-II tool not read an airbag fault?",
+   "marks": 3,
+   "a": "OBD-II covers only emissions-related systems. The airbag ECU's codes are read with the maker's enhanced diagnostics (UDS), which a generic tool does not know."
   }
  ],
- "beyond": "Not for the exam. Industry is moving toward 5G NR V2X, cooperative perception and edge computing at roadside units. Research questions include misbehaviour detection when a real OBU sends false data, and privacy-preserving certificates that still allow revocation. Search for C-V2X sidelink, cooperative awareness message, and V2X public-key infrastructure. The security and latency parts connect to autonomous-vehicle safety cases."
+ "beyond": "Not for the exam. The same socket now feeds fleet telematics, insurance dongles and remote diagnostics, and makers lock it with security access and secure gateways. Diagnostics over IP (DoIP) uses Ethernet for fast flashing, and newer rules move toward remote, over-the-air emissions monitoring. Search for SAE J1979, ISO 14229 UDS, DoIP and readiness monitors.",
+ "figure": {
+  "after_section": 1,
+  "caption": "The 16 pins of the J1962 socket, with the ones the standard fixes labelled, and the engine-speed request and reply of the worked example.",
+  "spec": {
+   "type": "svg",
+   "h": 368,
+   "body": "<text x=\"360.0\" y=\"18.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">J1962 diagnostic socket (front view)</text><path d=\"M150,70 L570,70 L548,176 L172,176 Z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round\"/><circle cx=\"202.5\" cy=\"100\" r=\"15\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"202.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">1</text><circle cx=\"247.5\" cy=\"100\" r=\"15\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"247.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">2</text><circle cx=\"292.5\" cy=\"100\" r=\"15\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"292.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">3</text><circle cx=\"337.5\" cy=\"100\" r=\"15\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"337.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">4</text><circle cx=\"382.5\" cy=\"100\" r=\"15\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"382.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">5</text><circle cx=\"427.5\" cy=\"100\" r=\"15\" style=\"fill:var(--live-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"427.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">6</text><circle cx=\"472.5\" cy=\"100\" r=\"15\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"472.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">7</text><circle cx=\"517.5\" cy=\"100\" r=\"15\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"517.5\" y=\"105.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">8</text><circle cx=\"202.5\" cy=\"146\" r=\"15\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"202.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">9</text><circle cx=\"247.5\" cy=\"146\" r=\"15\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"247.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">10</text><circle cx=\"292.5\" cy=\"146\" r=\"15\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"292.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">11</text><circle cx=\"337.5\" cy=\"146\" r=\"15\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"337.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">12</text><circle cx=\"382.5\" cy=\"146\" r=\"15\" style=\"fill:var(--fig);stroke:var(--line2);stroke-width:2\"/><text x=\"382.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">13</text><circle cx=\"427.5\" cy=\"146\" r=\"15\" style=\"fill:var(--live-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"427.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">14</text><circle cx=\"472.5\" cy=\"146\" r=\"15\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"472.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">15</text><circle cx=\"517.5\" cy=\"146\" r=\"15\" style=\"fill:var(--next-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"517.5\" y=\"151.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">16</text><line x1=\"247.5\" y1=\"44.0\" x2=\"247.5\" y2=\"84.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"217.0\" y=\"27.6\" width=\"61.0\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"247.5\" y=\"40.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">J1850 +</text><line x1=\"382.5\" y1=\"44.0\" x2=\"382.5\" y2=\"84.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"330.2\" y=\"27.6\" width=\"104.6\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"382.5\" y=\"40.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">signal ground</text><line x1=\"472.5\" y1=\"44.0\" x2=\"472.5\" y2=\"84.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"473.7\" y=\"27.6\" width=\"53.7\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"500.5\" y=\"40.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">K-line</text><line x1=\"337.5\" y1=\"64.0\" x2=\"337.5\" y2=\"84.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"263.5\" y=\"47.6\" width=\"111.9\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"319.5\" y=\"60.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">chassis ground</text><line x1=\"427.5\" y1=\"64.0\" x2=\"427.5\" y2=\"84.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"407.4\" y=\"47.6\" width=\"68.2\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"441.5\" y=\"60.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--live)\">CAN high</text><line x1=\"247.5\" y1=\"162.0\" x2=\"247.5\" y2=\"192.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"217.0\" y=\"193.7\" width=\"61.0\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"247.5\" y=\"206.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">J1850 −</text><line x1=\"427.5\" y1=\"162.0\" x2=\"427.5\" y2=\"192.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"385.0\" y=\"193.7\" width=\"61.0\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"415.5\" y=\"206.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--live)\">CAN low</text><line x1=\"517.5\" y1=\"162.0\" x2=\"517.5\" y2=\"192.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"501.7\" y=\"193.7\" width=\"75.5\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"539.5\" y=\"206.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\">battery +</text><line x1=\"472.5\" y1=\"162.0\" x2=\"472.5\" y2=\"214.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><rect x=\"445.7\" y=\"215.7\" width=\"53.7\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"472.5\" y=\"228.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">L-line</text><rect x=\"16.0\" y=\"262.0\" width=\"120.0\" height=\"64.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"76.0\" y=\"298.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Scan tool</text><rect x=\"584.0\" y=\"262.0\" width=\"120.0\" height=\"64.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"644.0\" y=\"298.9\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Engine ECU</text><line x1=\"140.0\" y1=\"280.0\" x2=\"580.0\" y2=\"280.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"229.6\" y=\"260.7\" width=\"260.9\" height=\"18.9\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"360.0\" y=\"274.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">request 01 0C: live engine speed</text><line x1=\"580.0\" y1=\"312.0\" x2=\"140.0\" y2=\"312.0\" style=\"stroke:var(--live);stroke-width:2\" marker-end=\"url(#ar-UID-l)\"/><rect x=\"288.4\" y=\"292.7\" width=\"143.3\" height=\"18.9\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"360.0\" y=\"306.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--live)\" font-weight=\"700\">reply 41 0C 1A F0</text><text x=\"360.0\" y=\"352.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">(256 × 26 + 240) ÷ 4 = 6896 ÷ 4 = 1724 rpm</text>",
+   "aria": "Trapezoid socket with two rows of eight pins; pins 2, 4, 5, 6, 7, 10, 14, 15 and 16 labelled; below, a scan tool sends 01 0C and the ECU replies 41 0C 1A F0, 1724 rpm."
+  }
+ }
 }
