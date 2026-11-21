@@ -1,13 +1,13 @@
 # ec-comm-u3: free-model run
 
-- Book: `books/ece/ec-comm/ec-comm-u3.html`
+- Book: `work/ec-comm-u3/tree/books/ece/ec-comm/ec-comm-u3.html`
 - Status: ok
 - Model calls so far: 26 (117,472 tokens in, 251,433 out), 7.1 minutes
 
 ## Checker
 
 ```
-ec-comm-u3.html: 8 chapters, 15973 words, 9 figures, 171 KB
+ec-comm-u3.html: 8 chapters, 23662 words, 13 figures, 266 KB
 OK
 ```
 
