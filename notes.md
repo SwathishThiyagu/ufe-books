@@ -572,4 +572,8 @@
 ## me-design-u6 (Claude correction pass, 21 Nov 2026)
 - Belts, chains and wire ropes are not in the exam course ME3591 (pipeline/EXAM_ND2026.md), so this book follows the other syllabi; no exam topics were added.
 - SRM's `where` topics include lab lines ("Experiments: Mode thermal analysis of Composite material Frequency analysis", "Harmonic Analysis") that are not syllabus content; NITK's entry lists its whole course (unit 1) rather than this unit.
+## au-elec-u2 (Claude correction pass, 21 Nov 2026)
+- No new subtopics for this unit; the exam course AU3502 lists "Wiper and Washer systems" and "electric horns", now covered in 2.9 (washer system, horn construction and horn relay), and "Special purpose lamps", covered in 2.6.
+- The packet tags 2.5 to 2.7 (lighting) "advanced" because only one syllabus lists them, but they are core exam topics of AU3502; the chapters run 1300 to 1450 words rather than the 650 to 900 advanced target.
+- Manipal's `where` entry for this unit is its whole ignition and engine-control unit (fuel control, sensors, CAN, ABS), most of which belongs to au-elec u3 to u6; NITT's is its automobile-fundamentals unit (engine block, drivetrain), only partly ignition.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
