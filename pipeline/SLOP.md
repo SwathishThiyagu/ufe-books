@@ -1557,3 +1557,47 @@ Count: 0 must fix, 0 should fix; 8 cosmetic fixed in 8 lessons, 0 left; 4 book i
 none in a lesson). Clean: u5-L2 entirely, and every lesson on facts, pictures and bookfigs. Patterns: the figs-note
 generator again kept a chapter note or a subset of the book's sources in place of the full list; the engine cuts a
 long kicker at 70 characters, so a long title needs a short kicker written into META.
+
+## Analog and Digital Communication fact review B (Nov 2026)
+
+Audited 21 Nov 2026: the 9 lessons on the branches lesson/ec-comm-u5-L1 … u7-L3 (u5 L1–L3, u6 L1–L3, u7 L1–L3), every
+scene's narration and on-screen text against the library books books/ece/ec-comm/ec-comm-u5..u7.html on main, each
+lesson's sheet once. Recomputed in python every worked example, model answer, trap, picture number and recap number:
+ISI sample −0.5 and D = 0.5, the α = 0.5 eye (worst +1 sample 0.785 at 0.1T, 0.535 at 0.2T; α = 0.25: 0.652, 0.289),
+raised cosine tails at 2.5T (0.127, 0.087, 0.017, 0), the NRZ pulse after a 0.4/T band (0.21 at T); the 3-tap ZF taps
+(−0.2273, 1.1364, −0.3409), new ISI −0.0455 / −0.1023, D 0.148, noise gain 1.459 (1.64 dB), LMS errors 0.25 → 0.0099,
+Gram-Schmidt points and distances; matched filter 2E/N₀ = 1000 (30 dB), 0.8T loss 1.94 dB, Q(√20) = 3.87e-6, 9.59 dB for
+1e-5, on-off 7.83e-4, decision distances 0.500 / 0.806 / 1.360, precoded duobinary and the unprecoded error run
+(1, 0, 1, 0, 1, −1, 2, −1), 4-PAM 3.51e-3 and 13.75 dB; BFSK h = 1, Carson 30 kHz, tone correlation at 7.5 kHz spacing
+−0.246 (−0.212 difference term, −0.034 sum term), BPSK 25° error 2.53e-5, BPSK at 7 dB 7.73e-4, the four receivers at
+10 dB, DPSK 1101 encode/decode; QPSK/8-PSK/16-PSK distances 1.414 / 0.765 / 0.390, 16-PSK penalty 13.1× (11.2 dB),
+16-QAM 7.02e-3 / 1.75e-3, MFSK union bounds at 8 dB (6.0e-3, 5.7e-4, 4.8e-5, 3.8e-6), MSK tones and main lobe;
+BPSK/MSK PSD at 2.5Rb (−17.9 / −37.8 dB), Gp 128 (21.07 dB), Mj 14.07 dB (25.5×), OFDM 312.5 kHz / 4.0 µs / 20 % /
+96 and 54 Mb/s; H = 1.75 (0.527 hartley), Huffman L̄ 2.2, H 2.1219, η 96.45 %, σ² 1.36 / 0.16, BSC I 0.531 / 0.456;
+Shannon-Hartley 30.9 / 20.6 kbit/s (dB-as-ratio slip 15.4), C(0.01) 0.919, repetition Pb 2.98e-4, (7,4) encode
+1011010 and syndrome 111, cyclic remainders 001 / 110 / 011, x⁷ + 1 factors, Viterbi trellis metric 1, BCH (15,7)
+121 ≤ 256. Every "Don't write" is false under each common convention and every stated wrong result is what the mistake
+gives; every exam question shows the givens its answer uses. No lesson names a college or a unit/lesson number.
+Book fixes bd252f4 (check_book.py --render OK on u5, u6, u7): u5 Fig 5.2.1 "opening 2 (noise margin)" on two lines
+inside the eye frame (it ran past the frame and past the viewBox); u6 Fig 6.3.1 caption: the under-1-dB gap of DPSK
+and non-coherent BFSK holds below about 10⁻⁴ (1.1 dB at 10⁻³, 1.6 dB at 10⁻²); u7 7.3 Check yourself: I ≥ 0 because
+conditioning cannot raise average uncertainty (the pointwise terms can be negative), I ≤ H(X) because H(X|Y) ≥ 0;
+u7 7.4 Check yourself 10<sup>1.7</sup> (was 10<sup>1</sup>.7). u5 5.6 WE "10^(10/10)": the book has the sup tag and
+renders it; only the text extraction lost it, no fix. Fixed lessons rebuilt with --revoice (u6-L1: scenes 17 and 20
+voiced again; the rest reused every line); each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text outside the safe area, play-through OK (the remaining notes are book figures under half the stage).
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-comm-u6-L1 | bookfig (17), recap | "Each no-phase receiver sits under one decibel to the right of its coherent partner" and "envelopes or DPSK cost under one decibel": true below about 10⁻⁴ only; the figure runs to 10⁻¹, where the gap is 2.9 dB (1.1 dB at 10⁻³). Now "At low error rates, …" in both lines (book caption too) | should fix: fixed 64222f4
+ec-comm-u5-L2, u5-L3 | figs | sources line "John G. Proakis and Masoud Salehi (signal space and error probability); B. P. Lathi and Zhi Ding (eye patterns and digital carrier modulation)": chapter notes as titles; now the three textbooks by author and title | cosmetic: fixed 29cc986, 87cafc5
+ec-comm-u7-L2, u7-L3 | figs | sources line "Lathi and Ding (channel capacity and error-control coding); Simon Haykin (4th edition: information and coding theory, …)": chapter notes as titles; now by title, with Cover and Thomas (u7-L2) and Lin and Costello (u7-L3) from the book's list | cosmetic: fixed 9ae9310, 4c553ed
+ec-comm-u5-L1 | bookfig (9) | "opening 2 (noise margin)" ran across the eye frame and past the right edge of the figure (book too) | cosmetic: fixed 963a55f
+ec-comm-u5-L2 | notebook (6) | "ZF: v₀ = 1 and vₘ = 0 for \|m\| ≤ N" includes m = 0; now "0 < \|m\| ≤ N" | cosmetic: fixed 29cc986
+ec-comm-u5-L2 | pq/pa (Q2) | "h0 = 1, h1 = 0.4 … (c0, c1) … v0, v1, v2" with plain digits for subscripts; now h₀, c₀, v₂ … | cosmetic: fixed 29cc986
+
+Count: 1 should-fix fixed in 1 lesson, 6 cosmetic fixed in 5 lessons; 4 book items fixed (u5 figure label, u6 caption,
+u7 two answers). Writer-known items checked: u7 7.3 I ≥ 0 reason (book fixed; u7-L1 Q1 already gave the right reason),
+u5 5.6 superscript (renders), u5 Fig 5.2.1 label (fixed), generator sources line (fixed in u5-L2, u5-L3, u7-L2, u7-L3;
+right in u5-L1, u6-L1, u6-L2, u6-L3, u7-L1). Clean on facts: u5-L1, u5-L2, u5-L3, u6-L2, u6-L3, u7-L1, u7-L2, u7-L3.
+Patterns: a figure caption's "less than 1 dB" said without its error-rate range (book and lesson); the figs-note
+generator again kept chapter notes in place of source titles.
