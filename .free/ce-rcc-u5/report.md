@@ -1,0 +1,48 @@
+# ce-rcc-u5: free-model run
+
+- Book: `books/civil/ce-rcc/ce-rcc-u5.html`
+- Status: ok
+- Model calls so far: 32 (116,795 tokens in, 303,475 out), 9.0 minutes
+
+## Checker
+
+```
+ce-rcc-u5.html: 8 chapters, 15656 words, 9 figures, 150 KB
+OK
+```
+
+## For the reviewer
+
+- nothing flagged
+
+## Reviewer notes (after any revision)
+
+- ch 1 [high] Section 3 ('short when both ratios are ≤ 12'), worked example step 4, Figure caption, Quiz Q2: The chapter fixes the short/slender line at 'at most 12' and states in step 4 that 'a ratio equal to 12 is still on the short side'. IS 456 clause 25.3.1 treats a compression member as short only when both slenderness ratios are less than 12; a ratio of 12 or more is slender. The worked example lands exactly on the boundary (λ_minor = 3600/300 = 12.0), so as written the example's classification is wrong: that column cannot be called short. The same wrong rule is repeated in the figure caption and in the Q2 answer, so a student who follows the book will lose marks.
+- ch 1 [low] Worked example steps 5 and 6: The column was introduced with the standard notation b × D, where D = 450 mm (used in step 2), but step 5 then writes 'about the minor axis (D = 300 mm)'. A student can read this as contradicting the earlier definition of D.
+- ch 2 [high] Section 2, tie design bullet (and Exam traps): The spacing rule is stated with only two limits: least lateral dimension and 16 × smallest bar diameter. IS 456 gives four limits for the pitch of lateral ties; the 300 mm absolute cap and the 40 × tie diameter limit are missing. Because of this omission the chapter's own quiz answer (Q5) ends up violating the code.
+- ch 2 [high] Quiz Q5: The answer allows 8 mm ties at 350 mm c/c. The pitch of lateral ties must not exceed 300 mm under IS 456, so 350 mm is a non-conforming answer marked as correct. (The 40 × 8 = 320 mm limit is also crossed, though 300 mm governs first.)
+- ch 2 [low] Worked example 1 and Section 2 first bullet: The chapter tells the student to confirm the minimum eccentricity is within 0.05 times the lateral dimension, then designs a 300 mm wide column without that check. For this section e_min = max(300/500 + 400/30, 20) = 20 mm, while 0.05 × 300 = 15 mm, so strictly the pure axial formula is outside its stated validity.
+- ch 2 [low] Figure and caption: The flow shows 'Assume Asc' before 'Ag = 300 × 400', and the caption says the 1200 kN load 'leads to' the 300 × 400 section, while the worked example starts with the section already given and then finds the steel.
+- ch 3 [high] quiz Q4: The answer says 'Uniaxial moment capacity falls as Pu rises'. That is false over the lower part of the diagram: from pure bending up to the balanced point, Mux1 increases as Pu increases (that is why the interaction curve rises and peaks near the balanced point). The statement only holds above the balanced load.
+- ch 3 [low] section 3: Rectangular-column charts are said to be arranged by b/D ratio. The SP 16 column charts are plotted as Pu/(fck·b·D) against Mu/(fck·b·D²) with lines of p/fck, so they are grouped by concrete grade and by bar arrangement (bars on two sides or on four sides), not by b/D.
+- ch 3 [low] figure: The plotted curve falls steadily from pure compression (0, 1500) to pure bending (160, 0). A real column curve peaks near the balanced point and gives a smaller Mu at Pu = 0 than 130 kN·m, so the shape suggests that the largest moment capacity occurs at zero axial load.
+- ch 3 [low] worked example steps 5 and 7; quiz Q3 and Q8: The exponents appear without superscript markup, so the text reads '0.6921.5 = 0.576', which a student can misread as multiplication or as a decimal.
+- ch 4 [high] Worked example 1, step 7 and answer; also Section 2, last sentence: The example cures a shear deficiency (τ_v = 0.53 > τ_c ≈ 0.42 N/mm²) by adding 8 mm two-legged stirrups at 300 mm c/c inside a 200 mm footing. IS 456 does not require shear reinforcement in footings; the standard remedy is to increase the depth until τ_v ≤ τ_c. Even if stirrups were allowed, 0.34 mm²/mm is far below the minimum shear reinforcement of 0.4b/(0.87 f_y) = 0.4 × 1000/(0.87 × 415) = 1.11 mm²/mm for Fe415, and 300 mm spacing exceeds the maximum spacing of about 91 mm that this minimum implies. The example therefore ends with a design that fails the code.
+- ch 4 [high] Quiz Q5: The second half of the answer, 'the section closer to the face has already been used for bending', is not a reason for the d offset and would mislead a student. Bending and shear are separate checks; the section at the face is not 'used up' by bending.
+- ch 4 [low] Figure (aria text and node labels): The flow shows service soil pressure 150 kN/m² leading to a moment of 26.5 kN·m/m. A student who multiplies 150 × 0.485²/2 gets 17.6 kN·m/m, not 26.5 kN·m/m, because the moment uses the factored pressure of 225 kN/m².
+- ch 4 [low] Exam traps, second trap; and Quiz Q2 answer: 'The critical section is at the wall face, where the cantilever is longest' is loose wording: the cantilever length a is the same at every section. What is largest at the wall face is the distance from that section to the free edge, which is the lever arm of the whole projection.
+- ch 5 [high] Section 2, last line: The chapter says "the shorter direction usually has the larger moment per metre". This is reversed. Both directions cantilever from the column face, and Mu = wu l²/2 per metre width, so the direction with the longer projection has the larger moment per metre. In a rectangular pad L × B with L > B, the projection (L − b)/2 is the longer one, so the long direction carries the bigger moment per metre.
+- ch 5 [high] Section 2, formula box: The units do not match the formula shown. The box says Pu is in N, A in m² (so wu comes out in N/m², not N/mm²), wu is in N/mm² "when used with mm", l is in m, and Mu is in N·mm. With wu in N/mm² and l in m, wu l²/2 is not N·mm per metre. The worked example actually uses wu in kN/m² and l in m to get kN·m per metre, which is correct but contradicts the box.
+- ch 5 [low] Section 2, rectangular pad sentence: In "lx = (L − b)/2 and ly = (B − c)/2" the symbols b and c are not defined. Earlier, c meant the side of a square column, so a reader cannot tell which column dimension goes with which pad side.
+- ch 5 [low] Section 1, eccentric pressure: Z is introduced only as "section modulus in m³" with no formula, so a student cannot compute pmax or pmin for a real pad.
+- ch 5 [low] Figure note: The figure note says "all three checks use the same factored upward pressure", which suggests the worked example carries out bending, one-way shear and punching. The worked example stops after the bending depth.
+- ch 6 [high] Quiz Q7: The answer gets the direction of change wrong and contradicts itself. With the loads unchanged and B fixed at 2 m, the area stays 10 m², so L stays 5 m — the base does not become longer. What changes is x̄: it rises from 1.8 m to 900 × 5 / 1500 = 3.0 m from the 600 kN column. So a1 = L/2 − x̄ falls from 0.70 m to 2.5 − 3.0 = −0.5 m. Saying 'a1 grows' and then 'a1 can become negative' is backwards and will teach the wrong trend.
+- ch 7 [high] Section 3, heel: The heel main steel is said to be at the bottom. The net load on the heel (soil plus slab weight downward, soil reaction upward) is downward, so the heel bends down at its free end and the tension is at the top face near the stem. Bottom steel contradicts the standard design.
+- ch 7 [high] Section 3, toe: The toe main steel is said to be at the top. The toe carries a net upward soil pressure and bends upward at its free end, so the tension is at the bottom face near the stem. Top steel contradicts the standard design.
+- ch 7 [high] Quiz Q5: The remedy is self-contradictory and points the wrong way. Shifting the stem forward (towards the toe) shortens the toe and lengthens the heel; it cannot lengthen the toe. Also, plain widening of the base does not necessarily reduce the eccentricity e; it reduces the average and maximum pressure.
+- ch 7 [low] Figure: The figure quotes 24 kN/m² and 48 kN/m with no retained height or soil data, so a reader cannot tell where these numbers come from until the worked example appears.
+- ch 7 [low] Section 2, overturning: A factor of safety of about 1.55 against overturning is unusual; most textbooks use about 2.0 for overturning (1.5 is common for sliding).
+- ch 8 [high] Exam traps, last bullet: The bullet contradicts itself: it says the correct base moment for h = 3 m is 45 kNm/m and then says 'not 45 kNm computed from the wrong formula', so it quotes 45 twice. The uniform-load moment p h²/2 with p = 30 kN/m² gives 30 × 9/2 = 135 kNm/m, three times the correct value, so the number given for the wrong formula is wrong and a student cannot tell which answer is which.
+- ch 8 [low] Figure: The flow reads 'Pressure 30 kN/m²' → 'Hoop tension 90 kN/m', but hoop tension T = p r also needs the radius. Without the radius (3 m) in the chain, the 90 kN/m and the 600 mm²/m that follow look as if they come from the pressure alone.
+- ch 8 [low] Section 1, formula box: 'about 10 kN/m³ (9.81 exactly)' calls 9.81 exact. The exact value is 9.80665 kN/m³, and 10 kN/m³ is the rounded design value; the wording invites students to quote 9.81 as exact.
+- ch 8 [low] Section 2, formula box (and Quiz Q2): The permissible stress is given as a single band '130 to 150 for Fe 415' without saying which case each value belongs to. Liquid-retaining practice sets the lower value for direct tension (hoop tension) and the higher value for bending; the worked example then uses 150 N/mm² for hoop tension, which is direct tension.
