@@ -614,3 +614,9 @@
 - EC3552's unit 5 lists "Introduction to wafer to chip fabrication process flow"; it is now a section of 2.3 (crystal growth to final test, with dies per wafer and good dies).
 - One university's `where` list is the whole course placed under unit 1; another lists FinFET technologies here, which the packet keeps in unit 1; one list ends with electron-beam characterisation topics ("Analytical Beams", "Beam Specimen interactions") that are not CMOS fabrication and are not covered.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
+## au-elec-u1 (Claude correction pass, 21 Nov 2026)
+- The packet now has 11 subtopics; the two new ones (power supply, wire sizing and circuit diagrams; electromagnetic compatibility and interference suppression) are chapters 1.2 and 1.3, and the draft's chapters 1.2–1.9 moved to 1.4–1.11.
+- The subtopic "High-voltage circuits and power distribution" comes from one university's ignition list, where "High voltage circuit and distribution" means the ignition secondary and the distributor, not EV traction voltage. The chapter now covers ignition HV distribution (distributor, distributorless, coil-on-plug, suppression) alongside low-voltage power distribution; the EV traction part is kept short and marked advanced.
+- AU3502's unit 1 also lists battery versions and substitutes, alternator circuitry and versions, regulator versions and starter development and design variations; each is now a section or paragraph in 1.5, 1.6, 1.7, 1.8 and 1.10.
+- The packet `out` path is stale (03_Books/...); queue.json holds the right one.
