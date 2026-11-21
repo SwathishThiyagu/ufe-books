@@ -582,4 +582,8 @@
 - No new subtopics for this unit. ME3591 lists "Design for finite and infinite life under variable loading": finite life (Sf from the S–N line), Miner's rule and a Soderberg sizing example are now in 2.3 and 2.4.
 - Impact and shock loading (2.5) is tagged "advanced" and appears only in the R2025 course ME25C06, not in ME3591; it stays short.
 - Many Indian syllabi and textbooks teach five or six theories of failure including maximum strain energy (Haigh); the packet's universal list did not name it, so it was added to 2.1.
+## ec-vlsi-u5 (Claude correction pass, 21 Nov 2026)
+- New subtopic 5.2 "Introduction to ASICs: full-custom, standard-cell and gate-array" written (the draft predates it); the draft's chapters moved to 5.3 to 5.8.
+- EC3552's unit 5 also lists fault models, ATPG, DFT, scan and boundary scan, which the packet places in ec-vlsi-u6; 5.1 gives them at exam-introduction depth and points to that unit by topic. "Test coding" in the EC3552 list is read as turning patterns into a tester program (STIL); the syllabus does not define it.
+- Programmable devices (ROM, PLA, FPGA) sit in EC3552 unit 4 but in this packet's 5.6; 5.6 now covers ROM, PAL and PLA logic implementation for that reason.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
