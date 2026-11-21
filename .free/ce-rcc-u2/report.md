@@ -1,13 +1,13 @@
 # ce-rcc-u2: free-model run
 
-- Book: `books/civil/ce-rcc/ce-rcc-u2.html`
+- Book: `work/ce-rcc-u2/tree/books/civil/ce-rcc/ce-rcc-u2.html`
 - Status: ok
-- Model calls so far: 26 (93,572 tokens in, 237,457 out), 7.4 minutes
+- Model calls so far: 26 (93,572 tokens in, 237,457 out), 7.5 minutes
 
 ## Checker
 
 ```
-ce-rcc-u2.html: 7 chapters, 12620 words, 8 figures, 133 KB
+ce-rcc-u2.html: 7 chapters, 21776 words, 8 figures, 202 KB
 OK
 ```
 
