@@ -893,3 +893,10 @@
 - Facts fixed: reciprocal ranging does not "prolong" a line; the 1.5 cm offset rule replaced by the limiting length of offset; scale classes (1:25,000 and 1:50,000 are medium, topographic); sag formula is per span (times n spans); "Not for exam" beyond line.
 - Kept but not checked against a source this session: the 250 km² plane-survey guide (textbook value); typical chain, rod and arrow dimensions; carrier-wave grouping of EDMs; the older Indian datum on the Everest ellipsoid with origin at Kalianpur, and the open series maps on WGS84.
 - Sources: S. K. Duggal added; DGCA and ISRO links dropped (not about this unit).
+
+## ce-survey-u6 (Remote Sensing and Image Interpretation) correction pass, 21 Nov 2026
+
+- Not in the exam course CE25C03 (remote sensing is outside it); no exam topics added. Packet data looks right: the seven subtopics match the remote-sensing units of the syllabi; the only `where` entry is a remote-sensing unit of an engineering surveying course.
+- Examples changed from the draft: the hazy-day reflectance example halved the radiance and so contradicted the chapter's own path-radiance paragraph (now T = 0.9, L<sub>p</sub> = 4.0: sensor 22.0, uncorrected 0.173, corrected 0.157); NDVI example now reads vegetation, soil and water from the figure (0.818, 0.100, −0.333) and shows the shaded crop unchanged; new second examples: Wien peaks (0.50, 9.66, 3.62 µm), orbital period at 705 km (98.9 min, 14.56 orbits, 2752 km spacing) and 35 786 km (86 164 s), 8-bit vs 12-bit quantisation (DN 128/128 vs 2049/2056), photo scale 1:20 000 with tower height 25.2 m from shadow, error matrix (OA 0.830, κ = 0.725).
+- Facts fixed: band table (NIR 0.7–1.3, SWIR 1.3–3, mid IR 3–8, TIR 8–14 µm; no "3–15 µm window"), mid-IR window 3–5 µm, the 1.37 µm cirrus band, reflectance changes with the surface (season), irradiance with area, tilted-photo scale, small-angle GSD, 2ⁿ − 1 steps; unit numbers in prerequisites named by topic.
+- Kept but not checked against a source this session: Landsat 8 at 705 km with a 185 km swath and 16-day repeat; the 6S/MODTRAN and Indian mission descriptions are qualitative.
