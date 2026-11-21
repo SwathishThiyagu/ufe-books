@@ -1,19 +1,29 @@
-# Department lessons: t16 only, in the split blueprint look (owner-approved 21 Nov 2026)
+# Department lessons: t16 only (owner-approved 21 Nov 2026)
 
-Every lesson of a non-CSE department (EEE, ECE, Mech, Auto and every new department) gets **one** thumbnail,
-`<lesson>_t16.jpg`, in the split blueprint look. Do not make t11, t14 or t15 for these lessons any more; leave any
-that already exist untouched (on the computer and on the deliver branches). CSE keeps its seven t16 category styles
-and its t11/t14/t15. Biotech, AI and DBMS are out of scope. Civil, Chemical, Aero and Biomedical are prototypes only:
-do not use them until the owner approves their palette and line art.
+Every lesson of a department gets **one** thumbnail, `<lesson>_t16.jpg`, and nothing else:
+
+- **EEE, ECE, Mech and Auto**: the split blueprint look (`t16_split.py`).
+- **Civil, Chemical, Aero and Biomedical**: each department's own look from `t16_looks.py` (approved 21 Nov 2026):
+  civil = Engineering Graphics drawing sheet, chem = ink schematic, aero = red-planet blueprint,
+  biomed = glass and leaf. Examples are in `examples_looks.py`.
+
+Do not make t11, t14 or t15 for these lessons any more; leave any that already exist untouched (on the computer and
+on the deliver branches). CSE keeps its seven t16 category styles and its t11/t14/t15. Biotech, AI and DBMS are out of
+scope.
 
 The full rules are in the skill `ufe-t16-thumbnails`, section "Department lessons: the split blueprint look".
 The older glass/emboss/cubes `T16_BRIEF.md` files in the department folders are superseded.
 
 ## Tool
 
-Data pack https://claude.ai/artifact/9j8tUxjFNfcEit4ZGerNpN, version 49 or later, folder `thumbs/t16_split/`:
-`t16_split.py.txt`, `t16_base.py.txt`, `bp_sheet.py.txt`, `examples.py.txt` (save them without `.txt`),
-`logo_tight.png`, `art/<dept>.svg`, `samples/<dept>.html` (the approved look per department: open it and match it).
+Data pack https://claude.ai/artifact/9j8tUxjFNfcEit4ZGerNpN, version 52 or later, folder `thumbs/t16_split/`:
+`t16_split.py.txt`, `t16_looks.py.txt`, `t16_base.py.txt`, `bp_sheet.py.txt`, `examples.py.txt`,
+`examples_looks.py.txt`, `planet_gen.py.txt` (save them without `.txt`), `logo_tight.png`, `planet_bg.jpg`,
+`art/<dept>.svg`, `samples/<dept>.html` (the approved look per department: open it and match it).
+One command builds every department: `t16_split.py build` sends civil, chem, aero and biomed specs to `t16_looks.py`.
+The department comes from the subject id prefix (`ec` ece, `ee` eee, `me` mech, `au` auto, `ce` civil, `ch` chem,
+`ae` aero, `bm` biomed) or from the exceptions `ec-circuits` → eee, `me-ic` → auto, `ei-sensor` → biomed; a spec can
+also set `dept` itself.
 
 | Dept | Subjects so far |
 |---|---|
@@ -21,6 +31,7 @@ Data pack https://claude.ai/artifact/9j8tUxjFNfcEit4ZGerNpN, version 49 or later
 | eee | ec-circuits, ee-pe |
 | mech | me-thermo, me-design |
 | auto | au-elec, me-ic |
+| civil, chem, aero, biomed | none yet (new subjects start here, e.g. `ae-avionics` → aero, `ei-sensor` → biomed) |
 
 ## In a subject's finishing run
 
@@ -30,7 +41,10 @@ Data pack https://claude.ai/artifact/9j8tUxjFNfcEit4ZGerNpN, version 49 or later
    (`books/<dept>/<sid>/<sid>-u<N>.html` on main, the chapters the lesson covers), every number computed in Python and
    matching the book's answer. Keep subject, topic and hook from `thumbs.json`. Title on 2 to 3 lines, takeaway two
    lines with one gold and one cyan word, card title 30 characters at most, 4 to 5 chips, 2-line summary, a board with
-   only the example's objects. No unit or lesson numbers (tag `Book example`), no college names, no two lessons with
+   only the example's objects. For civil, chem, aero and biomed the spec has a different shape (see the docstring of
+   `t16_looks.py`): title, question, takeaway, a `drawing` of full-size SVG layers kept in x 650 to 1250 and out of the
+   bottom-right timer corner, and positioned `boxes`; copy the department's example in `examples_looks.py`.
+   No unit or lesson numbers (tag `Book example`), no college names, no two lessons with
    the same picture.
 3. `python3 t16_split.py build work/t16/<sid>/specs.py work/t16/<sid>/out` until it prints OK; look at
    `t16_sheet.jpg` and three thumbnails at full size and fix anything crowded, clipped or untrue.
