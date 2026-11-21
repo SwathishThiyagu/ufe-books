@@ -1,13 +1,13 @@
 # ce-rcc-u5: free-model run
 
-- Book: `books/civil/ce-rcc/ce-rcc-u5.html`
+- Book: `work/claude_figs/ce-rcc-u5/tree/books/civil/ce-rcc/ce-rcc-u5.html`
 - Status: ok
 - Model calls so far: 32 (116,795 tokens in, 303,475 out), 9.0 minutes
 
 ## Checker
 
 ```
-ce-rcc-u5.html: 8 chapters, 15656 words, 9 figures, 150 KB
+ce-rcc-u5.html: 8 chapters, 22546 words, 13 figures, 244 KB
 OK
 ```
 
