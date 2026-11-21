@@ -1,13 +1,13 @@
 # ae-struct-u1: free-model run
 
-- Book: `books/aero/ae-struct/ae-struct-u1.html`
+- Book: `work/ae-struct-u1/tree/books/aero/ae-struct/ae-struct-u1.html`
 - Status: ok
 - Model calls so far: 45 (165,362 tokens in, 313,799 out), 6.4 minutes
 
 ## Checker
 
 ```
-ae-struct-u1.html: 10 chapters, 18025 words, 11 figures, 178 KB
+ae-struct-u1.html: 10 chapters, 25370 words, 14 figures, 263 KB
 OK
 ```
 
