@@ -520,3 +520,11 @@
 - Draft errors fixed: motoring curve defined with "fuel but no ignition"; flame propagation ending at 42° aTDC while peak pressure was put at 10–15°; ρu of 10–15 kg/m³ "at the spark" (about 6 at the spark, 12–13 mid-burn); a turbulent flame speed table (10–30 m/s) that contradicted S_T ≈ S_L + u′ (now laminar, turbulent burning and flame-travel velocities are separate); φ = 0.85 called rich; knock said to occur only in petrol engines; injection retard said always to shorten the delay; glow plug grouped with intake heating; squish called a rotation; hemispherical chamber said to have the largest surface (it has the lowest S/V, now worked out: 2.06 against 2.33 cm⁻¹); formulas that printed raw <sub> tags.
 - Facts used without a web check: BS-VI petrol density 720–775 kg/m³ and 10 ppm sulphur; regular petrol about 91 RON; COV_imep driveability limit about 10 %; IDI fuel economy 10–15 % worse than DI; first-mode knock frequency f ≈ 1.84 c/(πB). The MIT OCW link was dropped; the other links are the draft's.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+
+## me-ic-u2 (Claude correction pass, 21 Nov 2026)
+- The packet on main adds "Gasoline direct injection (GDI)" (subtopic 6) and "Electronic ignition and laser ignition" (subtopic 10) from AU25301; both chapters are new, and the draft's chapters 6–9 moved to 2.7–2.9 and 2.11 (reviews moved with them). The draft's GDI section in the EFI chapter now lives in 2.6.
+- AU25301 also lists air filters, the throttle and the simple carburettor; they are in 2.1 with a carburettor-sizing example. "Fuel injector" (the nozzle holder) is covered in the nozzle chapter.
+- "Ignition timing and spark advance" is tagged advanced (one syllabus); AU25301 does not list it but the chapter was kept and corrected.
+- The draft's MIT, NPTEL (university-hosted) and AFDC (off-topic) links were dropped; only SAE remains. The sandbox proxy blocks Wikipedia, so no link could be opened or added.
+- The Hiroyasu–Arai penetration correlation and the GDI pressure range (50–200 bar, up to about 350 bar) are from memory of standard sources and could not be re-checked online.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
