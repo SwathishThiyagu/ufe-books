@@ -929,6 +929,7 @@
 - New examples: lever-rule stage on the triangle (E 147.3 kg, K 1.54, β 29.4), real-stage count at η = 0.7, Δ point at (−1.87, 0.252) and S<sub>min</sub> 362 kg/h, HTU–NTU column 3.74 m × 1.46 m, two-stage cross-current leaching (74.6 %), centrifugal settling at 2012 g.
 - Packet note: the right-angled triangle method subtopic is tagged advanced (one university), but it is the standard Hunter–Nash construction most textbooks teach; the chapter is longer than the advanced target because it carries the stage construction the other chapters rely on.
 - Not verified this session (no web access): CO<sub>2</sub> density about 0.84 g/cm³ at 40 °C and 200 bar (standard tabulated value).
+- Follow-up the same day: the 12 bank model answers were lengthened to the brief's 360–990 words (graphical and stage-by-stage checks, solvent-ratio effects, retained-solution effect, Shanks cycle description); one limit corrected in the packed-column answer (below ε = 1 a column removes at most the fraction ε).
 
 ## ei-sensor-u4 (Piezoelectric, Hall Effect and Optical Sensors) correction pass, 21 Nov 2026
 
