@@ -1,13 +1,13 @@
 # ec-optical-u6: free-model run
 
-- Book: `books/ece/ec-optical/ec-optical-u6.html`
+- Book: `work/ec-optical-u6/tree/books/ece/ec-optical/ec-optical-u6.html`
 - Status: ok
-- Model calls so far: 28 (101,832 tokens in, 242,286 out), 6.0 minutes
+- Model calls so far: 28 (101,832 tokens in, 242,286 out), 6.1 minutes
 
 ## Checker
 
 ```
-ec-optical-u6.html: 8 chapters, 13915 words, 9 figures, 148 KB
+ec-optical-u6.html: 8 chapters, 23905 words, 9 figures, 239 KB
 OK
 ```
 
