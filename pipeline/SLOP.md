@@ -1102,3 +1102,55 @@ Count: 2 must fix (both known from the writers) and 2 should-fix hooks fixed, 3 
 main. Clean: u1-L1, u1-L2, u1-L3, u2-L4, u3-L2, u3-L3, u3-L4, u3-L5, u4-L1 … u4-L5, u5-L1 … u5-L4, u6-L1, u6-L2 (19, plus
 u3-L1 with one cosmetic line). Patterns: a model-answer point added beyond the chapter, an exam question that leans on a
 hint for its givens, and hooks that date or overstate an everyday fact.
+
+## Internal Combustion Engines fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 25 lessons on the branches lesson/me-ic-u1-L1 … u6-L5 (u1 L1–L4, u2 L1–L5, u3 L1–L4, u4 L1–L3,
+u5 L1–L4, u6 L1–L5), every scene's narration and on-screen text against the library books
+books/mech/me-ic/me-ic-u1..u6.html on main, and each lesson's lesson_sheet.py sheet once. Recomputed in python every
+worked example, model answer, trap, picture number and recap number: Otto 8^0.4 = 2.297 and 689.2 K, valve overlap
+1.11 ms, spark advance 22°/31°/58° for 36°/45°/72° spark to peak, nozzle penetration 0.84, E20 2.79 MJ/kg of mixture,
+COVimep, delay 10.8° and 17.3 mg, flame 14.4° against delay 17.3°, S/V 2.06 cm⁻¹, thermosyphon 80 Pa and 120.4 °C,
+FP 7.54 kW and ηm 74.9 %, Willans FP 3.75 kW and ηmech 84.2/57.1 %, density correction 34.27 kW, Otto ratio 1.039,
+NOx 0.078 g/km (30 % over), CO₂ 0.0701/0.0549 kg/MJ (22 % less), CNG 504 MJ = 15.5 L petrol, dual fuel 75 %/75.6 %/72.5 %
+and 33.9/33.0 %, λ 1.39, pumping 1375/250 W (7.5 %), coating ΔT 250/33 K, τ900/τ950 = 2.40, τ900/τ930 = 1.71, PRF 80/90,
+flame 40 m/s at 0.9°: all correct. No college names, unit, chapter or lesson numbers. Book fixes on
+claude/project-thread-f4sac2 for main (check_book.py --render OK on u1 … u6, run with the preinstalled Chromium):
+u1 1.7 trap reworded so "80.4" is named as the flat-written error, Figure 1.3.1 crankcase wall broken at the inlet port;
+u2 Figures 2.2.1 and 2.11.1 stroke-dasharray:True → 6 4, Figure 2.11.1 "72°: impossible advance" → "72° from spark to
+peak" (spark 58° is already drawn), 2.7 Remember answer now 3 to 10 holes and pintle for indirect-injection chambers;
+u3 E20 "about 8 %" → 9 % (14.7 ÷ 13.5), 3.7 answer 45 %/29 % → 44 %/28 % and "halves" → "nearly halves", Figure 3.1.1
+afterburning label clear of the C label and motoring label inside the box, Figure 3.4.1 knock label and arrow on the
+ringing trace and pre-ignition label clear of the spark line; u4 4.2 "only a few universities" removed and the cap
+paragraph's broken last sentence finished, Figure 4.3.1 note now "motoring torque 24 N·m; firing-test IP 30 kW", 4.7
+"interfere; Lightweight" → full stop; u5 5.3 repeated "to 13.5" removed, 5.5 two "only a few universities" removed,
+5.6 drop now (1 − 0.8569) × 100 = 14.31 %, 5.7 9.5^0.4 = 2.4609, 5.1 Analyze answer's weaker mixture now said of the
+diesel (throttled petrol loses to pumping); u6 6.4 NDIR straight-line guess 6.6 % high, Figure 6.3.1 "200 kW" removed,
+6.6 504 MJ and 11.45 kg, 6.8/6.9/6.10 brand names (Honda CVCC, Texaco TCCS, Ford PROCO, Mazda SPCCI) reworded as generic
+types (glossary "CVCC" → "Divided-chamber engine"), 6.8 second "Worked example 2" → 3, Figure 6.10.1 mirror redrawn "\".
+Already right in the HTML: 2.7 Apply answer superscripts (2<sup>0.25</sup>, Δp<sup>0.25</sup>), the u6 glossary TWC entry
+(λ = 1), 6.3 rounding 0.147/0.853 and the Willans caption "worked example 2". Fixed lessons rebuilt with --revoice;
+each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+me-ic-u4-L1 | pq/pa (Q3) | the answer uses 35 °C air, 160 °C fins and 55 °C shed air, which the question never gave (they come from the book's fin example, not in this lesson); the question card and narration now give them, and the picture's "duct outside air in" label moved inside the panel | must fix: fixed
+me-ic-u4-L1 | bookfig (16) | "motoring test at 3000 rev/min: indicated power 30 kW": the IP comes from the firing test; now "motoring torque 24 N·m; firing-test IP 30 kW" (same error in the book) | must fix: fixed
+me-ic-u2-L5 | bookfig (16) | "72°: impossible advance" reads as a 72° advance; the advance is 58°; now "72° from spark to peak" (same error in the book) | must fix: fixed
+me-ic-u6-L2 | bookfig (3) | the EGR loop shows "200 kW", a figure of the SCR example (same error in the book) | must fix: fixed
+me-ic-u6-L5 | outro (22) | next card "Next lesson: Engine performance parameters and efficiencies" on the subject's last lesson; now "Revise from the start: History and classification of IC engines", as ec-signals-u6-L3 | must fix: fixed
+me-ic-u5-L1 | pa (Q3), line 3 | "light load also means a weaker mixture" holds for the diesel, not a throttled petrol engine; now "In a diesel, like this one", picture label too (book line fixed) | should fix: fixed
+me-ic-u6-L1 | outro (23) | "every limit is grams per kilowatt hour": cars are limited in g/km; now "every limit comes with its unit and its test", card "g/km OR g/kWh, PER ITS TEST" | should fix: fixed
+me-ic-u1-L3 | hookArt (0) | swapped plug leads: "the engine will not start" is not in the chapter and overstates it (two cylinders still fire); now "the engine shakes and stumbles" | should fix: fixed
+me-ic-u1-L2 | bookfig | Figure 1.3.1 copy draws the crankcase wall unbroken across the inlet port (same error in the book) | should fix: fixed
+me-ic-u3-L1 | notebook | "the lag is chemistry": the book says chemical and physical | cosmetic: later
+me-ic-u3-L3 | hookArt (0) | "a petrol car knocks" where the chapter says may knock | cosmetic: later
+me-ic-u3-L2 / u5-L4 | notebook | COV stability limit 10 % in one, 5 % in the other; both conventions exist and no answer changes | cosmetic: later
+me-ic-u5-L2 | pa (Q3) | the illustration 31.3 → 28.2 comes from the worked example, not the question | cosmetic: later
+me-ic-u4-L2 | whole lesson | 884 narration words, just over the 880 aim; not rebuilt | cosmetic: later
+
+Count: 5 must fix (3 known from the brief, 2 new in u4-L1) and 4 should-fix fixed in 8 lessons, 5 cosmetic left; about
+30 book lines fixed. Clean: u1-L1, u1-L4, u2-L1 … u2-L4, u3-L4, u4-L3, u5-L3, u6-L3, u6-L4 (11), plus u3-L1, u3-L2, u3-L3,
+u4-L2, u5-L2, u5-L4 with one cosmetic line each. Patterns: bookfig scenes copy the book's figure errors verbatim (four
+of the five must-fix items were book errors), an exam question that leans on a worked example the lesson never showed,
+and outro and hook lines that state a rule more broadly than the chapter does.
