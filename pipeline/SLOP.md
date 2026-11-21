@@ -1121,7 +1121,7 @@ exam question shows its givens. No college names, unit, chapter or lesson number
 (check_book.py --render OK on u1, u3, u4, u5, u7): the four errors the writers had reported (u3 3.6 Rankine constant
 456 670 in both places and the Apply answer's k² as (419/132) × 64 = 203.2 mm²; u4 Figure 4.6.1 gap 3.7 mm; u5 Figure
 5.7.1 "req" subscript back on its line; u7 Figure 7.3.1 failing 6 912 N wear bar in the warning colour, not pass green),
-plus u5 5.4 Understand answer rewritten on sensitivity (as in the lesson) and u1 1.3 worked example "about two-fifths
+plus u5 5.4 Understand answer rewritten on sensitivity (as in the lesson) and u1 1.2 worked example "about two-fifths
 of its cost". Fixed lessons rebuilt (--revoice where a line changed, --reuse for drawing-only fixes); each --check OK,
 cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text outside the safe area, play-through OK.
 
@@ -1138,6 +1138,6 @@ me-design-u3-L3 | hookArt (0) | a motorcycle beside the "31.4 kN peak" rod force
 
 Count: 3 must fix and 2 should fix, all fixed; 3 cosmetic left; 7 book lines fixed on main (4 known from the writers).
 Clean: u1-L2, u1-L3, u2-L1, u3-L1, u3-L2, u4-L1 … u4-L5, u5-L1, u5-L3, u5-L4, u6-L1, u7-L1, u7-L2, u7-L3 (17, two with
-one cosmetic line). Patterns: an outro that names the topic after next (the writer took the book's next-but-one
-chapter), a "why" answer that argues from magnitude instead of sensitivity, a word count left one over the cap, a
+one cosmetic line). Patterns: an outro that names the topic after next (the same next card as the lesson after
+it), a "why" answer that argues from magnitude instead of sensitivity, a word count left one over the cap, a
 trap picture whose wrong idea is half true, and a ratio rounded to the wrong simple fraction.
