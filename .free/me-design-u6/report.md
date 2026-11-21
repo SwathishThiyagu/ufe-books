@@ -1,13 +1,13 @@
 # me-design-u6: free-model run
 
-- Book: `books/mech/me-design/me-design-u6.html`
+- Book: `work/claude_figs/me-design-u6/tree/books/mech/me-design/me-design-u6.html`
 - Status: ok
 - Model calls so far: 17 (65,862 tokens in, 167,718 out), 5.9 minutes
 
 ## Checker
 
 ```
-me-design-u6.html: 5 chapters, 11672 words, 6 figures, 115 KB
+me-design-u6.html: 5 chapters, 20065 words, 6 figures, 187 KB
 OK
 ```
 
