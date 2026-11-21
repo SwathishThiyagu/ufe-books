@@ -1194,6 +1194,53 @@ u4-L2, u5-L2, u5-L4 with one cosmetic line each. Patterns: bookfig scenes copy t
 of the five must-fix items were book errors), an exam question that leans on a worked example the lesson never showed,
 and outro and hook lines that state a rule more broadly than the chapter does.
 
+## Automotive Electrical and Electronics fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 25 lessons on the branches lesson/au-elec-u1-L1 … u6-L5 (u1 L1–L4, u2 L1–L4, u3 L1–L6,
+u4 L1–L3, u5 L1–L3, u6 L1–L5), every scene's narration and on-screen text against the library books
+books/auto/au-elec/au-elec-u1..u6.html on main, and each lesson's lesson_sheet.py sheet once. Recomputed in python every
+worked example, model answer, trap, picture number and recap number: charging 90 A from 14.2 V on 12.4 V and 0.02 Ω,
+alternator Imax 144 A and 72 A at 2000 rpm, cranking points 275 rpm/37.5 N·m and 1.08 kW, coil 0.141 A and 14,100 V,
+dwell 3.578 A/51.2 mJ and 2.70 A/29.2 mJ, ADC counts 682/341/348/614, NTC 269 Ω and 111 counts, 10.48 kΩ and 846 counts,
+60-2 wheel 333 µs and 1.0 ms gap, brake power 47.12 kW, BMEP 11.78 bar, BSFC 244.04 g/kWh and 34.31 %, BS IV/BS VI and
+Euro 4/6 limits, kickdown 1300 → 1857 rpm, ACC gap, crash pulse 161 m/s² (16.4 g) in 86 ms, ABS slip 0.055/0.145/0.40,
+cruise PI Kp 500 and Ti 15 s, 28.16/29.75/26.32/29.00 m/s, skyhook 400 N, CAN 66 links/132 drivers, bus load 60 %
+→ 70 %, arbitration 0x121 over 0x123 at bit 1, ISO-TP frames, MOST data rates, gateway delay, FTTI 200 − 90 = 110 ms,
+ASIL S3+E4+C3 = 10 → D, warning distance 104 m (4 m of latency), greedy hop B (36.1 m), contact times 3.75 s and 45 s,
+BSM airtime 0.4 ms: all correct. No unit, chapter or lesson numbers; one city name (Chennai, in u3-L6 and its book);
+no lesson says "only a few universities". Standards numbers checked exact (ISO 26262, MISRA C:2012, SAE J1962 with
+battery + on pin 16, SAE J1850, IEEE 802.11p, IEEE 1609.2/.3/.4, SAE J2735 BSM, BS IV/BS VI). Book fixes 45613e3 on claude/project-thread-kd5b53
+for main (check_book.py --render OK on u1 … u6): u1 1.5 note that the unrounded 0.1412 A gives 14,118 V (the printed
+14,100 V follows the rounded 0.141 A), Figure 1.6.1 sense wire now ends on the battery + terminal; u2 2.1 dwell current
+e^−2.25 = 0.1054 and i = 3.578 A in the steps, the table and the Analyze answer (3.58² gives 51.3 mJ, not the printed
+51.2); u3 3.6 worked example 4 now 0.5449 V and round(111.49) = 111 (round(0.545 × 1023 ÷ 5) is 112), Figure 3.4.1
+waveform no longer runs past the last tooth and its stray tick is gone, 3.12 Analyze question "Chennai traffic" → "slow
+city traffic"; u4 4.3 BSFC divides by the unrounded 47.124 kW (47.12 gives 244.06), in the steps and the table; u5 5.4
+Figure 5.4.1 "ABS band" label moved off "λ = 0.145: hold", Figure 5.6.1 −800 tick removed (it sat on the case 1 label),
+5.8 worked example 2 peak force about 3570 N at t = 3.75 s (3550 N was the force at t = 3 s, not the peak); all 14
+"only a few universities" sentences (u1 1, u2 4, u3 2, u4 1, u5 3, u6 3) reworded as plain scope notes ("Some syllabi
+leave this chapter out", "some cover it only briefly"). Fixed lessons rebuilt with --revoice (screen-only changes: 0
+lines voiced again); each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+au-elec-u6-L4 | outro (23) | next card split one title over two fields: "VANET architecture" as the heading and "applications and routing · DSRC …" as the subtitle; now "Next lesson" with the whole chapter title, as u6-L5 | must fix: fixed 0463049
+au-elec-u3-L6 | pq/pa (Q3, 19–20) | question card names a city ("idles in Chennai traffic"); now "slow city traffic" (the narration already said city traffic; same line in the book) | must fix: fixed 1c20731
+au-elec-u2-L1 | calc (8–9) | board "i = 3.58 A, E = 51.2 mJ": 3.58² gives 51.3 mJ; now 3.578 A and e^−2.25 = 0.1054 (voice "three point five eight" unchanged; same in the book) | should fix: fixed dc4baf4
+au-elec-u1-L3 | figs (26) | sources line garbled: "Robert Bosch GmbH (ed.) (Networking and Hybrid Drive); Tom Denton (starting and electrical architecture.)"; now the three textbook titles, as u1-L1 | should fix: fixed 1f1664d
+au-elec-u1-L4 | figs (24) | same garbled sources line | should fix: fixed 4297084
+au-elec-u3-L1, L2, L3, L4, L6 / u5-L3 | figs | sources line ends in ".)" or ")." (title and note run together); now "William B. Ribbens, Understanding Automotive Electronics (sensor and actuator chapters, ECU input and output circuits)" | cosmetic: fixed fffcc48, 7ff0e0f, 4ec7118, e16a11a, 1c20731, 0a6c8fa
+au-elec-u5-L1 | calc (ACC gap) | the car settles 50 m behind at 20 m/s (a 2.5 s gap) while the 2.0 s target is 40 m; the book's simplification, no answer changes | cosmetic: later
+au-elec-u6-L5 | whole lesson | 913 narration words, over the 880 aim; not rebuilt | cosmetic: later
+
+Count: 2 must fix and 3 should-fix fixed in 5 lessons, 6 cosmetic sources lines fixed, 2 cosmetic left; 26 book lines
+fixed across the six books. Clean: u1-L1, u1-L2, u2-L2, u2-L3, u2-L4, u3-L5, u4-L1, u4-L2, u4-L3, u5-L2, u6-L1, u6-L2,
+u6-L3 (13), plus u3-L1 … u3-L4 and u5-L3 with only the sources line. Patterns: the lessons had already corrected the
+book's figure and rounding errors (Figures 1.6.1, 3.4.1, 5.4.1 and 5.6.1, the 47.124 kW BSFC, 0.5449 V), so this time
+the books, not the lessons, carried most of the errors; numbers rounded early and then reused (3.58, 0.545, 47.12)
+gave answers one digit off; a generated sources line that splits a textbook title into a note; and a next card that
+splits a long chapter title over the heading and the subtitle.
+
 ## Engineering Thermodynamics fact review (Nov 2026)
 
 Audited 21 Nov 2026: all 24 lessons on the branches lesson/me-thermo-u1-L1 … u6-L4 (u1 L1–L3, u2 L1–L4, u3 L1–L5,
