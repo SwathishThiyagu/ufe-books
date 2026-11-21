@@ -42,3 +42,9 @@ OK
 - ch 7 [low] Worked example 1, step 1: The value of e is never given, so the student cannot check the claim that F_a/F_r = 0.4 is above e. The statement in the question ('the catalogue gives X = 0.56 and Y = 1.5, since F_a/F_r is greater than e') also assumes the result before the ratio is tested.
 - ch 7 [low] Worked example 1, question and step 8: The question says the bearing 'may see shock', but step 8 uses s0 = 2 'for ordinary running'. Section 3 of the same chapter says to use 3 or more where shock is expected, so question and solution contradict the text.
 - ch 7 [low] Figure caption: The caption says 'the highlighted box is the required rating', but the accent (highlight) is set on the equivalent load P node; C_req carries the 'live' style. A reader looking for the highlighted box is pointed at the wrong one.
+
+## Correction pass (Claude, 21 Nov 2026)
+
+- Every worked example, quiz and bank answer traced; Raimondi and Boyd readings rebuilt from the L/D = 1 table (the draft's ε = 0.62 at S = 0.031 and ε = 0.45 at S = 0.15 were impossible).
+- New ch 5.8 Seals and gaskets (exam topic); figures redrawn by hand; 14 full model answers.
+- Checker: OK (see the book).
