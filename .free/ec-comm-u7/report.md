@@ -1,6 +1,6 @@
 # ec-comm-u7: free-model run
 
-- Book: `work/ec-comm-u7/tree/books/ece/ec-comm/ec-comm-u7.html`
+- Book: `books/ece/ec-comm/ec-comm-u7.html`
 - Status: ok
 - Model calls so far: 38 (157,720 tokens in, 331,328 out), 8.7 minutes
 
