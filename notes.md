@@ -577,3 +577,9 @@
 - The packet tags 2.5 to 2.7 (lighting) "advanced" because only one syllabus lists them, but they are core exam topics of AU3502; the chapters run 1300 to 1450 words rather than the 650 to 900 advanced target.
 - Manipal's `where` entry for this unit is its whole ignition and engine-control unit (fuel control, sensors, CAN, ABS), most of which belongs to au-elec u3 to u6; NITT's is its automobile-fundamentals unit (engine block, drivetrain), only partly ignition.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
+## me-design-u2 (Claude correction pass, 21 Nov 2026)
+- No new subtopics for this unit. ME3591 lists "Design for finite and infinite life under variable loading": finite life (Sf from the S–N line), Miner's rule and a Soderberg sizing example are now in 2.3 and 2.4.
+- Impact and shock loading (2.5) is tagged "advanced" and appears only in the R2025 course ME25C06, not in ME3591; it stays short.
+- Many Indian syllabi and textbooks teach five or six theories of failure including maximum strain energy (Haigh); the packet's universal list did not name it, so it was added to 2.1.
+- The packet `out` path is stale (03_Books/...); queue.json holds the right one.
