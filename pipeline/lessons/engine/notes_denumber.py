@@ -35,15 +35,25 @@ def denumber(book, cut):
         else: ks = [a] + re.findall(NUM, m.group(4) or '')
         ks = [k for k in ks if k in titles] or ks
         plural = len(ks) > 1
-        lead = ('the chapters ' if plural else 'the chapter ') if word[0].islower() else ('The chapters ' if plural else 'The chapter ')
+        before = m.string[:m.start()].rstrip()
+        start = word[0].isupper() and (not before or before[-1] in '.!?:')   # capital only at a sentence start, never mid-sentence ("see The chapter")
+        lead = ('The chapters ' if plural else 'The chapter ') if start else ('the chapters ' if plural else 'the chapter ')
         return lead + names(ks)
     def text(t):
         t = re.sub(r'\b(Fig(?:ure|\.))\s+(\d+\.\d+\.\d+)', fig, t)
         t = re.sub(r'\b([Cc]hapters?)\s+(' + NUM + r')(?:\s+to\s+(' + NUM + r'))?((?:(?:,\s*|\s+and\s+)' + NUM + r')*)', chap, t)
+        # the book's own unit wording (students get standalone lesson notes, never a unit)
+        t = re.sub(r'\bthe rest of this unit is\b', 'the lessons that follow are', t)
+        t = re.sub(r'\bthe rest of this unit\b', 'the lessons that follow', t)
+        t = re.sub(r'\b(in|across) this unit\b', r'\1 these lessons', t)
         t = re.sub(r'\b(?:in|see)\s+' + NUM + r'\b', lambda m: m.group(0).split()[0] + ' ' + q(re.search(NUM, m.group(0)).group(0)) if re.search(NUM, m.group(0)).group(0) in titles else m.group(0), t)
         return t
     cut = re.sub(r'(<a href="#[^"]*">)(' + NUM + r')(</a>)', lambda m: m.group(1) + (q(m.group(2)) if m.group(2) in titles else m.group(2)) + m.group(3), cut)
     cut = visible(cut, text)
+    # some books escape <sub>/<sup> inside a <pre> formula, which prints the tags as text: restore them
+    cut = re.sub(r'<pre>.*?</pre>', lambda m: re.sub(r'&lt;(/?su[bp])&gt;', r'<\1>', m.group(0)), cut, flags=re.S)
+    # a reference inside a link is its own text chunk: lower-case it when the sentence runs on before the link
+    cut = re.sub(r'((?:[a-z0-9,;(]|”)\s+(?:<a\b[^>]*>)?)The (chapters?) “', r'\1the \2 “', cut)
     # key-terms table: the Chapter column holds bare numbers
     def keyterms(sec):
         return re.sub(r'<td>((?:' + NUM + r')(?:,\s*' + NUM + r')*)</td>', lambda m: '<td>' + names(re.findall(NUM, m.group(1))) + '</td>' if all(k in titles for k in re.findall(NUM, m.group(1))) else m.group(0), sec.group(0))
