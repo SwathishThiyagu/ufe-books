@@ -661,3 +661,12 @@
 - Another university's list here includes cyclo-converters (AC-AC converters book) and one entry gives the whole course as unit 1 with "Total Number of contact hours" as its title.
 - Packet data: the packet `out` path is stale (03_Books/...); queue.json holds the right one.
 - The allaboutcircuits link and a duplicate power-factor-correction link were dropped from the sources list.
+
+## me-design-u4 (Claude correction pass, 21 Nov 2026)
+- The packet has 10 subtopics; the two new ones (riveted joints for structures and bonded joints; rubber springs) are chapters 4.4 and 4.9. The draft's chapters moved: 4.4 (power screws) to 4.5, 4.5 to 4.6, 4.6 to 4.7, 4.7 to 4.8, 4.8 (flywheels) to 4.10.
+- ME3591 spreads this material over two units: threaded fasteners, welded joints, knuckle and cotter joints, riveted joints and bonded joints in one, and springs (helical, concentric, fatigue, leaf, rubber) and flywheels in the next. ME3591 does not list power screws; the chapter is kept for the other syllabi that do.
+- ME3591's unit with flywheels also lists connecting rods and crankshafts; they are not in this packet and belong with the shafts book (u3) or a later engine-parts unit.
+- The packet appears to be built from a newer regulation of the same course (ME25C06); one `where` entry's course_used names an unrelated course (an electrical machine design subject).
+- One convention is used throughout: bolt groups by direct plus moment shear, tilting brackets by W = Pel/Σl² with the principal-stress combination, welds checked on the 0.707h throat with τ = √(σ<sub>b</sub>² + τ₁²), Wahl K on the alternating stress and K<sub>s</sub> on the mean stress (Shigley's K-on-both noted), nipped leaf springs with effective length 2L₁ − l, rimmed flywheels with 0.75σ<sub>t</sub> + 0.25σ<sub>b</sub>.
+- Left out as unverifiable: a 94 MPa weld stress figure, a 15 to 18 MPa bearing-pressure table and fixed S<sub>se</sub> fractions of S<sub>ut</sub>. Kept but not checked against a source this session: the P<sub>i</sub> = 2840d preload rule, the 30 to 40 m/s cast-iron rim speed, the rubber G range and k ≈ 1 in E<sub>c</sub> = E(1 + 2kS²).
+- MIT OCW, NPTEL and OpenStax links were dropped from the sources (university-hosted or not checked); Wikipedia could not be reached.
