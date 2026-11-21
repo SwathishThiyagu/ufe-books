@@ -771,3 +771,11 @@
 - Conventions used throughout: overall pulse p(t), channel samples h<sub>m</sub>, equalizer taps c<sub>k</sub>, combined response v<sub>m</sub>; polar duobinary with levels −2, 0, +2 and the |c<sub>k</sub>| < 1 → 1 rule (unipolar mod-2 form mentioned once); M-PAM levels ±d … ±(M − 1)d, P<sub>e</sub> = 2(1 − 1/M)Q(√(6E<sub>s</sub>/((M² − 1)N₀))); duobinary P<sub>e</sub> = 1.5 Q((π/4)√(2E<sub>b</sub>/N₀)) derived for an equal transmit/receive split of the 1 + D response with symbol-by-symbol detection (2.1 dB).
 - Kept but not checked against a source this session: "about 2 dB" soft-decision gain (Beyond the syllabus only), DVB-S2 roll-off menu, PAM4 in 400G Ethernet.
 - MIT OpenCourseWare dropped from the sources (university-hosted).
+
+## ec-antenna-u5 (RF Circuits and Transceivers) correction pass, 21 Nov 2026
+
+- Packet left unchanged (owner's rule for the communication subjects); no `where` list, so every packet subtopic is covered in full; no chapter added.
+- Conventions: spiral Q as ωL/R<sub>s</sub> with the self-resonance correction Q<sub>eff</sub> = Q(1 − f²/f<sub>SR</sub>²); Friis written in linear factors with sensitivity −174 + NF + 10 log B + SNR<sub>min</sub>; cascaded IIP3 summed in milliwatts with each stage referred to the input; SFDR = (2/3)(IIP3 − noise floor); EIRP = P<sub>PA</sub> − L<sub>feed</sub> + G<sub>ant</sub> (no loss term from the antenna port); ACLR as wanted over adjacent power, larger is better; Leeson stated with the 2FkT/P<sub>s</sub> prefactor, the FkT/(2P<sub>s</sub>) form of some books noted beside it.
+- Draft error beyond the reviewer notes: a bank answer said a filter after the LNA costs only 0.05 dB; with the stated chain the noise figure rises from 2.46 to 2.75 dB (+0.29 dB).
+- Kept but not checked against a source this session: typical ranges (on-chip spiral Q 5 to 20, handset duplexer loss 1 to 3 dB, uncalibrated image rejection 30 to 40 dB). Every worked number (Q and self-resonance, varactor tuning, Friis and sensitivity, two-tone IIP3, cascaded IIP3 and SFDR, image rejection, EIRP and duplexer desensitisation, LNA matching, Gilbert-cell gain, spurs, PA efficiency and load-line match, Leeson and PLL divider) was computed in Python.
+- Sources kept as in the draft: Razavi, Pozar and Lee textbooks, microwaves101, rfwireless-world, allaboutcircuits and mtt.org; no university-hosted pages.
