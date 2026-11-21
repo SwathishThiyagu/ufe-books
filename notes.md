@@ -800,3 +800,11 @@
 - Convention: aircraft AC voltages are line-to-neutral (115 V, 235 V), so three-phase power is 3 × V<sub>ph</sub> × I, or √3 × 200 V × I; the draft's B787 example had used 115 V as a line voltage.
 - Kept but not checked against a source this session (no web lookups): MIL-STD-704 bands 22 to 29 V and 108 to 118 V, A320 TR 200 A and emergency generator about 5 kVA, B787 APU starter-generators 225 kVA, AWG 6 and 4 resistances (1.30 and 0.815 mΩ/m), ARINC 404 ATR and ARINC 600 MCU sizes.
 - Sources: MIT, NPTEL and OpenStax links dropped; Moir and Seabridge, and Wyatt and Tooley, added to the textbooks.
+
+## ce-rcc-u1 (Design Philosophies and Material Behaviour) correction pass, 21 Nov 2026
+
+- Packet unchanged; the 7 subtopics were all in the draft, so no chapter was added. CE3501 unit topics folded in: design of a singly reinforced beam by the working stress method (worked example and a 15-mark model answer), IS 456 Annex B permissible stresses, the advantages of the limit state method over the other two (comparison table and a WSM-against-LSM worked example). LSM analysis and design of singly reinforced beams is covered through the stress block chapter and two bank answers; doubly reinforced beams are left to limit state design of beams.
+- Packet data to note: the stress block parameters chapter is tagged advanced (one syllabus), but CE3501 uses it for every LSM beam, so it is written at full depth (about 1700 words, with the 0.36/0.42 derivation).
+- Facts corrected from the draft: IS 456 creep coefficients are 2.2, 1.6 and 1.1 for loading at 7 days, 28 days and one year (draft: 2.2 at 28 days, 1.6 at one year); HYSD steel reaches 0.87fy only at 0.87fy/Es + 0.002 (SP 16 Table A), not on a yield plateau; the stress block is not a uniform 0.36fck (it is the parabola-rectangle with peak 0.446fck; 0.36 and 0.42 are its area and centroid).
+- Kept from memory of the code, not looked up this session: IS 456 Tables 21/22 permissible stresses, Table 8 assumed standard deviations, Table 18 load factors, Tables 5/16 minimum grade and nominal cover, 23.2 deflection limits, 35.3.2 crack widths, IS 1786 elongations 14.5 % and 12 %, and the 1978 revision as the edition that adopted the limit state method.
+- Sources: MIT OpenCourseWare and NPTEL links dropped; IS 456:2000 and SP 16 added to the textbooks.
