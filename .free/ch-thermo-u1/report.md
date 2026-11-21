@@ -1,13 +1,13 @@
 # ch-thermo-u1: free-model run
 
-- Book: `books/chem/ch-thermo/ch-thermo-u1.html`
+- Book: `work/ch-thermo-u1/tree/books/chem/ch-thermo/ch-thermo-u1.html`
 - Status: ok
 - Model calls so far: 23 (85,115 tokens in, 188,150 out), 5.5 minutes
 
 ## Checker
 
 ```
-ch-thermo-u1.html: 8 chapters, 16663 words, 9 figures, 160 KB
+ch-thermo-u1.html: 8 chapters, 24704 words, 10 figures, 222 KB
 OK
 ```
 
