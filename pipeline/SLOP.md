@@ -1036,3 +1036,33 @@ Count: 1 must fix, 13 should fix (8 misleading facts, 5 template lines), 21 cosm
 u4-L1 on verification and validation, u2-L4 narration vs its own DFD), dated or overstated rules (sequence numbers, Java
 class adapter), "book" wording (7 agendas, 8 spoken lines in 5 lessons, 23 sources lines), unit numbers in 5 outros, spoken
 Bloom levels in 10 lessons (30 lines), and recap pills too long for their cards.
+
+## Signals and Systems fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 18 lessons on the branches lesson/ec-signals-u1-L1 … u6-L3 (u1 L1–L4, u2–u6 L1–L3), every
+scene's narration and on-screen text against the library books books/ece/ec-signals/ec-signals-u1..u6.html on main, and
+each lesson's lesson_sheet.py sheet once. Recomputed in python every worked example, model answer, trap, picture number and
+recap number: Fourier series (c₁₂ = 4/π, 81 % power share, truncation error 1.190), RC step (y(1) = 0.632, y(2) = 0.865,
+10–90 % in 2.2τ), |X(2)| = 0.354, 1/52, bandwidth B = 18.94 rad/s, Butterworth orders N = 12 and N = 3 with 34.1 dB,
+sinc(0.425) = 0.728, SQNR 19.82 dB, 1 + 3.706⁶ = 2591, DFTs [3, 1.71 − j1.71, …] and [10, −2+2j, −2, −2−2j], circular
+[5, 3, 5, 7] against linear [1, 3, 5, 7, 4] convolution, partial fractions A = −1/3, B = 4/3, plus the convolutions,
+Euler steps, Laplace and z ROCs and sampling rates: all correct. Every pq shows its givens; no college, unit, chapter or
+lesson numbers. No book errors beyond the two already fixed on main (u1 Q3 model answer 9c725a3, u5 2591), so no book
+fixes. Fixed lessons rebuilt with --revoice (u3-L3, u5-L1, u6-L1) or --reuse (u5-L3); each --check OK, cuecheck 0 late
+cues, sheet 0 page errors, 0 cue failures, 0 text outside the safe area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-signals-u1-L1 | pa (Q3) | "3 cos(0.25πn) has no continuous parent": false (it samples 3 cos(0.25πt) at t = n); fixed before this review, lesson 59b639a, book 9c725a3 | wrong fact: fixed
+ec-signals-u3-L3 | notebook (5) | "Paley–Wiener forbids a band of exact zeros" drops "causal", right after the ideal (noncausal) filter that has one; now "no causal filter can have a band of exact zeros" | misleading: fixed 4a64e41
+ec-signals-u6-L1 | notebook (12) | "It exists when Σ\|x[n]\| is finite" states the sufficient condition as if it were the rule; the book says sufficient, not necessary; now "enough, though not required" | should fix: fixed 8c93284
+ec-signals-u5-L1 | hookArt (0) | "The phone keeps 8000 numbers a second": dated (HD voice samples at 16 kHz); now "A classic phone line" | should fix: fixed d6fb762
+ec-signals-u5-L3 | notebook (5), panel 4 | "Σ\|h[n]\| = 2 ✓" unlabeled, right after a panel with h = [1, 2] (sum 3); panel now labeled h[n] = (0.5)ⁿu[n] (drawing only, voice kept) | cosmetic: fixed e3761b6
+ec-signals-u1-L3 | calc (6, 7) | hint "u(t) = 1 for t > 0" while the book takes u(0) = 1 | cosmetic: later
+ec-signals-u2-L3 | notebook (4) | "a step rises 10–90 % in 2.2τ" said generally; true for a first-order (RC) system, which is the page's example | cosmetic: later
+ec-signals-u3-L3 | bookfig (5) | figure fills 43 % of the stage (the sheet's own warning) | cosmetic: later
+
+Count: 0 must fix found (1 wrong fact already fixed before the review), 1 misleading fact and 2 should-fix lines fixed, 1
+cosmetic fixed, 3 cosmetic left. Clean: u1-L2, u1-L4, u2-L1, u2-L2, u3-L1, u3-L2, u4-L1, u4-L2, u4-L3, u5-L2, u6-L2, u6-L3.
+Patterns: a condition dropped from a theorem (causal) or a sufficient condition stated as "when", and one dated
+everyday fact in a hook.
