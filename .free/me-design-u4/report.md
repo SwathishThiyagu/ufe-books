@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-me-design-u4.html: 8 chapters, 15233 words, 9 figures, 157 KB
+me-design-u4.html: 10 chapters, 26894 words, 11 figures, 247 KB
 OK
 ```
 
@@ -50,3 +50,7 @@ OK
 - ch 7 [low] Figure spec, 'Leaf 1' note: The note reads 'master, b = 75' with no unit, while every other number in the chapter carries one.
 - ch 8 [low] Section 2 (arm stresses): The simplified model F = T/(nr) assumes every arm shares the torque equally. With a cast rim that flexes, the arms near the loaded side take most of the torque, so many textbooks design integral arms for the whole torque shared by only half the arms, giving M = 2T/n. A student using F = T/(nr) alone may under-design the arms.
 - ch 8 [low] Section 2, formula legend: The text tells the student to 'check σt = Fc/A', but σt is never defined and A appears in the legend attached to a formula block that does not contain σt.
+
+## Correction pass (21 Nov 2026)
+
+- Every chapter rewritten and every example, quiz and bank answer traced by script; new chapters on riveted and bonded joints and on rubber springs (packet order 1 to 10); every figure redrawn by hand from the chapter's worked example; 14 full model answers. The draft figures are kept as figclaude_old1 to 8.
