@@ -1032,7 +1032,7 @@
 ## bm-instr-u1 (Bioelectric Signals, Electrodes and Recorders) correction pass, 21 Nov 2026
 
 - BM3591 unit 1 topics covered: ECG normal and abnormal waves (5), heart-rate monitor, Holter and ECG troubleshooting (8), multichannel EEG, epilepsy, evoked potentials, MEG and now EEG maintenance and troubleshooting (9), EMG recording, analysis and fatigue (6), nerve and muscle stimulators with NCV (7), EEG and EMG biofeedback (10), load cell (3) and pedobarograph, gait and limb position (11).
-- Packet problem: the nitc (MT4024E Biosensors and Devices) and manipal (ECE 4320 Introduction to Biosensors) `where` entries for unit 1 are biosensor courses and belong with unit 4 (Biosensors); the manipal entry's title reads "Total Number of contact hours" and its first topic "36 Biosensor classification" (a PDF parsing slip). Harmless for this book, which does not use them.
+- Packet problem: two `where` entries for unit 1 (MT4024E Biosensors and Devices; ECE 4320 Introduction to Biosensors) are biosensor courses and belong with unit 4 (Biosensors); the ECE 4320 entry's title reads "Total Number of contact hours" and its first topic "36 Biosensor classification" (a PDF parsing slip). Harmless for this book, which does not use them.
 - Web sources in the draft that never loaded (NCBI Bookshelf, Khan Academy: captcha pages) and one university-hosted site were dropped.
 
 ## bm-instr-u2 (Cardiovascular and Respiratory Measurements) correction pass, 21 Nov 2026
