@@ -1,3 +1,6 @@
+> **Superseded 21 Nov 2026.** Department lessons now use the split blueprint t16 (owner-approved). Follow
+> `pipeline/lessons/DEPT_THUMBNAILS.md` and the skill ufe-t16-thumbnails, not this brief. Kept for history only.
+
 # t16 thumbnails (phone style, Stage look) for the 22 Machine Design lessons
 
 One thread, Opus high. Follow the ufe-t16-thumbnails skill; the style is phone (STYLE_OF in t16.py lists only CSE ids,

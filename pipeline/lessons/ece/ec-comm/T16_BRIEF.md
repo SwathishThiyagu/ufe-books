@@ -1,3 +1,6 @@
+> **Superseded 21 Nov 2026.** Department lessons now use the split blueprint t16 (owner-approved). Follow
+> `pipeline/lessons/DEPT_THUMBNAILS.md` and the skill ufe-t16-thumbnails, not this brief. Kept for history only.
+
 # t16 thumbnails (glass style, Stage look) for Analog and Digital Communication (24 lessons) and Optical Fiber Communication (21 lessons)
 
 One thread, Opus high. Follow the ufe-t16-thumbnails skill; the style is glass for both subjects, in the approved Stage look.
