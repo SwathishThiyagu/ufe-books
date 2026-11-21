@@ -1,22 +1,19 @@
 # me-design-u2: free-model run
 
-- Book: `books/mech/me-design/me-design-u2.html`
-- Status: corrected (Claude correction pass, 21 Nov 2026)
+- Book: `work/claude_figs/me-design-u2/tree/books/mech/me-design/me-design-u2.html`
+- Status: ok
 - Model calls so far: 16 (65,562 tokens in, 132,620 out), 4.9 minutes
 
 ## Checker
 
 ```
-me-design-u2.html: 5 chapters, 10065 words, 6 figures, 115 KB
-PROBLEMS:
- - at 390px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
- - at 1366px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
+me-design-u2.html: 5 chapters, 18360 words, 6 figures, 171 KB
+OK
 ```
 
 ## For the reviewer
 
-- checker: at 390px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
-- checker: at 1366px, text spills outside the svg box in figure(s) [4]: enlarge the viewBox or shorten the labels
+- nothing flagged
 
 ## Reviewer notes (after any revision)
 
@@ -40,10 +37,3 @@ PROBLEMS:
 - ch 5 [low] Lead: The lead says the extra stretch 'comes from the kinetic energy that must be stored as strain energy'. At maximum extension the weight is momentarily at rest, so the strain energy actually equals the weight's whole loss of potential energy over the fall, W(h + δ) — the kinetic energy at impact Wh plus the further work Wδ done during stretching. A student may think only Wh is absorbed and then mis-set the energy balance in Section 2.
 - ch 5 [low] Section 2, first line: 'Shock loading is a repeated sudden load' is too narrow. Standard texts use shock (sudden/impact) loading for any load applied in a very short time; repetition makes it worse but is not part of the definition. A student may conclude that a single falling weight is not a shock load, contradicting Section 1 of this same chapter.
 - ch 5 [low] Section 1: The falling-weight formula is used without stating its assumptions: the rod's own mass is neglected, the stress is taken as uniform at every instant (no stress-wave/propagation effect), and the weight stays in contact after impact. Without this, students apply the formula to long rods or high-speed impacts where it under-predicts stress.
-
-## Correction pass (21 Nov 2026)
-
-- Every reviewer note above fixed (Coulomb–Mohr reduces to Tresca; Rankine with both strengths; Neuber trend; Kt versus Kf in fatigue initiation; low-temperature kd; S–N overlay; Goodman versus Haigh naming; signed σmin in the quiz; Soderberg drawn past its intercept; impact energy W(h + δ); shock definition; impact assumptions).
-- Every worked example, quiz and bank answer traced in Python; Gerber example now checked against the Langer yield line (4.06 capped at 3.33).
-- New: maximum strain energy theory; shaft-diameter example (Tresca and von Mises); plate-with-hole example (Heywood); Marin factor values; Miner's rule with a worked example; finite-life design with Sf; Soderberg diameter design; cushioned-impact example.
-- All five figures hand-drawn from the worked examples; 14 full model answers; cross-unit references named by topic; university-hosted and unopened links dropped.
