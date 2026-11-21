@@ -1,0 +1,283 @@
+{
+ "lead": "An inertial navigation system is smooth and continuous but drifts without limit. A GPS fix is bounded but noisy, and it disappears when the sky is blocked. A Kalman filter blends the two: it carries a number for how much each source is trusted at that instant and weights the correction accordingly. The estimate and its uncertainty are updated in a two-step loop that runs many times a second. Every airliner, drone and missile flying on mixed sensors uses this loop, and some syllabi call the whole subject multisensor navigation.",
+ "prereq": "You need: <a href=\"#inertial-sensors-and-inertial-navigation-systems\">Chapter 5.5</a> for the INS and its drifting error, and <a href=\"#satellite-navigation-gps-and-navstar\">Chapters 5.6</a> and <a href=\"#satellite-signal-errors-clocks-and-atmospheric-effects\">5.7</a> for the GPS fix and its error budget.",
+ "sections": [
+  {
+   "h3": "A filter, not a fix",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "An INS integrates the accelerations its IMU measures, so its output is smooth but its error grows without limit. A GPS receiver gives a position that is bounded but noisy, and it can vanish for minutes. Neither alone is trustworthy all the time. A Kalman filter combines them instead of choosing between them."
+    },
+    {
+     "type": "p",
+     "text": "The filter carries a <b>state vector x</b>: the quantities it wants to know. In a typical aviation system these are position, velocity, attitude, and the biases of the accelerometers and gyros."
+    },
+    {
+     "type": "p",
+     "text": "It also carries a <b>covariance matrix P</b>: the uncertainty in x. The diagonal entries are variances, in m², (m/s)² and rad². The off-diagonal entries say how two errors move together — a position error caused by a velocity error, for instance."
+    },
+    {
+     "type": "p",
+     "text": "P is the heart of the idea. It is the filter's own statement of how wrong it might be right now. Small P means the estimate is trusted; large P means it is not. Every correction applied later is sized by P."
+    },
+    {
+     "type": "steps",
+     "items": [
+      "Predict: push x and P forward using inertial data only.",
+      "Update: compare with a GPS measurement and correct x and P.",
+      "Repeat, many times a second, for the whole flight."
+     ]
+    }
+   ]
+  },
+  {
+   "h3": "Predict, then update",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "The predict step carries the state forward on inertial data alone. F is the state transition matrix — the mechanics that turn position, velocity and attitude at one instant into the next. The control term is the IMU's measured acceleration and rotation, resolved into the navigation frame."
+    },
+    {
+     "type": "formula",
+     "text": "x = F x + B u",
+     "where": "x is the state vector (n × 1); F is the state transition matrix (n × n); B u is the inertial input driving the state forward."
+    },
+    {
+     "type": "formula",
+     "text": "P = F P Fᵀ + Q",
+     "where": "P is the state covariance; F P Fᵀ carries the old uncertainty forward; Q is the process noise covariance, the uncertainty the model itself adds."
+    },
+    {
+     "type": "p",
+     "text": "Q says how much the model is distrusted. A flawless INS with no vibration and no bias drift would have Q = 0. Real Q is set larger when vibration, temperature swings or uncorrected bias are expected. Large Q makes the filter nervous: P grows quickly, so the next GPS fix is believed more."
+    },
+    {
+     "type": "p",
+     "text": "The update step uses the GPS measurement z. H maps the state into the measurement — for a position fix it simply picks the position part of x."
+    },
+    {
+     "type": "formula",
+     "text": "y = z − H x",
+     "where": "y is the innovation, measurement minus prediction; z is the GPS fix; H x is the predicted measurement."
+    },
+    {
+     "type": "p",
+     "text": "The innovation has a sign. If the GPS says the aircraft is 50 m ahead of the prediction, the correction goes forward, not backward."
+    },
+    {
+     "type": "formula",
+     "text": "K = P Hᵀ (H P Hᵀ + R)⁻¹",
+     "where": "K is the Kalman gain; R is the measurement noise covariance taken from the GPS error budget; K is small when P is small."
+    },
+    {
+     "type": "formula",
+     "text": "x ← x + K y,  P ← (I − K H) P",
+     "where": "I is the identity matrix; the covariance shrinks by the factor (I − K H) at every fix."
+    },
+    {
+     "type": "p",
+     "text": "In one dimension K = P ÷ (P + R), always between 0 and 1. K near 1 means trust the GPS; K near 0 means trust the INS. It is recomputed at every fix, never tuned once and left."
+    }
+   ]
+  },
+  {
+   "h3": "Loosely, tightly and ultra-tight coupling",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "<b>Loosely coupled.</b> The receiver solves its own position and velocity, and hands them to the filter as z. Simple, receiver-independent, and needs four or more satellites. Most civil installations work this way."
+    },
+    {
+     "type": "p",
+     "text": "<b>Tightly coupled.</b> Raw pseudoranges enter as z, and H predicts the range to each satellite from the blended position. Two or three satellites plus a good INS still constrain the state, because the INS fills the missing geometry. This helps under jamming and in urban canyons."
+    },
+    {
+     "type": "p",
+     "text": "<b>Ultra-tight.</b> INS velocity is fed into the receiver's tracking loops, narrowing its frequency search so weaker signals can be tracked. Used in military and research receivers."
+    },
+    {
+     "type": "p",
+     "text": "<b>Coasting.</b> When GPS drops, only predict runs. P grows step by step and the solution stays smooth but drifts. After minutes P is huge, so the returning fix produces a jump; good software limits the correction or declares the filter failed."
+    },
+    {
+     "type": "p",
+     "text": "<b>Feedback.</b> The update also estimates accelerometer and gyro biases. Those estimates are fed back to reset the sensors, so the raw inertial data stops drifting. This closes the loop and is what makes long flights possible."
+    }
+   ]
+  }
+ ],
+ "figure": {
+  "after_section": 1,
+  "caption": "The IMU feeds mechanization, which predicts x and P. The GPS fix enters with its own R and together with P sets the Kalman gain, which sizes the correction applied in the update. Notice the dashed return: bias corrections are pushed back into the sensors themselves.",
+  "spec": {
+   "type": "blocks",
+   "direction": "down",
+   "title": "Predict–update loop",
+   "nodes": [
+    {
+     "id": "imu",
+     "label": "IMU",
+     "note": "rate + specific force",
+     "style": "accent"
+    },
+    {
+     "id": "mech",
+     "label": "INS mechanization",
+     "note": "integrate to position",
+     "style": "normal"
+    },
+    {
+     "id": "pred",
+     "label": "Predict",
+     "note": "x = Fx, P = FPFᵀ + Q",
+     "style": "live"
+    },
+    {
+     "id": "gps",
+     "label": "GPS fix",
+     "note": "z with noise R",
+     "style": "accent"
+    },
+    {
+     "id": "gain",
+     "label": "Kalman gain",
+     "note": "K = PHᵀ(HPHᵀ+R)⁻¹",
+     "style": "live"
+    },
+    {
+     "id": "upd",
+     "label": "Update",
+     "note": "x ← x + K(z − Hx)",
+     "style": "next"
+    },
+    {
+     "id": "out",
+     "label": "Blended solution",
+     "style": "next"
+    }
+   ],
+   "edges": [
+    {
+     "from": "imu",
+     "to": "mech"
+    },
+    {
+     "from": "mech",
+     "to": "pred"
+    },
+    {
+     "from": "pred",
+     "to": "gain",
+     "label": "P"
+    },
+    {
+     "from": "gps",
+     "to": "gain",
+     "label": "z, R"
+    },
+    {
+     "from": "gain",
+     "to": "upd"
+    },
+    {
+     "from": "pred",
+     "to": "upd",
+     "label": "x, P",
+     "style": "dashed"
+    },
+    {
+     "from": "upd",
+     "to": "out"
+    },
+    {
+     "from": "upd",
+     "to": "mech",
+     "label": "reset sensors",
+     "style": "dashed"
+    }
+   ],
+   "aria": "A loop where inertial mechanization predicts state and covariance, a GPS fix enters with its own noise, the Kalman gain sets the weight, and the update corrects both the output and the sensors themselves."
+  }
+ },
+ "examples": [
+  {
+   "question": "A one-dimensional GPS-INS filter has just finished a predict step. The INS solution is 1000 m along track with variance P = 100 m². At the same instant a GPS fix gives 1050 m with variance R = 25 m². Find the Kalman gain, the blended position and the new position variance, and say which source the filter trusted more.",
+   "steps": [
+    "Gain in one dimension: K = P ÷ (P + R) = 100 ÷ (100 + 25) = 0.8.",
+    "Innovation: y = z − x = 1050 − 1000 = 50 m, so the GPS is ahead of the prediction.",
+    "Correction: K y = 0.8 × 50 = 40 m, applied forward.",
+    "Blended position: x ← 1000 + 40 = 1040 m.",
+    "New variance: P ← (1 − K) P = 0.2 × 100 = 20 m², so σ = √20 ≈ 4.47 m.",
+    "Weights are 0.8 on GPS and 0.2 on INS, matching R = 25 m² being four times smaller than P = 100 m²."
+   ],
+   "answer": "K = 0.8, blended position 1040 m, new variance 20 m² (σ ≈ 4.47 m), which is better than either source alone.",
+   "check": "P = 100.0\nR = 25.0\nx_ins = 1000.0\nz = 1050.0\nK = P / (P + R)\nx = x_ins + K * (z - x_ins)\nP_new = (1 - K) * P\nprint(round(K, 2))\nprint(x)\nprint(P_new)\nprint(round(P_new ** 0.5, 2))",
+   "values": [
+    0.8,
+    1040.0,
+    20.0,
+    4.47
+   ],
+   "output": ""
+  }
+ ],
+ "traps": [
+  "K is not a fixed percentage or a tuned constant. It is recomputed from P and R at every step; writing 'K = 0.5 always' is the classic mistake.",
+  "The innovation is measurement minus prediction, z − H x. Reversing it sends the correction the wrong way and doubles the error.",
+  "Q and R are swapped under exam pressure. Q is process noise (how much the INS model is distrusted); R is measurement noise (the GPS error budget).",
+  "P grows during predict and shrinks during update. Forgetting the growth makes the filter overconfident and it stops listening to GPS.",
+  "The blend is not a plain average. With P = 100 m² and R = 25 m² the weights are 0.2 and 0.8, not 0.5 and 0.5."
+ ],
+ "quiz": [
+  {
+   "level": "remember",
+   "q": "What do the state vector x and the covariance P each hold?",
+   "marks": 2,
+   "a": "x holds the estimated quantities — position, velocity, attitude and sensor biases. P holds their variances and cross-covariances, that is, the uncertainty in x."
+  },
+  {
+   "level": "remember",
+   "q": "What does the matrix Q model?",
+   "marks": 2,
+   "a": "The process noise: uncertainty the INS model adds at each predict step through vibration, uncorrected bias and scale-factor error. Q = 0 would mean a perfect model."
+  },
+  {
+   "level": "understand",
+   "q": "Why is K recomputed at every update instead of being fixed at 0.5?",
+   "marks": 3,
+   "a": "Because P changes. After a long GPS outage P is large, so K moves toward 1 and the returning fix is trusted. Just after a fix P is small, so K moves toward 0 and the smooth INS dominates."
+  },
+  {
+   "level": "understand",
+   "q": "State the difference between R and Q in one line each.",
+   "marks": 3,
+   "a": "R is the measurement noise covariance, built from the GPS error budget (satellite clock, orbit, ionosphere, troposphere, antenna). Q is the process noise covariance, built from how much the inertial model is distrusted."
+  },
+  {
+   "level": "apply",
+   "q": "The INS gives 2000 m with variance 400 m²; the GPS fix at the same instant gives 2060 m with variance 100 m². Find K, the blended position and the new variance.",
+   "marks": 4,
+   "a": "K = 400 ÷ (400 + 100) = 0.8. Innovation = 2060 − 2000 = 60 m. Correction = 48 m. Position = 2048 m. New variance = 0.2 × 400 = 80 m², so σ ≈ 8.9 m."
+  },
+  {
+   "level": "apply",
+   "q": "The predicted position is 5000 m and the GPS fix is 4980 m, with K = 0.8. Give the innovation and the corrected position, with signs.",
+   "marks": 3,
+   "a": "y = 4980 − 5000 = −20 m. Correction = 0.8 × (−20) = −16 m. Corrected position = 5000 − 16 = 4984 m."
+  },
+  {
+   "level": "analyze",
+   "q": "GPS is lost for 90 s in a loosely coupled system. Describe what the filter does and what happens to P and to the position error.",
+   "marks": 5,
+   "a": "Only the predict step runs. x follows the INS, so the solution is smooth but drifts with the gyro and accelerometer biases. P grows by Q at every step, so the filter becomes progressively less certain. When the fix returns, the innovation is large, K is near 1, and the state jumps; the software either limits that jump or declares the filter failed."
+  },
+  {
+   "level": "analyze",
+   "q": "Why can a tightly coupled filter keep navigating on three satellites when a loosely coupled one cannot?",
+   "marks": 4,
+   "a": "A loosely coupled filter needs the receiver's own four-satellite position solution before any measurement exists. A tightly coupled filter takes raw pseudoranges as measurements, so three ranges plus the INS constraint still determine the state."
+  }
+ ],
+ "beyond": "Not for the exam. Almost every airborne implementation is an error-state (indirect) filter: the state is the small error between the INS solution and the truth, which keeps the equations nearly linear and the numbers well scaled. Current research often replaces the covariance recursion with factor-graph optimisation over a sliding window of measurements, which survives long GPS outages better. Multi-constellation GNSS with RTK corrections shrinks R to centimetres, so the same filter now supports autoland and surface guidance. Search 'error-state Kalman filter', 'tightly coupled GNSS/INS' and 'factor graph navigation' to go further."
+}
