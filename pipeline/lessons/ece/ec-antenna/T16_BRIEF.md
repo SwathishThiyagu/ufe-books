@@ -1,3 +1,6 @@
+> **Superseded 21 Nov 2026.** Department lessons now use the split blueprint t16 (owner-approved). Follow
+> `pipeline/lessons/DEPT_THUMBNAILS.md` and the skill ufe-t16-thumbnails, not this brief. Kept for history only.
+
 # t16 thumbnails (emboss style, Stage look) for the 20 Antennas, RF and Microwave Engineering lessons
 
 One thread, Opus high. Follow the ufe-t16-thumbnails skill; the style is emboss (STYLE_OF in t16.py lists only CSE ids,

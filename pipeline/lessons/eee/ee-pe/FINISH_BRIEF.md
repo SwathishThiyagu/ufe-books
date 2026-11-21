@@ -1,4 +1,4 @@
-# Power Electronics: notes PDFs, thumbnails (t11/t14/t15) and upload sheet
+# Power Electronics: notes PDFs, thumbnail (t16 only, split blueprint) and upload sheet
 
 One thread, Opus high. Follow the ufe-subject-pipeline skill from "notes PDFs" on; the lessons and fact review are done.
 The model to copy is Signals and Systems: branch `deliver/ec-signals` (folder `ec-signals/`) holds exactly what you
@@ -21,11 +21,14 @@ Steps:
    <pack>/worklist.json videos.json books site --pdf-only`. Use notes_denumber.py from main as it is now (it rewrites "this unit" wording). Open three PDFs and check: no chapter or unit numbers, figures
    numbered from 1, chapter titles in quotes where a number was, no college names.
 3. Descriptions (site/descriptions/*.txt from the same run): check each has the notes link and no unit or lesson number.
-4. Thumbnails: `make_thumbs.py scan` the 21 html, write one hook per lesson (at most 40 characters, a question the lesson
-   answers) and the page picks, `build`. Subject kicker "POWER ELECTRONICS" only. Look at thumbs_sheet.jpg and three thumbnails
-   at full size.
-5. Upload sheet: `make_subject.py ee-pe --lessons --notes --thumbs --out --universal --videos` must print OK.
-6. Deliver: commit `ee-pe/` (pdf/, thumbnail/ with thumbs.json and thumbs_sheet.jpg, descriptions/, upload_sheet.html,
+4. Thumbnails: t16 only, in the split blueprint look (owner-approved 21 Nov 2026; see
+   `pipeline/lessons/DEPT_THUMBNAILS.md` and the skill ufe-t16-thumbnails). `make_thumbs.py scan` the 21 html and write
+   one hook per lesson (at most 40 characters, a question the lesson answers) into thumbs.json. Subject kicker "POWER ELECTRONICS" only.
+   Do not run `make_thumbs.py build`: no t11, t14 or t15. Then write `work/t16/ee-pe/specs.py` from each lesson's book worked
+   example and run `t16_split.py build` until it prints OK; look at t16_sheet.jpg and three thumbnails at full size.
+5. Upload sheet: `make_subject.py ee-pe --lessons --notes --thumbs work/t16/ee-pe/out --thumb t16 --out --universal --videos` must print OK
+   (apply the t16-only patch in DEPT_THUMBNAILS.md first).
+6. Deliver: commit `ee-pe/` (pdf/, thumbnail/thumbs.json, t16/ with the _t16.jpg files, t16_sheet.jpg and specs.py, descriptions/, upload_sheet.html,
    upload_sheet.json, videos.json) to a new orphan branch `deliver/ee-pe`
    (only the `ee-pe/` folder in it, nothing from main) and push.
 7. Two make_subject.py bugs (found on VLSI, fix them in your local copy): its college check reads plain "bits" as BITS

@@ -1,3 +1,6 @@
+> **Superseded 21 Nov 2026.** Department lessons now use the split blueprint t16 (owner-approved). Follow
+> `pipeline/lessons/DEPT_THUMBNAILS.md` and the skill ufe-t16-thumbnails, not this brief. Kept for history only.
+
 # t16 thumbnails (cubes style, Stage look) for the 24 VLSI Design lessons
 
 One thread, Opus high. Follow the ufe-t16-thumbnails skill; the style is cubes (STYLE_OF in t16.py lists only CSE ids,
