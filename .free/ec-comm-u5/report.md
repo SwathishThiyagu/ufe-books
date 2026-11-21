@@ -7,7 +7,7 @@
 ## Checker
 
 ```
-ec-comm-u5.html: 7 chapters, 14381 words, 8 figures, 150 KB
+ec-comm-u5.html: 7 chapters, 21898 words, 8 figures, 290 KB
 OK
 ```
 
