@@ -38,3 +38,12 @@ OK
 - ch 7 [high] Section 1, array organisation and the R = 2^r, C = 2^c formula: The word count and the address split contradict each other. The text says the array is 'R words of C bits each' and also that the address splits into r row bits and c column bits, with the column multiplexer passing only Cout of the C bitline pairs. If a c-bit column address exists, the array holds 2^r × 2^c = R·2^c words of C/2^c (= Cout) bits each, not R words of C bits. Also, C = 2^c and Cout < C cannot both hold if the words are C bits wide. A student cannot tell how many words the array really stores.
 - ch 7 [low] Section 2, 6T SRAM, cell ratio sentence: 'Make the pull-down wider than the access transistor, typically above about 1.2 to 2' is vague — it is unclear whether the target is 1.2, 2, or a range. The cell ratio is a strength ratio, not a width, so 'wider' alone is loose.
 - ch 7 [low] Section 2, 1T1C DRAM, bitline swing sentence: The numbers do not match. With CS in the tens of fF and CBL in the hundreds of fF, CS/(CS + CBL) is about 0.1, so with (Vcell − VDD/2) at most about VDD/2 the swing is tens of millivolts, not 'tens to hundreds of mV'.
+
+## Correction pass (2026-11-21)
+
+- Checker: `ec-vlsi-u4.html: 10 chapters, 30081 words, 11 figures, 281 KB` / OK (with --render).
+- Every reviewer note above was fixed in the text. Worked examples and calculations were retraced and corrected.
+- New chapters: pipelining and sequential circuits (7), timing and clocking strategies (8), memory architecture (10). Chapter 6 was rewritten. Memory cells moved to chapter 9 (old review7 is now review9).
+- All figures were redrawn by hand (pipeline/claude_figs/ec_vlsi_u4.py).
+- The question bank now has 16 long questions, each with points to cover and a full model answer.
+- The university-hosted source was dropped from the sources list.
