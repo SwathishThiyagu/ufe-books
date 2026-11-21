@@ -1436,3 +1436,41 @@ u4 4.8 WE1 tan 1.390 already right in u4-L3; u1 W/h = 2 already 0.825 / 4.218 / 
 not used in u1-L1. Clean: u1-L1, u1-L3, u1-L4 (and u1-L2 on facts). Patterns: a hook line that states more than the
 lesson later shows (a ferrite "keeps it out", any speed gun "has no tube"); a theorem quoted without one of its conditions
 (lossless reciprocal three-port).
+
+## Analog and Digital Communication fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 15 lessons on the branches lesson/ec-comm-u1-L1 … u4-L4 (u1 L1–L3, u2 L1–L4, u3 L1–L4,
+u4 L1–L4), every scene's narration and on-screen text against the library books books/ece/ec-comm/ec-comm-u1..u4.html on
+main, each lesson's sheet once and every bookfig scene at 0.995. Recomputed in python every worked example, model answer,
+trap, picture number and recap number: AM, DSB, SSB and VSB powers and efficiencies, Friis noise figure and noise
+voltages, Bessel line amplitudes and Carson bands (β = 2 at 5 kHz: 10 Jn(2) V lines, 30 kHz holds 99.8 %), the
+Armstrong chain (×75, ×50, 7.5 MHz mixer to 96 MHz), Foster-Seeley outputs, figures of merit and FM threshold powers
+(−111.4 and −114.4 dBm), pre-emphasis gains, sampling and aliasing, PCM SQNR (6.02n + 1.76 dB), μ-law and A-law curves
+(μ = 255 at 0.01: ln 3.55 / ln 256 = 0.2285), DPCM and DM slope overload, TDM rates and line-code power spectra (AMI
+share 79.6 %, total power V²/4, checked numerically). Every "Don't write" is wrong and every "Write" right; every exam
+question shows the givens its answer uses. No lesson narrates or draws a college, university or unit/lesson number.
+Book fixes 58baa31 on claude/project-thread-squ3hy for main (check_book.py --render OK on u1, u3, u4, Python
+playwright 1.63.0): u1 1.6 WE2 "√(32.02 + 80.05) = 10.59 µV", Fig 1.3.1 carrier exponent e^(−j2πf_c t) with c as a
+subscript (was a flat "fct"); u3 Fig 3.2.1 n = −4 line labelled 0.340 like n = +4 and its six subscripts raised
+(baseline-shift sub sat low), Fig 3.6.1 β = 5 threshold label on two lines left of its knee (its box covered the β = 2
+line); u4 4.8 WE2 AMI share 79.6 % with total power V²/4 ("half-width pulses carry only the 1s"), answer "80 to 90 %",
+μ-law 0.01 → 0.228 in all five places (was 0.229). Fixed lessons rebuilt with --revoice (no line re-voiced: every fix
+is on screen); each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text outside the safe
+area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-comm-u4-L2 | bookfig (4) | μ-law curve label "0.01 → 0.229"; ln 3.55 / ln 256 = 0.2285 gives 0.228 (book too) | must fix: fixed 52463d0
+ec-comm-u3-L1 | bookfig (10) | wideband FM spectrum: n = −4 line had no value while n = +4 showed 0.340 (book too) | should fix: fixed 8798de2
+ec-comm-u3-L3 | bookfig (10) | β = 5 threshold label box drawn over the β = 2 line (book too) | should fix: fixed ef596b2
+ec-comm-u1-L2 | bookfig (4) | Hilbert figure exponent read e^(−j2πfct), c not a subscript (book too) | cosmetic: fixed 463d008
+ec-comm-u3-L2, u3-L3 | figs | sources line "Simon Haykin (4th: angle modulation and noise in continuous-wave modulation.)", a chapter note as a title; now the four textbooks by author and title | cosmetic: fixed 7d35cb0, ef596b2
+ec-comm-u1-L2 | notebook (5) | "Remove the carrier, only the taxi" (a dropped word in the joke) | cosmetic: later
+ec-comm-u1-L3 | trap2 | picture shows "scale: 1 µV = 38 px", a drawing note on screen | cosmetic: later
+ec-comm-u3-L2 | bookfig (Armstrong, split) | top half's last arrow leads off the view; bottom half carries on | cosmetic: later
+ec-comm-u3-L2 | figs | "V1 = 1.526 V, V2 = 1.267 V, vo" with plain digits for subscripts | cosmetic: later
+
+Count: 1 must fix and 2 should-fix fixed in 3 lessons, 3 cosmetic fixed, 4 cosmetic left; 5 book items fixed beyond
+the lesson ones (1.6 WE2 sum, AMI share and power, answer range). Clean: u1-L1, u1-L3 (words), u2-L1 … u2-L4, u3-L4,
+u4-L1, u4-L3, u4-L4. Patterns: every lesson error was inherited from a book figure (label left off, label box over a
+line, subscript shift); the figs-note generator again kept a chapter note in place of source titles.
