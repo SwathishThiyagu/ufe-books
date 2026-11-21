@@ -48,3 +48,20 @@ OK
 - ch 8 [low] Worked example 1: The example asks for NA, but the chapter body never defines NA or gives NA = √(n1² − n2²). A student meets the symbol for the first time inside a solved problem.
 - ch 9 [low] Section 3: The text says the period is 'often around 500 nm for n_eff near 1.5' at 1550 nm, but 1550/(2×1.5) = 516.7 nm. The rounded 500 nm is the value that gives 1500 nm (the worked example), so a student may read a contradiction between Section 3 and Quiz Q7.
 - ch 9 [low] Quiz Q6: The omnidirectional reflector is described only as reflecting 'over a wide range of incidence angles'. The standard definition is all incidence angles and both polarizations, which is what 'omnidirectional' means and why high index contrast is needed.
+
+## Claude correction pass (21 Nov 2026)
+
+Every reviewer note above is fixed, then a full pass: all nine chapters rewritten from the draft, every worked example,
+quiz answer and question-bank number recomputed in Python, nine figures hand-drawn from the worked examples
+(pipeline/claude_figs/ec_optical_u1.py), and all 14 long questions given "Points to cover" and a numbered model answer.
+
+- 1.1: hair, 1310 nm window and bandwidth wording fixed; safety advantage added; topic names instead of unit numbers.
+- 1.2: general NA definition (n₀ sin θa); limiting ray traced inside the core to the wall (14.84°, 75.16° = θc).
+- 1.3: exact and approximate Δ; skew-ray acceptance n₀ sin θas cos γ = NA added and worked (γ = 45°: 20.06°); wrong "stricter limit" for skew rays reversed.
+- 1.4: slab V convention stated (full thickness, cutoff mπ; half-thickness books mπ/2); TE₀/TE₁ effective indices, decay lengths and eigenvalue check added; fiber comparison quiz corrected (V = 2.95 guides LP₀₁ and LP₁₁).
+- 1.5: lost superscripts restored; graded profile uses the exact Δ; figure plotted from the formula; parabolic mode count V²/4 worked (215).
+- 1.6: broken inequality fixed; cabled cutoff ≤ 1260 nm; MFD values; design example (a ≤ 4.21 µm) added.
+- 1.7: 10 km lag corrected from 0.5 µs to 0.67 µs; group-index derivation and a dn/dλ example added.
+- 1.8: slab single-mode limit corrected to V < π for the full-thickness V; effective index method worked (n_eff 1.4564, V_w 1.11).
+- 1.9: thickness-weighted mean index; quarter-wave Si₃N₄/SiO₂ mirror worked (a = 461.0 nm, stop band 1407–1726 nm, R 98.4 % for 8 pairs).
+- Question bank: Q11 (dispersion, another unit's topic) replaced by a cross-chapter single-mode design question; wrong outline points (V²/4 for step index, skew rays "stricter", 90° − θa) fixed.
