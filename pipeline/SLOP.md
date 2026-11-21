@@ -1289,3 +1289,64 @@ u5-L2 "Steam and dryness" part title fits; every picture's source note names the
 u2-L1, u2-L2, u2-L4, u3-L1 … L3, u4-L2, u4-L3, u5-L2, u5-L5, u6-L3, u6-L4 (15), plus u5-L3, u6-L1, u6-L2 with a cosmetic
 line. Patterns: as in the Engines review, bookfig scenes copy the book's figure errors verbatim (all five figure items
 were book errors), and a given that lives only in a hint or a worked example the question leans on.
+
+## Circuit Theory fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 22 lessons on the branches lesson/ec-circuits-u1-L1 … u6-L4 (u1 L1–L4, u2 L1–L4, u3 L1–L4,
+u4 L1–L3, u5 L1–L3, u6 L1–L4), every scene's narration and on-screen text against the library books
+books/ece/ec-circuits/ec-circuits-u1..u6.html on main, each lesson's sheet once and every bookfig scene rendered at 0.995.
+Recomputed in python (sympy) every worked example, model answer, trap, picture number and recap number with the passive
+sign convention, the drawn current directions and RMS versus peak checked on each: element laws 24 V / 20 V / 20 mA,
+KCL/KVL 2, −1, 1 A and 24 W balance, bridge n = 4, b = 6, star 8/4/4 Ω and 3 A, source transformation 3.5 A at 7 V, mesh
+6/3 A and supermesh 2/5 A, nodal 8/6 V and supernode, superposition 9 + 9 V (54 W, not 27), Thevenin 24 V / 4 Ω / 6 A,
+maximum power 36 W at 50 %, Millman 8 V behind 1 Ω, reciprocity 4 A both ways, compensation 0.909 A and 4.091 A, phasor
+mesh 2 + j1 and 1 − j2 A, conjugate match 25 W against 20 W, 325 V peak / 229.8 RMS / 206.9 average, 30.4∠25.3°,
+impedance 26.77∠−72.6° and 8.59 A, series RLC 43.28∠−22.5° and 5.31 A, p(t) −460…4140 W, 46.6 µF pf correction,
+balanced star 230.9 V and 19.8∠−31° A, two wattmeters 8.0 kW and pf 0.839, harmonic RMS 73.8 V and THD 30 %, resonance
+1591.5 Hz, Q and bands (159, 80, 637 Hz), practical tank 1583.6 Hz, RC −3 dB at 1591.5 Hz, band-pass 0.263 at 1.2 kHz,
+loci 7.07 A / 500 W and 3.33 / 30 A, coupling M = 1 H, 7 H / 3 H, coupled mesh 9.48∠−58.6° and 2.12∠−32.0° A, ideal
+transformer 46 V, 4.6 A, 0.92 A and 250 Ω, magnetic circuit 0.279 mWb and 444/556 A, transients 2 A / 6 V / 4 V and 3.33 A,
+τ = 5 ms and 11.5 ms, 6.32 V at τ, damping cases (15.27 V at 0.321 s), poles for ζ = 0.1 … 1.25, sine switch-on 1.2e⁻⁴ᵗ,
+Laplace 10 − 6e⁻²ᵗ, peaks 5.03 and 1.15, state matrix roots −2 ± j4, Z/Y/h/ABCD of the 2-3-4 Ω T (Δz 26, Δh 6/7,
+AD − BC = 1), cascade Zin 5.06 Ω, series [12 8; 8 14] and the upright [11.2 9.2; 9.2 12.2], terminated Zin 4.4 and 8.2 Ω,
+Foster I/II and Cauer I/II of (s² + 1)(s² + 3)/[s(s² + 2)], RC Foster 2.667 Ω: all correct. Every exam question shows the
+givens its answer uses; every ribbon's "N worked examples" matches the calc scenes and no recap or answer leans on a
+dropped example. No lesson narrates or draws a college, city, university or unit/chapter/lesson number. Book fixes
+772acb9 on claude/project-thread-fkbze7 for main (check_book.py --render OK on u3, u4, u5; run with the preinstalled
+Chromium and Python playwright 1.63.0): u3 intro and 3.8 lead, u5 intro and state-equations lead "only a few universities"
+→ "not every syllabus covers"; u5 5.1 "a Chennai power cut" → "a brief power blink" (a hold-up capacitor rides through
+milliseconds, not a cut); u3 (31) and u4 (23) SVG subscripts baseline-shift "sub" → "−20%" so VL, XC, VR sit on their line
+(Figs 3.3.1, 3.4.1, 4.1.1); u4 Figure 4.1.1 "equal and opposite" moved below the I = 1 A line, clear of VR = 10 V; u5
+Figure 5.7.1 "vC(0⁻) = 4 V" with a small subscript, inside the left panel. u2 Figure 2.4.1 "worked example 1" kept: the
+book numbers every chapter's first example "Worked example", then 2. u6 Figure 6.8.1 title measured inside the viewBox
+(x 70–471 of 720) and the lesson frame: no change. Fixed lessons rebuilt with --revoice (re-voiced only u4-L3 hook,
+u5-L1 hook and two trims, u3-L2 and u3-L4 notes lines); each --check OK, cuecheck 0 late cues, sheet 0 page errors,
+0 cue failures, 0 text outside the safe area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-circuits-u6-L1 | outro (23) | next card put the topic as the headline; now ["NEXT TIME", "Next lesson", "Hybrid (h) and inverse hybrid (g) parameters", "book"] | must fix: fixed e905377
+ec-circuits-u6-L1 | calc (12, 13) | second example (Y test) titled "Worked example" again while the agenda says two; now "Worked example 2" | should fix: fixed e905377
+ec-circuits-u2-L1 | bookfig (12, 13) | figure titles say "Worked example 1/2" over the nodal and supernode examples, which the calc scenes call 3 and 4 | should fix: fixed e264cda
+ec-circuits-u2-L3 | bookfig (10, 11), calc (13–15) | Millman and reciprocity examples numbered 1 and 2 again after examples 1 and 2 on maximum power; now 3 and 4 | should fix: fixed e7c1d91
+ec-circuits-u2-L4 | bookfig (11, 12) | AC mesh and Thevenin figure titles "Worked example 1/2" against calc 3 and 4 | should fix: fixed eff7af6
+ec-circuits-u4-L3 | hookArt (1) | "Your phone charger … two coils share one iron core … a low AC voltage": a phone charger is switch-mode (ferrite, kHz) and gives DC; now "An old wall adapter" | should fix: fixed 3614019
+ec-circuits-u5-L1 | hookArt (1) | "The power cuts out, but a capacitor keeps your router running, and your video call survives": a hold-up capacitor rides through a blink of milliseconds, not a cut (book 5.1 said "a Chennai power cut"); now "The power blinks off" | should fix: fixed 7ef683c
+ec-circuits-u3-L1 | bookfig (3, 4) | one-cycle figure halves each carry the other half's curve (a tail below the axis and a stroke through "20 ms"; a stroke at 0); curve cut to its own half, label moved | should fix: fixed 53bcdc0
+ec-circuits-u6-L3 | bookfig (10) | network a carries the junction dot where network b joins (the other half's item); removed | cosmetic: fixed ec3d967
+ec-circuits-u3-L2, u3-L3, u3-L4, u4-L2, u4-L3 | bookfig | figure subscripts (VL, XC, IB) sit low on the next line, as in the book; baseline-shift −20 % | cosmetic: fixed 990d99e, 3f4e610, 55c46e6, 2eee82c, 3614019
+ec-circuits-u5-L3 | bookfig (4) | "vC(0⁻) = 4 V" ran past its panel (sheet: text past its card), as in the book | cosmetic: fixed 63c8a7d
+ec-circuits-u3-L2, u3-L3, u3-L4, u4-L2, u4-L3, u5-L3, u6-L3, u6-L4 | figs | sources line cut (".)", chapter names in place of book titles, or no titles); now whole author-and-title lines | cosmetic: fixed in the commits above and 8511959
+ec-circuits-u5-L1, u3-L2, u3-L4 | whole lesson | 891, 881, 881 narration words (aim 880); trimmed to 879, 880, 880 | cosmetic: fixed 7ef683c, 990d99e, 55c46e6
+ec-circuits-u5-L2 | whole lesson | 895 narration words; not rebuilt | cosmetic: later
+ec-circuits-u4-L1 | bookfig (3) | phasor subscripts sit low (same SVG style); not rebuilt | cosmetic: later
+ec-circuits-u1-L4 | bookfig (5) | panel (b) "2 Ω" sits between the 3 ∥ 6 equivalent and the load, whose "load" tag floats below | cosmetic: later
+ec-circuits-u4-L2 | hookArt (1) | hook repeats u4-L1's radio-tuning idea; "−1.44 dB" from the rounded 0.847 (exact −1.445) | cosmetic: later
+ec-circuits-u4-L2, u4-L3, u6-L3 | bookfig | sheet notes figures filling 36–49 % of the stage (wide circuits) | cosmetic: later
+
+Count: 1 must fix (known from the brief) and 7 should-fix fixed in 9 lessons, 6 cosmetic rows fixed, 5 cosmetic left;
+about 60 book lines fixed (54 of them subscripts). Must checks: u6-L4 next card "Revise from the start" kept; every
+picture's source note names the right book figure; every bookfig scene shows a whole circuit or plot after the two fixes.
+Clean: u1-L1 … L3, u2-L2, u5-L2 (words only), u6-L2 (6), plus u1-L4, u4-L1 with a cosmetic line. Patterns: worked-example
+numbering restarts when a lesson takes two book chapters (u2-L1, u2-L3, u2-L4, u6-L1), split figures keep a long curve or
+a join from the other half, and everyday hooks overstate the device (phone charger, router through a power cut).
