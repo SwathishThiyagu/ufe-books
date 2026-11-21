@@ -568,3 +568,8 @@
 - NITT's list keeps LIDAR and the flex-fuel sensor in this unit although they are motion-control and fuel topics; they stay short in 3.8.
 - Manipal's `where` entry is its ignition and engine-control unit (most topics belong to au-elec u2 and u4), not a sensors unit.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
+## me-design-u6 (Claude correction pass, 21 Nov 2026)
+- Belts, chains and wire ropes are not in the exam course ME3591 (pipeline/EXAM_ND2026.md), so this book follows the other syllabi; no exam topics were added.
+- SRM's `where` topics include lab lines ("Experiments: Mode thermal analysis of Composite material Frequency analysis", "Harmonic Analysis") that are not syllabus content; NITK's entry lists its whole course (unit 1) rather than this unit.
+- The packet `out` path is stale (03_Books/...); queue.json holds the right one.
