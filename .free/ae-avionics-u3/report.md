@@ -74,3 +74,10 @@ OK
 - ch 12 [low] section 3 table: The emergency source row is inconsistent: 'RAT generator' for A320 but 'RAT' for B787.
 - ch 13 [low] Section 1, table row for Torque and the paragraph after the table: The table says a torque sensor shows 'Shaft power, turboprop' and the text says it shows 'percentage or shaft power'. Torque and power are different quantities: shaft power = torque × angular velocity. A torque indicator alone cannot show power.
 - ch 13 [low] Section 1, table row for Fuel flow and the sentence after the table: Turbine and paddlewheel meters sense volume flow. Turning pulses into kilograms per hour needs the fuel density, and the chapter does not say this, so a student may think the meter measures mass directly.
+
+## Correction pass (Claude, 21 Nov 2026)
+
+Every worked example, quiz and bank number rerun in Python; all reviewer notes checked and fixed; thirteen figures hand-drawn
+from the worked examples (pipeline/claude_figs/ae_avionics_u3.py); fourteen full model answers; exam-course topics added
+(lithium-ion batteries, the APU, over- and under-voltage protection, A320 and B787 detail); MIT, NPTEL and OpenStax links dropped.
+Checker: OK with --render.
