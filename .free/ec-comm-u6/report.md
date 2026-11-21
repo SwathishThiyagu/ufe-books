@@ -52,3 +52,10 @@ OK
 - ch 9 [low] Section 2, after the Y[k] formula: 'After the cyclic prefix is removed, the channel acts as a circular convolution' can be read as if the physical channel were circular. The channel is linear; it is the received useful block that equals a circular convolution of x[n] with the channel impulse response, and only because the CP is long enough.
 - ch 9 [low] Section 3, Doppler sentence: f_d = v f_c / c is the maximum Doppler shift, not the Doppler spread. Calling it the Doppler spread is loose and can confuse the definition of coherence time.
 - ch 9 [low] Section 3 and Exam traps (CP rule): 'The rule is T_cp > τ_max' and 'The CP must be longer than τ_max' are slightly too strict. A CP exactly equal to the delay spread already keeps all echoes inside the prefix, so a student could wrongly mark T_cp = τ_max as a failure.
+
+## Claude correction pass (21 Nov 2026)
+
+- Every chapter rewritten from the draft; every worked example, quiz answer and question-bank number recomputed in Python. All 36 reviewer notes fixed, the 11 [high] first.
+- Examples changed: BFSK tones moved to 30/20 kHz (drawable, both orthogonality tests shown, 7.5 kHz counter-case); OOK vs BFSK at equal peak power added; BPSK phase-error and receiver-sensitivity (−103.4 dBm) examples; DPSK rotation-invariance and a four-receiver P_b comparison at 10 dB; 8-PSK P_s/P_b at 10 dB; 16-QAM Gray point and P_s; coherent 8-FSK union bound; MSK tones and phase trellis; PSD comparison at 2.5R_b; FHSS hop count; OFDM Wi-Fi rate (54 Mb/s) and a fading/diversity example (Rayleigh BPSK, two-branch MRC).
+- Added coverage: spectral density comparison of BPSK, QPSK and MSK; m-sequence properties; FH processing gain; coherence bandwidth and time, Rayleigh fading and diversity.
+- Nine figures hand-drawn (pipeline/claude_figs/ec_comm_u6.py), three sketches in model answers; 14 full model answers; MIT OCW dropped (university-hosted).
