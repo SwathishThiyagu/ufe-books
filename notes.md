@@ -495,4 +495,7 @@
 - Crankcase ventilation (new in the packet) is chapter 4.5; the draft's chapters 4.5–4.8 moved to 4.6–4.9.
 - "Thermosyphon, forced circulation and pressure cooling; coolants" is still tagged advanced (one university), but the exam course lists cooling system types and coolant properties, so the tag no longer fits; consider removing it.
 - Draft errors fixed: thermosyphon densities (992.2 and 971.8 kg/m³, Δp 80 Pa), physically impossible blower outlet temperatures (340 K at ratio 1.6, 320 K at 1.5), turbo mechanical efficiency 0.65 (now 0.95), pressure-cap "3 °C per 10 kPa", roots blower description, SAE grade definition.
+## me-ic-u5 (Claude correction pass, 21 Nov 2026)
+- The exam course AU25301 has no engine-testing unit (its unit 5 is cooling, lubrication, crankcase ventilation, boosting and advanced engines, which sit in me-ic-u4 and u6), so no exam subtopic was added here; the book follows the packet and the older AU3303 testing unit.
+- Draft errors fixed: heat-balance exhaust flows that implied air-fuel ratios of 44 to 66, a bank Morse test with negative friction power, a bank heat balance with a negative remainder, a 30 mm orifice giving 44 % volumetric efficiency, bmep key term with "n = 4", BP key term with N in rev/s, a timing figure where the retarded curve beat MBT, and the rope-brake dead-weight mix-up.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
