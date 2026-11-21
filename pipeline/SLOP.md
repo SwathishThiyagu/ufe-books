@@ -1350,3 +1350,53 @@ picture's source note names the right book figure; every bookfig scene shows a w
 Clean: u1-L1 … L3, u2-L2, u5-L2 (words only), u6-L2 (6), plus u1-L4, u4-L1 with a cosmetic line. Patterns: worked-example
 numbering restarts when a lesson takes two book chapters (u2-L1, u2-L3, u2-L4, u6-L1), split figures keep a long curve or
 a join from the other half, and everyday hooks overstate the device (phone charger, router through a power cut).
+
+## Power Electronics fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 21 lessons on the branches lesson/ee-pe-u1-L1 … u6-L3 (u1 L1–L3, u2 L1–L5, u3 L1–L4,
+u4 L1–L3, u5 L1–L3, u6 L1–L3), every scene's narration and on-screen text against the library books
+books/eee/ee-pe/ee-pe-u1..u6.html on main, each lesson's sheet once and every bookfig scene at 0.995. Recomputed in python
+every worked example, model answer, trap, picture number and recap number, with RMS against peak, phase against line
+voltage and where α is measured from checked on each, and every extinction angle solved numerically by bisection (u5 R-L
+controller β = 224.155°, so 2β = 448.3° exactly and 448.4° from the printed 224.2°; Io = 14.605 A gives 2133 W). Also
+checked: bridge Vdc 207.07 V, FF 1.1107, RF 0.483; capacitor filter ripple 20 V; delta line current 14.94 A; zero net
+output at α = 111.14°; 25 % power at α = 1.98665 rad; induction skin depth 12.3 mm at 2 kHz (1945 Hz for 12.5 mm). Every
+exam question shows the givens its answer uses (u5-L3 Q2 included); every ribbon's "N worked examples" matches its calc
+scenes. No lesson narrates or draws a college, city, publisher, university count or unit/chapter/lesson number. Book fixes
+a331d75 on claude/project-thread-549h21 for main (check_book.py --render OK on all six, Python playwright 1.63.0): u1
+Fig 1.4.1 tq label moved off the 20 µs tick, Fig 1.7.1 "½CsV²fs" (was ½C with "sV" as one subscript); u2 2.1 FF = 1.1107,
+Fig 2.8.1 "rectifier" above zero on the left, "inverter" below zero on the right (each sat in the other's sign region);
+u3 3.4 check answer D below about 0.85 (body said 0.85, answer 0.9), 3.7 total loss names the magnetics term that falls
+with fs (conduction plus switching alone has no minimum); u4 4.6 WE2 sums −0.0007 and −0.0009 (printed +), trap "Fix the
+fundamental, and N angles remove N − 1", Figs 4.5.1 and 4.6.1 info-box line pitch 21 so subscripts clear the next line;
+u5 5.1 "14.605² × 10 = 2133 W", "sin 448.4°", Fig 5.3.1 legend wrapped inside the 0–60° band and point labels kept inside
+the 90–150° band; u6 induction figure δ = 12.3 mm, 6.x "α = 1.987 rad", publishers (Wiley, Pearson, Khanna, Oxford
+University Press, IEEE Press, New Age) dropped from the sources; "only a few universities/syllabi" scope sentences removed
+in u2 2.x lead, u3 3.6 and 3.7, u4 4.6 lead, u5 note, u6 6.3 lead and 6.7. Fixed lessons rebuilt with --revoice (no line
+re-voiced: every fix is on screen); each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text
+outside the safe area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ee-pe-u1-L3 | bookfig (4, 5) | snubber figure split through the circuit: top had link, load and diode with a wire to nowhere, bottom the IGBT, Cs, Rs and driver; both scenes now show the whole circuit (scene 4 adds the switch leg at s4, scene 5 builds its half on the whole) | must fix: fixed b00549d
+ee-pe-u5-L3 | bookfig (12) | nine-switch array top: output columns end in mid-air (output boxes were only in the bottom half); boxes and load line added at s3 | must fix: fixed 91140ce
+ee-pe-u6-L3 | bookfig (4) | home-system top: bidirectional converter with no battery; battery and BMS added at s4 ("Below the bus, the battery converter") | must fix: fixed 04d75df
+ee-pe-u6-L1 | bookfig (induction heater) | "hot layer: δ = 12.5 mm" at 2 kHz; 12.5 mm is the target, 2 kHz gives 12.3 mm (book too) | must fix: fixed c94117e
+ee-pe-u5-L3 | bookfig (13), figs | "worked example 2" over the matrix on-time bar; the lesson calls it worked example 4 | should fix: fixed 91140ce
+ee-pe-u2-L1 | calc (WE1, WE3) | "FF = 1.111" printed where the brief asks 1.1107; WE3 "(0.482 with no filter)" against WE1's 0.483 | should fix: fixed 5e2ac94
+ee-pe-u3-L3 | pa (Q3 picture) | "rise 0.4 T, reset 0.4 T" reads as tesla; now 0.4 Ts | should fix: fixed de77952
+ee-pe-u1-L2, u1-L3, u3-L1 … L4, u4-L2, u5-L2, u6-L3 | figs | sources line gave chapter notes in place of titles, stray ".)", a garbled "Ned Mohan (and Design); … (Devices and Applications)" (u4-L2) or a chapter as a title (u5-L2, u6-L3); now whole author-and-title lines | cosmetic: fixed e339fba, b00549d, b3102a5, 0fc3a25, de77952, 3a5c080, caa4d19, cddbb4b, 04d75df
+ee-pe-u1-L3 | hookArt (1) | "Its gallium nitride switch" said of any fast charger (many are silicon) | cosmetic: later
+ee-pe-u2-L1 | bookfig (capacitor filter) | "Vdc ≈ 315.3 V" is the textbook approximation; the exact average is 316.5 V (dip 307.3 V, 35.4 A peak) | cosmetic: later
+ee-pe-u2-L4 | bookfig (overlap) | caption writes γ0 with a plain 0 | cosmetic: later
+ee-pe-u4-L1 | whole lesson | 899 narration words (aim 880); not rebuilt | cosmetic: later
+ee-pe-u1-L2, u1-L3, u3-L1, u3-L4 | bookfig | sheet notes figures filling 31–45 % of the stage (wide circuits) | cosmetic: later
+ee-pe-u5-L2 | bookfig (4, 5) | sheet flags "text past its card" on the RMS plot labels; the frame shows them inside the plot card | cosmetic: no change
+
+Count: 4 must fix and 3 should-fix fixed in 6 lessons, 9 cosmetic source lines fixed, 5 cosmetic left; 22 book lines
+fixed. Must checks: Fig 1.4.1's tq bar runs 0–30 µs in the lesson; Fig 2.8.1 labels are right in u2-L4; u4-L2 trap
+already says "N angles remove N − 1" with the fundamental fixed; u5-L1 shows "14.60² × 10 = 2.13 kW" (true to 3
+figures); u5-L3 Q2 has its givens; u6-L3 next card kept. Clean: u1-L1, u2-L2, u2-L3, u2-L5, u4-L1 (words only), u4-L3,
+u5-L1, u6-L2. Patterns: split bookfig halves cut a circuit or block diagram where the split line runs through a loop
+(u1-L3, u5-L3, u6-L3); the figs-note generator cut source titles at commas and kept chapter notes; an example's target
+value is printed where the chosen design's value belongs (12.5 against 12.3 mm).
