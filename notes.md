@@ -614,3 +614,8 @@
 - EC3552's unit 5 lists "Introduction to wafer to chip fabrication process flow"; it is now a section of 2.3 (crystal growth to final test, with dies per wafer and good dies).
 - One university's `where` list is the whole course placed under unit 1; another lists FinFET technologies here, which the packet keeps in unit 1; one list ends with electron-beam characterisation topics ("Analytical Beams", "Beam Specimen interactions") that are not CMOS fabrication and are not covered.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
+## ee-pe-u4 (Claude correction pass, 21 Nov 2026)
+- No new subtopics for this unit. EE3591 lists this material as its unit 2 "Inverters", which opens with "IGBT, static and dynamic behavior"; the packet keeps IGBTs in "Power BJT, MOSFET and IGBT", so this book points there by topic name. "Various harmonic elimination techniques" is an exam topic, though the packet tags "Harmonic elimination techniques" advanced; chapter 6 covers pulse-width, notching (selective elimination), transformer phase-shifting and stepped-wave methods.
+- Packet data: one university's `where` entry (unit title "Total Number of contact hours") lists its whole course; another mixes inverters and choppers in one unit; the packet `out` path is stale (03_Books/...).
+- Harmonic amplitudes in the SPWM chapter (bipolar m_f and m_f ± 2, unipolar 2m_f ± 1 at m_a = 0.8) and the selective-elimination and cascaded H-bridge switching angles were computed by script (FFT and Newton iteration), not copied from a table.
