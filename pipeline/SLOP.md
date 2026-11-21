@@ -1066,3 +1066,39 @@ Count: 0 must fix found (1 wrong fact already fixed before the review), 1 mislea
 cosmetic fixed, 3 cosmetic left. Clean: u1-L2, u1-L4, u2-L1, u2-L2, u3-L1, u3-L2, u4-L1, u4-L2, u5-L2, u6-L2, u6-L3 (12, with u1-L1 clean after its fix).
 Patterns: a condition dropped from a theorem (causal) or a sufficient condition stated as "when", and one dated
 everyday fact in a hook.
+
+## VLSI Design fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 24 lessons on the branches lesson/ec-vlsi-u1-L1 … u6-L3 (u1 L1–L3, u2 L1–L4, u3 L1–L5, u4 L1–L5,
+u5 L1–L4, u6 L1–L3), every scene's narration and on-screen text against the library books
+books/ece/ec-vlsi/ec-vlsi-u1..u6.html on main, and each lesson's lesson_sheet.py sheet once. Recomputed in python every
+worked example, model answer, trap, picture number and recap number: MOS charge and threshold budgets (VT0 = 0.036 V,
+γ = 0.21 √V, body-effect iteration to 1.098 V), square-law and velocity-saturated currents (0.86 mA against 3.44 mA),
+constant-field scaling (6.25 → 1.56 µW, density unchanged), subthreshold 17.8× per 100 mV, FinFET Weff = 70 nm, drive-in
+junction at 2.5 diffusion lengths, Y = e^(−AD) = 61 %, γ 0.053 vs 0.53 √V, inverter VM 1.65/1.41 V and margins, logical
+effort D = 17.2τ, Elmore 280/130 ps, power crossover 1.11 MHz, adder and Booth recodings, Wallace column heights, refresh
+15.625 µs, ±60 mV charge sharing, predecode 2368 vs 10240 inputs, scan test times, NRE break-evens 3,077 / 64,000 /
+12 lakh, all Verilog evaluations (53, 59/−5, $signed >>> 2 = 1110, == with x), LUT/ROM/PLA/PAL counts, HPWL 21 → 13,
+memory-map ends, DPM 5254/1053, NAND fault collapsing, D-algorithm test 110, JTAG 94 TCK, LFSR period 15, MISR aliasing,
+March C− 10n, wafer-sort ₹89.50, TAM 45.4 %, DNL/INL ±0.4: all correct. The two swapped questions (u4-L3, u5-L3) are
+the book's own check-yourself questions with their givens. No college names, unit, chapter or lesson numbers. Book fixes
+on main cec5f69 (check_book.py --render OK on u1, u2, u3): u2 2.4 worked example 2qεSi·NA = 3.33×10⁻¹⁶ (was 3.31);
+u3 3.4 "Here D is the path delay" (was d); u1 Figure 1.6.1 "10 V/µm in both" moved clear of "field VDD/L" (the u1-L3
+bookfig already had it clear); u1 1.8 and u2 2.4 "only a few universities teach" reworded to "not every syllabus covers".
+Fixed lessons rebuilt with --revoice; each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text
+outside the safe area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-vlsi-u2-L3 | pa (Q3), line 2 | "area and yield: each NPN with its isolation takes more silicon" is not in the chapter; now "cycle time and yield: every extra step lengthens the run and adds defects", as the chapter says, picture redrawn | must fix: fixed 42e50bc
+ec-vlsi-u6-L3 | pq/pa (Q2) | asks for the MATS+ length, but MATS+ is never taught and appeared only in the hint; the question card and narration now give ⇕(w0); ⇑(r0, w1); ⇓(r1, w0) | must fix: fixed 1aea589
+ec-vlsi-u2-L1 | hookArt (0) | "Every transistor in your phone sits on silicon dioxide": dated (phone chips use high-k gate stacks, the notes' own beyond-the-syllabus section); now "In a classic CMOS process" | should fix: fixed 259db06
+ec-vlsi-u2-L2 | hookArt (0) | "each mask adds one layer" contradicts the notes' own trap that mask count is not layer count; now "each mask patterns one step" | should fix: fixed 7d8c438
+ec-vlsi-u2-L3 | recap (17) | "about 10× the gm" drops "at the same current" and the book's 4–10× range | cosmetic: later
+ec-vlsi-u3-L1 | hookArt (0) | "billions of inverters on one chip": loose (billions of transistors) | cosmetic: later
+ec-vlsi-u6-L3 | bookfig (11) | figure fills 42 % of the stage (the sheet's own warning) | cosmetic: later
+
+Count: 2 must fix (both known from the writers) and 2 should-fix hooks fixed, 3 cosmetic left; 5 book lines fixed on
+main. Clean: u1-L1, u1-L2, u1-L3, u2-L4, u3-L2, u3-L3, u3-L4, u3-L5, u4-L1 … u4-L5, u5-L1 … u5-L4, u6-L1, u6-L2 (19, plus
+u3-L1 with one cosmetic line). Patterns: a model-answer point added beyond the chapter, an exam question that leans on a
+hint for its givens, and hooks that date or overstate an everyday fact.
