@@ -32,10 +32,10 @@ Reply with the hand-back in the brief, one block per unit.
 | Correct Chemical mass transfer books 3-4 | ch-mass-u3, u4 (ds/) | CH3551 core |
 | Correct Chemical mass transfer books 5-6 | ch-mass-u5 (free/), ch-mass-u6 (ds/) | CH3551 core |
 | Correct Chemical mass transfer books 1, 2, 7 | ch-mass-u1, u2, u7 (ds/) | Mass Transfer I; last |
-| Correct Diagnostic equipment books 1, 5, 6 | bm-instr-u1, u5, u6 | BM3591 core; branches when drafted |
-| Correct Diagnostic equipment books 2-4 | bm-instr-u2, u3, u4 | |
+| Correct Diagnostic equipment books 1, 5, 6 | bm-instr-u1, u5, u6 (ds/) | BM3591 core |
+| Correct Diagnostic equipment books 2-4 | bm-instr-u2 (ds/), bm-instr-u3 (free/), bm-instr-u4 (ds/) | u3, u4 not in BM3591 |
 | Correct Chemical thermodynamics books 1-2 | ch-thermo-u1 (ds/), ch-thermo-u2 (free/) | u2 draft status "error" (a figure fell back to a box diagram) |
 | Correct Chemical thermodynamics books 3-4 | ch-thermo-u3, ch-thermo-u4 (ds/) | |
-| Correct Chemical thermodynamics books 5-7 | ch-thermo-u5, u6 (ds/), u7 | Thermodynamics II; last |
+| Correct Chemical thermodynamics books 5-7 | ch-thermo-u5, u6 (ds/), ch-thermo-u7 (free/) | Thermodynamics II; last |
 
 Done before this file: ce-rcc-u1..u6 and ae-avionics-u1..u5 had one thread each; ae-avionics-u6 is written in the main chat.
