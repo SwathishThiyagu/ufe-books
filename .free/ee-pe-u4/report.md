@@ -1,19 +1,19 @@
 # ee-pe-u4: free-model run
 
-- Book: `books/eee/ee-pe/ee-pe-u4.html`
+- Book: `work/ee-pe-u4/tree/books/eee/ee-pe/ee-pe-u4.html`
 - Status: ok
-- Model calls so far: 27 (102,110 tokens in, 310,703 out), 7.0 minutes
+- Model calls so far: 27 (102,110 tokens in, 310,703 out), 7.2 minutes
 
 ## Checker
 
 ```
-ee-pe-u4.html: 9 chapters, 15606 words, 10 figures, 168 KB
+ee-pe-u4.html: 9 chapters, 23097 words, 10 figures, 339 KB
 OK
 ```
 
 ## For the reviewer
 
-- chapter 8: the figure cannot be drawn: note "s cells per phase" runs off the right edge; shorten it
+- nothing flagged
 
 ## Reviewer notes (after any revision)
 
