@@ -3,12 +3,9 @@
 24 lessons, generated 21 Nov 2026 from the corrected library books with engine v4.6 (book2lesson.py).
 One Opus-high writer thread per line, following WRITER_BRIEF.md in this folder (N and k from the lesson id).
 
-The person reviews the first lesson of this subject before the rest are built.
+The person approved the first lesson on 21 Nov 2026; the rest follow in the same style.
 
-## Now
-- ec-comm-u1-L1 (built 21 Nov, waiting for the person's review)
-
-## After the person approves ec-comm-u1-L1
+## Approved 21 Nov 2026, 13:08 IST (the person approved ec-comm-u1-L1); all start, most needed first
 - ec-comm-u1-L2
 - ec-comm-u1-L3
 - ec-comm-u2-L1

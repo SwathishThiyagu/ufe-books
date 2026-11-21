@@ -3,12 +3,9 @@
 20 lessons (units 4 and 1 first: the Microwave course's units), generated 21 Nov 2026 from the corrected library books with engine v4.6 (book2lesson.py).
 One Opus-high writer thread per line, following WRITER_BRIEF.md in this folder (N and k from the lesson id).
 
-The person reviews the first lesson of this subject before the rest are built.
+The person approved the first lesson on 21 Nov 2026; the rest follow in the same style.
 
-## Now
-- ec-antenna-u4-L1 (being written 21 Nov for the person's review)
-
-## After the person approves ec-antenna-u4-L1
+## Approved 21 Nov 2026, 13:08 IST (the person approved ec-antenna-u4-L1); all start, most needed first
 - ec-antenna-u4-L2
 - ec-antenna-u4-L3
 - ec-antenna-u1-L1

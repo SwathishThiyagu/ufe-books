@@ -25,6 +25,11 @@ Inputs, all in the repo SwathishThiyagu/ufe-books on main (clone it with push ac
    - the final stage of a calc row replaces the row, so the final must restate the key value;
    - bookfig steps often come out all as one step: renumber them so the figure builds one panel at a time;
    - the next-lesson card may show the unit title: use the next lesson's first chapter title.
+   - (from this subject's first lessons) SVG baseline-shift="sub" sits far too low: use dy/baseline-shift -0.2em at 72 % size;
+   - pa `al` lines wrap on spaces and can break a tspan: keep formulas in an `al` line as plain text (exp(−j2πft₀));
+   - the sheet captures each scene at 92 %: cue answer stamps and captions early, never on the last words;
+   - when a unit has more worked examples than 880 words allow, keep one per chapter and fix agenda.ribbon2 to match;
+   - a fact check on every stamp's unit is worth it (one writer stamped 4 mV²·s for 4×10⁻³ V²·s).
 4. Build and check as the ufe-unit-lessons skill says (section 8): --check, voice build, lesson_sheet.py --frames --play,
    as often as you need; rebuild with --reuse when only the drawing changed. Look at sheet.png once, the bookfig, calc,
    picture and answer pages and the four logo frames.
