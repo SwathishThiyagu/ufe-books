@@ -714,3 +714,10 @@
 - One convention throughout: f<sub>s</sub> ≥ 2f<sub>m</sub> with a guard band; flat-top hold τ sinc(fτ); SQNR = 4.77 + 6.02n − 20 log(V/σ) (6.02n + 1.76 for a full-scale sine); DM bit b[n] = 1 if x[n] ≥ x̃[n − 1]; Manchester 1 = low-to-high (IEEE 802.3); differential Manchester 0 = transition at the start.
 - μ-law SQNR against level is from the fine-step formula (a quantizer simulation agrees within about 0.6 dB). Kept but not checked against a source this session: speech neighbour correlation 0.85 to 0.9 at 8 kHz.
 - MIT OCW links dropped from the sources (university-hosted); Wikipedia could not be reached from this session, so only the two Wikibooks pages the writer run had opened are listed.
+## ec-optical-u6 (Claude correction pass, 21 Nov 2026)
+
+- Packet left unchanged (owner's rule for the communication subjects). Chapters 6.3, 6.4 and 6.8 are tagged advanced but carry the queue's calculations (EDFA gain, power conversion efficiency and OSNR; γ, L<sub>eff</sub>, SPM phase and soliton lengths; AAL5 cell counts), so they run to about 1,340–1,770 words rather than the 650 to 900 the tag asks for.
+- The exam-course topic "Optical network transmission modes" has no subtopic of its own; it is covered as circuit against packet switching in 6.5.
+- Conventions used throughout: Δλ = λ²Δf/c with c = 3 × 10⁸ m/s; coupler ports 1, 2 input side and 3, 4 output side, directivity 10 log₁₀(P<sub>in</sub>/P₂); PCE = (P<sub>s,out</sub> − P<sub>s,in</sub>)/P<sub>p</sub> ≤ λ<sub>p</sub>/λ<sub>s</sub>; OSNR ≈ 58 + P<sub>in</sub> − NF − 10 log₁₀ N in 0.1 nm; NLS in the β₂/γ form with N² = L<sub>D</sub>/L<sub>NL</sub>; bidirectional lightpaths counted once per pair with one wavelength on both fibers.
+- Kept but not checked against a source this session: isolator isolation 30 to 60 dB and insertion loss 0.5 to 1 dB, SOA noise figure 6 to 9 dB, erbium level-2 lifetime about 10 ms, the 58 dB OSNR constant, and the qualitative switch-element table (switching times only; the draft's dB columns were dropped as unverified).
+- Dropped the MIT OpenCourseWare link (university-hosted); RP Photonics and ITU-T kept.
