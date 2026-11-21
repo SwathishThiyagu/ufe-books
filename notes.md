@@ -748,3 +748,10 @@
 - Conventions: Sᵢⱼ = bᵢ/aⱼ with the other ports matched; coupler ports 1 input, 2 through, 3 coupled, 4 isolated, I = C + D; reflex modes N = n + ¾ (n = 0, 1, 2 …); Gunn transit-time mode n₀L > 10¹² cm⁻², LSA 2 × 10⁴ < n₀/f < 2 × 10⁵ s/cm³.
 - Not checked against a source this session: the GaAs velocity–field curve in the Gunn figure is an empirical fit (threshold 3.2 kV/cm, peak near 2 × 10⁷ cm/s); typical ranges (magnetron 40 % to 70 %, IMPATT up to about 15 %, spiral-inductor Q about 10 to 20) are textbook-typical figures quoted without a citation. The draft's "±20 % bandwidth" for the Wilkinson was removed as unverified.
 - Sources: three textbooks (Pozar 4th, Collin 2nd, Liao 3rd), Microwaves101 and five Wikipedia pages; no university-hosted pages.
+
+## ec-antenna-u6 (Radar Systems) correction pass, 21 Nov 2026
+
+- Packet left unchanged (owner's rule for the communication subjects); no `where` list, so every packet subtopic is covered in full; no chapter added.
+- Conventions: R<sub>max</sub> uses S<sub>min</sub> = kT<sub>0</sub>BF·(S/N)<sub>min</sub> with a system loss L; Doppler positive for a closing target; FMCW f<sub>b</sub> = 2RΔf/(cT<sub>m</sub>) per sweep, with the triangular textbook form 4RΔf·f<sub>m</sub>/c shown beside it; matched-filter peak S/N 2E/N<sub>0</sub> (E/N<sub>0</sub> on the average-power basis); CA-CFAR formula stated for a square-law detector; monopulse horns A top-left, B bottom-left, C top-right, D bottom-right.
+- Kept but not checked against a source this session: typical cross sections (insect 10⁻⁵ to ship 10⁴ m²), the IEEE band edges, the ~1.4/τ filter within 1 dB of matched, ~13 dB plain-chirp sidelobes, 60–70 dB TR-tube isolation. The sphere curve, CFAR multipliers and Albersheim estimate are computed, not quoted.
+- Only one online source is left (radartutorial.eu); MIT OCW, NPTEL (university-hosted) and the Internet Archive home page were dropped, and the container could not open new pages to add others.
