@@ -41,7 +41,10 @@ def chevron(x1, y1, x2, y2, col, s=7):
 def glow(path, col=CY, w=4.5, z=.03, arrows=True, dash=None):
     pl = [P(a, b, z) for a, b in path]
     d = f' stroke-dasharray="{dash}"' if dash else ''
-    s = f'<g filter="url(#gl)"><polyline points="{pts(*pl)}" fill="none" stroke="{col}" stroke-width="{w}" stroke-linejoin="round" stroke-linecap="round"{d}/></g>'
+    # a polyline that is flat on screen has a zero-height box and the glow filter would erase it; pad the group's box
+    xs, ys = [q[0] for q in pl], [q[1] for q in pl]
+    padr = f'<rect x="{min(xs) - w:.1f}" y="{min(ys) - w:.1f}" width="{max(xs) - min(xs) + 2 * w:.1f}" height="{max(ys) - min(ys) + 2 * w:.1f}" fill="none" stroke="none"/>'
+    s = f'<g filter="url(#gl)">{padr}<polyline points="{pts(*pl)}" fill="none" stroke="{col}" stroke-width="{w}" stroke-linejoin="round" stroke-linecap="round"{d}/></g>'
     if arrows:
         for (x1, y1), (x2, y2) in zip(pl, pl[1:]):
             if math.hypot(x2 - x1, y2 - y1) > 40:

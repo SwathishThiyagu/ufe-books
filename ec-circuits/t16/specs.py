@@ -125,7 +125,7 @@ def u1_L4():
     parts = [glow([Bn, D], GO, 7, arrows=False), glow([Cn, D], GO, 7, arrows=False),
              glow([D, (7.5, 6.0), (7.5, .5), (2.2, .5), A], GO, 7, arrows=False)]
     parts += [glow([A, Bn], CY, 5, arrows=False, dash='10 8'), glow([A, Cn], CY, 5, arrows=False, dash='10 8'), glow([Cn, Bn], CY, 5, arrows=False, dash='10 8')]
-    parts += [lab(1.7, 3.8, .2, '1', CY, 20), lab(4.4, 1.1, .2, '2', CY, 20), lab(4.7, 4.1, .4, '3', CY, 20),
+    parts += [lab(1.7, 3.8, .2, '1', CY, 20), lab(4.4, 1.1, .2, '2', CY, 20), lab(4.1, 3.3, .3, '3', CY, 20),
               lab(4.4, 6.6, .2, '4', GO, 20), lab(7.1, 3.8, .2, '5', GO, 20), lab(8.0, 3.2, .2, '6', GO, 20)]
     parts += [post(*A, 'A', h=30), post(*Bn, 'B', h=30), post(*Cn, 'C', h=30), post(*D, 'D', h=30)]
     bd = board(parts)
