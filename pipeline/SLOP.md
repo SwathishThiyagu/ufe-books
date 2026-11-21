@@ -1474,3 +1474,52 @@ Count: 1 must fix and 2 should-fix fixed in 3 lessons, 3 cosmetic fixed, 4 cosme
 the lesson ones (1.6 WE2 sum, AMI share and power, answer range). Clean: u1-L1, u1-L3 (words), u2-L1 … u2-L4, u3-L4,
 u4-L1, u4-L3, u4-L4. Patterns: every lesson error was inherited from a book figure (label left off, label box over a
 line, subscript shift); the figs-note generator again kept a chapter note in place of source titles.
+
+## Optical Fiber Communication fact review A (Nov 2026)
+
+Audited 21 Nov 2026: all 12 lessons on the branches lesson/ec-optical-u1-L1 … u3-L4 (u1 L1–L4, u2 L1–L4, u3 L1–L4),
+every scene's narration and on-screen text against the library books books/ece/ec-optical/ec-optical-u1..u3.html on
+main, each lesson's sheet once and every bookfig scene. Recomputed in python every worked example, model answer, trap,
+picture number and recap number: NA and acceptance angle (n₁ 1.48, n₂ 1.46: NA 0.2425, 14.0°), skew-ray acceptance,
+the slab V (5.90, two TE modes) with the TE eigenvalues solved by bisection (n_eff 1.4968989 and 1.4882333; 1/γ 0.92
+and 1.32 µm), fiber V and mode counts, cutoff wavelength, group index and delay, strip-guide and Bragg-mirror stop band
+numbers; dB/dBm budgets, Rayleigh 1/λ⁴ scaling, bend loss, intermodal spread (49.3 ns/km), D(λ) = (S₀/4)(λ − λ₀⁴/λ³)
+(1310⁴/1550³ = 790.84, D = 17.46), Δλ = λ²Δf/c, PMD √L, DCF length and span loss, L_eff = 21.17 km and the SBS and
+SRS thresholds (1.59 mW, 0.864 W); Einstein ratios at 300 K (hf/kT = 56.52, exp(−56.52) = 2.84 × 10⁻²⁵, R = 1 at
+69 µm), LED photon chain (3.13 × 10¹⁷ /s, η_ext 0.14, 9.8 mW, flat-chip escape 1/[n(n+1)²] = 1.3 % at n = 3.6), laser
+threshold and slope numbers, quantum-well levels (E₁ₑ 0.0562 eV, E₁ₕ 0.0075 eV, 1.488 eV, 833 nm), Lambertian
+coupling (0.25 × 0.04 = 1 %, 20 µW), joint losses (lateral 0.59 dB, tilt 0.12 dB, gap 0.68 dB with 0.33 dB Fresnel,
+1.13 dB total, 1.27 dB at x = 0.2) and the push-pull MZM curve (1.0 mW at V = 2 V, null at Vπ = 4 V). Every "Don't
+write" is wrong under every common convention and every "Write" right; every exam question shows the givens its answer
+uses. No lesson narrates or draws a college, university or unit/lesson number; the seven "Only a few universities …"
+sentences live in the books only.
+Book fixes 9314777 on main (check_book.py --render OK on u1, u2, u3, Python playwright 1.63.0): u1 1.4 WE TE₁ n_eff printed
+1.48823 in the question, guided check, γ step, answer, model answer and Fig 1.4.1 label, with γ = 4.833 × 0.1563 =
+0.755 µm⁻¹ (the printed 0.756 needed the unrounded root; 1/γ 1.32 unchanged), and the convention trap reworded
+("Mixing the two conventions puts every cutoff off by a factor of two", was "Mixing the two halves or doubles the
+answer"); u2 2.5 sub-heading "Graded index: long paths through fast glass" (was "fast rays through slow glass",
+backwards), 2.6 WE2 790.8 nm and 1550 − 790.8 = 759.2 (was 790.9, 759.1); u3 Fig 3.1.1 and its model-answer copy:
+rate labels B₁₂ρN₁, A₂₁N₂, B₂₁ρN₂ (and the E₂ − E₁, A₂₁, N₂/N₁ notes) subscripted, viewBox widened to 744 so the
+stimulated-emission panel no longer runs 12 px past the edge; Fig 3.2.1 "A flat chip in air lets out only
+1/[n(n + 1)²] = 1.3 %" (was "keeps all but", backwards); 3.1 WE2 and model answer hf/kT = 56.52 (exp(−56.5) is
+2.90 × 10⁻²⁵, not the printed 2.84); the seven "Only a few universities teach …" sentences in u1 (1.3, 1.7, 1.8) and
+u3 (3.1, 3.3, 3.5, 3.6) now read "Some syllabi cover …". Fixed lessons rebuilt with --revoice (three lines re-voiced:
+u1-L2 scene 13, u2-L4 scene 12, u3-L1 scene 6); each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text outside the safe area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-optical-u3-L1 | calc (6, 7) | "hf/kT = … = 56.5" then exp(−56.5) = 2.84 × 10⁻²⁵; exp(−56.5) is 2.90 × 10⁻²⁵, the 2.84 needs 56.52; now 56.52 on screen and in the narration (book too) | must fix: fixed 55a8a49
+ec-optical-u1-L2 | bookfig (10), calc (12, 13) | TE₁ n_eff shown as 1.4882 with γ 0.756 and 1/γ 1.32; 1.4882 gives γ 0.754, 1/γ 1.33; now n_eff 1.48823, γ 0.755 (screen and narration) (book too) | should fix: fixed 15e10a3
+ec-optical-u3-L1 | bookfig (4) | rate labels "B12ρN1", "A21N2", "B21ρN2" with plain digits, and the stimulated-emission panel ran 12 px past the figure's edge (book Fig 3.1.1 too) | should fix: fixed 55a8a49
+ec-optical-u3-L1 | bookfig (10) | "A flat chip in air keeps all but 1/[n(n+1)²] = 1.3 %": backwards, only 1.3 % escapes (book Fig 3.2.1 too) | should fix: fixed 55a8a49
+ec-optical-u2-L4 | notebook (12) | "so the glass literally hums": the 11 GHz acoustic wave is far above hearing; now "a sound wave in the glass, far above hearing" | should fix: fixed 31f67f0
+ec-optical-u2-L4 | calc (13, 14) | givens left out the book's "narrow-line source", which the 21 A_eff/(g_B L_eff) threshold assumes; added | should fix: fixed 31f67f0
+ec-optical-u1-L4, u2-L1, u2-L3, u2-L4, u3-L4 | figs | sources line kept chapter notes in place of titles ("Gerd Keiser (dispersion and nonlinear effects in optical fibers.)", "Gerd Keiser (power launching and connectors.)"), u1-L4 without Saleh and Teich, who cover photonic crystals; now authors and titles from the book's sources list | cosmetic: fixed 322d54d, bd0f422, d3a46df, 31f67f0, e023d1d
+ec-optical-u2-L1 | recap, trap2 | recap says n = 1.53 at 850 nm, the trap 1.55; both are book values from different chapters | cosmetic: left
+ec-optical-u3-L2, u3-L3 | figs | sources line carries titles plus chapter notes ("Optical Fiber Communications: lasers, power launching and connectors"); readable, left | cosmetic: left
+
+Count: 1 must fix and 5 should-fix fixed in 3 lessons, 5 cosmetic fixed, 2 cosmetic left; book items beyond the
+lesson ones fixed: the u1 1.4 trap wording, the u2 2.5 heading and 2.6 WE2 rounding, and seven university
+sentences. Clean: u1-L1, u1-L3, u2-L2, u3-L2, u3-L3. Patterns: every number error was inherited from the book (an
+intermediate rounded before the next step: 56.5, 1.4882, 790.9); the figs-note generator again kept chapter notes in
+place of source titles in five of twelve lessons.
