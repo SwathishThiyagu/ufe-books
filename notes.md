@@ -535,3 +535,11 @@
 - BS IV and BS VI car limits (Euro 4 and Euro 6 values), the April 2017 and April 2020 dates, the 50 to 10 ppm sulphur step and the April 2023 second BS VI phase are from memory of standard sources and could not be re-checked online.
 - The draft's NPTEL and MIT links were dropped; SAE, AFDC and DieselNet remain.
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+## ec-vlsi-u1 (Claude correction pass, 21 Nov 2026)
+
+- EC3552 unit 1 also lists "MOS logic families (NMOS and CMOS)" and "power consumption", which the universal syllabus places in the CMOS inverters unit (NMOS inverters; static and dynamic power). They are covered here briefly (switches, NMOS logic against CMOS in 1.1; dynamic, short-circuit and static power with the power-delay product in 1.6) and named by topic for the full treatment.
+- "Static and dynamic conditions" is read as DC I-V behaviour (1.3) and device capacitances (1.5); SRM's temperature and geometry dependence are in 1.2, 1.4 and 1.7.
+- The subject chip says "Usually Sem 4"; EC3552 is a semester 5 course (Regulation 2021). The packet's `usual_sem` may want a look.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
+- The velocity-saturation chapter uses v = µE/(1 + E/Ec) with Ec = vsat/µ and the exact VDSsat that follows; textbooks differ (some define Ec = 2vsat/µ), and the chapter says so.
+- The draft's NPTEL and MIT links were dropped; All About Circuits and three Wikipedia pages remain (opened by the draft run's link check; the sandbox could not reopen them).
