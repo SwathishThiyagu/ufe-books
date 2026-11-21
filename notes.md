@@ -991,6 +991,14 @@
 - Reviewer notes on the draft that were already fixed in the draft text (sudden load four times the energy, fixed-fixed contraflexure at 0.211L, the moment-distribution sign sentence, the wL⁴/(4EI) quiz) were checked and kept.
 - Sources: MIT OpenCourseWare, NPTEL and OpenStax links dropped (university-hosted); Megson, Hibbeler and Timoshenko kept as textbooks.
 
+
+## ae-struct-u3 (correction pass, 21 Nov 2026)
+
+- Packet unchanged; all 9 subtopics were in the draft, so no chapter was added. The unit is AE25C02 (Structures I) and outside the AE3501 exam, so no exam topics were added.
+- Packet note: the `where` list includes an SRM unit-4 plate-buckling course; plate buckling belongs with the thin-plates unit, not this column unit, and is only mentioned here as local buckling.
+- Facts corrected from the draft: the end-conditions example used Euler for the fixed-fixed strut at 276 MPa, past the 200 MPa proportional limit (now marked invalid, with the limiting slenderness 99.3 for steel and 58.8 for aluminium); the beam-column example's EI did not match its E (now E = 70 GPa, EI 2520 N·m², P/P_E 0.603, factor 2.52, 102.0 MPa; exact tan u/u 2.24 gives 97.3); λ_t was defined two ways (now λ_p for the proportional limit and λ_J = 65.7 for the Johnson/Euler tangent point); σ_y meant both the y-direction stress and the yield stress (yield now σ_Y); Rankine-Gordon is presented as empirical, not derived.
+- Examples added or changed: steel tube strut by Rankine-Gordon (λ 156.2, P_R 34.05 kN, safe 11.35 kN); secant bow 2.375 mm; Marin endurance limits 244.8 and 163.2 MPa (Marin factors given as question data, not read from charts).
+- Sources: MIT OpenCourseWare link dropped (university-hosted); textbooks kept.
 ## ei-sensor-u5 (Chemical, Smart and Micro Sensors) correction pass, 21 Nov 2026
 
 - Packet unchanged; all 10 subtopics were in the draft, so no chapter was added. BM25C05 Biosensors topics covered: advantages and limitations, components (block diagram), classification by transduction (electrochemical, optical, acoustic, calorimetric) and by biological element (enzyme, immunosensor), ISFET and IMFET (and EnFET), blood glucose sensors (first and second generation, strips, continuous monitors). Biomedical uses added across the unit: Clark pO2 electrode and paramagnetic O2 in anaesthesia, incubator and ventilator humidity, arterial-line pressure transducer (5 uV/V/mmHg), microneedles and lab-on-chip, smart pressure and SpO2 modules, acoustic immunosensors, fuel-cell breath alcohol.
