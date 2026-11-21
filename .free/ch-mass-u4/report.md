@@ -2,12 +2,12 @@
 
 - Book: `books/chem/ch-mass/ch-mass-u4.html`
 - Status: ok
-- Model calls so far: 26 (111,317 tokens in, 254,989 out), 5.8 minutes
+- Model calls so far: 26 (111,317 tokens in, 254,989 out), 6.0 minutes
 
 ## Checker
 
 ```
-ch-mass-u4.html: 9 chapters, 16328 words, 10 figures, 181 KB
+ch-mass-u4.html: 9 chapters, 25800 words, 13 figures, 309 KB
 OK
 ```
 
