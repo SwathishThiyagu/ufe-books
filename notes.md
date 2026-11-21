@@ -587,3 +587,9 @@
 - EC3552's unit 5 also lists fault models, ATPG, DFT, scan and boundary scan, which the packet places in ec-vlsi-u6; 5.1 gives them at exam-introduction depth and points to that unit by topic. "Test coding" in the EC3552 list is read as turning patterns into a tester program (STIL); the syllabus does not define it.
 - Programmable devices (ROM, PLA, FPGA) sit in EC3552 unit 4 but in this packet's 5.6; 5.6 now covers ROM, PAL and PLA logic implementation for that reason.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
+## me-design-u1 (Claude correction pass, 21 Nov 2026)
+- The DeepSeek run stopped on chapter 2 (selection of materials) and left no book; the whole book was written by hand from the packet, using the draft chapters as material.
+- ME3591 unit 1 also lists theories of failure, stress concentration, fluctuating stresses, endurance limit and finite/infinite life; the packet keeps them in "Failure Theories and Fatigue Design", so this book only points there by topic name (bank note says so).
+- Crane hook and C-frame (ME3591) are worked in 1.9 Curved beams, with the trapezium and circle formulas for R_n; modes of failure and exposure to standards (IS 1570, IS 919, IS 2062, ISO 3, ISO 286) are in 1.4.
+- Packet data: `where` for one university lists the whole course (all units) as unit 1; one university's `course_used` is Electrical Machine Design, and `course_names` mixes in Electrical Machine Design and Robot and Machine Elements Design (other subjects); the packet `out` path is stale (03_Books/...).
