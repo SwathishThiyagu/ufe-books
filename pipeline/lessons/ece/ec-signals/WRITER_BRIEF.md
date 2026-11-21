@@ -22,13 +22,17 @@ Inputs, all in the repo SwathishThiyagu/ufe-books on main (clone it with push ac
    - the figs note may be cut mid-word: rewrite it from the book;
    - --check lists only 12 unknown words per run;
    - aim for 800 to 880 words from the first draft.
+   - each worked example costs two calc scenes: with four examples, plan for that or the first draft runs past 1000 words;
+   - the final stage of a calc row replaces the row, so the final must restate the key value;
+   - bookfig steps often come out all as one step: renumber them so the figure builds one panel at a time;
+   - the next-lesson card may show the unit title: use the next lesson's first chapter title.
 4. Build and check as the ufe-unit-lessons skill says (section 8): --check, voice build, lesson_sheet.py --frames --play,
    as often as you need; rebuild with --reuse when only the drawing changed. Look at sheet.png once, the bookfig, calc,
    picture and answer pages and the four logo frames.
 5. Name the page ec-signals-uN-Lk_<slug>.html (slug from META title, lowercase, hyphens).
 6. Deliver to git, never to /mnt/project-files (it is nearly full): make an orphan branch `lesson/ec-signals-uN-Lk`
    holding only `ec-signals-uN-Lk/` with the html, .mp3, .words.json, final .js and .pron.json, and sheet.png renamed
-   ec-signals-uN-Lk-sheet.png, and push it (`git checkout --orphan lesson/ec-signals-uN-Lk && git rm -rqf . && ...`).
+   ec-signals-uN-Lk-sheet.png, and push it (`git worktree add --orphan -b lesson/ec-signals-uN-Lk ../wt-ec-signals-uN-Lk`, copy the folder in, commit, push; `git rm -rf` is blocked as destructive).
 7. Hand back in under 15 lines by messaging the thread "Build 8 new exam subjects" (thread id
    cmsg_01VwvcZRx1mMD7zJQeF8gbhCHJ7d555QwKT2VRz537cmu9): the branch, runtime, scenes, words, what each picture shows,
    anything wrong in the book, what slowed you down. Do not write to the person's computer, do not touch other lessons'
