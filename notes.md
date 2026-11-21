@@ -543,3 +543,8 @@
 - Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
 - The velocity-saturation chapter uses v = µE/(1 + E/Ec) with Ec = vsat/µ and the exact VDSsat that follows; textbooks differ (some define Ec = 2vsat/µ), and the chapter says so.
 - The draft's NPTEL and MIT links were dropped; All About Circuits and three Wikipedia pages remain (opened by the draft run's link check; the sandbox could not reopen them).
+## ee-pe-u6 (Claude correction pass, 21 Nov 2026)
+- The exam course EE3591 has no applications unit, so no exam subtopic was added; the book follows the packet.
+- SRM's unit lists liquid level control, light dimmers and electronic timers; the draft had no liquid level control, now a section of the process control chapter (on-off probes, level transmitter, VFD and pump affinity laws).
+- Draft errors fixed: CC-CV charge time double-counted the taper charge (now 4.44 h CC + 1.85 h CV = 6.30 h), skin depths of steel at 50 Hz and 10 kHz (cold 3.2 / 0.23 mm, hot 78 / 5.5 mm), STATCOM current direction, UPFC shunt-converter role, anti-islanding time (about 2 s, not a few cycles), thyristor loss in the heater controller, crane quadrant, CC-CV and backup-time key terms, a bank outline that called the pump power law quadratic.
+- Packet `out` path is stale (old 03_Books/ path); queue.json holds the right one.
