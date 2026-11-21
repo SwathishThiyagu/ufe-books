@@ -686,3 +686,11 @@
 - Conventions used throughout: Δ exact = (n₁² − n₂²)/(2n₁²) with the approximation (n₁ − n₂)/n₁ shown beside it; slab V = (2πd/λ)NA with the full thickness d (cutoffs mπ, single-mode V < π), with a note that half-thickness books use mπ/2; fiber V uses the radius a; mode counts V²/2 (step) and V²/4 (parabolic); skew-ray acceptance n₀ sin θas cos γ = NA; λB = 2n̄a with the thickness-weighted mean index.
 - Kept but not checked against a source this session: cabled cutoff ≤ 1260 nm for standard single-mode fiber, MFD about 9 µm at 1310 nm and 10 µm at 1550 nm, typical NA ranges per fiber type, the 220 nm × 500 nm silicon guide. The 98.4 % peak reflectance and the 1407–1726 nm stop band are computed (transfer matrix and the quarter-wave gap formula), not quoted.
 - OpenStax dropped from the sources (consistent with the other correction passes); HyperPhysics was never in the rendered list. Question-bank Q11 (modal and material dispersion) belongs to the signal-degradation unit and was replaced by a cross-chapter single-mode design question.
+
+## ec-optical-u2 (Claude correction pass, 21 Nov 2026)
+
+- Packet left unchanged (owner's rule for the communication subjects); it has no `where` list for this unit, so every packet subtopic is covered in full and no chapter was added.
+- The srm entry under `where` lists "Microwave Measurements" topics (VSWR, network analyzer), which belong to the microwave subject, not to fiber signal degradation; only its "Attenuation" item matches this unit.
+- Conventions used throughout: bit-rate limit B ≤ 1/(2δT) for a full spread and B ≈ 0.2/σ for an RMS width; graded-index delay Ln₁Δ²/(8c) for the near-parabolic profile (with a note that some books give Ln₁Δ²/(2c)); RMS forms Ln₁Δ/(2√3c) and Ln₁Δ²/(20√3c); D > 0 when longer wavelengths arrive later; Rayleigh C = 0.8 dB·km⁻¹·µm⁴.
+- Formula constants kept from standard texts but not opened this session: the germania UV-tail formula, the single-mode critical-radius formula (20λ/(n₁ − n₂)^3/2)(2.748 − 0.996λ/λc)^−3, and the empirical SBS/SRS thresholds 4.4 × 10⁻³ d²λ²αν and 5.9 × 10⁻² d²λα. The IR-tail formula 7.81 × 10¹¹ e^(−48.48/λ) was checked against lecture notes. Model curves (material zero 1270 nm, slope 0.0986; D(λ) = (S₀/4)(λ − λ₀⁴/λ³)) are illustrative.
+- NPTEL and OpenStax dropped from the sources.
