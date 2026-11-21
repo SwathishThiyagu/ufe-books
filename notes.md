@@ -741,3 +741,10 @@
 - One convention throughout: R<sub>X</sub>(τ) = E[X(t + τ)X(t)]; two-sided PSD N₀/2; T₀ = 290 K; noise factor F linear and NF in dB; Friis in F and in T<sub>e</sub>, with T<sub>e</sub> referred to the stage input; complex envelope x̃ = x<sub>I</sub> + jx<sub>Q</sub> with x(t) = Re[x̃ e<sup>j2πf<sub>c</sub>t</sup>] and ỹ = ½ x̃ ∗ h̃.
 - Bandwidth of a T-second pulse given in all three forms: null-to-null 2/T band-pass (1/T one-sided baseband) and full 3-dB width 0.886/T (0.443/T one-sided).
 - MIT OCW links dropped from the sources (university-hosted). The web could not be reached from this session, so only pages the pipeline had already opened are listed (dspguide.com, the Communication Systems Wikibook and PySDR).
+## ec-antenna-u4 (Claude correction pass, 21 Nov 2026)
+
+- The packet was not changed. Its nine subtopics match the draft's nine chapters, and each is covered in full (there is no `where` list for this unit).
+- Rat-race numbering used throughout: arcs 1–2 = λg/4, 2–3 = 3λg/4, 3–4 = λg/4, 4–1 = λg/4; port 1 is the sum port, port 3 the difference port, outputs 2 and 4. The draft's numbering made port 1 a difference port, and the reviewer's suggested numbering was also inconsistent with the stated arcs.
+- Conventions: Sᵢⱼ = bᵢ/aⱼ with the other ports matched; coupler ports 1 input, 2 through, 3 coupled, 4 isolated, I = C + D; reflex modes N = n + ¾ (n = 0, 1, 2 …); Gunn transit-time mode n₀L > 10¹² cm⁻², LSA 2 × 10⁴ < n₀/f < 2 × 10⁵ s/cm³.
+- Not checked against a source this session: the GaAs velocity–field curve in the Gunn figure is an empirical fit (threshold 3.2 kV/cm, peak near 2 × 10⁷ cm/s); typical ranges (magnetron 40 % to 70 %, IMPATT up to about 15 %, spiral-inductor Q about 10 to 20) are textbook-typical figures quoted without a citation. The draft's "±20 % bandwidth" for the Wilkinson was removed as unverified.
+- Sources: three textbooks (Pozar 4th, Collin 2nd, Liao 3rd), Microwaves101 and five Wikipedia pages; no university-hosted pages.
