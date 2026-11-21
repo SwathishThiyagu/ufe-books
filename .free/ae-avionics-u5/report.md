@@ -1,13 +1,13 @@
 # ae-avionics-u5: free-model run
 
-- Book: `books/aero/ae-avionics/ae-avionics-u5.html`
+- Book: `work/ae-avionics-u5/tree/books/aero/ae-avionics/ae-avionics-u5.html`
 - Status: ok
-- Model calls so far: 37 (146,503 tokens in, 323,072 out), 10.1 minutes
+- Model calls so far: 37 (146,503 tokens in, 323,072 out), 10.5 minutes
 
 ## Checker
 
 ```
-ae-avionics-u5.html: 10 chapters, 19482 words, 11 figures, 194 KB
+ae-avionics-u5.html: 10 chapters, 28631 words, 11 figures, 294 KB
 OK
 ```
 
