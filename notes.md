@@ -721,3 +721,9 @@
 - Conventions used throughout: Δλ = λ²Δf/c with c = 3 × 10⁸ m/s; coupler ports 1, 2 input side and 3, 4 output side, directivity 10 log₁₀(P<sub>in</sub>/P₂); PCE = (P<sub>s,out</sub> − P<sub>s,in</sub>)/P<sub>p</sub> ≤ λ<sub>p</sub>/λ<sub>s</sub>; OSNR ≈ 58 + P<sub>in</sub> − NF − 10 log₁₀ N in 0.1 nm; NLS in the β₂/γ form with N² = L<sub>D</sub>/L<sub>NL</sub>; bidirectional lightpaths counted once per pair with one wavelength on both fibers.
 - Kept but not checked against a source this session: isolator isolation 30 to 60 dB and insertion loss 0.5 to 1 dB, SOA noise figure 6 to 9 dB, erbium level-2 lifetime about 10 ms, the 58 dB OSNR constant, and the qualitative switch-element table (switching times only; the draft's dB columns were dropped as unverified).
 - Dropped the MIT OpenCourseWare link (university-hosted); RP Photonics and ITU-T kept.
+## ec-comm-u1 (Claude correction pass, 21 Nov 2026)
+
+- The packet was not changed (owner's rule for these subjects). Several `where` lists for this unit belong mostly to other units: two of them list AM, FM and PCM topics (the modulation and digitisation units). Only their block-diagram, Fourier, random-process and noise topics are covered here.
+- One convention throughout: R<sub>X</sub>(τ) = E[X(t + τ)X(t)]; two-sided PSD N₀/2; T₀ = 290 K; noise factor F linear and NF in dB; Friis in F and in T<sub>e</sub>, with T<sub>e</sub> referred to the stage input; complex envelope x̃ = x<sub>I</sub> + jx<sub>Q</sub> with x(t) = Re[x̃ e<sup>j2πf<sub>c</sub>t</sup>] and ỹ = ½ x̃ ∗ h̃.
+- Bandwidth of a T-second pulse given in all three forms: null-to-null 2/T band-pass (1/T one-sided baseband) and full 3-dB width 0.886/T (0.443/T one-sided).
+- MIT OCW links dropped from the sources (university-hosted). The web could not be reached from this session, so only pages the pipeline had already opened are listed (dspguide.com, the Communication Systems Wikibook and PySDR).
