@@ -1523,3 +1523,37 @@ lesson ones fixed: the u1 1.4 trap wording, the u2 2.5 heading and 2.6 WE2 round
 sentences. Clean: u1-L1, u1-L3, u2-L2, u3-L2, u3-L3. Patterns: every number error was inherited from the book (an
 intermediate rounded before the next step: 56.5, 1.4882, 790.9); the figs-note generator again kept chapter notes in
 place of source titles in five of twelve lessons.
+
+## Optical Fiber Communication fact review B (Nov 2026)
+
+Audited 21 Nov 2026: all 9 lessons on the branches lesson/ec-optical-u4-L1 … u6-L4 (u4 L1–L3, u5 L1–L2, u6 L1–L4),
+every scene's narration and on-screen text against the library books books/ece/ec-optical/ec-optical-u4..u6.html on
+main, each lesson's sheet once and every bookfig scene against its book figure. Recomputed in python every worked
+example, model answer, trap, picture number and recap number: quantum efficiency, responsivity and cutoff wavelengths,
+PIN transit and RC bandwidths, APD gain, excess noise and optimum gain, shot, dark and thermal noise currents and SNR,
+receiver sensitivity, Q and BER = ½ erfc(Q/√2), analog CNR, power and rise-time budgets, cut-back attenuation, NA,
+WDM channel spacing and comb width, coupler excess, insertion and directivity losses, Bragg grating period, EDFA gain,
+OSNR and power conversion efficiency, soliton dispersion length, peak power and soliton period (the N = 1 pulse checked
+with a split-step NLS run), SONET/SDH frame rates and payloads, and AAL5 padding and cell counts. Every number in the 9
+lessons is right; every "Don't write" is wrong and every "Write" right; every exam question shows the givens its answer
+uses; u6-L3 and u6-L4 figure titles and captions are whole on screen. No lesson narrates or draws a college,
+university or unit/lesson number; the "Only a few universities teach …" lines are in the u4 book only.
+Book fixes 8aa75f1 on main (check_book.py --render OK on u4, u5 and u6): u4 4.1, 4.4 and 4.6 "Only a few universities
+teach this as a topic of its own" → "Some syllabi cover this as a topic of its own"; u5 5.1(b) noise total 2.77 × 10⁻¹⁶
+A² is 95 % thermal (was 96 %); u5 5.4 WE2 bandwidth-length product prints 178.3 MHz (B_opt before rounding) × 2.0 km =
+357 MHz·km (was 178 × 2.0 = 357). No lesson uses those three. Fixed lessons rebuilt with --revoice (no line re-voiced:
+every fix is on screen); each --check OK, cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text outside
+the safe area, play-through OK; the build's .bumper.mp3 copy, committed by mistake in five branches, removed in the
+follow-up commit.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+ec-optical-u4-L2, u4-L3 | figs | sources line "Gerd Keiser (Optical Fiber Communications), the chapters on photodetectors and on optical receiver operation", a chapter note and one book of the four; now the book's four textbooks by author and title | cosmetic: fixed 2d30d29, ea9eae8
+ec-optical-u4-L1 | figs | sources line lists three of the book's four textbooks (Saleh and Teich, Fundamentals of Photonics, left off) | cosmetic: fixed 70b022b
+ec-optical-u6-L1 … u6-L4 | figs | sources line lists Keiser and Senior only; Agrawal (amplifiers, solitons) and Ramaswami, Sivarajan and Sasaki (networks) left off | cosmetic: fixed e174dea, 5d306b5, 8383bc9, 2ffeae7
+ec-optical-u5-L1 | every scene header | kicker "OPTICAL FIBER COMMUNICATION · POINT-TO-POINT LINKS AND THE POWER…", the title cut at the engine's 70 characters; now "… · POINT-TO-POINT LINKS AND POWER BUDGET" (67) | cosmetic: fixed 920df08
+
+Count: 0 must fix, 0 should fix; 8 cosmetic fixed in 8 lessons, 0 left; 4 book items fixed (the three known ones,
+none in a lesson). Clean: u5-L2 entirely, and every lesson on facts, pictures and bookfigs. Patterns: the figs-note
+generator again kept a chapter note or a subset of the book's sources in place of the full list; the engine cuts a
+long kicker at 70 characters, so a long title needs a short kicker written into META.
