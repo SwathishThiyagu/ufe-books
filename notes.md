@@ -721,6 +721,13 @@
 - Conventions used throughout: Δλ = λ²Δf/c with c = 3 × 10⁸ m/s; coupler ports 1, 2 input side and 3, 4 output side, directivity 10 log₁₀(P<sub>in</sub>/P₂); PCE = (P<sub>s,out</sub> − P<sub>s,in</sub>)/P<sub>p</sub> ≤ λ<sub>p</sub>/λ<sub>s</sub>; OSNR ≈ 58 + P<sub>in</sub> − NF − 10 log₁₀ N in 0.1 nm; NLS in the β₂/γ form with N² = L<sub>D</sub>/L<sub>NL</sub>; bidirectional lightpaths counted once per pair with one wavelength on both fibers.
 - Kept but not checked against a source this session: isolator isolation 30 to 60 dB and insertion loss 0.5 to 1 dB, SOA noise figure 6 to 9 dB, erbium level-2 lifetime about 10 ms, the 58 dB OSNR constant, and the qualitative switch-element table (switching times only; the draft's dB columns were dropped as unverified).
 - Dropped the MIT OpenCourseWare link (university-hosted); RP Photonics and ITU-T kept.
+
+## ec-optical-u4 (Claude correction pass, 21 Nov 2026)
+
+- Packet left unchanged (owner's rule for the communication subjects). Chapters 4.1, 4.4 and 4.6 are tagged advanced but carry the queue's calculations, so they run longer than the 650 to 900 words the tag asks for.
+- Only one syllabus lists receiver noise, sensitivity and BER for this unit; the others stop at PIN and APD detectors, and one places detectors in its sources unit. The packet keeps them as advanced chapters here, which fits the subject.
+- Conventions used throughout: q = 1.602 × 10⁻¹⁹ C, h = 6.626 × 10⁻³⁴ J·s, c = 3 × 10⁸ m/s, k<sub>B</sub> = 1.38 × 10⁻²³ J/K (k is kept for the ionisation ratio); R = ηλ/1.24; surface reflectivity r, extinction ratio r<sub>ex</sub>; f<sub>tr</sub> ≈ 0.44/t<sub>tr</sub> (some textbooks use v<sub>sat</sub>/2w); F = kM + (1 − k)(2 − 1/M); APD sensitivity (Q/R)(qFBQ + σ<sub>T</sub>/M); BER = ½erfc(Q/√2), Q = 7.03 for 10⁻¹².
+- Kept but not checked against a source this session: v<sub>sat</sub> of 6.5 × 10⁴ m/s for InGaAs holes, typical k values (Si 0.02–0.05, InP about 0.5, Ge near 1), F ≈ M<sup>x</sup> with x = 0.3 (Si) and 0.7 (InGaAs), and "APD receivers 5 to 10 dB better than PIN".
 ## ec-comm-u1 (Claude correction pass, 21 Nov 2026)
 
 - The packet was not changed (owner's rule for these subjects). Several `where` lists for this unit belong mostly to other units: two of them list AM, FM and PCM topics (the modulation and digitisation units). Only their block-diagram, Fourier, random-process and noise topics are covered here.
