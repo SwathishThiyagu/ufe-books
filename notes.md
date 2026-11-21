@@ -621,6 +621,13 @@
 - AU3502's unit 1 also lists battery versions and substitutes, alternator circuitry and versions, regulator versions and starter development and design variations; each is now a section or paragraph in 1.5, 1.6, 1.7, 1.8 and 1.10.
 - The packet `out` path is stale (03_Books/...); queue.json holds the right one.
 
+## ec-vlsi-u3 (Claude correction pass, 21 Nov 2026)
+- The packet now has 11 subtopics; the two new ones (interconnect parameters and electrical wire models; the Elmore delay model) are chapters 3.5 and 3.6, and the draft's chapters 3.5–3.9 moved to 3.7–3.11.
+- EC3552's unit 2 "Combinational Logic Circuits" maps here except "stick diagram" and "Layout diagrams", which the packet keeps with fabrication and layout (unit 2 book). "Examples of combinational logic design" is covered by the compound-gate and multiplexer examples in 3.9 and 3.10; "Elmore's constant" by 3.6.
+- EC3552's unit 4 lists "Interconnect Parameters: Capacitance, Resistance, and Inductance" and "Electrical Wire Models"; both are now 3.5. The rest of that unit (arithmetic, programmable devices, memory) belongs to other units.
+- The packet's `where` list also carries the CEC362 VLSI testing course units, which do not belong to this unit and are not covered here.
+- The packet `out` path is stale (03_Books/...); queue.json holds the right one.
+
 ## ee-pe-u4 (Claude correction pass, 21 Nov 2026)
 - No new subtopics for this unit. EE3591 lists this material as its unit 2 "Inverters", which opens with "IGBT, static and dynamic behavior"; the packet keeps IGBTs in "Power BJT, MOSFET and IGBT", so this book points there by topic name. "Various harmonic elimination techniques" is an exam topic, though the packet tags "Harmonic elimination techniques" advanced; chapter 6 covers pulse-width, notching (selective elimination), transformer phase-shifting and stepped-wave methods.
 - Packet data: one university's `where` entry (unit title "Total Number of contact hours") lists its whole course; another mixes inverters and choppers in one unit; the packet `out` path is stale (03_Books/...).
