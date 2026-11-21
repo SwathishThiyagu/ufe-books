@@ -1,13 +1,13 @@
 # ee-pe-u5: free-model run
 
-- Book: `books/eee/ee-pe/ee-pe-u5.html`
+- Book: `work/ee-pe-u5/tree/books/eee/ee-pe/ee-pe-u5.html`
 - Status: ok
-- Model calls so far: 20 (73,829 tokens in, 242,165 out), 8.7 minutes
+- Model calls so far: 20 (73,829 tokens in, 242,165 out), 8.9 minutes
 
 ## Checker
 
 ```
-ee-pe-u5.html: 6 chapters, 14023 words, 7 figures, 141 KB
+ee-pe-u5.html: 6 chapters, 20291 words, 9 figures, 253 KB
 OK
 ```
 
