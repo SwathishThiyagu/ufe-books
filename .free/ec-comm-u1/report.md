@@ -2,12 +2,12 @@
 
 - Book: `books/ece/ec-comm/ec-comm-u1.html`
 - Status: ok
-- Model calls so far: 24 (105,436 tokens in, 247,961 out), 7.1 minutes
+- Model calls so far: 24 (105,436 tokens in, 247,961 out), 7.5 minutes
 
 ## Checker
 
 ```
-ec-comm-u1.html: 7 chapters, 14757 words, 8 figures, 154 KB
+ec-comm-u1.html: 7 chapters, 22562 words, 9 figures, 248 KB
 OK
 ```
 
@@ -45,3 +45,16 @@ OK
 - ch 7 [high] Figure spec, stage notes: The notes label the stage noise figures as 'F1 = 3 dB' and 'F2 = 6 dB'. The chapter defines F as the linear noise factor (no unit) and NF as the dB value. Attaching dB to F contradicts the chapter's own definition and can make a student use 3 and 6 as linear factors in Friis.
 - ch 7 [low] Section 2, equivalent noise temperature: The sentence 'The added noise power is k Te B' does not say that this is the noise power referred to the device input. For a device with gain G, the added noise at the output is G k Te B, so a student may apply k Te B at the output by mistake.
 - ch 7 [low] Quiz Q5: The answer evaluates the 6 dB attenuator as Te ≈ 3 × 290 = 870 K. The exact value is (3.981 − 1) × 290 = 864.5 K; using 3 instead of 2.981 hides the exact calculation.
+
+## Correction pass (Claude, Opus high)
+
+- All 7 chapters rewritten from the draft; every worked example, quiz answer and bank answer traced in Python with concrete numbers; every reviewer note above fixed, the five [high] first (density trap, distortionless delay vs phase, full 3-dB width 0.886/T, Hilbert Q2 answer, R(τ) zeros at 50 µs, F vs NF labels).
+- New worked examples: modulated pulse spectrum and its I/Q parts, offset-tone complex envelope (I = Q = 1.414 V), Bayes binary channel (P(1|r=1) = 0.934, Pe = 0.07), random-phase sinusoid R(τ), resistor series/parallel noise, cable-first vs LNA-first receiver (3.8 dB sensitivity gap).
+- All 7 figures redrawn by hand from each chapter's own numbers (pipeline/claude_figs/ec_comm_u1.py on main), plus a spectra sketch in a model answer.
+- Question bank: 14 questions, each with points to cover and a full computed model answer.
+- Notes cleanups: no cross-unit numbers, no "(from memory; check)", "Further reading online", university-hosted sources removed.
+
+```
+ec-comm-u1.html: 7 chapters, 22562 words, 9 figures, 248 KB
+OK
+```
