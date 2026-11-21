@@ -1102,3 +1102,42 @@ Count: 2 must fix (both known from the writers) and 2 should-fix hooks fixed, 3 
 main. Clean: u1-L1, u1-L2, u1-L3, u2-L4, u3-L2, u3-L3, u3-L4, u3-L5, u4-L1 … u4-L5, u5-L1 … u5-L4, u6-L1, u6-L2 (19, plus
 u3-L1 with one cosmetic line). Patterns: a model-answer point added beyond the chapter, an exam question that leans on a
 hint for its givens, and hooks that date or overstate an everyday fact.
+
+## Machine Design fact review (Nov 2026)
+
+Audited 21 Nov 2026: all 22 lessons on the branches lesson/me-design-u1-L1 … u7-L3 (u1 L1–L3, u2 L1–L2, u3 L1–L3,
+u4 L1–L5, u5 L1–L4, u6 L1–L2, u7 L1–L3), every scene's narration and on-screen text against the library books
+books/mech/me-design/me-design-u1..u7.html on main, and each lesson's lesson_sheet.py sheet once. Recomputed in python every
+worked example, model answer, trap, picture number and recap number: tie-rod sizing 160/83.3/241.5 mm² and the three
+masses and costs, H7/g6 limits and fits, curved-beam Rn and the 36 % inner-fibre rise, principal stresses and the five
+failure theories, Marin factors, Goodman/Soderberg lines and the impact factor 113 → 20.7 (180 → 33 MPa), shaft
+diameters under combined loads, key and spline stresses, clutch torques (n = 2, uniform wear), band and block brakes,
+connecting-rod Rankine design (t = 7.37 mm, Pcr 223 860 N), eccentric bolted and welded brackets, knuckle and cotter
+joints, power-screw torque and efficiency, spring index, Wahl factor, deflection and the 3.7 mm gap, concentric and leaf
+springs, flywheel energy and rim size, Sommerfeld numbers, e and h₀, Petroff friction, bearing selection (Creq 54 980 N,
+P = 6134 N, s₀ = 6.3), belt and chain power, wire-rope stresses, Lewis and Buckingham checks (10 896 / 6 912 / 11 090 N
+against 10 737 N), helical and bevel gear forces and epicyclic train ratios: correct apart from the rows below. Every
+exam question shows its givens. No college names, unit, chapter or lesson numbers. Book fixes on main 6544046
+(check_book.py --render OK on u1, u3, u4, u5, u7): the four errors the writers had reported (u3 3.6 Rankine constant
+456 670 in both places and the Apply answer's k² as (419/132) × 64 = 203.2 mm²; u4 Figure 4.6.1 gap 3.7 mm; u5 Figure
+5.7.1 "req" subscript back on its line; u7 Figure 7.3.1 failing 6 912 N wear bar in the warning colour, not pass green),
+plus u5 5.4 Understand answer rewritten on sensitivity (as in the lesson) and u1 1.3 worked example "about two-fifths
+of its cost". Fixed lessons rebuilt (--revoice where a line changed, --reuse for drawing-only fixes); each --check OK,
+cuecheck 0 late cues, sheet 0 page errors, 0 cue failures, 0 text outside the safe area, play-through OK.
+
+lesson | scene | what's wrong | severity
+--- | --- | --- | ---
+me-design-u3-L3 | outro (25) | "Next time, knuckle and cotter joints" and the next card skip a lesson: the next lesson opens with threaded fasteners and bolted joints under eccentric loading; say line and card corrected | must fix: fixed d506e9a
+me-design-u5-L2 | pa (Q1, 17) | the model answer argued from size ("r/c ≈ 500 squared: 2.5 × 10⁵, while μn/p is of order 10⁻⁷"), which does not explain why a change in r/c matters more; now S ∝ (r/c)² against μ¹n¹, so 10 % less clearance gives ×1.23 against ×1.10; the book's 5.4 answer had the same flaw and is fixed | must fix: fixed 709c000
+me-design-u6-L2 | whole lesson (hook, 0) | 881 narration words, over the 880 cap; "How do you size them both?" now "How do you size both?" (880) | must fix: fixed 0c6ac60
+me-design-u2-L2 | trap2 (19), wrong-card picture | label "thicker, stiffer rod = less stress?": a thicker rod does lower impact stress (by √A), so the wrong idea was drawn as partly right; now "stiffer rod", as the book's "stronger, stiffer" | should fix: fixed 3054ed3
+me-design-u1-L1 | figs (26) | "alloy steel is almost as light at about a third of its cost": ₹39.2 against ₹97.8 is 0.40, two-fifths; card and book worked example fixed | should fix: fixed cd48b31
+me-design-u5-L4 | bookfig (4), calc (7) | life of B (55 300/6134)³ = 732.7 million rev and 10 177 h, shown as 732.6 and 10 175 (book the same) | cosmetic: later
+me-design-u2-L1 | hookArt (0) | shafts crack "at the step, never politely in the middle": overstates (keyways and mid-span notches crack too) | cosmetic: later
+me-design-u3-L3 | hookArt (0) | a motorcycle beside the "31.4 kN peak" rod force, which is the worked example's 100 mm-bore engine, not a motorcycle's | cosmetic: later
+
+Count: 3 must fix and 2 should fix, all fixed; 3 cosmetic left; 7 book lines fixed on main (4 known from the writers).
+Clean: u1-L2, u1-L3, u2-L1, u3-L1, u3-L2, u4-L1 … u4-L5, u5-L1, u5-L3, u5-L4, u6-L1, u7-L1, u7-L2, u7-L3 (17, two with
+one cosmetic line). Patterns: an outro that names the topic after next (the writer took the book's next-but-one
+chapter), a "why" answer that argues from magnitude instead of sensitivity, a word count left one over the cap, a
+trap picture whose wrong idea is half true, and a ratio rounded to the wrong simple fraction.
