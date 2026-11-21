@@ -725,9 +725,16 @@
 ## ec-optical-u4 (Claude correction pass, 21 Nov 2026)
 
 - Packet left unchanged (owner's rule for the communication subjects). Chapters 4.1, 4.4 and 4.6 are tagged advanced but carry the queue's calculations, so they run longer than the 650 to 900 words the tag asks for.
-- Only one syllabus lists receiver noise, sensitivity and BER for this unit; the others stop at PIN and APD detectors, and one places detectors in its sources unit. The packet keeps them as advanced chapters here, which fits the subject.
+- Only one syllabus lists photodetector noise and optical receivers for this unit, and none names BER; the others stop at PIN and APD detectors, and one teaches detectors in its sources unit. The packet keeps noise, receivers and BER here (two as advanced chapters), which fits the subject.
 - Conventions used throughout: q = 1.602 × 10⁻¹⁹ C, h = 6.626 × 10⁻³⁴ J·s, c = 3 × 10⁸ m/s, k<sub>B</sub> = 1.38 × 10⁻²³ J/K (k is kept for the ionisation ratio); R = ηλ/1.24; surface reflectivity r, extinction ratio r<sub>ex</sub>; f<sub>tr</sub> ≈ 0.44/t<sub>tr</sub> (some textbooks use v<sub>sat</sub>/2w); F = kM + (1 − k)(2 − 1/M); APD sensitivity (Q/R)(qFBQ + σ<sub>T</sub>/M); BER = ½erfc(Q/√2), Q = 7.03 for 10⁻¹².
 - Kept but not checked against a source this session: v<sub>sat</sub> of 6.5 × 10⁴ m/s for InGaAs holes, typical k values (Si 0.02–0.05, InP about 0.5, Ge near 1), F ≈ M<sup>x</sup> with x = 0.3 (Si) and 0.7 (InGaAs), and "APD receivers 5 to 10 dB better than PIN".
+
+## ec-comm-u3 (Claude correction pass, 21 Nov 2026)
+
+- Packet left unchanged (owner's rule for the communication subjects); no errors found in its subtopics or exam weights. All eight subtopics already had chapters, so none were added; each chapter now carries two worked examples carried to the answer.
+- Conventions used throughout: β = Δf/f<sub>m</sub>; Carson B<sub>T</sub> = 2(Δf + f<sub>m</sub>); figure of merit = (S/N)<sub>o</sub> over the channel SNR with total received power in N<sub>0</sub>W (AM m²/(2 + m²), DSB-SC and SSB 1, FM 3β²/2 with tone modulation); FM threshold taken at a carrier-to-noise ratio of 10 dB in B<sub>T</sub>, with 13 dB mentioned as the other common figure; stereo separation from pilot phase error φ as 20 log₁₀[(1 + cos φ)/(1 − cos φ)] (the draft's 20 log cot φ was wrong).
+- Kept but not checked against a source this session: the edition of Taub and Schilling (listed without one), and the click-noise expression for the FM threshold curve (not used; the threshold figure marks the fall below threshold as not to scale). The 50 µs de-emphasis is described as the value used outside the Americas, without naming countries.
+- Dropped the MIT OpenCourseWare link (university-hosted); kept two Wikipedia pages, two All About Circuits pages and dspguide.com.
 ## ec-comm-u1 (Claude correction pass, 21 Nov 2026)
 
 - The packet was not changed (owner's rule for these subjects). Several `where` lists for this unit belong mostly to other units: two of them list AM, FM and PCM topics (the modulation and digitisation units). Only their block-diagram, Fourier, random-process and noise topics are covered here.
