@@ -1,13 +1,13 @@
 # ec-antenna-u4: free-model run
 
-- Book: `books/ece/ec-antenna/ec-antenna-u4.html`
+- Book: `work/claude_figs/ec-antenna-u4/tree/books/ece/ec-antenna/ec-antenna-u4.html`
 - Status: ok
-- Model calls so far: 32 (122,512 tokens in, 302,302 out), 7.5 minutes
+- Model calls so far: 32 (122,512 tokens in, 302,302 out), 7.6 minutes
 
 ## Checker
 
 ```
-ec-antenna-u4.html: 9 chapters, 16026 words, 10 figures, 168 KB
+ec-antenna-u4.html: 9 chapters, 27660 words, 12 figures, 260 KB
 OK
 ```
 
