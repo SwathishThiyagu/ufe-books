@@ -12,7 +12,7 @@ Inputs:
   `e2` path, extend r_emboss in your scratchpad copy so it draws `e2` blocks to match those samples, and say so.
 - the Stage recipe `/mnt/project-files/06_Deliver/t16/stage_bg_recipe.md` and the logo `/mnt/project-files/06_Deliver/t16/logo_tight.png`.
 - `t16.py` from the data pack (https://claude.ai/artifact/9j8tUxjFNfcEit4ZGerNpN, path thumbs/t16.py).
-- branch `deliver/ec-circuits` of SwathishThiyagu/ufe-books: `ec-circuits/thumbs.json` (subject, topic, hook per lesson;
+- branch `deliver/ec-circuits` of SwathishThiyagu/ufe-books: `ec-circuits/thumbnail/thumbs.json` (subject, topic, hook per lesson;
   the hooks are final) and `ec-circuits/thumbnail/` (the other three thumbnails, for reference). That branch is made by the
   finishing thread: if it is not there yet, wait for it (check every 10 minutes) before step "Render".
 - the lessons on branches `lesson/ec-circuits-uN-Lk` and the books `books/ece/ec-circuits/` on main, for the figures and numbers.
@@ -25,7 +25,7 @@ Look at t16_sheet.jpg and at three thumbnails at full size: no unit or lesson nu
 labels readable at phone size.
 
 Deliver: commit `ec-circuits/t16/` (the 22 `<lesson>_t16.jpg`, `t16_sheet.jpg`, and your renderer changes if any) and the
-updated `ec-circuits/thumbs.json` to the branch `deliver/ec-circuits` and push. Do not write to /mnt/project-files or the
+updated `ec-circuits/thumbnail/thumbs.json` to the branch `deliver/ec-circuits` and push. Do not write to /mnt/project-files or the
 person's computer, and do not message the person. Hand back in under 10 lines by messaging the thread
 "Build 8 new exam subjects" (thread id cmsg_01VwvcZRx1mMD7zJQeF8gbhCHJ7d555QwKT2VRz537cmu9): the commit, what each
 drawing shows in a few words, and anything that did not fit.
