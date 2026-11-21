@@ -3,7 +3,7 @@
 One thread, Opus high. You did not write these lessons: review them as a stranger would.
 
 Inputs (repo SwathishThiyagu/ufe-books, clone with push access):
-- the 18 lessons, each on its orphan branch `lesson/<id>` (folder `<id>/` with html, mp3, words.json, final .js, .pron.json, sheet png):
+- the 25 lessons, each on its orphan branch `lesson/<id>` (folder `<id>/` with html, mp3, words.json, final .js, .pron.json, sheet png):
   me-ic-u1-L1 to u1-L4, u2-L1 to u2-L5, u3-L1 to u3-L4, u4-L1 to u4-L3, u5-L1 to u5-L4, u6-L1 to u6-L5
 - the library books `books/mech/me-ic/me-ic-u1..u6.html` on main (the lessons may say only what these say)
 - the engine `pipeline/lessons/engine/` (v4.6), `pipeline/SLOP.md` (the audit rules, section C is yours)
