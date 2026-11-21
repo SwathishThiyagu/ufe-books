@@ -1,26 +1,26 @@
 {
- "lead": "Fault simulation asks how many modelled faults a vector set catches. ATPG, automatic test pattern generation, asks the reverse: for one undetected fault, what input vector exposes it at an output? The two programs form a loop. Fault simulation measures coverage after each vector; ATPG adds vectors for faults still missed. The loop ends when coverage reaches a target or no testable fault remains. Every fabricated chip then receives the compact set, so a manufacturing defect shows up as a wrong output instead of being shipped.",
- "prereq": "You need: fault collapsing from <a href=\"#fault-models-stuck-at-and-delay-faults\">6.2</a> and gate-level simulation from Unit 5.",
+ "lead": "Fault simulation asks how many listed faults a set of vectors catches. ATPG, automatic test pattern generation, asks the reverse: for one fault not yet caught, which input vector shows it at an output? The two programs work in a loop: fault simulation measures coverage, ATPG adds vectors for the faults still missed, and the loop stops at the coverage target. The compact vector set that comes out is applied to every chip that is made.",
+ "prereq": "You need: the stuck-at fault list and collapsing from <a href=\"#fault-models-stuck-at-and-delay-faults\">6.2</a>, and gate-level simulation from the Verilog chapters.",
  "sections": [
   {
    "h3": "Fault simulation measures detection",
    "blocks": [
     {
      "type": "p",
-     "text": "A fault list is the collapsed set of modelled faults, such as line A stuck-at-0. Fault simulation applies one input vector to the good circuit and to every faulty circuit in the list. It records a fault as detected when at least one output differs between good and faulty machines."
+     "text": "Fault simulation applies each vector to the good circuit and to every faulty circuit in the collapsed fault list. A fault is <b>detected</b> when at least one primary output differs between the good and the faulty circuit. A detected fault is dropped from the list, so later vectors simulate fewer faulty circuits (fault dropping)."
     },
     {
      "type": "p",
-     "text": "The good circuit is simulated once. Faulty circuits can be simulated in parallel by packing 32 or 64 faults into the bits of a machine word. Deductive simulation evaluates good lines once and deduces faulty values. Concurrent simulation keeps an event list per fault. Speed matters because a large chip can have millions of collapsed faults and thousands of vectors."
+     "text": "A large chip has millions of faults, so speed matters. <b>Serial</b> simulation runs one faulty circuit at a time. <b>Parallel</b> simulation packs circuits into the bits of a machine word: a 32-bit word carries the good circuit in one bit and 31 faulty circuits in the others, and one bitwise AND evaluates a gate for all of them. <b>Deductive</b> simulation carries, on each line, the list of faults that would flip it. <b>Concurrent</b> simulation re-evaluates a faulty circuit only where it differs from the good one."
     },
     {
      "type": "formula",
-     "text": "C = (N_detected ÷ N_testable) × 100%",
-     "where": "C is fault coverage in percent, N_detected is the number of testable faults detected by the current vector set, and N_testable is the number of faults in the collapsed testable fault list."
+     "text": "FC = (detected ÷ total faults) × 100 %",
+     "where": "where FC is the fault coverage, 'detected' is the number of faults the vectors detect and 'total faults' is the size of the collapsed fault list."
     },
     {
      "type": "p",
-     "text": "Report coverage after each vector. Vectors that add no new detection are dropped; this is test compaction. Vector ordering can also reduce tester time, but it does not change final coverage."
+     "text": "Tools also report <b>fault efficiency</b> (some call it ATPG efficiency or test coverage): detected faults divided by the faults left after removing those ATPG proved redundant. It shows how well ATPG did on the faults that can be tested; fault coverage shows how well the chip is tested."
     }
    ]
   },
@@ -29,191 +29,179 @@
    "blocks": [
     {
      "type": "p",
-     "text": "Exhaustive ATPG applies all 2ⁿ vectors for n inputs. It is complete but impossible beyond small n. Pseudo-exhaustive testing partitions the circuit and exhausts small subcircuits. Random ATPG applies pseudo-random vectors; weighted random biases inputs toward values that activate faults. Algorithmic ATPG works backward from one fault."
+     "text": "<b>Exhaustive</b> test applies all 2ⁿ vectors of an n-input circuit: complete, but impossible beyond small n. <b>Pseudo-exhaustive</b> test splits the circuit into small cones and exhausts each. <b>Random</b> test applies pseudo-random vectors and keeps those that detect new faults; <b>weighted random</b> biases the 0/1 probability of each input. <b>Algorithmic</b> ATPG works backwards from one target fault."
     },
     {
      "type": "p",
-     "text": "In the D-algorithm, D means 1 in the good machine and 0 in the faulty machine. D-bar is the reverse: 0 in good, 1 in faulty. A line carrying D or D-bar is sensitized."
+     "text": "In the D-algorithm, <b>D</b> means 1 in the good circuit and 0 in the faulty circuit; <b>D̄</b> means 0 in the good and 1 in the faulty circuit. The <b>D-frontier</b> is the set of gates with D or D̄ on an input and an output still unknown; the <b>J-frontier</b> is the set of gates whose output value is set but whose inputs are not yet justified."
     },
     {
      "type": "steps",
      "items": [
-      "Fault activation: assign the faulty line the value that creates D or D-bar.",
-      "D-propagation: push D or D-bar toward an output through gates whose side inputs allow it.",
-      "Line justification: set the side inputs and primary inputs needed for each chosen gate.",
-      "Conflict and backtracking: if two requirements contradict, undo the last choice and try another."
+      "<b>Activate</b> the fault: give the faulty line the opposite of its stuck value, creating D or D̄.",
+      "<b>Propagate</b>: pick a gate from the D-frontier and set its other inputs to non-controlling values (1 for AND/NAND, 0 for OR/NOR) so the difference passes through. Repeat until D or D̄ reaches a primary output.",
+      "<b>Justify</b>: work back from every value set so far to primary inputs, emptying the J-frontier.",
+      "<b>Backtrack</b> on a conflict: undo the last choice and try another. If every choice fails, the fault is redundant."
      ]
     },
     {
      "type": "p",
-     "text": "The D-frontier is the set of gates with a D or D-bar on an input but no D or D-bar on the output. The J-frontier is the set of gates whose output is known but whose inputs are not yet justified. PODEM works on primary inputs and needs fewer backtracks. FAN uses fanout-free regions and multiple backtracks per pass."
+     "text": "<b>PODEM</b> assigns values only at primary inputs, chosen by tracing back from the current objective, so its search space is the 2ⁿ input combinations rather than all internal lines and it usually backtracks less. <b>FAN</b> adds smarter backtracing through fanout-free regions and several objectives at once."
     }
    ]
   },
   {
-   "h3": "Redundant faults, compaction and vector ordering",
+   "h3": "Redundant faults, compaction and the ATPG loop",
    "blocks": [
     {
      "type": "p",
-     "text": "A redundant fault has no test: no input vector makes its effect reach an output. A stuck-at line that is logically redundant is the common case. An untestable fault has no test for another reason, such as an input tied off or a blocked path. Coverage is measured against the testable fault list, because counting redundant faults can make a 100 % target impossible."
+     "text": "A fault with no test is <b>undetectable</b>. In combinational logic an undetectable stuck-at fault is called <b>redundant</b>, because the line could be tied to that constant without changing the function. It comes from redundant logic, such as a consensus term added to remove a hazard, or from reconvergent fanout whose two paths cancel the difference. ATPG proves redundancy by exhausting the search; the designer may then remove the redundant logic, which also removes the fault."
     },
     {
      "type": "p",
-     "text": "Test compaction removes vectors that detect no new fault. Run fault simulation after each removal to confirm no fault is lost. Vector ordering puts high-coverage vectors first, or sorts by current demand when the tester and power grid need it. Compaction cuts test time and tester memory; ordering cuts test execution time and supply noise, not coverage."
+     "text": "<b>Test compaction</b> removes vectors that detect nothing new and merges vectors whose specified bits do not clash. <b>Vector ordering</b> puts high-yield vectors first so a bad chip fails, and leaves the tester, early. Neither changes the coverage of the final set."
     },
     {
      "type": "p",
-     "text": "The ATPG loop in the figure is therefore iterative: simulate, check coverage, generate for the undetected list, add vectors, simulate again. Stop at the target or when only redundant and untestable faults remain."
+     "text": "The loop in the figure is iterative: simulate, check coverage, run ATPG on the undetected faults, add the new vectors, simulate again. It stops at the coverage target or when only redundant and aborted faults remain."
     }
    ]
   }
  ],
  "figure": {
-  "after_section": 1,
-  "caption": "The loop measures coverage with fault simulation, then adds vectors for faults still undetected until the coverage target is met.",
+  "after_section": 2,
+  "caption": "The D-algorithm test for A stuck-at-0. Each line shows its good and faulty value; the difference passes through G1 and reaches Z while C = 0 keeps G2 steady.",
   "spec": {
-   "type": "blocks",
-   "direction": "down",
-   "title": "The ATPG loop",
-   "nodes": [
-    {
-     "id": "a",
-     "label": "Netlist + fault list",
-     "style": "normal"
-    },
-    {
-     "id": "b",
-     "label": "Fault simulation",
-     "note": "coverage of current vectors",
-     "style": "accent"
-    },
-    {
-     "id": "c",
-     "label": "Coverage target met?",
-     "style": "live"
-    },
-    {
-     "id": "d",
-     "label": "ATPG for undetected faults",
-     "style": "next"
-    },
-    {
-     "id": "e",
-     "label": "Test set ready",
-     "style": "normal"
-    }
-   ],
-   "edges": [
-    {
-     "from": "a",
-     "to": "b",
-     "style": "solid"
-    },
-    {
-     "from": "b",
-     "to": "c",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "d",
-     "label": "no",
-     "style": "solid"
-    },
-    {
-     "from": "d",
-     "to": "b",
-     "label": "add vectors",
-     "style": "dashed"
-    },
-    {
-     "from": "c",
-     "to": "e",
-     "label": "yes",
-     "style": "solid"
-    }
-   ],
-   "aria": "Loop in which fault simulation measures coverage, and ATPG adds vectors for the still-undetected faults until the coverage target is reached."
+   "type": "svg",
+   "h": 340,
+   "body": "<path d=\"M300.0,60.0 H333.0 A30.0,30.0 0 0 1 333.0,120.0 H300.0 Z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><circle cx=\"369.0\" cy=\"90.0\" r=\"6\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"324.8\" y=\"95.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">G1</text><path d=\"M300.0,200.0 H333.0 A30.0,30.0 0 0 1 333.0,260.0 H300.0 Z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><circle cx=\"369.0\" cy=\"230.0\" r=\"6\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"324.8\" y=\"235.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">G2</text><path d=\"M500.0,130.0 H533.0 A30.0,30.0 0 0 1 533.0,190.0 H500.0 Z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><circle cx=\"569.0\" cy=\"160.0\" r=\"6\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"524.8\" y=\"165.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">G3</text><line x1=\"40.0\" y1=\"160.0\" x2=\"200.0\" y2=\"160.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><line x1=\"200.0\" y1=\"75.0\" x2=\"200.0\" y2=\"215.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><line x1=\"200.0\" y1=\"75.0\" x2=\"300.0\" y2=\"75.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><line x1=\"200.0\" y1=\"215.0\" x2=\"300.0\" y2=\"215.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><circle cx=\"200.0\" cy=\"160.0\" r=\"5\" style=\"fill:var(--next);stroke:var(--fig);stroke-width:2\"/><line x1=\"40.0\" y1=\"105.0\" x2=\"300.0\" y2=\"105.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"40.0\" y1=\"245.0\" x2=\"300.0\" y2=\"245.0\" style=\"stroke:var(--ink);stroke-width:2\"/><text x=\"20.0\" y=\"165.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">A</text><text x=\"20.0\" y=\"110.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">B</text><text x=\"20.0\" y=\"250.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">C</text><rect x=\"11.3\" y=\"137.7\" width=\"177.4\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"100.0\" y=\"150.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">A = 1 good, 0 faulty: D</text><text x=\"66.0\" y=\"98.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">1</text><text x=\"66.0\" y=\"238.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">0</text><rect x=\"150.0\" y=\"166.0\" width=\"40.0\" height=\"22.0\" rx=\"4\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"170.0\" y=\"182.0\" font-size=\"12\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">SA0</text><line x1=\"375.0\" y1=\"90.0\" x2=\"440.0\" y2=\"90.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><line x1=\"440.0\" y1=\"90.0\" x2=\"440.0\" y2=\"145.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><line x1=\"440.0\" y1=\"145.0\" x2=\"500.0\" y2=\"145.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><line x1=\"375.0\" y1=\"230.0\" x2=\"440.0\" y2=\"230.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"440.0\" y1=\"230.0\" x2=\"440.0\" y2=\"175.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"440.0\" y1=\"175.0\" x2=\"500.0\" y2=\"175.0\" style=\"stroke:var(--ink);stroke-width:2\"/><rect x=\"375.0\" y=\"63.6\" width=\"111.9\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"380.0\" y=\"76.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--next)\" font-weight=\"700\">G1 = 0 / 1: D̄</text><rect x=\"375.0\" y=\"239.7\" width=\"111.9\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"380.0\" y=\"252.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--ink)\">G2 = 1 in both</text><line x1=\"575.0\" y1=\"160.0\" x2=\"690.0\" y2=\"160.0\" style=\"stroke:var(--next);stroke-width:2.5\"/><rect x=\"588.0\" y=\"136.7\" width=\"104.1\" height=\"18.9\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"640.0\" y=\"150.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">Z = 1 / 0: D</text><text x=\"360.0\" y=\"300.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Values are good / faulty. The difference (D, D̄) travels A → G1 → Z; C = 0 holds G2 at 1.</text><text x=\"360.0\" y=\"324.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Test vector ABC = 110</text>",
+   "aria": "Three NAND gates computing Z equals A times B plus C, with A marked stuck at 0, B equal 1, C equal 0, G1 carrying D bar, G2 equal 1 and Z carrying D."
   }
  },
  "examples": [
   {
-   "question": "Question (6 marks): The circuit is Z = A·(B + C), built as G1 = NAND(A,B), G2 = NAND(A,C), Z = NAND(G1,G2). Use the D-algorithm to find a test for the fault A stuck-at-0. Show activation, propagation, the D-frontier and the final vector. State the good and faulty values of Z.",
+   "question": "The circuit is Z = A·(B + C), built as G1 = NAND(A, B), G2 = NAND(A, C), Z = NAND(G1, G2); input A fans out to both G1 and G2. Use the D-algorithm to find a test for A stuck-at-0. Show activation, the D-frontier at each step, propagation and the final vector, and give the good and faulty values of Z.",
    "steps": [
-    "Activation: for A stuck-at-0, set A = 1 in the good machine; the faulty line is fixed at 0. This puts D on A (good 1, faulty 0).",
-    "Propagate through G1 = NAND(A,B). Set B = 1 as a side input. Then G1 = NOT(A) for this input: good A=1 gives G1=0, faulty A=0 gives G1=1. So G1 carries D-bar (good 0, faulty 1).",
-    "G2 = NAND(A,C). Choose C = 0. Then G2 = 1 in both machines, because NAND(x,0)=1. G2 does not block the D-bar; it is a constant 1 side input to the last gate.",
-    "D-frontier: G1 now drives the Z gate with D-bar, while G2 is 1. Z = NAND(D-bar,1). In the good machine Z = NAND(0,1)=1; in the faulty machine Z = NAND(1,1)=0. So Z carries D.",
-    "Vector: (A,B,C) = (1,1,0). No line justification conflict occurred, so no backtracking was needed. The output difference Z = 1 good, Z = 0 faulty detects A stuck-at-0."
+    "Activate: A/0 needs A = 1 in the good circuit; the faulty circuit has A = 0. A carries D, and so do both fanout branches.",
+    "D-frontier = {G1, G2}: both gates have D on an input and an unknown output.",
+    "Propagate through G1: set B = 1 (non-controlling for NAND). Good G1 = NAND(1, 1) = 0, faulty G1 = NAND(0, 1) = 1, so G1 = D̄.",
+    "Set C = 0. Then G2 = 1 in both circuits, because a 0 input forces a NAND to 1. G2 leaves the D-frontier and becomes a steady 1 into the last gate.",
+    "D-frontier = {Z gate}. Z = NAND(D̄, 1): good NAND(0, 1) = 1, faulty NAND(1, 1) = 0, so Z = D and the difference has reached the output.",
+    "Justify: B = 1 and C = 0 are primary inputs, so the J-frontier is empty and no backtrack is needed. Vector ABC = 110."
    ],
-   "answer": "The test is (A,B,C) = (1,1,0); it gives Z = 1 in the good machine and Z = 0 in the faulty machine, so the fault is detected.",
-   "check": "def nand(a, b):\n    return 0 if (a == 1 and b == 1) else 1\n\nA = 1\nB = 1\nC = 0\nG1g = nand(A, B)\nG2g = nand(A, C)\nZg = nand(G1g, G2g)\nAf = 0\nG1f = nand(Af, B)\nG2f = nand(Af, C)\nZf = nand(G1f, G2f)\nprint(A)\nprint(B)\nprint(C)\nprint(Zg)\nprint(Zf)\n",
-   "values": [
-    1,
-    1,
-    0,
-    1,
-    0
+   "answer": "ABC = 110 detects A stuck-at-0: Z = 1 in the good circuit and Z = 0 in the faulty circuit."
+  },
+  {
+   "question": "For the same circuit, the collapsed fault list holds the eight checkpoint faults: A1/0, A1/1 (the branch of A into G1), A2/0, A2/1 (the branch into G2), B/0, B/1, C/0, C/1. Fault-simulate the vectors 110, 101, 011, 111, 100 in that order with fault dropping. Give the coverage after each vector and the compacted test set.",
+   "steps": [
+    "For each vector find the good Z, then which remaining faults change Z.",
+    "Vector 111 is applied after 011; it would detect only faults already dropped, so it adds nothing."
    ],
-   "output": ""
+   "answer": "Coverage climbs 25 %, 50 %, 75 %, 75 %, 100 %. Vector 111 detects nothing new and is removed, so the compacted set is {110, 101, 011, 100}: four vectors for 100 % of the eight faults.",
+   "dry_run": {
+    "head": [
+     "Vector ABC",
+     "Good Z",
+     "New faults detected",
+     "Detected so far",
+     "FC"
+    ],
+    "rows": [
+     [
+      "110",
+      "1",
+      "A1/0, B/0",
+      "2",
+      "25 %"
+     ],
+     [
+      "101",
+      "1",
+      "A2/0, C/0",
+      "4",
+      "50 %"
+     ],
+     [
+      "011",
+      "0",
+      "A1/1, A2/1",
+      "6",
+      "75 %"
+     ],
+     [
+      "111",
+      "1",
+      "none",
+      "6",
+      "75 %"
+     ],
+     [
+      "100",
+      "0",
+      "B/1, C/1",
+      "8",
+      "100 %"
+     ]
+    ]
+   }
   }
  ],
  "traps": [
-  "Reading D as 'the fault is present at this line' without the convention D = good 1, faulty 0; D-bar is good 0, faulty 1.",
-  "Forgetting that a redundant fault has no test, so 100 % coverage of all faults may be impossible; report coverage against the testable list.",
-  "Confusing the D-frontier, which propagates a difference, with the J-frontier, which justifies known values.",
-  "Calling a vector a test because it activates a fault, without checking that an output differs between good and faulty machines.",
-  "Counting all vectors applied as coverage, instead of detected testable faults divided by total testable faults."
+  "Reading D as 'fault present here'. D means good 1 and faulty 0; D̄ means good 0 and faulty 1.",
+  "Calling a vector a test because it activates the fault. It is a test only if a primary output differs.",
+  "Using the wrong denominator. Fault coverage divides by all faults in the list; fault efficiency leaves out the faults proved redundant.",
+  "Confusing the D-frontier (where the difference can move forward) with the J-frontier (values still to be justified backwards).",
+  "Thinking compaction or ordering raises coverage. They cut test time and tester memory; coverage stays the same."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Define D and D-bar in D-algorithm notation.",
+   "q": "Define D and D̄ in D-algorithm notation.",
    "marks": 2,
-   "a": "D = 1 in the good machine and 0 in the faulty machine. D-bar = 0 in good and 1 in faulty."
+   "a": "D is 1 in the good circuit and 0 in the faulty circuit. D̄ is 0 in the good circuit and 1 in the faulty circuit."
   },
   {
    "level": "remember",
-   "q": "Write the fault coverage formula.",
+   "q": "Write the formula for fault coverage and for fault efficiency.",
    "marks": 2,
-   "a": "C = (N_detected ÷ N_testable) × 100%, where N_detected is detected testable faults and N_testable is total testable faults."
+   "a": "FC = detected ÷ total faults × 100 %. Fault efficiency = detected ÷ (total faults − proven redundant faults) × 100 %."
   },
   {
    "level": "understand",
-   "q": "Why is the good circuit simulated only once in fault simulation?",
+   "q": "How many faulty circuits does one 64-bit word carry in parallel fault simulation, and why?",
    "marks": 3,
-   "a": "Its line values are shared by all faulty copies; only faulty values differ, so one good simulation saves work when the fault list is large."
+   "a": "63. One bit is kept for the good circuit, so its values can be compared with the 63 faulty circuits in the other bits."
   },
   {
    "level": "understand",
-   "q": "Why report coverage after each vector?",
+   "q": "What is the job of the D-frontier and of the J-frontier during ATPG?",
    "marks": 3,
-   "a": "It shows which vectors add new detections; vectors with no new fault can be removed in compaction, and the loop can stop at the target."
+   "a": "The D-frontier lists gates where the fault difference can be pushed one step towards an output. The J-frontier lists gates whose output has been fixed but whose inputs still have to be set from the primary inputs."
   },
   {
    "level": "apply",
-   "q": "In the worked example, after setting A=1 and B=1, what are G1 in the good and faulty machines? What symbol is on G1?",
+   "q": "In the first worked example, find the test for B stuck-at-1 instead.",
    "marks": 4,
-   "a": "Good: G1 = NAND(1,1) = 0. Faulty: G1 = NAND(0,1) = 1. So G1 carries D-bar."
+   "a": "Activate: B = 0 (good 0, faulty 1, so B = D̄). Propagate through G1: A = 1, giving G1 = D. Block G2 from changing: with A = 1, G2 = NOT C, so set C = 0 to make G2 = 1. Then Z = NAND(D, 1) = D̄: good Z = 0, faulty Z = 1. Vector ABC = 100, matching the fault-simulation table."
   },
   {
    "level": "apply",
-   "q": "A collapsed testable fault list has 4,000 faults. Current vectors detect 3,600. Compute coverage.",
-   "marks": 4,
-   "a": "C = 3600 ÷ 4000 × 100% = 90%."
+   "q": "A collapsed fault list has 4,000 faults. The vectors detect 3,600, and ATPG proves 160 of the rest redundant. Find FC and fault efficiency.",
+   "marks": 3,
+   "a": "FC = 3,600 ÷ 4,000 = 90.0 %. Fault efficiency = 3,600 ÷ (4,000 − 160) = 3,600 ÷ 3,840 = 93.75 %."
   },
   {
    "level": "analyze",
-   "q": "A vector detects no new fault. Should it be kept? Explain in terms of compaction and fault simulation.",
+   "q": "A vector detects no new fault in fault simulation with fault dropping. Should it be kept? Explain.",
    "marks": 4,
-   "a": "No, remove it; rerun fault simulation to confirm every fault it might have covered is covered by another vector. This is test compaction."
+   "a": "No. Every fault it detects was already detected by an earlier vector, so removing it loses no coverage and saves tester time. This is static compaction."
   },
   {
    "level": "analyze",
-   "q": "Why can 100% coverage of all faults be impossible even for a correct design?",
+   "q": "Why can 100 % fault coverage be impossible even for a correctly working design?",
    "marks": 5,
-   "a": "Some faults are redundant or untestable and have no vector that makes an output differ; coverage is defined against the testable fault list, so an all-fault target may be below 100%."
+   "a": "Some faults are redundant: no vector makes any output differ, because the logic is redundant or reconvergent paths cancel the difference. They stay in the fault list, so fault coverage stays below 100 % even when every testable fault is detected; fault efficiency can still reach 100 %."
   }
  ],
- "beyond": "Not for the exam. Commercial ATPG tools combine structural algorithms with SAT solvers and use fault simulation engines accelerated on GPUs. Cell-aware and layout-aware fault models add defects that classical stuck-at ATPG misses. Researchers study X-tolerant compaction and low-power ATPG, where vector ordering limits switching during scan shift. Search for 'cell-aware ATPG', 'X-filling', and 'SAT-based ATPG' to go further."
+ "beyond": "Not for the exam. Commercial ATPG combines structural search with SAT solvers and runs fault simulation on many cores or GPUs. Cell-aware and layout-aware fault models add defects that classical stuck-at ATPG misses, and low-power ATPG fills don't-care bits to limit switching. Search 'SAT-based ATPG', 'X-filling' and 'cell-aware test'."
 }

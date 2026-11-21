@@ -1,34 +1,69 @@
 {
- "lead": "Boundary scan puts a small test cell at every chip pin and a serial controller on the chip. A board full of chips can then be tested through four wires: TCK, TMS, TDI and TDO. The standard is IEEE 1149.1, usually called JTAG. It checks the wiring between chips, not the logic inside them. Board makers use it to find open and short printed-circuit-board (PCB) traces, and to program flash and FPGAs after soldering. The same port also gives a standard way to reach internal test structures.",
- "prereq": "You need: scan cells and shift-register behaviour from <a href=\"#design-for-testability-and-scan-design\">6.4</a>, and board and packaging ideas from <a href=\"#need-for-testing-and-manufacturing-test-principles\">6.1</a>.",
+ "lead": "Boundary scan puts a small test cell at every digital signal pin of a chip and a serial controller inside it, so a whole board of chips can be tested through four wires: TCK, TMS, TDI and TDO. The standard is IEEE 1149.1, usually called JTAG. It checks the wiring between chips after soldering, not the logic inside them, and the same port is used to program flash and FPGAs on the board and to reach a chip's internal test hardware.",
+ "prereq": "You need: shift registers and scan cells from <a href=\"#design-for-testability-and-scan-design\">6.4</a>, and the board-test step from <a href=\"#need-for-testing-and-manufacturing-test-principles\">6.1</a>.",
  "sections": [
   {
-   "h3": "The four mandatory pins",
+   "h3": "The test access port and the boundary cells",
    "blocks": [
     {
      "type": "p",
-     "text": "JTAG adds a Test Access Port (TAP) to the chip. Four pins are mandatory. TCK is the test clock. TMS is Test Mode Select; the TAP controller samples it on the rising edge of TCK. TDI is Test Data In. TDO is Test Data Out. TRST, an optional asynchronous reset, is not required. A boundary-scan cell sits at every digital I/O pin, between the chip's internal logic and the pad. In normal operation the cell is transparent: signal passes in and out. In test mode the cell can drive the pad from a stored bit, or capture the pad value into a flip-flop. All cells join into one long shift register, the boundary scan register (BSR), with one cell per pin."
+     "text": "JTAG adds a <b>test access port</b> (TAP) to the chip. Four pins are required: <b>TCK</b>, the test clock; <b>TMS</b>, test mode select, which steers the TAP controller; <b>TDI</b>, serial test data in; and <b>TDO</b>, serial test data out. TMS and TDI are sampled on the rising edge of TCK, and TDO changes on the falling edge, so the next device in a chain samples a steady bit. A fifth pin, <b>TRST</b>, an asynchronous reset, is optional."
     },
     {
      "type": "p",
-     "text": "Why at the pin? A chip's internal logic can be tested by scan (<a href=\"#design-for-testability-and-scan-design\">6.4</a>) or BIST (<a href=\"#built-in-self-test-bist\">6.6</a>). The PCB trace from one chip pin to another has no access point after soldering. A bed of nails probe board is expensive and cannot reach fine-pitch ball-grid arrays. Boundary scan moves the probe to the pin itself. The tester shifts a pattern into the output cells, the chip drives the board traces, and the input cells capture what arrives. A mismatch shows a trace open, a short to a neighbour, or a wrong connection."
+     "text": "A <b>boundary-scan cell</b> sits between the core logic and each digital signal pad (power, ground and analog pins have none). In normal mode the cell is transparent. In test mode an output cell can drive its pad from a stored bit, and an input cell can capture the value arriving at its pad. All the cells join into one shift register, the <b>boundary-scan register</b> (BSR)."
+    },
+    {
+     "type": "p",
+     "text": "Why at the pin? Inside the chip, scan and BIST do the testing. The copper trace between two chips on a board has no access point once fine-pitch and ball-grid-array parts are soldered, and a bed-of-nails fixture cannot reach it. Boundary scan moves the probe to the pin: the tester shifts a pattern into the output cells, the chips drive the traces, and the input cells capture what arrives. A wrong bit shows an open trace, a short to a neighbour or a missing part."
     }
    ]
   },
   {
-   "h3": "TAP controller and registers",
+   "h3": "TAP controller, registers and instructions",
    "blocks": [
     {
      "type": "p",
-     "text": "The TAP controller is a 16-state finite state machine. It moves on each rising edge of TCK according to TMS. The important states are Test-Logic-Reset, Run-Test/Idle, Select-DR (data register), Capture-DR, Shift-DR, Update-DR, and the same four for the instruction register: Select-IR, Capture-IR, Shift-IR, Update-IR. Holding TMS high for five TCK cycles reaches Test-Logic-Reset from any state. That is the safety reset."
+     "text": "The <b>TAP controller</b> is a 16-state machine that moves on each rising edge of TCK according to TMS. Besides Test-Logic-Reset and Run-Test/Idle it has two matching columns of seven states, one for a data register (DR) and one for the instruction register (IR): Select, Capture, Shift, Exit1, Pause, Exit2 and Update. Capture loads the register in parallel, Shift moves it one bit per TCK from TDI to TDO, and Update copies the shifted bits to the outputs. Holding TMS = 1 for five TCK edges reaches Test-Logic-Reset from any state."
     },
     {
      "type": "p",
-     "text": "Inside are four registers. The instruction register (IR) holds the current instruction; its length is device-specific. The bypass register is one bit and shortens the chain when a device is not being tested. The IDCODE register returns a device identification number. The boundary scan register has one cell per I/O pin. The TAP controller connects the chosen data register between TDI and TDO during Shift-DR."
+     "text": "Every compliant chip has the <b>instruction register</b> (IR, at least 2 bits), the 1-bit <b>bypass register</b> and the <b>BSR</b>; most also have a 32-bit <b>IDCODE</b> register that returns the maker and part number. The instruction in the IR decides which data register sits between TDI and TDO."
     },
     {
-     "type": "p",
-     "text": "BYPASS, EXTEST and SAMPLE/PRELOAD are mandatory. BYPASS selects the 1-bit bypass register. EXTEST drives and observes the pins through the boundary cells; it is the board-interconnect test. SAMPLE/PRELOAD captures pin values without disturbing normal operation, and preloads the BSR before EXTEST. Most devices also provide IDCODE, which shifts out the device identity. The instruction in the IR decides which data register is connected."
+     "type": "table",
+     "head": [
+      "Instruction",
+      "Register between TDI and TDO",
+      "What it does"
+     ],
+     "rows": [
+      [
+       "BYPASS (required, code all 1s)",
+       "Bypass, 1 bit",
+       "Passes data through a chip that is not being tested"
+      ],
+      [
+       "SAMPLE/PRELOAD (required)",
+       "BSR",
+       "Captures pin values without disturbing normal operation; loads a safe pattern before EXTEST"
+      ],
+      [
+       "EXTEST (required)",
+       "BSR",
+       "Output cells drive the pins and input cells capture them: the board-wiring test"
+      ],
+      [
+       "IDCODE (optional)",
+       "IDCODE, 32 bits",
+       "Shifts out the identity of the chip"
+      ],
+      [
+       "INTEST (optional)",
+       "BSR",
+       "Applies values to the core logic through the boundary cells"
+      ]
+     ]
     }
    ]
   },
@@ -37,168 +72,94 @@
    "blocks": [
     {
      "type": "p",
-     "text": "On a board, devices are wired in a daisy chain. The board's TDI goes to the first device's TDI; its TDO goes to the next device's TDI; the last TDO is the board's TDO. TCK and TMS go to every device in parallel. So the board behaves as one long shift register. All TAP controllers see the same TMS, so they step through states together. The board's total instruction length is the sum of the device IR lengths; the total data length is the sum of the selected register lengths."
+     "text": "On a board the chips form a daisy chain: the board's TDI goes to the first chip's TDI, each TDO feeds the next TDI, and the last TDO is the board's TDO. TCK and TMS go to every chip in parallel, so all TAP controllers step through the same states together and the board behaves as one long shift register."
     },
     {
      "type": "formula",
-     "text": "L<sub>chain</sub> = Σ L<sub>i</sub>",
-     "where": "L<sub>chain</sub> is the total bits shifted in one Shift-DR or Shift-IR pass; L<sub>i</sub> is the length of the selected register in device i; the sum runs over the N devices in the chain."
+     "text": "L = L₁ + L₂ + … + Lₙ",
+     "where": "where L is the number of bits shifted in one pass of Shift-IR or Shift-DR and Lᵢ is the length of the register selected in chip i. The bits for the chip nearest TDO are shifted in first."
     },
     {
      "type": "p",
-     "text": "Board test uses EXTEST. For each net, one device drives a 0 or 1 and another device captures the value. A short to VDD, GND or a neighbour changes the captured bit. An open leaves the input floating or stuck. The tester shifts out all captured bits and compares with the expected netlist. In-system programming reuses the same TAP: the FPGA or flash is put in programming mode and its configuration is shifted through TDI/TDO. One port can control many chips and can also reach internal scan chains (<a href=\"#chip-level-and-system-level-test-techniques\">6.8</a>)."
+     "text": "In an interconnect test the tester loads EXTEST into every chip, preloads drive values, then for each pattern captures the received bits and shifts them out while the next pattern shifts in. A short changes the captured bit of both nets; an open leaves the receiving pin floating, so its bit is unreliable. In-system programming uses the same port: the FPGA or flash is put in programming mode and its configuration is shifted through TDI and TDO."
     }
    ]
   }
  ],
  "figure": {
-  "after_section": 1,
-  "caption": "TDI enters the selected register and leaves through TDO; TCK and TMS move the TAP controller that chooses the register.",
+  "after_section": 2,
+  "caption": "The 16 states of the TAP controller. Arrows carry the value of TMS; the bold boxes are the path the worked example takes to load EXTEST and shift one pattern.",
   "spec": {
-   "type": "blocks",
-   "direction": "right",
-   "title": "Inside a JTAG device",
-   "nodes": [
-    {
-     "id": "tdi",
-     "label": "TDI",
-     "style": "accent"
-    },
-    {
-     "id": "ir",
-     "label": "Instruction register",
-     "style": "normal"
-    },
-    {
-     "id": "by",
-     "label": "Bypass register",
-     "style": "muted"
-    },
-    {
-     "id": "bsr",
-     "label": "Boundary scan cells",
-     "note": "one per pin",
-     "style": "accent"
-    },
-    {
-     "id": "tap",
-     "label": "TAP controller",
-     "note": "TCK and TMS drive it",
-     "style": "live"
-    },
-    {
-     "id": "tdo",
-     "label": "TDO",
-     "style": "accent"
-    }
-   ],
-   "edges": [
-    {
-     "from": "tdi",
-     "to": "ir",
-     "style": "solid"
-    },
-    {
-     "from": "tdi",
-     "to": "by",
-     "style": "dashed"
-    },
-    {
-     "from": "tdi",
-     "to": "bsr",
-     "style": "solid"
-    },
-    {
-     "from": "tap",
-     "to": "ir",
-     "style": "dashed"
-    },
-    {
-     "from": "tap",
-     "to": "bsr",
-     "style": "dashed"
-    },
-    {
-     "from": "ir",
-     "to": "tdo",
-     "style": "solid"
-    },
-    {
-     "from": "by",
-     "to": "tdo",
-     "style": "solid"
-    },
-    {
-     "from": "bsr",
-     "to": "tdo",
-     "style": "solid"
-    }
-   ],
-   "aria": "Data path from TDI through the selected register to TDO, with the TAP controller issuing select and shift signals and the instruction register choosing the data register."
+   "type": "svg",
+   "h": 660,
+   "body": "<rect x=\"50.0\" y=\"29.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"120.0\" y=\"51.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Test-Logic-Reset</text><rect x=\"50.0\" y=\"113.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"120.0\" y=\"135.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Run-Test/Idle</text><rect x=\"275.0\" y=\"113.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"345.0\" y=\"135.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Select-DR</text><rect x=\"275.0\" y=\"185.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"345.0\" y=\"207.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Capture-DR</text><rect x=\"275.0\" y=\"257.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"345.0\" y=\"279.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Shift-DR</text><rect x=\"275.0\" y=\"329.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"345.0\" y=\"351.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Exit1-DR</text><rect x=\"275.0\" y=\"401.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"345.0\" y=\"423.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Pause-DR</text><rect x=\"275.0\" y=\"473.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"345.0\" y=\"495.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Exit2-DR</text><rect x=\"275.0\" y=\"545.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"345.0\" y=\"567.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Update-DR</text><rect x=\"520.0\" y=\"113.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"590.0\" y=\"135.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Select-IR</text><rect x=\"520.0\" y=\"185.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"590.0\" y=\"207.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Capture-IR</text><rect x=\"520.0\" y=\"257.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"590.0\" y=\"279.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Shift-IR</text><rect x=\"520.0\" y=\"329.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"590.0\" y=\"351.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Exit1-IR</text><rect x=\"520.0\" y=\"401.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"590.0\" y=\"423.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Pause-IR</text><rect x=\"520.0\" y=\"473.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"590.0\" y=\"495.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Exit2-IR</text><rect x=\"520.0\" y=\"545.0\" width=\"140.0\" height=\"34.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"590.0\" y=\"567.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">Update-IR</text><polyline points=\"120.0,63.0 120.0,110.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"120.0\" y1=\"63.0\" x2=\"120.0\" y2=\"110.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"127.0\" y=\"80.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"132.0\" y=\"93.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><path d=\"M50.0,38.0 C16.0,18.0 16.0,74.0 47.0,55.0\" style=\"fill:none;stroke:var(--line2);stroke-width:2\" marker-end=\"url(#ar-UID-m)\"/><text x=\"20.0\" y=\"51.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--line2)\">1</text><path d=\"M50.0,122.0 C16.0,102.0 16.0,158.0 47.0,139.0\" style=\"fill:none;stroke:var(--line2);stroke-width:2\" marker-end=\"url(#ar-UID-m)\"/><text x=\"20.0\" y=\"135.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--line2)\">0</text><polyline points=\"345.0,147.0 345.0,182.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"345.0\" y1=\"147.0\" x2=\"345.0\" y2=\"182.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"352.0\" y=\"158.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"357.0\" y=\"171.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><polyline points=\"345.0,219.0 345.0,254.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"345.0\" y1=\"219.0\" x2=\"345.0\" y2=\"254.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"352.0\" y=\"230.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"357.0\" y=\"243.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><polyline points=\"345.0,291.0 345.0,326.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"345.0\" y1=\"291.0\" x2=\"345.0\" y2=\"326.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"352.0\" y=\"302.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"357.0\" y=\"315.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><polyline points=\"345.0,363.0 345.0,398.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"345.0\" y1=\"363.0\" x2=\"345.0\" y2=\"398.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"352.0\" y=\"374.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"357.0\" y=\"387.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">0</text><polyline points=\"345.0,435.0 345.0,470.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"345.0\" y1=\"435.0\" x2=\"345.0\" y2=\"470.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"352.0\" y=\"446.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"357.0\" y=\"459.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">1</text><polyline points=\"345.0,507.0 345.0,542.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"345.0\" y1=\"507.0\" x2=\"345.0\" y2=\"542.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"352.0\" y=\"518.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"357.0\" y=\"531.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">1</text><path d=\"M275.0,266.0 C241.0,246.0 241.0,302.0 272.0,283.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><text x=\"245.0\" y=\"279.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><path d=\"M275.0,410.0 C241.0,390.0 241.0,446.0 272.0,427.0\" style=\"fill:none;stroke:var(--line2);stroke-width:2\" marker-end=\"url(#ar-UID-m)\"/><text x=\"245.0\" y=\"423.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--line2)\">0</text><polyline points=\"415.0,202.0 427.0,202.0 427.0,338.0 418.0,338.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"427.0\" y1=\"338.0\" x2=\"418.0\" y2=\"338.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"426.0\" y=\"241.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"431.0\" y=\"254.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">1</text><polyline points=\"415.0,354.0 441.0,354.0 441.0,556.0 418.0,556.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"441.0\" y1=\"556.0\" x2=\"418.0\" y2=\"556.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"440.0\" y=\"471.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"445.0\" y=\"484.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><polyline points=\"275.0,490.0 229.0,490.0 229.0,284.0 272.0,284.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"229.0\" y1=\"284.0\" x2=\"272.0\" y2=\"284.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"242.4\" y=\"469.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"251.0\" y=\"482.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--line2)\">0</text><polyline points=\"590.0,147.0 590.0,182.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"590.0\" y1=\"147.0\" x2=\"590.0\" y2=\"182.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"597.0\" y=\"158.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"602.0\" y=\"171.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><polyline points=\"590.0,219.0 590.0,254.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"590.0\" y1=\"219.0\" x2=\"590.0\" y2=\"254.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"597.0\" y=\"230.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"602.0\" y=\"243.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><polyline points=\"590.0,291.0 590.0,326.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"590.0\" y1=\"291.0\" x2=\"590.0\" y2=\"326.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"597.0\" y=\"302.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"602.0\" y=\"315.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><polyline points=\"590.0,363.0 590.0,398.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"590.0\" y1=\"363.0\" x2=\"590.0\" y2=\"398.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"597.0\" y=\"374.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"602.0\" y=\"387.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">0</text><polyline points=\"590.0,435.0 590.0,470.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"590.0\" y1=\"435.0\" x2=\"590.0\" y2=\"470.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"597.0\" y=\"446.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"602.0\" y=\"459.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">1</text><polyline points=\"590.0,507.0 590.0,542.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"590.0\" y1=\"507.0\" x2=\"590.0\" y2=\"542.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"597.0\" y=\"518.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"602.0\" y=\"531.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">1</text><path d=\"M520.0,266.0 C486.0,246.0 486.0,302.0 517.0,283.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><text x=\"490.0\" y=\"279.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><path d=\"M520.0,410.0 C486.0,390.0 486.0,446.0 517.0,427.0\" style=\"fill:none;stroke:var(--line2);stroke-width:2\" marker-end=\"url(#ar-UID-m)\"/><text x=\"490.0\" y=\"423.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--line2)\">0</text><polyline points=\"660.0,202.0 672.0,202.0 672.0,338.0 663.0,338.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"672.0\" y1=\"338.0\" x2=\"663.0\" y2=\"338.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"671.0\" y=\"241.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"676.0\" y=\"254.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">1</text><polyline points=\"660.0,354.0 686.0,354.0 686.0,556.0 663.0,556.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"686.0\" y1=\"556.0\" x2=\"663.0\" y2=\"556.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"685.0\" y=\"471.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"690.0\" y=\"484.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><polyline points=\"520.0,490.0 474.0,490.0 474.0,284.0 517.0,284.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"474.0\" y1=\"284.0\" x2=\"517.0\" y2=\"284.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"487.4\" y=\"469.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"496.0\" y=\"482.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--line2)\">0</text><polyline points=\"415.0,570.0 462.0,570.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><rect x=\"424.0\" y=\"575.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"429.0\" y=\"588.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--line2)\">1</text><polyline points=\"520.0,570.0 462.0,570.0 462.0,156.0 385.0,156.0 385.0,150.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"385.0\" y1=\"156.0\" x2=\"385.0\" y2=\"150.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"493.7\" y=\"575.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"506.0\" y=\"588.0\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><polyline points=\"275.0,562.0 120.0,562.0 120.0,150.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"120.0\" y1=\"562.0\" x2=\"120.0\" y2=\"150.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"206.4\" y=\"543.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"215.0\" y=\"556.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">0</text><polyline points=\"590.0,579.0 590.0,606.0 120.0,606.0 120.0,562.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><rect x=\"551.4\" y=\"589.6\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"560.0\" y=\"602.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--line2)\">0</text><polyline points=\"190.0,130.0 272.0,130.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"190.0\" y1=\"130.0\" x2=\"272.0\" y2=\"130.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"227.9\" y=\"111.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"236.5\" y=\"124.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><polyline points=\"415.0,130.0 517.0,130.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round\"/><line x1=\"415.0\" y1=\"130.0\" x2=\"517.0\" y2=\"130.0\" style=\"stroke:var(--accent);stroke-width:2.2\" marker-end=\"url(#ar-UID-n)\"/><rect x=\"468.9\" y=\"111.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"477.5\" y=\"124.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--accent)\" font-weight=\"700\">1</text><polyline points=\"660.0,130.0 704.0,130.0 704.0,18.0 120.0,18.0 120.0,26.0\" style=\"fill:none;stroke:var(--line2);stroke-width:1.8;stroke-linejoin:round\"/><line x1=\"120.0\" y1=\"18.0\" x2=\"120.0\" y2=\"26.0\" style=\"stroke:var(--line2);stroke-width:1.8\" marker-end=\"url(#ar-UID-m)\"/><rect x=\"551.4\" y=\"9.7\" width=\"17.3\" height=\"17.6\" rx=\"4\" style=\"fill:var(--fig)\"/><text x=\"560.0\" y=\"22.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--line2)\">1</text><text x=\"360.0\" y=\"644.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Arrows carry the TMS value. Bold: load EXTEST (13 IR bits), then shift one 70-bit pattern, 94 TCK cycles.</text>",
+   "aria": "State diagram of the JTAG TAP controller with Test-Logic-Reset, Run-Test/Idle, and the seven DR and seven IR states, with TMS values on each arrow and the worked-example path highlighted."
   }
  },
  "examples": [
   {
-   "question": "A board carries three JTAG devices in a daisy chain. Their instruction registers are 4, 4 and 5 bits long; their boundary scan registers are 20, 20 and 30 cells; each bypass register is 1 bit. (a) How many TCK cycles are needed in Shift-IR to shift an EXTEST instruction into all three? (b) How many TCK cycles are needed in Shift-DR to pass one data bit through the board in BYPASS mode? (c) How many TCK cycles are needed in Shift-DR to shift a complete boundary-scan pattern through all three boundary scan registers?",
+   "question": "A board carries three JTAG chips in a daisy chain. Their instruction registers are 4, 4 and 5 bits; their boundary-scan registers are 20, 20 and 30 cells. Starting in Test-Logic-Reset, the tester loads EXTEST into all three chips and then shifts one complete boundary-scan pattern. (a) How many bits pass in Shift-IR and in Shift-DR? (b) Write the TMS sequence. (c) How many TCK cycles does the whole job take?",
    "steps": [
-    "Instruction shift length = 4 + 4 + 5 = 13 bits. Shift-IR shifts one bit per TCK, so (a) is 13 cycles. Entry and update add control cycles but shift no instruction bits.",
-    "Bypass chain length = 1 + 1 + 1 = 3 bits. (b) is 3 cycles.",
-    "Boundary scan chain length = 20 + 20 + 30 = 70 cells. (c) is 70 cycles."
+    "(a) Shift-IR: 4 + 4 + 5 = 13 bits. Shift-DR with EXTEST selects the BSRs: 20 + 20 + 30 = 70 bits. (With BYPASS in all three it would be 1 + 1 + 1 = 3 bits.)",
+    "(b) To reach Shift-IR: TMS = 0 (Run-Test/Idle), 1 (Select-DR), 1 (Select-IR), 0 (Capture-IR), 0 (Shift-IR): 5 edges.",
+    "Shift 13 instruction bits: TMS = 0 for 12 edges and 1 on the 13th, which shifts the last bit and moves to Exit1-IR. Then TMS = 1 (Update-IR): EXTEST becomes active.",
+    "From Update-IR: TMS = 1 (Select-DR), 0 (Capture-DR, the input cells capture the pins), 0 (Shift-DR): 3 edges.",
+    "Shift 70 data bits: TMS = 0 for 69 edges and 1 on the 70th (to Exit1-DR). Then TMS = 1 (Update-DR, the output cells drive the new pattern) and 0 (Run-Test/Idle).",
+    "(c) Count: 5 + 13 + 1 + 3 + 70 + 2 = 94 TCK cycles."
    ],
-   "answer": "The chain needs 13 TCK cycles for the instruction shift, 3 cycles for one bypass bit, and 70 cycles for a full boundary-scan pattern.",
-   "check": "ir = [4, 4, 5]\nbsr = [20, 20, 30]\nbypass = [1, 1, 1]\nprint(sum(ir))\nprint(sum(bypass))\nprint(sum(bsr))",
-   "values": [
-    13,
-    3,
-    70
-   ],
-   "output": ""
+   "answer": "13 instruction bits and 70 data bits; TMS = 0 1 1 0 0, then twelve 0s and a 1, then 1 1 0 0, then sixty-nine 0s and a 1, then 1 0; 94 TCK cycles in all, or 9.4 µs at a 10 MHz TCK."
   }
  ],
  "traps": [
-  "Boundary scan tests board wiring and pin behaviour; it does not test the chip's internal logic. Internal logic needs scan or BIST.",
-  "The whole daisy chain is one shift register: instruction lengths add and data-register lengths add. Do not use one device's IR length for the board.",
-  "BYPASS shortens the chain; EXTEST drives and captures pins. They are different instructions.",
-  "SAMPLE/PRELOAD does not drive the board. It captures pin values and preloads boundary cells before a later EXTEST.",
-  "TCK and TMS are not data pins: TDI/TDO carry data, TMS controls state, TCK clocks both."
+  "Thinking boundary scan tests the logic inside the chip. It tests pins and board wiring; the core needs scan or BIST.",
+  "Using one chip's IR length for the board. In a daisy chain the instruction lengths add, and so do the selected data-register lengths.",
+  "Forgetting that the last shift happens on the edge that leaves Shift-DR: n bits need n edges in the Shift state, the last with TMS = 1.",
+  "Saying SAMPLE/PRELOAD drives the board. It only captures pin values and preloads the cells; EXTEST drives.",
+  "Treating TMS as a data pin. TDI and TDO carry data, TMS steers the state machine, TCK clocks both."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Name the four mandatory JTAG pins and say what each does.",
+   "q": "Name the four required JTAG pins and the optional fifth one.",
    "marks": 2,
-   "a": "TCK is the test clock; TMS selects the TAP state; TDI is serial test data in; TDO is serial test data out."
+   "a": "TCK test clock, TMS test mode select, TDI test data in, TDO test data out; TRST, the asynchronous test reset, is optional."
   },
   {
-   "level": "understand",
-   "q": "Why put a boundary-scan cell at every I/O pin instead of probing the board with a bed of nails?",
-   "marks": 3,
-   "a": "Fine-pitch and BGA boards have no accessible probe points. A cell at the pin can drive and capture the trace after soldering, so the board is tested through four wires."
-  },
-  {
-   "level": "apply",
-   "q": "Three devices have IR lengths 3, 5 and 4 bits. What is the board instruction shift length in Shift-IR?",
+   "level": "remember",
+   "q": "Which three instructions must every IEEE 1149.1 chip have?",
    "marks": 2,
-   "a": "3 + 5 + 4 = 12 bits, so 12 TCK cycles."
-  },
-  {
-   "level": "analyze",
-   "q": "A board test captures a 0 where the netlist expects 1 on a trace between two chips. Give two possible physical faults and name the JTAG instruction in use.",
-   "marks": 4,
-   "a": "An open trace or a short to ground can hold the net at 0. The instruction is EXTEST, which drives one pin and captures the other."
+   "a": "BYPASS, SAMPLE/PRELOAD and EXTEST. IDCODE and INTEST are optional."
   },
   {
    "level": "understand",
    "q": "What does the bypass register do, and why is it only one bit?",
    "marks": 3,
-   "a": "It connects a single flip-flop between TDI and TDO for a device not under test, so data passes through in one TCK instead of crossing that device's whole boundary scan register."
+   "a": "It puts a single flip-flop between TDI and TDO for a chip that is not being tested, so data crosses that chip in one TCK instead of its whole BSR."
+  },
+  {
+   "level": "understand",
+   "q": "Why are TMS and TDI sampled on the rising edge of TCK while TDO changes on the falling edge?",
+   "marks": 3,
+   "a": "The half period between the falling edge, where a chip's TDO changes, and the next rising edge, where the next chip samples it as TDI, gives the bit time to settle, so a daisy chain works without hold-time races."
+  },
+  {
+   "level": "apply",
+   "q": "Three chips have IR lengths 3, 5 and 4 bits and are all given BYPASS. How many TCK edges in Shift-IR and how many in Shift-DR are needed to pass one bit through?",
+   "marks": 3,
+   "a": "Shift-IR: 3 + 5 + 4 = 12 edges. Shift-DR through three bypass registers: 1 + 1 + 1 = 3 edges."
+  },
+  {
+   "level": "apply",
+   "q": "From any unknown state, how does the tester reach Run-Test/Idle?",
+   "marks": 3,
+   "a": "Hold TMS = 1 for five TCK edges to reach Test-Logic-Reset, then give one edge with TMS = 0. Six edges in all."
   },
   {
    "level": "analyze",
-   "q": "Why can all devices on a board share TCK and TMS but must be ordered from TDI to TDO?",
+   "q": "In an EXTEST run, a trace between two chips captures 0 where 1 is expected. Give two physical causes and say which gives a dependable 0.",
    "marks": 4,
-   "a": "Shared TCK and TMS keep every TAP controller in the same state. Test data is serial, so each device's TDO must feed the next device's TDI; this makes one chain."
+   "a": "A short to ground, or a short to a neighbouring net that is driving 0 (a wired-AND short), gives a dependable 0. An open trace leaves the receiving pin floating, so it may read 0, 1 or its last value; that is why interconnect codes avoid relying on a single bit."
   }
  ],
- "beyond": "Not for the exam. JTAG is also a debug port: processors expose run-control and memory access through it, and FPGAs use it for configuration. Newer work adds IEEE 1149.7 for two-wire operation and IJTAG (IEEE 1687) for accessing embedded instruments. Security teams now lock or disable JTAG on shipped products because it can read secrets. Search for \"TAP state diagram\", \"EXTEST interconnect test\" and \"IJTAG\" to go further."
+ "beyond": "Not for the exam. JTAG is also the debug port of most processors, giving run control and memory access, which is why shipped products often lock it. IEEE 1149.7 cuts the port to two wires, and IEEE 1687 (IJTAG) gives access to embedded instruments behind the TAP. Search 'TAP state diagram', 'IJTAG' and 'JTAG security'."
 }

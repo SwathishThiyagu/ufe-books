@@ -1,17 +1,17 @@
 {
- "lead": "A physical defect is a short, an open or a missing implant. There are too many shapes and sizes to test one by one, so test programs work on a small logical fault list. A fault model maps a defect onto a line stuck at 0 or 1, two bridged lines, or a path that is too slow. The stuck-at model is the workhorse; delay faults catch chips that compute the right value too late. Fault simulation and ATPG in <a href='#fault-simulation-and-test-pattern-generation'>6.3</a> depend on this list.",
- "prereq": "You need Boolean gates and truth tables (Unit 3) and gate-level Verilog modelling (Unit 5); the fault list built here is used by <a href='#fault-simulation-and-test-pattern-generation'>fault simulation and ATPG</a>.",
+ "lead": "A physical defect can be a short, an open or a missing implant, in endless shapes and sizes, so no test program can target defects one by one. A fault model replaces them with a short logical list: a line stuck at 0 or 1, two lines bridged, a transistor that never conducts, a path that is too slow. The single stuck-at model is the workhorse of digital test; delay faults catch chips that compute the right value too late. Fault simulation and ATPG in <a href=\"#fault-simulation-and-test-pattern-generation\">6.3</a> work on this list.",
+ "prereq": "You need: logic gates and truth tables, and gate-level modelling from the Verilog chapters.",
  "sections": [
   {
    "h3": "From physical defect to logical fault",
    "blocks": [
     {
      "type": "p",
-     "text": "A <b>defect</b> is physical: a metal short, an open contact, a missing implant, a thin oxide pinhole. A <b>fault</b> is the logical abstraction of that defect: for example, line A is stuck at logic 0. An <b>error</b> is a wrong signal value somewhere inside the circuit. A <b>failure</b> is a wrong value at an output pin during a test. A short from an input of a NAND gate to ground may behave like that input stuck at 0."
+     "text": "A <b>defect</b> is physical: a metal short, an open contact, a missing implant, a pinhole in thin oxide. A <b>fault</b> is the logical model of that defect, for example 'line A is stuck at 0'. An <b>error</b> is a wrong value on some line inside the circuit, and a <b>failure</b> is lost function: a wrong value reaches an output pin and the chip misses its specification. A short from one input of a NAND gate to ground behaves like that input stuck at 0."
     },
     {
      "type": "p",
-     "text": "A defect has a size, a resistance and a location; its effect changes with all three. A fault model fixes the effect, not the cause. The single stuck-at model assumes one line is fixed at 0 or 1 while every other line works. The list is finite, so a program can enumerate it, generate vectors and report fault coverage."
+     "text": "A defect has a size, a resistance and a place, and its effect changes with all three. A fault model fixes the effect, not the cause. Because the list is finite, a program can enumerate it, generate vectors for it and report fault coverage."
     }
    ]
   },
@@ -20,192 +20,129 @@
    "blocks": [
     {
      "type": "p",
-     "text": "A line is a primary input, a primary output or a gate terminal. A line stuck-at-0 (SA0) always reads logic 0. A line stuck-at-1 (SA1) always reads logic 1. Single means only one line is faulty at a time."
+     "text": "A <b>line</b> is a primary input, a primary output, a gate input or a gate output; each branch of a fanout is a separate line. A line stuck-at-0 (SA0, written A/0) always reads 0; stuck-at-1 (SA1, A/1) always reads 1. <b>Single</b> stuck-at means only one line is faulty at a time."
     },
     {
      "type": "formula",
-     "text": "N<sub>SA</sub> = 2 × L",
-     "where": "N<sub>SA</sub> is the number of single stuck-at faults; L is the number of lines; the factor 2 is for SA0 and SA1."
+     "text": "N = 2 × L",
+     "where": "where N is the number of single stuck-at faults and L the number of lines; the 2 counts SA0 and SA1."
     },
     {
      "type": "p",
-     "text": "Two faults are equivalent if no input vector can tell their faulty outputs apart. On a two-input NAND gate, A/0, B/0 and Z/1 all force the output to 1 for every input, so they form one equivalence class. A/1 and B/1 are not equivalent: A/1 changes the output only when B=1, and B/1 changes it only when A=1."
+     "text": "Two faults are <b>equivalent</b> if no input vector can tell their faulty circuits apart. On a two-input NAND, A/0, B/0 and Z/1 all force the output to 1 for every input, so they form one class. A/1 and B/1 are not equivalent: A/1 shows only when B = 1, and B/1 only when A = 1. <b>Equivalence collapsing</b> keeps one fault per class; a k-input NAND, NOR, AND or OR gate goes from 2(k + 1) faults to k + 2."
     },
     {
      "type": "p",
-     "text": "Fault collapsing keeps one fault per equivalence class. If every test for fault g also detects fault f, then f dominates g; drop f because testing g covers it. With fanout, a stem fault is equivalent to the multiple fault in which every fanout branch is stuck at the same value, so test programs place checkpoints on the fanout branches and do not count the stem again. A redundant fault has no vector that detects it; ATPG identifies such faults and they are excluded from the fault list before fault coverage is computed."
+     "text": "Fault f <b>dominates</b> fault g if every test for g also detects f. Then f can be dropped too, because the test for g catches it. On the NAND, the only test for A/1 is 01, and 01 also detects Z/0, so Z/0 dominates A/1 and is dropped."
+    },
+    {
+     "type": "p",
+     "text": "For a whole circuit the <b>checkpoint theorem</b> says a test set that detects every stuck-at fault on the primary inputs and on the fanout branches detects every single stuck-at fault in the circuit. So the fault list can start from the checkpoints only. A fault that no vector can detect is called <b>redundant</b>; only ATPG can prove it, and coverage reports count it separately (<a href=\"#fault-simulation-and-test-pattern-generation\">6.3</a>)."
     }
    ]
   },
   {
-   "h3": "Transistor, bridge and delay faults",
+   "h3": "Transistor, bridging and delay faults",
    "blocks": [
     {
      "type": "p",
-     "text": "A transistor stuck open never conducts; a transistor stuck short always conducts. In static CMOS, a stuck-open may disconnect the output from the positive supply (VDD) or from ground for one input combination. The output then holds its old value on load capacitance. Detection may need two vectors: the first sets the output to 0, the second tries to drive it to 1. If the transistor is open, the output stays at 0."
+     "text": "A transistor <b>stuck-open</b> never conducts; a transistor <b>stuck-short</b> always conducts. In static CMOS a stuck-open pMOS cuts the output off from VDD, and a stuck-open nMOS cuts it off from ground, for some input combinations. The output then floats and keeps its old value on its capacitance, so the gate behaves like a memory. A test needs two vectors: the first sets the output to a known value (say 0), the second asks the broken transistor to drive it to 1. If the output stays 0, the fault is caught. A stuck-short makes pull-up and pull-down fight; it is best caught by the large quiescent supply current it causes (IDDQ test)."
     },
     {
      "type": "p",
-     "text": "A bridging fault shorts two lines. If one driver pulls 0 and the other pulls 1, the result depends on drive strength. It is often modelled as wired-AND (0 wins) or wired-OR (1 wins). A resistive bridge may pass logic tests but add delay."
+     "text": "A <b>bridging fault</b> shorts two lines. When one driver pulls 0 and the other pulls 1, the result depends on drive strength; simple models are wired-AND (0 wins) and wired-OR (1 wins). A resistive bridge may give the right logic value but slowly."
     },
     {
      "type": "p",
-     "text": "A transition delay fault makes one line slow-to-rise or slow-to-fall. A path delay fault makes a whole input-to-output path too slow. The test uses a vector pair and two clock edges: the first vector sets the line to its initial value, the launch clock edge creates the transition, and the capture clock edge captures the response after the rated clock period. If the path is too slow, the captured value is the old one."
+     "text": "A <b>transition delay fault</b> makes one line slow-to-rise or slow-to-fall. A <b>path delay fault</b> makes a whole input-to-output path too slow, even when each gate on it is only a little slow. Both need a two-vector test applied at the rated clock: the first vector V1 sets the line to its starting value, the <b>launch</b> edge applies V2 and creates the transition, and the <b>capture</b> edge one clock period later stores the result. A slow path still holds the old value at capture."
     }
    ]
   }
  ],
  "figure": {
-  "after_section": 1,
-  "caption": "Physical defects are mapped onto a small set of fault models that a test program can enumerate. Bridging and stuck-open are shown as their own families.",
+  "after_section": 2,
+  "caption": "The two-input NAND gate and the output of each faulty version for every input. A/0, B/0 and Z/1 give the same faulty table, so they are one class; three vectors catch all six faults.",
   "spec": {
-   "type": "tree",
-   "shape": "box",
-   "root": {
-    "label": "Defects",
-    "note": "physical",
-    "children": [
-     {
-      "label": "Stuck-at",
-      "edge": "one line fixed",
-      "children": [
-       {
-        "label": "SA0",
-        "_d": 2,
-        "children": [],
-        "_x": 76.66666666666666,
-        "_y": 190
-       },
-       {
-        "label": "SA1",
-        "_d": 2,
-        "children": [],
-        "_x": 190.0,
-        "_y": 190
-       }
-      ],
-      "_d": 1,
-      "_x": 133.33333333333331,
-      "_y": 116
-     },
-     {
-      "label": "Bridging",
-      "edge": "two lines shorted",
-      "_d": 1,
-      "children": [],
-      "_x": 303.3333333333333,
-      "_y": 116
-     },
-     {
-      "label": "Delay",
-      "edge": "too slow",
-      "children": [
-       {
-        "label": "Transition",
-        "_d": 2,
-        "children": [],
-        "_x": 416.6666666666667,
-        "_y": 190
-       },
-       {
-        "label": "Path",
-        "_d": 2,
-        "children": [],
-        "_x": 530.0,
-        "_y": 190
-       }
-      ],
-      "_d": 1,
-      "_x": 473.33333333333337,
-      "_y": 116
-     },
-     {
-      "label": "Stuck-open",
-      "edge": "transistor never conducts",
-      "_d": 1,
-      "children": [],
-      "_x": 643.3333333333333,
-      "_y": 116
-     }
-    ],
-    "_d": 0,
-    "_x": 388.3333333333333,
-    "_y": 42
-   },
-   "aria": "Tree from physical defects to stuck-at, bridging, delay and stuck-open fault models, with SA0/SA1 and transition/path variants."
+   "type": "svg",
+   "h": 356,
+   "body": "<path d=\"M70.0,88.0 H105.2 A32.0,32.0 0 0 1 105.2,152.0 H70.0 Z\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><circle cx=\"143.2\" cy=\"120.0\" r=\"6\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><line x1=\"36.0\" y1=\"100.0\" x2=\"70.0\" y2=\"100.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"36.0\" y1=\"140.0\" x2=\"70.0\" y2=\"140.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"149.2\" y1=\"120.0\" x2=\"179.2\" y2=\"120.0\" style=\"stroke:var(--ink);stroke-width:2\"/><text x=\"14.0\" y=\"105.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">A</text><text x=\"14.0\" y=\"145.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">B</text><text x=\"183.2\" y=\"125.0\" font-size=\"15\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">Z</text><text x=\"100.0\" y=\"200.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--muted)\">Z = NOT (A·B)</text><text x=\"300.0\" y=\"44.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--muted)\">AB =</text><text x=\"370.0\" y=\"44.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">00</text><text x=\"432.0\" y=\"44.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">01</text><text x=\"494.0\" y=\"44.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">10</text><text x=\"556.0\" y=\"44.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">11</text><text x=\"300.0\" y=\"84.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">good</text><text x=\"370.0\" y=\"85.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"432.0\" y=\"85.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"494.0\" y=\"85.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"556.0\" y=\"85.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">0</text><line x1=\"260.0\" y1=\"96.0\" x2=\"590.0\" y2=\"96.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"300.0\" y=\"120.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">A/0</text><text x=\"370.0\" y=\"121.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"432.0\" y=\"121.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"494.0\" y=\"121.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><rect x=\"534.0\" y=\"102.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"556.0\" y=\"121.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">1</text><text x=\"300.0\" y=\"156.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">B/0</text><text x=\"370.0\" y=\"157.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"432.0\" y=\"157.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"494.0\" y=\"157.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><rect x=\"534.0\" y=\"138.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"556.0\" y=\"157.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">1</text><text x=\"300.0\" y=\"192.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Z/1</text><text x=\"370.0\" y=\"193.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"432.0\" y=\"193.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"494.0\" y=\"193.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><rect x=\"534.0\" y=\"174.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"556.0\" y=\"193.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">1</text><text x=\"300.0\" y=\"228.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">A/1</text><text x=\"370.0\" y=\"229.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><rect x=\"410.0\" y=\"210.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"432.0\" y=\"229.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><text x=\"494.0\" y=\"229.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"556.0\" y=\"229.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">0</text><text x=\"300.0\" y=\"264.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">B/1</text><text x=\"370.0\" y=\"265.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><text x=\"432.0\" y=\"265.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">1</text><rect x=\"472.0\" y=\"246.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"494.0\" y=\"265.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><text x=\"556.0\" y=\"265.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">0</text><text x=\"300.0\" y=\"300.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Z/0</text><rect x=\"348.0\" y=\"282.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"370.0\" y=\"301.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><rect x=\"410.0\" y=\"282.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"432.0\" y=\"301.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><rect x=\"472.0\" y=\"282.0\" width=\"44.0\" height=\"28.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"494.0\" y=\"301.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><text x=\"556.0\" y=\"301.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">0</text><polyline points=\"600.0,104.0 608.0,104.0 608.0,200.0 600.0,200.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><text x=\"616.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\">one class,</text><text x=\"616.0\" y=\"166.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--accent)\">test 11</text><text x=\"616.0\" y=\"229.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">test 01</text><text x=\"616.0\" y=\"265.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">test 10</text><text x=\"616.0\" y=\"301.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">dominates A/1</text><text x=\"360.0\" y=\"340.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">Shaded cells: the faulty output differs from the good one. Tests {01, 10, 11} catch all six faults.</text>",
+   "aria": "NAND gate with inputs A and B and output Z, beside a table of the good output and the six stuck-at faults for inputs 00, 01, 10 and 11, with differing cells shaded."
   }
  },
  "examples": [
   {
-   "question": "A two-input NAND gate has inputs A, B and output Z. (a) List every single stuck-at fault. (b) Collapse the faults into equivalence classes. (c) Give the smallest test set that detects at least one fault from every class. Write each vector as (A,B).",
+   "question": "A two-input NAND gate has inputs A, B and output Z. (a) List every single stuck-at fault. (b) Collapse the faults by equivalence, then by dominance. (c) Give the smallest test set that detects all six faults. Write each vector as AB.",
    "steps": [
-    "The gate has three lines: A, B and Z. Number of single stuck-at faults is 2 × 3 = 6: A/0, A/1, B/0, B/1, Z/0, Z/1.",
-    "Good NAND outputs for (A,B) = 00, 01, 10, 11 are 1, 1, 1, 0.",
-    "A/0 forces A=0, so Z=1 for all B. It differs from the good gate only at 11. B/0 does the same. Z/1 also forces Z=1 for all inputs. So {A/0, B/0, Z/1} is one equivalence class.",
-    "A/1 forces A=1. It differs only at (0,1), where good Z=1 but faulty Z=0. B/1 differs only at (1,0). They are separate classes.",
-    "Z/0 forces Z=0. It differs at 00, 01 and 10. It is a separate class. Total classes: 4.",
-    "Class {A/0,B/0,Z/1} needs vector 11. A/1 needs 01. B/1 needs 10. The set {01,10,11} covers all four classes with 3 vectors. 00 detects Z/0 alone, but 01 and 10 already detect Z/0, so 00 is not needed."
+    "Lines: A, B and Z, so N = 2 × 3 = 6 faults: A/0, A/1, B/0, B/1, Z/0, Z/1.",
+    "Good outputs for AB = 00, 01, 10, 11 are 1, 1, 1, 0.",
+    "A/0 makes Z = 1 for every input; it differs from the good gate only at 11. B/0 and Z/1 give the same faulty table. Class {A/0, B/0, Z/1}, detected only by 11.",
+    "A/1 gives Z = NOT B: it differs only at 01 (good 1, faulty 0). B/1 differs only at 10. Z/0 differs at 00, 01 and 10. So there are 4 equivalence classes: {A/0, B/0, Z/1}, {A/1}, {B/1}, {Z/0}.",
+    "Dominance: the test for A/1 (01) also detects Z/0, so Z/0 dominates A/1 and is dropped. The collapsed list is A/0, A/1, B/1: 3 faults, which is k + 1 for k = 2 after dominance.",
+    "Each of the 3 faults has exactly one test (11, 01 and 10), so no smaller set exists. Check that {01, 10, 11} also catches Z/0: at 01 the good Z is 1 and the faulty Z is 0, so yes."
    ],
-   "answer": "The 6 single stuck-at faults collapse to 4 equivalence classes, and the smallest test set is {01, 10, 11}, which has 3 vectors.",
-   "check": "import itertools\nvectors=[(0,0),(0,1),(1,0),(1,1)]\ndef nand(a,b):\n    return 0 if (a==1 and b==1) else 1\nfaults=[('A/0','A',0),('A/1','A',1),('B/0','B',0),('B/1','B',1),('Z/0','Z',0),('Z/1','Z',1)]\ndef out(name,line,val,a,b):\n    if line=='A': a=val\n    if line=='B': b=val\n    z=nand(a,b)\n    if line=='Z': z=val\n    return z\nsigs={}\nfor f in faults:\n    name,line,val=f\n    sig=tuple(1 if out(name,line,val,a,b)!=nand(a,b) else 0 for a,b in vectors)\n    sigs.setdefault(sig,[]).append(name)\nclasses=list(sigs.keys())\nmin_size=None\nfor r in range(1,5):\n    for combo in itertools.combinations(range(4),r):\n        if all(any(sig[i] for i in combo) for sig in classes):\n            min_size=r\n            break\n    if min_size is not None:\n        break\nprint(len(faults))\nprint(len(classes))\nprint(min_size)",
-   "values": [
-    6,
-    4,
-    3
+   "answer": "Six faults collapse to four equivalence classes and to three faults after dominance; the smallest complete test set is {01, 10, 11}, three vectors, and 00 is not needed."
+  },
+  {
+   "question": "Line A of a two-input AND gate Z = A·B is slow-to-rise. The path from A to the capturing flip-flop normally takes 1.2 ns, and the defect adds 1.0 ns. The clock period is 2.0 ns. Give the two-vector test, and say what the flip-flop captures at speed and on a slow tester with a 10 ns period.",
+   "steps": [
+    "To see a rising A, V1 must hold A = 0 and V2 must have A = 1. B must be 1 in V2 so that Z follows A. So V1 = (A, B) = (0, 1) and V2 = (1, 1).",
+    "Good circuit: Z goes 0 → 1 and settles 1.2 ns after the launch edge, before the capture edge at 2.0 ns. Captured Z = 1.",
+    "Faulty circuit: Z settles after 1.2 + 1.0 = 2.2 ns, which is 0.2 ns after the capture edge. Captured Z = 0, the old value, so the fault is detected.",
+    "Slow tester: capture comes 10 ns after launch; even the faulty Z has settled by 2.2 ns, so it captures 1 and the chip wrongly passes."
    ],
-   "output": ""
+   "answer": "The test is V1 = 01, V2 = 11 at the rated 2.0 ns clock; the faulty chip captures 0 instead of 1. At a 10 ns period the same vectors miss the fault, which is why delay tests run at speed."
   }
  ],
  "traps": [
-  "On a two-input NAND, Z/1 is equivalent to A/0 and B/0; it is not a separate class.",
-  "A/1 and B/1 are not equivalent on a NAND; each is detected only when the other input is 1.",
-  "Single stuck-at means one line at a time, not all lines at once.",
-  "A stuck-open in CMOS can escape a single-vector test; it often needs a two-vector sequence because the floating output keeps its old value.",
-  "A delay fault test needs a launch edge that creates the transition and a capture edge after the rated period; testing only the final logic value misses a slow path."
+  "On a two-input NAND, Z/1 is equivalent to A/0 and B/0; it is not a class of its own.",
+  "A/1 and B/1 are not equivalent on a NAND: each shows only when the other input is 1.",
+  "Counting lines without the fanout branches. Each branch is a line with its own two faults.",
+  "A stuck-open can pass a single vector, because the floating output keeps a value that may happen to be right. It needs a two-vector sequence.",
+  "Applying a delay test slowly. Launch and capture must be one rated clock period apart, or a slow path looks good."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Define stuck-at-0 and stuck-at-1 for a line.",
+   "q": "Define stuck-at-0 and stuck-at-1 for a line, and say what 'single' means.",
    "marks": 2,
-   "a": "SA0: the line always reads logic 0. SA1: the line always reads logic 1. Single stuck-at means only one line is faulty at a time."
+   "a": "SA0: the line always reads 0. SA1: the line always reads 1. Single: only one line in the circuit is faulty at a time."
   },
   {
    "level": "understand",
-   "q": "Why can two different stuck-at faults be equivalent?",
+   "q": "When are two stuck-at faults equivalent, and when does one dominate another?",
    "marks": 3,
-   "a": "For every input vector they produce the same faulty output at the primary outputs, so no test can tell them apart."
+   "a": "Equivalent: every input vector gives the same output for both faulty circuits, so no test can tell them apart. Fault f dominates g when every test for g also detects f, so f can be dropped once g is targeted."
   },
   {
    "level": "apply",
-   "q": "A 3-input NAND gate has inputs A, B, C and output Z. How many single stuck-at faults exist?",
+   "q": "A three-input NAND gate has inputs A, B, C and output Z. How many single stuck-at faults exist, and how many remain after equivalence collapsing?",
    "marks": 2,
-   "a": "There are 4 lines: A, B, C and Z. Number of faults = 2 × 4 = 8."
+   "a": "Lines A, B, C and Z: 2 × 4 = 8 faults. Equivalence merges A/0, B/0, C/0 and Z/1 into one class, leaving k + 2 = 5 faults."
   },
   {
    "level": "apply",
-   "q": "For the two-input NAND example, which vector detects A/1 and what output difference appears?",
+   "q": "In the NAND example, which vector detects A/1 and what output difference appears?",
    "marks": 3,
-   "a": "Vector (A,B)=01. Good Z=1; with A stuck at 1, Z=NAND(1,1)=0."
-  },
-  {
-   "level": "analyze",
-   "q": "Why may a stuck-open transistor in a CMOS gate need two vectors?",
-   "marks": 4,
-   "a": "The open disconnects the output for some input. The first vector charges the output node to a known value; the second tries to drive it to the opposite value. If the transistor is open, the node stays at the old value, so the fault is seen only as a sequence."
-  },
-  {
-   "level": "analyze",
-   "q": "Why are redundant faults removed from the fault list before computing fault coverage?",
-   "marks": 3,
-   "a": "No input vector can detect them. Keeping them would make 100% coverage impossible even for a correct design."
+   "a": "AB = 01. The good gate gives Z = 1; with A stuck at 1 the gate sees 11 and gives Z = 0."
   },
   {
    "level": "understand",
    "q": "State the difference between a transition delay fault and a path delay fault.",
    "marks": 3,
-   "a": "Transition delay fault: one line is slow to rise or slow to fall. Path delay fault: a complete input-to-output path is too slow, even if each gate is within its own limit."
+   "a": "A transition delay fault makes one line slow to rise or slow to fall. A path delay fault makes one complete path from input to output too slow, even when each gate on it is only slightly slow."
+  },
+  {
+   "level": "analyze",
+   "q": "Why may a stuck-open transistor in a CMOS gate need two vectors?",
+   "marks": 4,
+   "a": "For some inputs the broken transistor leaves the output connected to neither rail, so the output keeps its previous value. The first vector sets that value (say 0); the second asks the broken transistor to drive the opposite value. Only the pair shows the output stuck at its old value."
+  },
+  {
+   "level": "analyze",
+   "q": "In the second worked example the defect adds 1.0 ns. What is the smallest extra delay the 2.0 ns test can catch, and why?",
+   "marks": 4,
+   "a": "The good path has 2.0 − 1.2 = 0.8 ns of slack. An extra delay of more than 0.8 ns moves Z past the capture edge, so about 0.8 ns is the smallest defect this test catches. Smaller defects need a longer path through the same line or a faster capture."
   }
  ],
- "beyond": "Not for the exam. Industry adds cell-aware fault models, and FinFET defects make some opens and shorts behave differently from planar CMOS. Delay test is run at-speed on automatic test equipment, and path selection is a research problem. Search for cell-aware ATPG, transition delay test, and path delay fault coverage."
+ "beyond": "Not for the exam. Industry now uses cell-aware fault models that list the opens and shorts inside each library cell, and FinFET defects make some faults behave differently from planar CMOS. Delay test is run at speed on most chips, and choosing which paths to test is still a research problem. Search 'cell-aware ATPG', 'transition delay test' and 'small delay defects'."
 }

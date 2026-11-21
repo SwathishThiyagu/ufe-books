@@ -1,233 +1,168 @@
 {
- "lead": "An external tester drives every input and reads every output of a chip, and that machine costs money for every second it runs. Built-in self-test (BIST) moves the pattern generator and the response checker onto the chip itself. An on-chip LFSR makes pseudo-random vectors, a MISR squeezes the replies into a short signature, and one comparator against a stored golden value gives a single pass or fail bit. The chip tests itself at power-on, after packaging, or in the field, with almost no tester.",
- "prereq": "You need: scan design from <a href=\"#design-for-testability-and-scan-design\">6.4</a>, and flip-flops and shift registers from Unit 4.",
+ "lead": "An external tester drives every input and reads every output, and it costs money for every second it runs. Built-in self-test (BIST) moves the pattern generator and the response checker onto the chip. An on-chip LFSR makes pseudo-random vectors, a MISR squeezes the responses into a short signature, and one comparison with a stored good signature gives a single pass or fail bit. The chip can then test itself at power-on, after packaging or in the field, with almost no tester.",
+ "prereq": "You need: shift registers and XOR gates, and scan chains from <a href=\"#design-for-testability-and-scan-design\">6.4</a>.",
  "sections": [
   {
    "h3": "The BIST loop and its parts",
    "blocks": [
     {
      "type": "p",
-     "text": "Built-in self-test (BIST) wraps three blocks around the circuit under test (CUT). The test pattern generator (TPG) makes the input vectors. The output response analyser (ORA) compresses the CUT outputs into one short signature. The BIST controller sequences the run: reset, load the seed, apply N vectors, stop, compare the signature, set pass or fail."
+     "text": "BIST wraps three blocks around the <b>circuit under test</b> (CUT). The <b>test pattern generator</b> (TPG) makes the input vectors. The <b>output response analyser</b> (ORA) compresses the CUT outputs into a short signature. The <b>BIST controller</b> runs the sequence: reset, load the seed, apply the vectors, stop, compare the signature with the good one, set pass or fail."
     },
     {
      "type": "bullets",
      "items": [
-      "TPG: an LFSR, a binary counter, or a small on-chip ROM holding ATPG vectors.",
-      "CUT: combinational logic, a scan chain, or a memory array.",
-      "ORA: a MISR or a parity tree; the pass/fail flip-flop holds one bit for the tester to read."
+      "TPG: an LFSR, a binary counter, or a small ROM holding ATPG vectors.",
+      "CUT: combinational logic, logic reached through scan chains, or a memory array.",
+      "ORA: a MISR, or a simple ones-counter or transition counter; a pass/fail flip-flop holds the result for the tester."
      ]
     },
     {
      "type": "p",
-     "text": "There are two ways to deliver vectors. In test-per-clock the TPG drives the primary inputs and the flip-flop inputs directly, one vector per clock. In test-per-scan the TPG drives the scan-in input of each chain; L shift clocks push one vector into the chain, one capture clock loads the response, and the shifted-out bits go to the ORA. A vector therefore costs L + 1 clocks. Test-per-scan needs no extra pins but is slower."
+     "text": "Vectors reach the CUT in two ways. In <b>test-per-clock</b> BIST the TPG drives the CUT inputs directly, one new vector every clock. In <b>test-per-scan</b> BIST the TPG drives the scan-in of each chain and the scan-outs feed the ORA, so each vector needs L shift clocks and one capture clock:"
     },
     {
      "type": "formula",
      "text": "T = N × (L + 1)",
-     "where": "T = test time in clock cycles; N = number of test vectors; L = length of the longest scan chain in flip-flops; the extra 1 is the capture clock."
+     "where": "where T is the BIST time in clocks, N the number of vectors, L the length of the longest scan chain, and the 1 the capture clock."
     }
    ]
   },
   {
-   "h3": "The LFSR as test pattern generator",
+   "h3": "The LFSR as pattern generator",
    "blocks": [
     {
      "type": "p",
-     "text": "A linear feedback shift register (LFSR) is a shift register whose serial input is the XOR of a few of its stages, called taps. With the right taps an n-bit LFSR visits every non-zero n-bit word once before repeating, and is then called maximal-length."
+     "text": "A <b>linear feedback shift register</b> (LFSR) is a shift register whose input is the XOR of a few chosen stages, the <b>taps</b>. With taps taken from a primitive polynomial, an n-stage LFSR steps through every non-zero n-bit word once before repeating; it is then <b>maximal-length</b>."
     },
     {
      "type": "formula",
-     "text": "P = 2ⁿ − 1",
-     "where": "P = period, the number of distinct states before the pattern repeats; n = number of LFSR stages (flip-flops). The single state left out is all zeros."
+     "text": "period = 2ⁿ − 1",
+     "where": "where n is the number of stages. The one word left out is all zeros."
     },
     {
      "type": "p",
-     "text": "In the external-XOR (Fibonacci) form, XOR gates combine the tapped stages and drive the first stage, so the feedback passes through a chain of XORs. In the internal-XOR (Galois) form the XOR gates sit between stages, so the feedback passes through only one XOR per clock and the register can run faster; the trade-off is a less obvious tap table. The taps follow a primitive polynomial, and good tap tables exist for every n."
+     "text": "The all-zero word is a lock-up state: XOR of zeros is zero, so the register would stay there for ever. The <b>seed</b>, the starting word, must be non-zero; different seeds start the same cycle at different points. In the <b>external-XOR</b> (Fibonacci) form the XOR gates combine the taps and feed the first stage; in the <b>internal-XOR</b> (Galois) form one XOR sits between stages, so the feedback passes through only one gate and the register runs faster."
     },
     {
      "type": "p",
-     "text": "The all-zero word is a lockup state: the feedback of zeros is zero, so the register never leaves 000…0. The seed, the starting word, must therefore be non-zero. Different seeds give shifted copies of the same 2ⁿ − 1 states."
-    },
-    {
-     "type": "p",
-     "text": "Some faults need a vector a plain LFSR rarely makes. A weighted LFSR gates each stage output with a control bit. ANDing the output with the control pushes the probability of a 1 below 0.5, so the stream carries many 0s — good for wide OR gates, which need all-zero inputs. ORing the output with the control pushes the probability of a 1 above 0.5 — good for wide AND gates, which need all-one inputs. Reseeding loads a fresh seed after every block of vectors so the patterns decorrelate."
+     "text": "Some faults need a vector a plain LFSR rarely makes; they are called <b>random-pattern-resistant</b>. A 10-input AND gate output stuck-at-0 needs all ten inputs at 1, a chance of 1 in 1024 per vector. A <b>weighted</b> generator ORs two LFSR bits to make a 1 three times in four, or ANDs them to make a 0 three times in four; <b>reseeding</b> loads seeds that expand into chosen ATPG vectors; a <b>test point</b> can also be added to the logic."
     }
    ]
   },
   {
-   "h3": "Signature analysis and BIST flavours",
+   "h3": "Signature analysis and BILBO",
    "blocks": [
     {
      "type": "p",
-     "text": "A multiple-input signature register (MISR) is an n-bit LFSR with one extra XOR per stage: the CUT outputs are XORed into the feedback path at every clock. Every output bit mixes into every register bit, and after the last vector the register holds an n-bit signature. The comparator checks it against the golden signature, the value a fault-free simulation of the same design produces."
+     "text": "A <b>multiple-input signature register</b> (MISR) is an LFSR with one extra XOR in front of each stage, where one CUT output enters each clock. After the last vector the register holds an n-bit <b>signature</b>. It is compared with the <b>golden signature</b>, found by simulating the fault-free design with the same seed and the same vectors."
     },
     {
      "type": "formula",
      "text": "P(aliasing) ≈ 2⁻ⁿ",
-     "where": "P(aliasing) = probability that a faulty CUT still ends with the golden signature; n = MISR width in bits. A 16-bit MISR gives about 1 in 65,536."
-    },
-    {
-     "type": "bullets",
-     "items": [
-      "Exhaustive BIST: a counter applies all 2ᵐ vectors of an m-input block; fine only for small blocks.",
-      "Pseudo-exhaustive BIST: the circuit is partitioned so each output cone still sees all of its inputs.",
-      "Pseudo-random BIST: the LFSR stream, cheap and effective for most faults.",
-      "Deterministic BIST: ATPG vectors held in an on-chip ROM, or an LFSR reseeded to generate them."
-     ]
+     "where": "where P(aliasing) is the chance that a faulty CUT still ends with the golden signature and n is the MISR width. A 16-bit MISR gives about 1 in 65,536."
     },
     {
      "type": "p",
-     "text": "A built-in logic block observer (BILBO) is one register with two jobs. In functional mode it is an ordinary register. In test mode the same flip-flops become an LFSR as TPG or a MISR as ORA, selected by control inputs that add XOR and multiplexer gates per stage. In a chain of blocks, the register after block A is the ORA for A and the TPG for B."
+     "text": "BIST comes in flavours by its TPG: <b>exhaustive</b> (a counter applies all 2ᵐ vectors to an m-input block), <b>pseudo-exhaustive</b> (each output cone gets all combinations of its own inputs), <b>pseudo-random</b> (the LFSR stream) and <b>deterministic</b> (stored or reseeded ATPG vectors)."
     },
     {
      "type": "p",
-     "text": "The price is area for the LFSR, MISR and controller, delay from the multiplexer at each flip-flop input, extra test time, and the need to resimulate the golden signature whenever the netlist changes. Aliasing means a pass is strong evidence, not proof."
+     "text": "A <b>BILBO</b>, built-in logic block observer, is one register with four modes set by two control bits B1 B2: 11 normal register, 00 scan shift register, 10 LFSR or MISR, 01 reset. Between two blocks, the same BILBO is the ORA for the block before it and the TPG for the block after it. The price of BIST is area for the generator, analyser and controller, a little delay on functional paths, and a golden signature that must be re-simulated whenever the netlist changes."
     }
    ]
   }
  ],
  "figure": {
-  "after_section": 1,
-  "caption": "The LFSR feeds vectors to the circuit, the MISR squeezes every response into one signature, and a single comparator turns the whole run into one pass or fail bit.",
+  "after_section": 2,
+  "caption": "The 4-bit LFSR of the worked example and the order of its states. The feedback b3 XOR b0 enters b0 on the right, and from seed 0001 the register visits all 15 non-zero words.",
   "spec": {
-   "type": "blocks",
-   "direction": "right",
-   "title": "Logic BIST loop",
-   "nodes": [
-    {
-     "id": "l",
-     "label": "LFSR (TPG)",
-     "note": "test vectors",
-     "style": "accent"
-    },
-    {
-     "id": "c",
-     "label": "Circuit under test",
-     "style": "normal"
-    },
-    {
-     "id": "m",
-     "label": "MISR (ORA)",
-     "note": "compresses outputs",
-     "style": "accent"
-    },
-    {
-     "id": "cp",
-     "label": "Compare",
-     "note": "golden value",
-     "style": "live"
-    },
-    {
-     "id": "p",
-     "label": "Pass / fail",
-     "style": "next"
-    }
-   ],
-   "edges": [
-    {
-     "from": "l",
-     "to": "c",
-     "style": "solid"
-    },
-    {
-     "from": "c",
-     "to": "m",
-     "style": "solid"
-    },
-    {
-     "from": "m",
-     "to": "cp",
-     "style": "solid"
-    },
-    {
-     "from": "cp",
-     "to": "p",
-     "style": "solid"
-    }
-   ],
-   "aria": "On-chip BIST loop in which an LFSR generates vectors, the MISR compresses the responses into a signature, and a comparator against the golden signature gives a single pass or fail bit."
+   "type": "svg",
+   "h": 500,
+   "body": "<rect x=\"70.0\" y=\"44.0\" width=\"80.0\" height=\"52.0\" rx=\"6\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"110.0\" y=\"66.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">b<tspan baseline-shift=\"sub\" font-size=\"11\">3</tspan></text><text x=\"110.0\" y=\"86.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><rect x=\"190.0\" y=\"44.0\" width=\"80.0\" height=\"52.0\" rx=\"6\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"230.0\" y=\"66.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">b<tspan baseline-shift=\"sub\" font-size=\"11\">2</tspan></text><text x=\"230.0\" y=\"86.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><rect x=\"310.0\" y=\"44.0\" width=\"80.0\" height=\"52.0\" rx=\"6\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"350.0\" y=\"66.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">b<tspan baseline-shift=\"sub\" font-size=\"11\">1</tspan></text><text x=\"350.0\" y=\"86.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">0</text><rect x=\"430.0\" y=\"44.0\" width=\"80.0\" height=\"52.0\" rx=\"6\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"470.0\" y=\"66.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">b<tspan baseline-shift=\"sub\" font-size=\"11\">0</tspan></text><text x=\"470.0\" y=\"86.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--next)\" font-weight=\"700\">1</text><line x1=\"190.0\" y1=\"70.0\" x2=\"153.0\" y2=\"70.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><line x1=\"310.0\" y1=\"70.0\" x2=\"273.0\" y2=\"70.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><line x1=\"430.0\" y1=\"70.0\" x2=\"393.0\" y2=\"70.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><circle cx=\"590.0\" cy=\"70.0\" r=\"16\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><line x1=\"577.0\" y1=\"70.0\" x2=\"603.0\" y2=\"70.0\" style=\"stroke:var(--accent);stroke-width:2\"/><line x1=\"590.0\" y1=\"57.0\" x2=\"590.0\" y2=\"83.0\" style=\"stroke:var(--accent);stroke-width:2\"/><line x1=\"510.0\" y1=\"70.0\" x2=\"571.0\" y2=\"70.0\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><polyline points=\"110.0,44.0 110.0,24.0 590.0,24.0 590.0,51.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><line x1=\"590\" y1=\"40\" x2=\"590\" y2=\"51\" style=\"stroke:var(--accent);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><polyline points=\"606.0,70.0 650.0,70.0 650.0,120.0 470.0,120.0 470.0,99.0\" style=\"fill:none;stroke:var(--live);stroke-width:2.5;stroke-linejoin:round\"/><line x1=\"470\" y1=\"110\" x2=\"470\" y2=\"99\" style=\"stroke:var(--live);stroke-width:2.5\" marker-end=\"url(#ar-UID-l)\"/><text x=\"570.0\" y=\"142.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--live)\" font-weight=\"700\">feedback f = b<tspan baseline-shift=\"sub\" font-size=\"11\">3</tspan> XOR b<tspan baseline-shift=\"sub\" font-size=\"11\">0</tspan> enters b<tspan baseline-shift=\"sub\" font-size=\"11\">0</tspan></text><text x=\"290.0\" y=\"16.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">shift left each clock; seed 0001</text><rect x=\"332.0\" y=\"176.0\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"360.0\" y=\"195.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\" font-weight=\"700\">0001</text><rect x=\"440.2\" y=\"188.1\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"468.2\" y=\"207.1\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">0011</text><rect x=\"529.7\" y=\"222.3\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"557.7\" y=\"241.3\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">0111</text><rect x=\"585.0\" y=\"272.7\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"613.0\" y=\"291.7\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1111</text><rect x=\"596.5\" y=\"330.6\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"624.5\" y=\"349.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1110</text><rect x=\"562.4\" y=\"386.0\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"590.4\" y=\"405.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1101</text><rect x=\"488.4\" y=\"429.3\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"516.4\" y=\"448.3\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1010</text><rect x=\"387.3\" y=\"452.9\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"415.3\" y=\"471.9\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">0101</text><rect x=\"276.7\" y=\"452.9\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"304.7\" y=\"471.9\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1011</text><rect x=\"175.6\" y=\"429.3\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"203.6\" y=\"448.3\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">0110</text><rect x=\"101.6\" y=\"386.0\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"129.6\" y=\"405.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1100</text><rect x=\"67.5\" y=\"330.6\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"95.5\" y=\"349.6\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1001</text><rect x=\"79.0\" y=\"272.7\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"107.0\" y=\"291.7\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">0010</text><rect x=\"134.3\" y=\"222.3\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"162.3\" y=\"241.3\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">0100</text><rect x=\"223.8\" y=\"188.1\" width=\"56.0\" height=\"26.0\" rx=\"6\" style=\"fill:var(--panel);stroke:var(--line2);stroke-width:2\"/><text x=\"251.8\" y=\"207.1\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink);font-family:var(--mono)\">1000</text><text x=\"360.0\" y=\"324.0\" font-size=\"15\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">15 states, then repeat</text><text x=\"360.0\" y=\"346.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">period = 2⁴ − 1 = 15</text><text x=\"360.0\" y=\"366.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0000 never appears</text>",
+   "aria": "Four flip-flops b3 to b0 holding 0001 with an XOR of b3 and b0 feeding b0, above a ring of the 15 states from 0001 to 1000."
   }
  },
  "examples": [
   {
-   "question": "A 4-bit LFSR shifts left every clock. Its feedback bit f = b<sub>3</sub> ⊕ b<sub>0</sub> enters at b<sub>0</sub>, where b<sub>3</sub> is the leftmost bit and b<sub>0</sub> the rightmost. (a) Seed the register with 0001, list the states until the pattern repeats, and give the period. (b) The same circuit feeds a 16-bit MISR. Give the aliasing probability as a fraction and as a decimal.",
+   "question": "A 4-bit LFSR shifts left every clock. Its feedback f = b<sub>3</sub> ⊕ b<sub>0</sub> enters at b<sub>0</sub>, where b<sub>3</sub> is the leftmost bit. Seed it with 0001, list the states until it repeats, and give the period.",
    "steps": [
-    "Write the state as b<sub>3</sub>b<sub>2</sub>b<sub>1</sub>b<sub>0</sub>. The next state is b<sub>2</sub>b<sub>1</sub>b<sub>0</sub>f, with f = b<sub>3</sub> ⊕ b<sub>0</sub>.",
-    "0001: f = 0 ⊕ 1 = 1, next state 0011.",
-    "0011: f = 0 ⊕ 1 = 1, next 0111. 0111: f = 0 ⊕ 1 = 1, next 1111. 1111: f = 1 ⊕ 1 = 0, next 1110.",
-    "1110: f = 1 ⊕ 0 = 1, next 1101. 1101: f = 1 ⊕ 1 = 0, next 1010. 1010: f = 1 ⊕ 0 = 1, next 0101. 0101: f = 0 ⊕ 1 = 1, next 1011.",
-    "1011: f = 1 ⊕ 1 = 0, next 0110. 0110: f = 0 ⊕ 0 = 0, next 1100. 1100: f = 1 ⊕ 0 = 1, next 1001. 1001: f = 1 ⊕ 1 = 0, next 0010.",
-    "0010: f = 0 ⊕ 0 = 0, next 0100. 0100: f = 0 ⊕ 0 = 0, next 1000. 1000: f = 1 ⊕ 0 = 1, next 0001, the seed again.",
-    "Count: 0001, 0011, 0111, 1111, 1110, 1101, 1010, 0101, 1011, 0110, 1100, 1001, 0010, 0100, 1000. That is 15 distinct states, then repeat.",
-    "Period check: 2⁴ − 1 = 15. The period matches, so the LFSR is maximal-length and generates each non-zero 4-bit vector exactly once.",
-    "Aliasing: 2⁻¹⁶ = 1/65,536 = 1.526 × 10⁻⁵."
+    "Write the state as b<sub>3</sub>b<sub>2</sub>b<sub>1</sub>b<sub>0</sub>. The next state is b<sub>2</sub>b<sub>1</sub>b<sub>0</sub>f.",
+    "0001: f = 0 ⊕ 1 = 1 → 0011. 0011: f = 1 → 0111. 0111: f = 1 → 1111. 1111: f = 1 ⊕ 1 = 0 → 1110.",
+    "1110: f = 1 → 1101. 1101: f = 0 → 1010. 1010: f = 1 → 0101. 0101: f = 1 → 1011.",
+    "1011: f = 0 → 0110. 0110: f = 0 → 1100. 1100: f = 1 → 1001. 1001: f = 0 → 0010.",
+    "0010: f = 0 → 0100. 0100: f = 0 → 1000. 1000: f = 1 → 0001, the seed again.",
+    "Fifteen distinct states appear, and 2⁴ − 1 = 15, so every non-zero word appears once: the LFSR is maximal-length."
    ],
-   "answer": "The LFSR has 15 states and period 2⁴ − 1 = 15, so it is maximal-length; the 16-bit MISR aliasing probability is 2⁻¹⁶ ≈ 1.53 × 10⁻⁵, about 1 in 65,536.",
-   "check": "b3, b2, b1, b0 = 0, 0, 0, 1\nstart = (b3, b2, b1, b0)\nseq = [start]\nwhile True:\n    f = b3 ^ b0\n    b3, b2, b1, b0 = b2, b1, b0, f\n    if (b3, b2, b1, b0) == start:\n        break\n    seq.append((b3, b2, b1, b0))\nprint(len(seq))\nprint(2**16)\nprint(2**-16)",
-   "values": [
-    15,
-    65536,
-    1.52587890625e-05
+   "answer": "The period is 15 = 2⁴ − 1, so this LFSR is maximal-length; only 0000 never appears."
+  },
+  {
+   "question": "A 3-bit MISR with state b<sub>2</sub>b<sub>1</sub>b<sub>0</sub> updates as b<sub>2</sub>′ = b<sub>1</sub> ⊕ x<sub>2</sub>, b<sub>1</sub>′ = b<sub>0</sub> ⊕ x<sub>1</sub>, b<sub>0</sub>′ = b<sub>2</sub> ⊕ b<sub>0</sub> ⊕ x<sub>0</sub>, where x<sub>2</sub>x<sub>1</sub>x<sub>0</sub> is the CUT output that clock. It starts at 000. (a) The good CUT gives 101, 011, 110, 001. Find the golden signature. (b) A fault turns the second output into 001. Is it caught? (c) A different fault gives 001, 010, 110, 001. What happens?",
+   "steps": [
+    "(a) 000 with 101 → b<sub>2</sub>′ = 0 ⊕ 1 = 1, b<sub>1</sub>′ = 0 ⊕ 0 = 0, b<sub>0</sub>′ = 0 ⊕ 0 ⊕ 1 = 1: state 101. With 011 → 001. With 110 → 101. With 001 → 011. Golden signature 011.",
+    "(b) 101, then 001 → 011, then 110 → 001, then 001 → 010. Signature 010 ≠ 011: the fault is caught.",
+    "(c) 001 → 001, then 010 → 001, then 110 → 101, then 001 → 011. Signature 011 equals the golden one, although two output bits were wrong.",
+    "In (c) the first error entered b<sub>2</sub> and the second error, one clock later, cancelled it in the feedback: this is aliasing. For n = 3, 2⁻³ = 1 in 8 of long random error streams alias; a 16-bit MISR cuts that to about 1 in 65,536."
    ],
-   "output": ""
+   "answer": "Golden signature 011. Fault (b) gives 010 and is caught; fault (c) also ends at 011 and escapes by aliasing, which is why practical MISRs are 16 to 32 bits wide."
   }
  ],
  "traps": [
-  "BIST does not make ATPG unnecessary. Random vectors may never hit a random-pattern-resistant fault, so weighted or deterministic vectors still need fault simulation and ATPG.",
-  "The all-zero seed is a lockup for an XOR-feedback LFSR: the register sits at 000…0 forever. The seed must be non-zero.",
-  "Maximal length is 2ⁿ − 1, not 2ⁿ. The all-zero state is never reached, and counting it is a standard mark-losing slip.",
-  "Aliasing: a faulty circuit can produce the golden signature. A BIST pass means the signature matched, not that the chip has zero defects.",
-  "A MISR only compresses. It cannot tell you which output was wrong, and the golden signature must come from simulating this exact netlist, not from another chip."
+  "Counting 2ⁿ states for a maximal-length LFSR. The period is 2ⁿ − 1; the all-zero word never appears.",
+  "Seeding with all zeros. The register locks up at 000…0 and makes no vectors.",
+  "Reading a BIST pass as proof of a good chip. A faulty circuit can alias to the golden signature.",
+  "Expecting a MISR to say which output was wrong. It only compresses; diagnosis needs the raw responses.",
+  "Saying BIST makes ATPG unnecessary. Random-pattern-resistant faults still need weighted, reseeded or ATPG vectors, checked by fault simulation."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "Expand TPG and ORA, and say what each does in BIST.",
+   "q": "Expand TPG, ORA and MISR.",
    "marks": 2,
-   "a": "TPG = test pattern generator, on-chip block that makes test vectors, usually an LFSR. ORA = output response analyser, on-chip block that compresses CUT responses into a signature, usually a MISR."
+   "a": "Test pattern generator, output response analyser, multiple-input signature register."
   },
   {
    "level": "remember",
-   "q": "What is the period of a maximal-length n-bit LFSR?",
+   "q": "What is the period of a maximal-length n-stage LFSR?",
    "marks": 2,
-   "a": "2ⁿ − 1 states, where n is the number of stages; the all-zero state is excluded."
+   "a": "2ⁿ − 1 clocks; every non-zero n-bit word appears once and the all-zero word never appears."
   },
   {
    "level": "understand",
    "q": "Why must an LFSR seed be non-zero?",
    "marks": 3,
-   "a": "In an XOR-feedback LFSR the all-zero word maps to itself: feedback 0 ⊕ 0 = 0, so the register stays at 000…0 and produces no useful vectors. Any non-zero seed keeps it moving through the 2ⁿ − 1 non-zero states."
+   "a": "With XOR feedback, all zeros gives a feedback of 0 ⊕ 0 = 0, so the register stays at all zeros and produces no vectors."
   },
   {
    "level": "understand",
-   "q": "Give one difference between the external-XOR (Fibonacci) and internal-XOR (Galois) LFSR forms.",
+   "q": "Give one difference between the external-XOR and internal-XOR LFSR forms.",
    "marks": 3,
-   "a": "In external-XOR form the XOR gates combine tapped stages and drive the first stage, so the feedback path is a chain of XORs. In internal-XOR form the XOR gates sit between stages, so the feedback passes through only one XOR per clock and the register can run faster; the trade-off is a less obvious tap table."
+   "a": "External-XOR feeds the XOR of the taps into the first stage, so the feedback passes a chain of XOR gates. Internal-XOR puts one XOR between stages, so the feedback passes one gate and the register can run faster."
   },
   {
    "level": "apply",
    "q": "A 3-bit LFSR shifts left with f = b<sub>2</sub> ⊕ b<sub>0</sub> entering at b<sub>0</sub>. Start from 001, list the states and give the period.",
    "marks": 4,
-   "a": "States: 001 → 011 → 111 → 110 → 101 → 010 → 100 → 001. Seven distinct states, period 7 = 2³ − 1, so the LFSR is maximal-length."
+   "a": "001 → 011 → 111 → 110 → 101 → 010 → 100 → 001. Seven states, period 7 = 2³ − 1, so it is maximal-length."
   },
   {
    "level": "apply",
-   "q": "A 20-bit MISR checks a circuit. Estimate the aliasing probability.",
+   "q": "A block is tested by test-per-scan BIST with 5,000 vectors through chains of at most 120 flip-flops, at 100 MHz. How long does BIST take?",
    "marks": 3,
-   "a": "P ≈ 2⁻²⁰ = 9.54 × 10⁻⁷, about 1 in 1,048,576."
+   "a": "T = 5,000 × (120 + 1) = 605,000 clocks. At 10 ns per clock, 6.05 ms."
+  },
+  {
+   "level": "apply",
+   "q": "Estimate the aliasing probability of a 20-bit MISR.",
+   "marks": 3,
+   "a": "2⁻²⁰ = 1 ÷ 1,048,576, about 9.5 × 10⁻⁷."
   },
   {
    "level": "analyze",
-   "q": "Why does test-per-scan take longer than test-per-clock for the same number of vectors?",
+   "q": "A pipeline has block A, a register, then block B. Explain how a BILBO in place of that register supports testing.",
    "marks": 4,
-   "a": "In test-per-scan each vector must be shifted through L scan flip-flops before one capture clock, so N vectors cost N(L + 1) clocks. Test-per-clock applies one vector per clock but needs direct access to flip-flop inputs, which costs extra multiplexer area and routing."
-  },
-  {
-   "level": "analyze",
-   "q": "A pipeline has block A, then a register, then block B. Explain how a BILBO on that register supports testing.",
-   "marks": 4,
-   "a": "In test mode the register becomes a MISR that compresses A's outputs, then an LFSR that drives B's inputs, so one register serves as ORA for A and TPG for B. In functional mode the same flip-flops act as an ordinary register, selected by control inputs that add XOR and multiplexer gates per stage."
+   "a": "Set the BILBO to 10. To test A, a BILBO before A generates vectors and this BILBO compresses A's outputs as a MISR. To test B, this BILBO runs as an LFSR feeding B while the next BILBO compresses. In mode 11 the same flip-flops are an ordinary pipeline register."
   }
  ],
- "beyond": "Not for the exam. Logic BIST ships inside most large SoCs, run at power-on and again after packaging, and memory BIST controllers reuse the same loop with march algorithms. Embedded-core test is standardised (IEEE 1500), while board access still goes through boundary scan. Current work looks at reseeding an LFSR with ATPG vectors, holding switching activity low so the chip does not burn power while testing itself, and measuring aliasing on real designs. Search: logic BIST, LFSR reseeding, MISR aliasing."
+ "beyond": "Not for the exam. Logic BIST ships inside most large SoCs and is run at every power-on in cars, where safety standards ask the chip to check itself in the field. Current work combines LFSR reseeding with compression, and keeps switching low so the chip does not overheat while it tests itself. Search 'logic BIST', 'LFSR reseeding' and 'in-system test'."
 }
