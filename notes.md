@@ -893,6 +893,7 @@
 - Facts fixed: reciprocal ranging does not "prolong" a line; the 1.5 cm offset rule replaced by the limiting length of offset; scale classes (1:25,000 and 1:50,000 are medium, topographic); sag formula is per span (times n spans); "Not for exam" beyond line.
 - Kept but not checked against a source this session: the 250 km² plane-survey guide (textbook value); typical chain, rod and arrow dimensions; carrier-wave grouping of EDMs; the older Indian datum on the Everest ellipsoid with origin at Kalianpur, and the open series maps on WGS84.
 - Sources: S. K. Duggal added; DGCA and ISRO links dropped (not about this unit).
+- Later the same day: the 13 model answers were lengthened to 444–643 words (scaled to marks) and the library copy updated.
 
 ## ce-survey-u6 (Remote Sensing and Image Interpretation) correction pass, 21 Nov 2026
 
@@ -966,3 +967,11 @@
 - Examples changed from the draft: the metro-station buffer example now gives each street's distance from the station and computes the new pipe from chord lengths 2√(R² − d²) (Market Street 366.6 m + Lake Road 124.9 m = 491.5 m, buffer 125 664 m²); the wells example tests "inside ward 7" on the coordinates, so the spatial and attribute queries return different wells; new second examples: vector against raster storage (16 016 B against 4 MB, ratio 250) and slope and aspect from a DEM window (13.5°, 24.0 %, 213.7°).
 - Facts fixed: affine fit (3 points fix it exactly, 4 or more by least squares, second order needs 6 or more); dangle, undershoot and overshoot; Everest and WGS84 described correctly; grid length reduces to the ellipsoid before the 0.9996 scale factor (1000 m at h = 100 m gives 999.584 m); datum shift "a hundred metres or more"; sliver and spatial-query glossary entries; unit and chapter numbers named by topic; DGCA and a GIS blog link dropped.
 - Kept but not checked against a source this session: none of the numbers depend on outside data; the UTM easting of about 391 600 m for 80° E, 13° N is a rounded spherical estimate.
+
+## ce-survey-u2 (Compass, Plane Table and Traversing) correction pass, 21 Nov 2026
+
+- Packet unchanged; all 6 subtopics were in the draft, so no chapter was added. CE25C03's matching unit is "Control Surveying, Adjustment": traversing, coordinate computation, errors, weights and adjustment are covered here (weights of observations and weighted angle corrections added to the traverse chapter); horizontal and vertical control, triangulation and trilateration belong to the universal control-survey unit (ce-survey-u4). The SRM entry mixes contours and curves (u3/u4) with traverse computation.
+- Examples changed from the draft: the closing-error example used sums (−0.34, −0.19) that did not come from any traverse in the book; it now adjusts the traverse of the latitude and departure chapter (ΣL −0.23, ΣD −0.12, e 0.259 m at 207°33′, 1 in 2950, Bowditch coordinates traced to the millimetre); the omitted-measurement example now uses the same traverse (DA 226.03 m at 303°24′); a second area example computes the area of that adjusted traverse (36 047 m²); the bank questions that said "given" without data now carry full data (local attraction, Bowditch, area, Bowditch vs transit, blunder hunt).
+- Facts fixed: rule for leftover minutes in the compass chapter; the trap on bearings; a paragraph on carrying bearings from interior angles for theodolite traverses; precision limits stated without invented specification numbers; "only a few universities teach it" removed; Unit 1, Unit 4, Unit 7 and chapter-number cross-references replaced by topic names.
+- Kept but not checked against a source this session: compass traverse acceptance of about 1 in 300 to 1 in 600 (textbook value); the 5″√n angular allowance is not used in this unit.
+- Sources: MIT and OpenDroneMap links dropped (not about this unit); USGS link retitled; Basak textbook title corrected.
