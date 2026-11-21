@@ -1,233 +1,176 @@
 {
- "lead": "Static CMOS waits for inputs; dynamic logic uses a clock to precharge a node high, then evaluate a pull-down network. This saves transistors and can be faster, but the floating dynamic node brings charge sharing and leakage problems. Domino logic adds an inverter so gates can cascade, and cascode voltage switch logic (CVSL) uses a cross-coupled pMOS pair for differential outputs. These styles appear in high-speed datapaths and adders. The cost is clock power, careful timing and extra design rules.",
- "prereq": "You need: <a href=\"#switching-characteristics-and-propagation-delay\">Chapter 3.3</a> for capacitance and <a href=\"#pass-transistor-logic-and-transmission-gates\">Chapter 3.8</a> for pass transistors.",
+ "lead": "Static CMOS builds every gate from two complementary networks: an nMOS pull-down network (PDN) that connects the output to ground and a pMOS pull-up network (PUN) that connects it to V<sub>DD</sub>. For every input combination exactly one of them conducts, so the output always sits at a rail and no steady current flows. Ratioed logic keeps the pull-down network but replaces the pull-up with one always-on load. It saves transistors, but its low output sits above 0 V and it draws current whenever the output is low. Static CMOS is the default style of standard-cell libraries.",
+ "prereq": "You need: the <a href=\"#cmos-inverter-dc-characteristics-and-noise-margins\">CMOS inverter</a>, the <a href=\"#nmos-inverters-resistive-enhancement-depletion-pseudo-nmos-loads\">pseudo-nMOS load</a> and <a href=\"#delay-estimation-logical-effort-and-transistor-sizing\">logical effort</a>.",
  "sections": [
   {
-   "h3": "Dynamic gate: precharge, evaluate, hold",
+   "h3": "Designing a static CMOS gate",
    "blocks": [
-    {
-     "type": "p",
-     "text": "A dynamic gate has a clock φ (phi). When φ = 0, a pMOS precharge transistor connects the dynamic node to V<sub>DD</sub>. The node voltage V<sub>dyn</sub> becomes V<sub>DD</sub>. The evaluate nMOS is off, so the pull-down network cannot discharge."
-    },
-    {
-     "type": "p",
-     "text": "When φ = 1, precharge turns off and evaluate turns on. If the NMOS pull-down network conducts, it discharges C<sub>dyn</sub> to 0 V. If the network is off, the node stays high only because C<sub>dyn</sub> stores charge. It is dynamic: the value is held by capacitance, not by a DC path."
-    },
     {
      "type": "steps",
      "items": [
-      "Set φ = 0: precharge C<sub>dyn</sub> to V<sub>DD</sub>; the dynamic node is high.",
-      "Set φ = 1: evaluate the NMOS pull-down network.",
-      "Inputs high enough: C<sub>dyn</sub> discharges to 0 V.",
-      "Inputs low: C<sub>dyn</sub> stays high; leakage slowly removes charge."
+      "Write the function in inverted form, Y = NOT(F). Static CMOS gates are inverting.",
+      "Build the PDN from F: an AND becomes nMOS in series, an OR becomes nMOS in parallel.",
+      "Build the PUN as the dual: every series connection in the PDN becomes parallel in the PUN, and every parallel one becomes series. The pMOS take the same inputs.",
+      "Size for the same drive as a unit inverter (nMOS 1, pMOS 2): a device in a stack of k gets k times the unit width.",
+      "Check each input's logical effort, and draw the stick diagram with an Euler path so one diffusion strip serves each network (see Stick diagrams)."
      ]
     },
     {
      "type": "p",
-     "text": "A dynamic NAND with n inputs uses n series nMOS devices, one evaluate nMOS and one precharge pMOS. Static CMOS needs 2n transistors for the same NAND. The saving is large for wide gates. The clock line drives many transistors, so its power and skew matter."
+     "text": "A simple N-input gate uses 2N transistors. Because one network is always off in steady state, V<sub>OH</sub> = V<sub>DD</sub>, V<sub>OL</sub> = 0 V, static current is only leakage, and the noise margins are those of the inverter. The costs are the transistor count and the input capacitance of the series pMOS, which grow quickly for wide NOR gates; this is why gates are kept to about four inputs and larger functions are built as trees."
+    },
+    {
+     "type": "p",
+     "text": "Some syllabi call this style complementary CMOS. It gives compound gates such as AND-OR-INVERT (AOI) and OR-AND-INVERT (OAI) in one stage."
     }
    ]
   },
   {
-   "h3": "Charge sharing, keepers and leakage",
+   "h3": "Ratioed logic: an always-on load",
    "blocks": [
     {
      "type": "p",
-     "text": "Charge sharing happens when an internal node with capacitance C<sub>int</sub> connects to C<sub>dyn</sub> during evaluation. The charge on C<sub>dyn</sub> is shared, so V<sub>dyn</sub> falls even if the pull-down path is not complete to ground. If the drop crosses the inverter threshold, the output flips wrongly."
-    },
-    {
-     "type": "formula",
-     "text": "V<sub>dyn</sub> = (C<sub>dyn</sub>V<sub>pre</sub> + C<sub>int</sub>V<sub>int</sub>) ÷ (C<sub>dyn</sub> + C<sub>int</sub>)",
-     "where": "C<sub>dyn</sub> is the dynamic node capacitance in farads (F); C<sub>int</sub> is the internal node capacitance in F; V<sub>pre</sub> is the precharged voltage in volts (V); V<sub>int</sub> is the internal node voltage before connection in V; V<sub>dyn</sub> is the final shared voltage in V."
+     "text": "In pseudo-nMOS the PUN is a single pMOS with its gate at ground. An N-input gate needs N + 1 transistors. When the PDN is off the load pulls the output to V<sub>DD</sub>. When the PDN is on, the load and the PDN both conduct, so a static current flows and the output settles at a V<sub>OL</sub> above 0 V set by the ratio of their strengths. For a NOR, the worst case is a single conducting nMOS, so each nMOS is sized to hold V<sub>OL</sub> on its own."
     },
     {
      "type": "p",
-     "text": "A keeper transistor is a weak pMOS from V<sub>DD</sub> to the dynamic node. Its gate is driven by the output of the inverter, that is, by the gate output node. When the node should stay high, the keeper supplies leakage current and fights charge sharing. The keeper must be weak enough that the NMOS pull-down can still discharge the node during evaluation."
-    },
-    {
-     "type": "p",
-     "text": "Charge sharing is reduced by precharging internal nodes, by adding dummy capacitance, or by keeping C<sub>int</sub> small. Leakage sets a minimum clock frequency: if the clock runs too slowly, the dynamic node may droop before evaluation. Dynamic gates therefore suit continuous high-speed operation, not long pauses."
+     "text": "The load current is (k<sub>p</sub>/2)(V<sub>DD</sub> − |V<sub>tp</sub>|)² while the pMOS stays saturated, which needs V<sub>OL</sub> ≤ |V<sub>tp</sub>|. Making k<sub>p</sub> small lowers V<sub>OL</sub> and the static current but slows the rising edge, so a pseudo-nMOS gate is fast falling and slow rising. Its logical effort for a falling output is low (an input drives only one nMOS), which is why wide pseudo-nMOS NOR gates appear in PLA planes, ROM address decoders and comparators."
     }
    ]
   },
   {
-   "h3": "Domino logic and the non-inverting rule",
+   "h3": "Comparison and other static variants",
    "blocks": [
     {
-     "type": "p",
-     "text": "A dynamic gate cannot drive another dynamic gate directly in a simple cascade. During precharge, every dynamic output goes high. The next gate would see a high input and may start evaluating with the wrong value. Domino logic adds an inverter after the dynamic node."
-    },
-    {
-     "type": "p",
-     "text": "The inverter output is low during precharge. During evaluation it can only rise from 0 to 1, never fall. A chain of domino gates therefore evaluates in order, like falling dominoes. The overall gate is non-inverting: the pull-down condition is inverted at the dynamic node and inverted again at the output."
-    },
-    {
-     "type": "p",
-     "text": "Because the output makes only low-to-high transitions in evaluation, a domino gate can feed another domino gate safely. Inverting logic inside a domino stage needs differential or special techniques. Domino is common in high-speed adders and critical datapaths, but clock power and charge sharing remain."
-    },
-    {
-     "type": "p",
-     "text": "Domino logic is grouped with other clocked logic families such as clocked CMOS (C²MOS), NORA and TSPC, but it is not the same circuit. NORA and TSPC are clocked dynamic families: NORA uses alternating clock phases, and TSPC uses a true single-phase clock. Only a few universities teach NORA and TSPC in detail; know their names and purpose."
-    }
-   ]
-  },
-  {
-   "h3": "Cascode voltage switch logic (CVSL)",
-   "blocks": [
-    {
-     "type": "p",
-     "text": "CVSL is a differential logic family. It has two NMOS pull-down networks: one for the true function and one for its complement. Two cross-coupled pMOS transistors act as the load. The pMOS gate of each side connects to the other output node."
-    },
-    {
-     "type": "p",
-     "text": "During evaluation, one NMOS network conducts and pulls its output low. The cross-coupled pMOS whose gate is low turns on and holds the other output high. The circuit therefore produces both the true and complement outputs. The NMOS network must be strong enough to overpower the pMOS keeper, so CVSL is ratioed during switching."
-    },
-    {
-     "type": "p",
-     "text": "CVSL can implement complex functions in one gate because it uses both true and complement inputs. The cost is more wiring, more transistors and careful sizing. It is used in complex high-speed logic where differential signals are available."
-    },
-    {
-     "type": "bullets",
-     "items": [
-      "Static CMOS: complementary networks, no clock, robust, 2n transistors for an n-input gate.",
-      "Dynamic: clocked precharge and evaluate; for an n-input NAND, n pull-down nMOS plus one evaluate and one precharge transistor (n+2), before adding a keeper or output inverter.",
-      "Domino: dynamic plus inverter, cascadable, non-inverting.",
-      "CVSL: differential, cross-coupled pMOS load, ratioed during switching."
+     "type": "table",
+     "head": [
+      "Style",
+      "Pull-up",
+      "V<sub>OH</sub>",
+      "V<sub>OL</sub>",
+      "Static current",
+      "Transistors (N inputs)"
+     ],
+     "rows": [
+      [
+       "Static CMOS",
+       "pMOS network",
+       "V<sub>DD</sub>",
+       "0 V",
+       "leakage only",
+       "2N"
+      ],
+      [
+       "Pseudo-nMOS",
+       "pMOS, gate at 0 V",
+       "V<sub>DD</sub>",
+       "&gt; 0 V",
+       "yes, output low",
+       "N + 1"
+      ],
+      [
+       "Enhancement load",
+       "nMOS, gate at V<sub>DD</sub>",
+       "V<sub>DD</sub> − V<sub>tn</sub>",
+       "&gt; 0 V",
+       "yes, output low",
+       "N + 1"
+      ]
      ]
+    },
+    {
+     "type": "p",
+     "text": "A <b>tristate inverter</b> adds an enable nMOS and pMOS in series with the two networks; when disabled both paths are open and the output floats (high impedance), so several drivers can share a bus. <b>Clocked CMOS</b> (C²MOS) puts clock-driven transistors in series in the same way, so the gate follows its input only while the clock enables it; it is used in latches (see Static and dynamic latches and registers). Neither is ratioed, because neither has an always-on load. Pass-transistor and dynamic styles come in the next two chapters."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "The clock is low for precharge and high for evaluate. The output is valid only after evaluation starts, so the next stage must wait.",
-  "spec": {
-   "type": "gantt",
-   "unit": "ns",
-   "lanes": [
-    {
-     "label": "Clock",
-     "bars": [
-      {
-       "label": "low",
-       "start": 0,
-       "end": 2,
-       "style": "normal"
-      },
-      {
-       "label": "high",
-       "start": 2,
-       "end": 6,
-       "style": "accent"
-      }
-     ]
-    },
-    {
-     "label": "Dynamic node",
-     "bars": [
-      {
-       "label": "pre",
-       "start": 0,
-       "end": 2,
-       "style": "normal"
-      },
-      {
-       "label": "eval",
-       "start": 2,
-       "end": 6,
-       "style": "live"
-      }
-     ]
-    },
-    {
-     "label": "Output",
-     "bars": [
-      {
-       "label": "hold",
-       "start": 0,
-       "end": 2,
-       "style": "muted"
-      },
-      {
-       "label": "valid",
-       "start": 2.5,
-       "end": 6,
-       "style": "next"
-      }
-     ]
-    }
-   ],
-   "aria": "A clocked timeline: precharge while the clock is low, evaluate while it is high."
-  }
- },
  "examples": [
   {
-   "question": "A dynamic node C<sub>dyn</sub> = 50 fF is precharged to V<sub>pre</sub> = 1.8 V. An internal node C<sub>int</sub> = 10 fF starts at V<sub>int</sub> = 0 V and connects to the dynamic node during evaluation. No keeper is present. Find the final dynamic node voltage.",
+   "question": "Design the static CMOS gate Y = NOT(A·(B + C)). Give the PDN and PUN, size every transistor for the drive of a unit inverter (nMOS 1, pMOS 2), and find the logical effort of each input.",
    "steps": [
-    "Before connection, charge on the dynamic node is Q<sub>dyn</sub> = C<sub>dyn</sub>V<sub>pre</sub> = 50 fF × 1.8 V = 90 fC.",
-    "Charge on the internal node is Q<sub>int</sub> = C<sub>int</sub>V<sub>int</sub> = 10 fF × 0 V = 0 fC.",
-    "After connection, total capacitance is C<sub>total</sub> = C<sub>dyn</sub> + C<sub>int</sub> = 50 fF + 10 fF = 60 fF.",
-    "Total charge is conserved: Q<sub>total</sub> = Q<sub>dyn</sub> + Q<sub>int</sub> = 90 fC + 0 fC = 90 fC.",
-    "Final voltage is V<sub>dyn</sub> = Q<sub>total</sub> / C<sub>total</sub> = 90 fC / 60 fF = 1.5 V."
+    "F = A·(B + C). PDN: nMOS B and C in parallel, that pair in series with nMOS A, between Y and ground.",
+    "PUN (dual): pMOS B and C in series, that pair in parallel with pMOS A, between V<sub>DD</sub> and Y.",
+    "Check one case: A = 1, B = 0, C = 1. PDN: A on and C on, a path to ground, so Y = 0. PUN: pMOS A is off, and the B-C series pair has C off, so no path to V<sub>DD</sub>. Y = NOT(1·(0 + 1)) = 0. ✓",
+    "nMOS sizes: the worst pull-down path is two in series (A then B, or A then C), so each nMOS is width 2.",
+    "pMOS sizes: pMOS A alone forms a path, so width 2; B and C are two in series, so width 4 each.",
+    "Logical effort: input A drives nMOS 2 + pMOS 2 = 4 units, g<sub>A</sub> = 4/3. Inputs B and C drive 2 + 4 = 6 units, g<sub>B</sub> = g<sub>C</sub> = 6/3 = 2.",
+    "Count: 6 transistors. Built from separate gates it would need a NOR2, an inverter and a NAND2: 4 + 2 + 4 = 10 transistors and three gate delays instead of one."
    ],
-   "answer": "The final dynamic node voltage is 1.5 V.",
-   "check": "c_dyn = 50e-15\nc_int = 10e-15\nv_pre = 1.8\nv_int = 0.0\nq_total = c_dyn * v_pre + c_int * v_int\nc_total = c_dyn + c_int\nv_final = q_total / c_total\nprint(v_final)",
-   "values": [
-    1.5
+   "answer": "PDN: A in series with (B ∥ C), all nMOS width 2. PUN: A ∥ (B in series with C), pMOS A width 2, B and C width 4. g<sub>A</sub> = 4/3, g<sub>B</sub> = g<sub>C</sub> = 2."
+  },
+  {
+   "question": "A pseudo-nMOS inverter has V<sub>DD</sub> = 2.5 V, k<sub>n</sub> = 100 µA/V², V<sub>tn</sub> = 0.5 V, k<sub>p</sub> = 20 µA/V² and |V<sub>tp</sub>| = 0.5 V. With the input high, find the load current, V<sub>OL</sub> and the static power, and check that the pMOS is saturated.",
+   "steps": [
+    "pMOS: V<sub>SG</sub> = 2.5 V, overdrive 2.0 V. Assume saturation: I = (20/2)(2.0)² = 40 µA.",
+    "nMOS: V<sub>GS</sub> = 2.5 V, overdrive 2.0 V, linear because V<sub>OL</sub> is small: 40 = 100[2.0V<sub>OL</sub> − V<sub>OL</sub>²/2].",
+    "0.4 = 2V<sub>OL</sub> − V<sub>OL</sub>²/2, so V<sub>OL</sub>² − 4V<sub>OL</sub> + 0.8 = 0 and V<sub>OL</sub> = (4 − √12.8)/2 = (4 − 3.578)/2 = 0.211 V.",
+    "Saturation check: V<sub>OL</sub> = 0.211 V ≤ |V<sub>tp</sub>| = 0.5 V, so the pMOS is saturated. ✓",
+    "Static power with the output low: 2.5 V × 40 µA = 100 µW."
    ],
-   "output": ""
+   "answer": "I = 40 µA, V<sub>OL</sub> ≈ 0.21 V, static power 100 µW while the output is low."
   }
  ],
  "traps": [
-  "Cascading dynamic gates without domino inverters; the precharged high output can make the next gate evaluate the wrong value.",
-  "Ignoring charge sharing: an internal node at 0 V can pull the dynamic node down even when the pull-down path is off, flipping the output.",
-  "Making the keeper too strong: it holds the node high but the NMOS pull-down cannot discharge it, so evaluation fails or slows.",
-  "Mixing dynamic and static inputs at different times; inputs must be stable before evaluate and must not glitch.",
-  "Calling CVSL non-ratioed: the NMOS network must overpower the cross-coupled pMOS during switching."
+  "Drawing the PUN with the same series and parallel structure as the PDN. The PUN is the dual.",
+  "Forgetting that a static CMOS gate inverts. NOT(A·(B + C)) is one gate; A·(B + C) needs an inverter after it.",
+  "Sizing all transistors equally. Devices in a stack of k are made k times wider to keep the drive.",
+  "Saying a ratioed gate has zero static power. It draws V<sub>DD</sub> × I<sub>load</sub> whenever its output is low.",
+  "Sizing a pseudo-nMOS NOR for all inputs on. The worst case is one input on."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "What are the two phases of a dynamic gate?",
    "marks": 2,
-   "a": "Precharge when the clock is low, and evaluate when the clock is high."
+   "q": "What are the two networks of a static CMOS gate and which transistors form each?",
+   "a": "An nMOS pull-down network to ground and a pMOS pull-up network to V<sub>DD</sub>; they are duals, and exactly one conducts for each input."
   },
   {
    "level": "understand",
-   "q": "Why does a dynamic gate need a clock?",
    "marks": 3,
-   "a": "The clock turns on the precharge pMOS and the evaluate nMOS in turn. The high level is stored on capacitance, so the gate needs a precharge phase before each evaluation."
+   "q": "Why does static CMOS draw no steady current?",
+   "a": "For any steady input one network is off, so there is no path from V<sub>DD</sub> to ground; only leakage flows."
   },
   {
    "level": "apply",
-   "q": "A dynamic node C<sub>dyn</sub> = 80 fF is precharged to 1.8 V. An internal node C<sub>int</sub> = 20 fF is at 0 V and connects during evaluation. Find the final voltage.",
    "marks": 4,
-   "a": "Q = 80 fF × 1.8 V = 144 fC. C<sub>total</sub> = 100 fF. V = 144 fC / 100 fF = 1.44 V."
-  },
-  {
-   "level": "analyze",
-   "q": "Why can a domino gate drive another domino gate, while a plain dynamic gate cannot in a simple cascade?",
-   "marks": 4,
-   "a": "A plain dynamic output is high during precharge, which can falsely turn on the next gate. A domino gate has an inverter, so its output is low during precharge and can only rise during evaluation. This makes the cascade evaluate in order."
-  },
-  {
-   "level": "remember",
-   "q": "What is the role of a keeper transistor?",
-   "marks": 2,
-   "a": "It is a weak pMOS that holds the dynamic node high against leakage and charge sharing when the pull-down network is off."
-  },
-  {
-   "level": "analyze",
-   "q": "CVSL is called ratioed during switching. Explain why.",
-   "marks": 4,
-   "a": "The conducting NMOS network pulls one output low while a cross-coupled pMOS tries to hold it high. The NMOS must be strong enough to overpower the pMOS, so transistor sizing ratios matter."
+   "q": "Draw the PDN and PUN of Y = NOT(A·B + C) and size them for unit-inverter drive.",
+   "a": "PDN: (A series B) parallel with C; A and B width 2, C width 1. PUN: (A ∥ B) in series with C; all three pMOS width 4."
   },
   {
    "level": "apply",
-   "q": "A dynamic node C<sub>dyn</sub> = 60 fF is precharged to 1.8 V. An internal node C<sub>int</sub> = 15 fF is at 0.9 V and connects during evaluation. Find the final voltage.",
-   "marks": 5,
-   "a": "Q = 60 fF × 1.8 V + 15 fF × 0.9 V = 108 fC + 13.5 fC = 121.5 fC. C<sub>total</sub> = 75 fF. V = 121.5 fC / 75 fF = 1.62 V."
+   "marks": 3,
+   "q": "A pseudo-nMOS gate has k<sub>p</sub> = 40 µA/V², V<sub>DD</sub> = 1.8 V and |V<sub>tp</sub>| = 0.4 V. Find the load current.",
+   "a": "I = (40/2)(1.8 − 0.4)² = 20 × 1.96 = 39.2 µA."
+  },
+  {
+   "level": "understand",
+   "marks": 3,
+   "q": "What is a tristate inverter used for?",
+   "a": "It drives a shared bus: when its enable is off both paths open and the output floats, so another driver can take the bus."
+  },
+  {
+   "level": "analyze",
+   "marks": 4,
+   "q": "A 16-input NOR is needed in a decoder. Compare static CMOS and pseudo-nMOS.",
+   "a": "Static CMOS needs 32 transistors with 16 pMOS in series, each very wide, giving a huge input capacitance and a slow rise. Pseudo-nMOS needs 17 transistors and each input drives only one nMOS, but it burns static current whenever the output is low and has a reduced low noise margin."
+  },
+  {
+   "level": "analyze",
+   "marks": 4,
+   "q": "In the pseudo-nMOS example, k<sub>p</sub> is doubled to 40 µA/V². Find the new V<sub>OL</sub> and comment.",
+   "a": "I = 80 µA, so 0.8 = 2V<sub>OL</sub> − V<sub>OL</sub>²/2, V<sub>OL</sub>² − 4V<sub>OL</sub> + 1.6 = 0, V<sub>OL</sub> = (4 − √9.6)/2 = 0.451 V. The pMOS is still saturated (0.451 ≤ 0.5). The rising edge is faster, but V<sub>OL</sub> doubles and the static power doubles to 200 µW."
   }
  ],
- "beyond": "Not for the exam. Domino logic appears in high-performance processor datapaths, where clock-delayed domino and dual-rail domino help manage timing. CVSL and other differential styles connect to low-swing and high-speed signaling research. Modern finFET and low-voltage designs make charge sharing and keeper sizing more critical. Search for clock-delayed domino, true single-phase clock logic, and differential cascode voltage switch logic to go further."
+ "beyond": "Not for the exam. A standard-cell library offers hundreds of static CMOS cells, including many AOI and OAI compound gates in several drive strengths; synthesis maps logic onto them. Ratioed pull-ups survive in SRAM sense amplifiers and in fast comparators. Search next for AOI and OAI cells, Euler path layout and standard-cell libraries.",
+ "figure": {
+  "after_section": 1,
+  "caption": "The six-transistor gate Y = NOT(A·(B + C)) of the worked example, with each width chosen for the drive of a unit inverter. The pull-up is the dual of the pull-down: the series pair B, C becomes a parallel pair below the output.",
+  "spec": {
+   "type": "svg",
+   "h": 384,
+   "body": "<line x1=\"120.0\" y1=\"34.0\" x2=\"460.0\" y2=\"34.0\" style=\"stroke:var(--ink);stroke-width:2.5\"/><text x=\"112.0\" y=\"39.0\" font-size=\"14\" text-anchor=\"end\" style=\"fill:var(--muted)\">V<tspan baseline-shift=\"sub\" font-size=\"11\">DD</tspan></text><line x1=\"186.0\" y1=\"72.0\" x2=\"186.0\" y2=\"108.0\" style=\"stroke:var(--accent);stroke-width:2.5\"/><line x1=\"179.0\" y1=\"76.0\" x2=\"179.0\" y2=\"104.0\" style=\"stroke:var(--accent);stroke-width:2\"/><circle cx=\"175.0\" cy=\"90.0\" r=\"4\" style=\"fill:var(--fig);stroke:var(--accent);stroke-width:2\"/><line x1=\"171.0\" y1=\"90.0\" x2=\"149.0\" y2=\"90.0\" style=\"stroke:var(--accent);stroke-width:2\"/><polyline points=\"186.0,76.0 200.0,76.0 200.0,60.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><polyline points=\"186.0,104.0 200.0,104.0 200.0,120.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><text x=\"208.0\" y=\"95.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">A (2)</text><line x1=\"200.0\" y1=\"34.0\" x2=\"200.0\" y2=\"60.0\" style=\"stroke:var(--accent);stroke-width:2\"/><line x1=\"366.0\" y1=\"58.0\" x2=\"366.0\" y2=\"94.0\" style=\"stroke:var(--accent);stroke-width:2.5\"/><line x1=\"359.0\" y1=\"62.0\" x2=\"359.0\" y2=\"90.0\" style=\"stroke:var(--accent);stroke-width:2\"/><circle cx=\"355.0\" cy=\"76.0\" r=\"4\" style=\"fill:var(--fig);stroke:var(--accent);stroke-width:2\"/><line x1=\"351.0\" y1=\"76.0\" x2=\"329.0\" y2=\"76.0\" style=\"stroke:var(--accent);stroke-width:2\"/><polyline points=\"366.0,62.0 380.0,62.0 380.0,46.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><polyline points=\"366.0,90.0 380.0,90.0 380.0,106.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><text x=\"388.0\" y=\"81.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">B (4)</text><line x1=\"380.0\" y1=\"34.0\" x2=\"380.0\" y2=\"46.0\" style=\"stroke:var(--accent);stroke-width:2\"/><line x1=\"366.0\" y1=\"118.0\" x2=\"366.0\" y2=\"154.0\" style=\"stroke:var(--accent);stroke-width:2.5\"/><line x1=\"359.0\" y1=\"122.0\" x2=\"359.0\" y2=\"150.0\" style=\"stroke:var(--accent);stroke-width:2\"/><circle cx=\"355.0\" cy=\"136.0\" r=\"4\" style=\"fill:var(--fig);stroke:var(--accent);stroke-width:2\"/><line x1=\"351.0\" y1=\"136.0\" x2=\"329.0\" y2=\"136.0\" style=\"stroke:var(--accent);stroke-width:2\"/><polyline points=\"366.0,122.0 380.0,122.0 380.0,106.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><polyline points=\"366.0,150.0 380.0,150.0 380.0,166.0\" style=\"fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round\"/><text x=\"388.0\" y=\"141.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">C (4)</text><line x1=\"380.0\" y1=\"106.0\" x2=\"380.0\" y2=\"106.0\" style=\"stroke:var(--accent);stroke-width:2\"/><line x1=\"200.0\" y1=\"120.0\" x2=\"200.0\" y2=\"180.0\" style=\"stroke:var(--accent);stroke-width:2\"/><line x1=\"380.0\" y1=\"166.0\" x2=\"380.0\" y2=\"180.0\" style=\"stroke:var(--accent);stroke-width:2\"/><line x1=\"200.0\" y1=\"180.0\" x2=\"380.0\" y2=\"180.0\" style=\"stroke:var(--ink);stroke-width:2\"/><circle cx=\"290.0\" cy=\"180.0\" r=\"3.5\" style=\"fill:var(--ink)\"/><line x1=\"290.0\" y1=\"180.0\" x2=\"560.0\" y2=\"180.0\" style=\"stroke:var(--ink);stroke-width:2\"/><text x=\"566.0\" y=\"186.0\" font-size=\"16\" text-anchor=\"start\" style=\"fill:var(--ink)\" font-weight=\"700\">Y</text><line x1=\"290.0\" y1=\"180.0\" x2=\"290.0\" y2=\"204.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"276.0\" y1=\"216.0\" x2=\"276.0\" y2=\"252.0\" style=\"stroke:var(--live);stroke-width:2.5\"/><line x1=\"269.0\" y1=\"220.0\" x2=\"269.0\" y2=\"248.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"269.0\" y1=\"234.0\" x2=\"239.0\" y2=\"234.0\" style=\"stroke:var(--live);stroke-width:2\"/><polyline points=\"276.0,220.0 290.0,220.0 290.0,204.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><polyline points=\"276.0,248.0 290.0,248.0 290.0,264.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><text x=\"298.0\" y=\"239.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">A (2)</text><line x1=\"290.0\" y1=\"264.0\" x2=\"290.0\" y2=\"280.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"220.0\" y1=\"280.0\" x2=\"360.0\" y2=\"280.0\" style=\"stroke:var(--live);stroke-width:2\"/><circle cx=\"290.0\" cy=\"280.0\" r=\"3.5\" style=\"fill:var(--live)\"/><line x1=\"220.0\" y1=\"280.0\" x2=\"220.0\" y2=\"286.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"360.0\" y1=\"280.0\" x2=\"360.0\" y2=\"286.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"206.0\" y1=\"298.0\" x2=\"206.0\" y2=\"334.0\" style=\"stroke:var(--live);stroke-width:2.5\"/><line x1=\"199.0\" y1=\"302.0\" x2=\"199.0\" y2=\"330.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"199.0\" y1=\"316.0\" x2=\"169.0\" y2=\"316.0\" style=\"stroke:var(--live);stroke-width:2\"/><polyline points=\"206.0,302.0 220.0,302.0 220.0,286.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><polyline points=\"206.0,330.0 220.0,330.0 220.0,346.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><text x=\"228.0\" y=\"321.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">B (2)</text><line x1=\"346.0\" y1=\"298.0\" x2=\"346.0\" y2=\"334.0\" style=\"stroke:var(--live);stroke-width:2.5\"/><line x1=\"339.0\" y1=\"302.0\" x2=\"339.0\" y2=\"330.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"339.0\" y1=\"316.0\" x2=\"309.0\" y2=\"316.0\" style=\"stroke:var(--live);stroke-width:2\"/><polyline points=\"346.0,302.0 360.0,302.0 360.0,286.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><polyline points=\"346.0,330.0 360.0,330.0 360.0,346.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><text x=\"368.0\" y=\"321.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">C (2)</text><line x1=\"220.0\" y1=\"346.0\" x2=\"220.0\" y2=\"356.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"360.0\" y1=\"346.0\" x2=\"360.0\" y2=\"356.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"220.0\" y1=\"356.0\" x2=\"360.0\" y2=\"356.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"290.0\" y1=\"356.0\" x2=\"290.0\" y2=\"364.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"278.0\" y1=\"364.0\" x2=\"302.0\" y2=\"364.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"283.0\" y1=\"369.0\" x2=\"297.0\" y2=\"369.0\" style=\"stroke:var(--ink);stroke-width:2\"/><line x1=\"287.0\" y1=\"374.0\" x2=\"293.0\" y2=\"374.0\" style=\"stroke:var(--ink);stroke-width:2\"/><text x=\"470.0\" y=\"70.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--accent)\" font-weight=\"700\">pull-up (pMOS):</text><text x=\"470.0\" y=\"90.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">A ∥ (B then C)</text><text x=\"470.0\" y=\"250.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--live)\" font-weight=\"700\">pull-down (nMOS):</text><text x=\"470.0\" y=\"270.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">A then (B ∥ C)</text><text x=\"470.0\" y=\"320.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">g<tspan baseline-shift=\"sub\" font-size=\"11\">A</tspan> = (2 + 2)/3 = 4/3</text><text x=\"470.0\" y=\"342.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--ink)\">g<tspan baseline-shift=\"sub\" font-size=\"11\">B</tspan> = g<tspan baseline-shift=\"sub\" font-size=\"11\">C</tspan> = (2 + 4)/3 = 2</text><text x=\"470.0\" y=\"130.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">(number) = width</text><text x=\"470.0\" y=\"148.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">(unit inverter: n 1, p 2)</text>",
+   "aria": "Transistor schematic: between VDD and Y, a pMOS A in parallel with pMOS B and C in series; between Y and ground, an nMOS A in series with nMOS B and C in parallel. Widths 2 for A in both networks, 4 for pMOS B and C, 2 for nMOS B and C."
+  }
+ }
 }

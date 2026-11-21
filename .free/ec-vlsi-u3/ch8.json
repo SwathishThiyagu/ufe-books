@@ -1,237 +1,167 @@
 {
- "lead": "A pass transistor connects an input to an output through a switch, so data flows without a logic gate. An nMOS alone cannot pass a full logic 1: it stops one threshold voltage below its gate. A pMOS alone cannot pass a full logic 0. A transmission gate puts an nMOS and a pMOS in parallel, with complementary controls, and passes both rails. These circuits are used in multiplexers, XOR gates, flip-flops and adder cells, where saving transistors matters more than restoring every node.",
- "prereq": "You need: threshold voltage and body effect from Unit 1, and static CMOS from <a href=\"#static-cmos-and-ratioed-logic\">Chapter 3.7</a>.",
+ "lead": "Low-power design keeps a chip inside its battery and heat budget by attacking each term of the power equation. Dynamic power α CV<sub>DD</sub>²f falls if fewer nodes switch, if less capacitance is switched, or above all if the supply is lowered; leakage falls if idle blocks are switched off or slower, low-leakage transistors are used where speed is not needed. A power manager applies these methods block by block while the chip runs. This chapter covers the design principles, clock gating, power gating, multi-threshold cells and dynamic voltage and frequency scaling (DVFS), with what each one costs.",
+ "prereq": "You need: the power equation in <a href=\"#static-and-dynamic-power-dissipation\">static and dynamic power dissipation</a> and how delay depends on V<sub>DD</sub> in <a href=\"#switching-characteristics-and-propagation-delay\">switching characteristics</a>.",
  "sections": [
   {
-   "h3": "nMOS pass transistor and threshold drop",
+   "h3": "Principles: one knob per term",
    "blocks": [
-    {
-     "type": "p",
-     "text": "An nMOS pass transistor is one nMOS switch placed between a data input A and an output Y. The gate is the control C. When C is high, the channel can connect A to Y. The switch is not a gate: it does not invert or restore the signal; it only passes it."
-    },
-    {
-     "type": "p",
-     "text": "Passing a low input works well. With A = 0 V and C = V<sub>DD</sub>, the input side A is the source because it is at the lower potential. Then V<sub>GS</sub> = V<sub>G</sub> − V<sub>A</sub> = V<sub>DD</sub> − 0 V = V<sub>DD</sub>, independent of Y. The nMOS stays on for the whole discharge, so Y reaches 0 V. Use V<sub>GS</sub> = C − Y only for the high-level case, where the output Y is the source."
-    },
-    {
-     "type": "p",
-     "text": "Passing a high input is different. Start with Y at 0 V and A = V<sub>DD</sub>. The nMOS turns on and charges Y. As Y rises, V<sub>GS</sub> falls because V<sub>GS</sub> = C − Y; here Y is the source. The transistor turns off when V<sub>GS</sub> = V<sub>tn</sub>, where V<sub>tn</sub> is the nMOS threshold voltage in V. At that point Y stops at V<sub>DD</sub> − V<sub>tn</sub>. The highest output is min(V<sub>in</sub>, V<sub>G</sub> − V<sub>tn</sub>)."
-    },
-    {
-     "type": "formula",
-     "text": "V<sub>out(max)</sub> = min(V<sub>in</sub>, V<sub>G</sub> − V<sub>tn</sub>)",
-     "where": "V<sub>out(max)</sub> is the highest output voltage in V; V<sub>in</sub> is the input high level in V; V<sub>G</sub> is the gate voltage in V; V<sub>tn</sub> is the nMOS threshold in V."
-    },
-    {
-     "type": "p",
-     "text": "When Y is above ground, the source-to-body voltage V<sub>SB</sub> is not zero. The threshold rises with body effect:"
-    },
-    {
-     "type": "formula",
-     "text": "V<sub>t</sub> = V<sub>t0</sub> + γ(√(2φ<sub>F</sub> + V<sub>SB</sub>) − √(2φ<sub>F</sub>))",
-     "where": "V<sub>t</sub> is the body-biased threshold in V; V<sub>t0</sub> is the zero-bias threshold in V; γ is the body-effect coefficient in V<sup>1/2</sup>; 2φ<sub>F</sub> is the surface potential parameter in V; V<sub>SB</sub> is the source-to-body voltage in V."
-    },
-    {
-     "type": "p",
-     "text": "A larger V<sub>tn</sub> means a larger drop. The body of the nMOS is tied to ground in a standard n-well process, so this effect is always present when the source node is high."
-    }
-   ]
-  },
-  {
-   "h3": "pMOS pass transistor and transmission gate",
-   "blocks": [
-    {
-     "type": "p",
-     "text": "A pMOS pass transistor is the dual. It passes a high input well because its source can sit at the high rail and its gate at 0 V keeps V<sub>GS</sub> negative. It passes a low input poorly: the output falls only to |V<sub>tp</sub>| above ground, then the pMOS turns off. So one transistor alone always loses one threshold on one rail."
-    },
-    {
-     "type": "p",
-     "text": "A transmission gate (TG) fixes this by placing an nMOS and a pMOS in parallel. The nMOS gate is driven by C, the pMOS gate by C bar, the complement of C. When C = 1, both are on and Y = A. When C = 0, both are off and Y is high impedance (high-Z). The pMOS carries the high part of the swing; the nMOS carries the low part. Together they pass the full rail."
-    },
-    {
-     "type": "p",
-     "text": "The symbol is a switch with two control inputs, one drawn with a bubble for the pMOS. Some syllabi call a network of these switches pass transistor logic (PTL). When complementary data and control signals are used in several branches, some syllabi call it complementary pass-transistor logic. The idea is the same: data travels through switches, not through a complementary CMOS gate."
-    },
     {
      "type": "table",
      "head": [
-      "C",
-      "nMOS",
-      "pMOS",
-      "Y"
+      "Term",
+      "Knob",
+      "Typical method"
      ],
      "rows": [
       [
-       "0",
-       "off",
-       "off",
-       "high-Z"
+       "V<sub>DD</sub>",
+       "lower supply (squared)",
+       "voltage scaling, multiple voltage islands, DVFS"
       ],
       [
-       "1",
-       "on",
-       "on",
-       "A"
+       "α",
+       "fewer transitions",
+       "clock gating, operand isolation, fewer glitches"
+      ],
+      [
+       "C",
+       "less switched capacitance",
+       "smaller gates off the critical path, shorter wires"
+      ],
+      [
+       "f",
+       "slower clock where allowed",
+       "frequency scaling"
+      ],
+      [
+       "I<sub>leak</sub>",
+       "less leakage",
+       "power gating, high-V<sub>t</sub> cells, body bias"
       ]
      ]
+    },
+    {
+     "type": "p",
+     "text": "Lowering V<sub>DD</sub> makes gates slower, so it must be paid for in speed. <b>Parallelism</b> pays it in area: two copies of a block, each at half the clock, deliver the same throughput, and the extra time per operation lets V<sub>DD</sub> fall. <b>Pipelining</b> does the same by shortening the logic between registers. The energy per operation then drops roughly as V<sub>DD</sub>², with some overhead for the extra multiplexers or registers."
     }
    ]
   },
   {
-   "h3": "Using transmission gates and PTL",
+   "h3": "Clock gating, power gating and multi-threshold cells",
    "blocks": [
     {
      "type": "p",
-     "text": "Transmission gates build useful functions with few transistors. Two TGs form a 2:1 multiplexer: one TG connects A when C = 1, the other connects B when C = 0. An XOR gate uses two TGs and two inverters, or a small TG network, and is common in adder cells. A D flip-flop can use TGs as the input and feedback switches."
+     "text": "<b>Clock gating</b> stops the clock to registers that have no new data. An integrated clock-gating cell holds the enable in a latch while the clock is high, so the gated clock cannot glitch. The clock tree and registers take a large share of a chip's dynamic power, and gating them is cheap, but it leaves leakage untouched because the supply stays on."
     },
     {
      "type": "p",
-     "text": "PTL saves transistors but has costs. A passed high through an nMOS alone stops at V<sub>DD</sub> − V<sub>tn</sub>, and a passed low through a pMOS alone stops at |V<sub>tp</sub>| above ground, not at 0 V. So outputs may be weak. Weak nodes are slower and more sensitive to noise. Each stage whose gate is held at V<sub>DD</sub> stops at V<sub>DD</sub> − V<sub>tn</sub>. Drops pile up only when a later gate or control is itself a passed level, as in some PTL networks. Delay grows with chain length in both cases. If the output drives a gate, a restoring inverter or a full CMOS stage is added at the end. Charge sharing is another issue: when switches change, charge on an internal node can redistribute and disturb the output. Floating nodes must not drive control inputs."
+     "text": "<b>Power gating</b> puts a large switch between a block and a rail: a pMOS header to V<sub>DD</sub> or an nMOS footer to ground, usually a high-V<sub>t</sub> device that leaks little itself. When the block is idle the switch opens and its leakage nearly vanishes. The costs: the switch's resistance slows the block a little; the block forgets its state unless retention flip-flops keep it; its outputs need isolation cells so they do not float into neighbours; and waking up takes time and energy to recharge the block's rail. Power gating saves energy only if the idle time exceeds the break-even time, wake energy divided by leakage power."
     },
     {
      "type": "p",
-     "text": "Use PTL where the function is switch-like: multiplexers, XOR/XNOR, adders and flip-flops. Use static CMOS from <a href=\"#static-cmos-and-ratioed-logic\">Chapter 3.7</a> when full rail restoration and robust noise margins are required. Dynamic logic in <a href=\"#dynamic-domino-and-cascode-voltage-switch-logic\">Chapter 3.9</a> also uses clocked switches, but it precharges first."
+     "text": "<b>Multi-threshold (multi-V<sub>t</sub>) cells.</b> A library offers each cell with low, standard and high V<sub>t</sub>. Low-V<sub>t</sub> cells are fast but leak; high-V<sub>t</sub> cells are slow but leak far less. Synthesis puts low-V<sub>t</sub> cells only on the critical paths and high-V<sub>t</sub> cells everywhere else, often cutting leakage several times at no cost in clock speed."
+    }
+   ]
+  },
+  {
+   "h3": "DVFS and the power manager",
+   "blocks": [
+    {
+     "type": "p",
+     "text": "DVFS picks the lowest voltage and frequency pair that meets the current workload, from a table checked at every process corner. With α and C fixed, moving from (V<sub>1</sub>, f<sub>1</sub>) to (V<sub>2</sub>, f<sub>2</sub>) scales dynamic power by (V<sub>2</sub>/V<sub>1</sub>)² × (f<sub>2</sub>/f<sub>1</sub>), and energy per operation by (V<sub>2</sub>/V<sub>1</sub>)²."
+    },
+    {
+     "type": "p",
+     "text": "Order matters. Going down, lower the frequency first and then the voltage; going up, raise the voltage first and then the frequency. Otherwise the gates are briefly too slow for the clock and timing fails. Regulators and PLLs need microseconds to settle, so the operating system's governor changes points with some hysteresis."
+    },
+    {
+     "type": "p",
+     "text": "A power manager ties these together: the operating system or a hardware monitor reports the workload, and the manager sets the DVFS point, gates clocks and switches power domains. Sleep states form a ladder: clock-gated (wakes in a cycle, small saving), retention (registers kept at low voltage), and fully power-gated (largest saving, slowest wake-up)."
     }
    ]
   }
  ],
- "figure": {
-  "after_section": 1,
-  "caption": "The transmission gate connects A to Y only when C is 1 and C bar is 0. The nMOS and pMOS are in parallel, so the pMOS passes the high level and the nMOS passes the low level.",
-  "spec": {
-   "type": "blocks",
-   "direction": "right",
-   "title": "Transmission gate",
-   "nodes": [
-    {
-     "id": "A",
-     "label": "Data A",
-     "style": "normal"
-    },
-    {
-     "id": "TG",
-     "label": "Transmission gate",
-     "style": "accent"
-    },
-    {
-     "id": "Y",
-     "label": "Output Y",
-     "style": "normal"
-    },
-    {
-     "id": "C",
-     "label": "Control C",
-     "style": "live"
-    },
-    {
-     "id": "Cb",
-     "label": "C bar",
-     "style": "live"
-    }
-   ],
-   "edges": [
-    {
-     "from": "A",
-     "to": "TG",
-     "label": "data",
-     "style": "solid"
-    },
-    {
-     "from": "TG",
-     "to": "Y",
-     "style": "solid"
-    },
-    {
-     "from": "C",
-     "to": "TG",
-     "label": "nMOS",
-     "style": "solid"
-    },
-    {
-     "from": "Cb",
-     "to": "TG",
-     "label": "pMOS",
-     "style": "solid"
-    }
-   ],
-   "aria": "A data path from A through a transmission gate to Y, with control C on the nMOS and C bar on the pMOS."
-  }
- },
  "examples": [
   {
-   "question": "An nMOS pass transistor has V<sub>in</sub> = 3.3 V, gate voltage V<sub>G</sub> = 3.3 V and threshold V<sub>tn</sub> = 0.6 V. (a) Find the maximum output voltage. (b) A transmission gate adds a pMOS in parallel with its gate at 0 V. What maximum output does the transmission gate pass?",
+   "question": "A block runs at 1.2 V and 1 GHz. DVFS moves it to 1.0 V and 0.8 GHz with the same α and C. Find the ratio of the new dynamic power to the old, the saving, and the change in energy per operation.",
    "steps": [
-    "For the nMOS passing a high level, the source is the output Y. V<sub>GS</sub> = V<sub>G</sub> − Y.",
-    "The nMOS turns off at V<sub>GS</sub> = V<sub>tn</sub>. Set V<sub>G</sub> − Y = V<sub>tn</sub>.",
-    "Solve: Y = V<sub>G</sub> − V<sub>tn</sub> = 3.3 V − 0.6 V = 2.7 V.",
-    "The transmission gate has a pMOS in parallel. Its gate is at 0 V, its source is at 3.3 V, so V<sub>GS</sub> = −3.3 V and the pMOS is on.",
-    "The pMOS passes the full high rail, so the TG maximum output is 3.3 V."
+    "P<sub>2</sub>/P<sub>1</sub> = (1.0/1.2)² × (0.8/1.0). α and C cancel.",
+    "(1.0/1.2)² = 0.8333² = 0.6944; frequency ratio = 0.8.",
+    "P<sub>2</sub>/P<sub>1</sub> = 0.6944 × 0.8 = 0.5556, a saving of 44.4%.",
+    "Energy per operation depends only on V²: ratio 0.6944, a saving of 30.6%. The rest of the power saving comes from doing fewer operations per second."
    ],
-   "answer": "The nMOS alone passes a maximum of 2.7 V; the transmission gate passes 3.3 V.",
-   "check": "vin = 3.3\nvg = 3.3\nvtn = 0.6\nvout_nmos = vg - vtn\nvout_tg = vin\nprint(round(vout_nmos, 2))\nprint(round(vout_tg, 2))",
-   "values": [
-    2.7,
-    3.3
+   "answer": "New power is 0.556 of the old (44.4% saved); energy per operation falls by 30.6%."
+  },
+  {
+   "question": "A block leaks 0.5 mW. Power-gating it costs 1.5 nJ for each sleep and wake-up (recharging its rail and saving state). Find the break-even idle time. Is it worth gating for idle periods of 2 µs and of 10 µs?",
+   "steps": [
+    "Break-even time = wake energy ÷ leakage power = 1.5 nJ ÷ 0.5 mW = 3 µs.",
+    "Idle 2 µs: leakage saved = 0.5 mW × 2 µs = 1.0 nJ, less than the 1.5 nJ cost, so gating loses 0.5 nJ. Clock gating alone is better here.",
+    "Idle 10 µs: saved = 5.0 nJ, net gain 5.0 − 1.5 = 3.5 nJ, 70% of the leakage energy."
    ],
-   "output": ""
+   "answer": "Break-even is 3 µs: gating loses 0.5 nJ for a 2 µs gap and gains 3.5 nJ for a 10 µs gap."
   }
  ],
  "traps": [
-  "Do not use V<sub>out</sub> = V<sub>in</sub> for an nMOS passing a high level. The output stops at V<sub>G</sub> − V<sub>tn</sub>, and body effect makes V<sub>tn</sub> larger.",
-  "Do not say a pMOS passes a low level perfectly. A pMOS alone stops at |V<sub>tp</sub>| above ground.",
-  "Do not confuse a transmission gate with a single pass transistor. The TG has both nMOS and pMOS in parallel and needs C and C bar.",
-  "Do not ignore high-Z. When C = 0, a TG output is floating; a following gate must not be left without a defined level.",
-  "Do not forget that the pMOS gate is controlled by C bar, not C. Reversing the controls turns both transistors off or makes the switch behave wrongly."
+  "Calling power gating a dynamic-power method. It cuts leakage while a block is idle; an idle block is not switching anyway.",
+  "Saying clock gating stops leakage. The supply is still on.",
+  "Lowering V without lowering f. Gates become slower, so the clock must drop first.",
+  "Assuming high-V<sub>t</sub> cells are free. They are slower, so they go only off the critical path.",
+  "Power-gating for short idle gaps. Below the break-even time it wastes energy."
  ],
  "quiz": [
   {
    "level": "remember",
-   "q": "For an nMOS pass transistor with gate at V<sub>DD</sub>, input at V<sub>DD</sub> and threshold V<sub>tn</sub>, what is the maximum output voltage?",
    "marks": 2,
-   "a": "V<sub>DD</sub> − V<sub>tn</sub>. The nMOS turns off when V<sub>GS</sub> = V<sub>tn</sub>."
-  },
-  {
-   "level": "remember",
-   "q": "In a transmission gate, which control signal drives the pMOS gate?",
-   "marks": 2,
-   "a": "C bar, the complement of C."
+   "q": "What does DVFS stand for, and which two quantities does it change?",
+   "a": "Dynamic voltage and frequency scaling; it changes the supply voltage and the clock frequency together."
   },
   {
    "level": "understand",
-   "q": "Why does a single pMOS pass transistor fail to pass a full 0 V?",
    "marks": 3,
-   "a": "It turns off when its gate-to-source voltage reaches V<sub>tp</sub>, leaving the output at |V<sub>tp</sub>| above ground."
+   "q": "Why does clock gating not reduce leakage?",
+   "a": "It only stops clock edges; the block stays connected to the supply, so its off transistors keep leaking."
+  },
+  {
+   "level": "apply",
+   "marks": 4,
+   "q": "V falls from 1.2 V to 1.1 V and f from 1.0 GHz to 0.9 GHz. Find the dynamic power ratio and the saving.",
+   "a": "(1.1/1.2)² × 0.9 = 0.8403 × 0.9 = 0.756, a saving of 24.4%."
+  },
+  {
+   "level": "apply",
+   "marks": 4,
+   "q": "A datapath at 1.2 V is duplicated so each copy runs at half the clock, which lets V drop to 0.9 V. The duplicate and its multiplexer raise switched capacitance to 2.15 times. Find the new power for the same throughput.",
+   "a": "P<sub>2</sub>/P<sub>1</sub> = 2.15 × (0.9/1.2)² × 0.5 = 2.15 × 0.5625 × 0.5 = 0.605: 39.5% less power for twice the area."
   },
   {
    "level": "understand",
-   "q": "How does body effect change the threshold drop of an nMOS passing a high level?",
    "marks": 3,
-   "a": "The source is above ground, so V<sub>SB</sub> > 0. The threshold V<sub>t</sub> rises above V<sub>t0</sub>, so the output V<sub>DD</sub> − V<sub>t</sub> is lower."
-  },
-  {
-   "level": "apply",
-   "q": "An nMOS pass transistor has V<sub>G</sub> = 2.5 V, V<sub>in</sub> = 2.5 V, V<sub>t0</sub> = 0.5 V. Body effect raises V<sub>t</sub> to 0.7 V. Find the maximum output.",
-   "marks": 4,
-   "a": "V<sub>out(max)</sub> = min(2.5, 2.5 − 0.7) = 1.8 V."
-  },
-  {
-   "level": "apply",
-   "q": "A transmission gate has V<sub>DD</sub> = 1.8 V, V<sub>tn</sub> = 0.4 V and |V<sub>tp</sub>| = 0.4 V. What are the output high and low levels it can pass?",
-   "marks": 4,
-   "a": "High = 1.8 V through the pMOS; low = 0 V through the nMOS."
+   "q": "Why are high-V<sub>t</sub> cells placed off the critical path?",
+   "a": "They leak much less but are slower; off the critical path their extra delay does not lengthen the clock period, so the saving costs nothing in speed."
   },
   {
    "level": "analyze",
-   "q": "A TG output feeds a long wire and then a CMOS gate. Why is a restoring inverter often placed after the TG?",
+   "marks": 4,
+   "q": "A block wakes every 10 µs; each wake-up takes 2 µs, leaving an 8 µs idle gap. It leaks 0.2 mW and a sleep-wake cycle costs 2 nJ. Should it be power-gated?",
+   "a": "Break-even = 2 nJ ÷ 0.2 mW = 10 µs. The 8 µs gap is shorter, saving only 1.6 nJ against a 2 nJ cost, so power gating loses; clock gating or a retention state is better."
+  },
+  {
+   "level": "analyze",
    "marks": 5,
-   "a": "The TG output may be weak or disturbed by charge sharing. The inverter restores full rails and improves noise margin and drive."
-  },
-  {
-   "level": "analyze",
-   "q": "Compare a 2:1 multiplexer built from transmission gates with a static CMOS AND-OR-INVERT style mux. Give one advantage and one disadvantage.",
-   "marks": 6,
-   "a": "A TG 2:1 mux uses about 4 transistors plus one inverter for C bar; a static CMOS mux uses more transistors. The TG output floats (high-Z) when no branch is selected, internal nodes can share charge, and both C and C bar are needed. A TG output is weak only if C or C bar is itself a passed, degraded level. Static CMOS always drives the output to a rail."
+   "q": "When moving to a lower performance point, why lower the frequency before the voltage?",
+   "a": "If the voltage falls first, the gates slow down while the clock is still fast and paths fail timing. Lowering f first keeps every path safe; going up, raise V first for the same reason."
   }
  ],
- "beyond": "Not for the exam. Transmission gates are common in standard-cell libraries for multiplexers, XOR cells and scan flip-flops. In advanced nodes, finFETs and low-voltage designs make the loss through a single pass transistor worse, so engineers use full transmission gates or restore buffers. EDA tools check charge sharing and floating nodes during simulation. Search for 'transmission gate XOR', 'pass transistor logic standard cell' and 'charge sharing in dynamic logic'."
+ "beyond": "Not for the exam. Power intent is written in the Unified Power Format (UPF, IEEE 1801), which tells the tools where the power domains, switches, isolation and retention cells are. Phones combine DVFS with big and little processor cores and adaptive body bias. Search next for UPF power intent, near-threshold computing and adaptive voltage scaling.",
+ "figure": {
+  "after_section": 1,
+  "caption": "Left: a power-gated block behind a high-V<sub>t</sub> header switch, with retention flip-flops to keep its state and isolation cells on its outputs. Right: the second worked example; the 0.5 mW of leakage saved overtakes the 1.5 nJ wake-up cost after 3 µs of idle time.",
+  "spec": {
+   "type": "svg",
+   "h": 348,
+   "body": "<line x1=\"70.0\" y1=\"40.0\" x2=\"300.0\" y2=\"40.0\" style=\"stroke:var(--ink);stroke-width:2.5\"/><text x=\"62.0\" y=\"45.0\" font-size=\"14\" text-anchor=\"end\" style=\"fill:var(--muted)\">V<tspan baseline-shift=\"sub\" font-size=\"11\">DD</tspan></text><line x1=\"156.0\" y1=\"62.0\" x2=\"156.0\" y2=\"98.0\" style=\"stroke:var(--live);stroke-width:2.5\"/><line x1=\"149.0\" y1=\"66.0\" x2=\"149.0\" y2=\"94.0\" style=\"stroke:var(--live);stroke-width:2\"/><circle cx=\"145.0\" cy=\"80.0\" r=\"4\" style=\"fill:var(--fig);stroke:var(--live);stroke-width:2\"/><line x1=\"141.0\" y1=\"80.0\" x2=\"109.0\" y2=\"80.0\" style=\"stroke:var(--live);stroke-width:2\"/><polyline points=\"156.0,66.0 170.0,66.0 170.0,50.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><polyline points=\"156.0,94.0 170.0,94.0 170.0,110.0\" style=\"fill:none;stroke:var(--live);stroke-width:2;stroke-linejoin:round\"/><line x1=\"170.0\" y1=\"40.0\" x2=\"170.0\" y2=\"50.0\" style=\"stroke:var(--live);stroke-width:2\"/><text x=\"105.0\" y=\"85.0\" font-size=\"14\" text-anchor=\"end\" style=\"fill:var(--live)\" font-weight=\"700\">sleep</text><text x=\"186.0\" y=\"76.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">high-V<tspan baseline-shift=\"sub\" font-size=\"11\">t</tspan> header</text><line x1=\"170.0\" y1=\"110.0\" x2=\"170.0\" y2=\"122.0\" style=\"stroke:var(--live);stroke-width:2\"/><line x1=\"60.0\" y1=\"122.0\" x2=\"290.0\" y2=\"122.0\" style=\"stroke:var(--live);stroke-width:2.5;stroke-dasharray:6 3\"/><text x=\"60.0\" y=\"140.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--live)\">virtual V<tspan baseline-shift=\"sub\" font-size=\"11\">DD</tspan></text><line x1=\"170.0\" y1=\"122.0\" x2=\"170.0\" y2=\"150.0\" style=\"stroke:var(--ink);stroke-width:2\"/><rect x=\"70.0\" y=\"150.0\" width=\"200.0\" height=\"70.0\" rx=\"8\" style=\"fill:var(--panel);stroke:var(--accent);stroke-width:2\"/><text x=\"170.0\" y=\"180.8\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\" font-weight=\"700\">logic block</text><text x=\"170.0\" y=\"199.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--ink)\">leaks 0.5 mW</text><rect x=\"70.0\" y=\"236.0\" width=\"96.0\" height=\"44.0\" rx=\"8\" style=\"fill:var(--accent-soft);stroke:var(--accent);stroke-width:2\"/><text x=\"118.0\" y=\"254.1\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">retention</text><text x=\"118.0\" y=\"271.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">flip-flops</text><rect x=\"176.0\" y=\"236.0\" width=\"94.0\" height=\"44.0\" rx=\"8\" style=\"fill:var(--next-soft);stroke:var(--next);stroke-width:2\"/><text x=\"223.0\" y=\"254.1\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">isolation</text><text x=\"223.0\" y=\"271.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--ink)\">cells</text><line x1=\"270.0\" y1=\"258.0\" x2=\"300.0\" y2=\"258.0\" style=\"stroke:var(--ink);stroke-width:2\" marker-end=\"url(#ar-UID-n)\"/><text x=\"304.0\" y=\"263.0\" font-size=\"13\" text-anchor=\"start\" style=\"fill:var(--muted)\">out</text><line x1=\"170.0\" y1=\"220.0\" x2=\"170.0\" y2=\"236.0\" style=\"stroke:var(--ink);stroke-width:1.5\"/><text x=\"170.0\" y=\"312.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">ground</text><line x1=\"60.0\" y1=\"296.0\" x2=\"290.0\" y2=\"296.0\" style=\"stroke:var(--ink);stroke-width:2.5\"/><line x1=\"118.0\" y1=\"280.0\" x2=\"118.0\" y2=\"296.0\" style=\"stroke:var(--ink);stroke-width:1.5\"/><line x1=\"223.0\" y1=\"280.0\" x2=\"223.0\" y2=\"296.0\" style=\"stroke:var(--ink);stroke-width:1.5\"/><line x1=\"400.0\" y1=\"290.0\" x2=\"680.0\" y2=\"290.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><line x1=\"400.0\" y1=\"60.0\" x2=\"400.0\" y2=\"290.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><line x1=\"400.0\" y1=\"290.0\" x2=\"400.0\" y2=\"295.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"400.0\" y=\"310.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">0</text><line x1=\"456.0\" y1=\"290.0\" x2=\"456.0\" y2=\"295.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"456.0\" y=\"310.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">2</text><line x1=\"484.0\" y1=\"290.0\" x2=\"484.0\" y2=\"295.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"484.0\" y=\"310.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">3</text><line x1=\"568.0\" y1=\"290.0\" x2=\"568.0\" y2=\"295.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"568.0\" y=\"310.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">6</text><line x1=\"680.0\" y1=\"290.0\" x2=\"680.0\" y2=\"295.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"680.0\" y=\"310.0\" font-size=\"13\" text-anchor=\"middle\" style=\"fill:var(--muted)\">10</text><line x1=\"395.0\" y1=\"290.0\" x2=\"400.0\" y2=\"290.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"391.0\" y=\"294.5\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">0</text><line x1=\"400.0\" y1=\"290.0\" x2=\"680.0\" y2=\"290.0\" style=\"stroke:var(--line);stroke-width:1\"/><line x1=\"395.0\" y1=\"244.0\" x2=\"400.0\" y2=\"244.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"391.0\" y=\"248.5\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">1</text><line x1=\"400.0\" y1=\"244.0\" x2=\"680.0\" y2=\"244.0\" style=\"stroke:var(--line);stroke-width:1\"/><line x1=\"395.0\" y1=\"221.0\" x2=\"400.0\" y2=\"221.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"391.0\" y=\"225.5\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">1.5</text><line x1=\"400.0\" y1=\"221.0\" x2=\"680.0\" y2=\"221.0\" style=\"stroke:var(--line);stroke-width:1\"/><line x1=\"395.0\" y1=\"152.0\" x2=\"400.0\" y2=\"152.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"391.0\" y=\"156.5\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">3</text><line x1=\"400.0\" y1=\"152.0\" x2=\"680.0\" y2=\"152.0\" style=\"stroke:var(--line);stroke-width:1\"/><line x1=\"395.0\" y1=\"60.0\" x2=\"400.0\" y2=\"60.0\" style=\"stroke:var(--line2);stroke-width:1.5\"/><text x=\"391.0\" y=\"64.5\" font-size=\"13\" text-anchor=\"end\" style=\"fill:var(--muted)\">5</text><line x1=\"400.0\" y1=\"60.0\" x2=\"680.0\" y2=\"60.0\" style=\"stroke:var(--line);stroke-width:1\"/><text x=\"540.0\" y=\"330.0\" font-size=\"14\" text-anchor=\"middle\" style=\"fill:var(--muted)\">idle time (µs)</text><text x=\"396.0\" y=\"48.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--muted)\">energy (nJ)</text><line x1=\"400.0\" y1=\"290.0\" x2=\"680.0\" y2=\"60.0\" style=\"stroke:var(--accent);stroke-width:3\"/><text x=\"601.6\" y=\"112.4\" font-size=\"14\" text-anchor=\"end\" style=\"fill:var(--accent)\" font-weight=\"700\">leakage saved</text><line x1=\"400.0\" y1=\"221.0\" x2=\"680.0\" y2=\"221.0\" style=\"stroke:var(--live);stroke-width:2.5\"/><text x=\"680.0\" y=\"241.0\" font-size=\"14\" text-anchor=\"end\" style=\"fill:var(--live)\" font-weight=\"700\">wake cost 1.5 nJ</text><circle cx=\"484.0\" cy=\"221.0\" r=\"6\" style=\"fill:var(--next);stroke:var(--fig);stroke-width:2\"/><line x1=\"484.0\" y1=\"221.0\" x2=\"484.0\" y2=\"290.0\" style=\"stroke:var(--next);stroke-width:1.5;stroke-dasharray:3 3\"/><text x=\"492.0\" y=\"193.0\" font-size=\"14\" text-anchor=\"start\" style=\"fill:var(--next)\" font-weight=\"700\">break-even 3 µs</text><circle cx=\"456.0\" cy=\"244.0\" r=\"5\" style=\"fill:var(--muted);stroke:var(--fig);stroke-width:2\"/><circle cx=\"680.0\" cy=\"60.0\" r=\"5\" style=\"fill:var(--muted);stroke:var(--fig);stroke-width:2\"/>",
+   "aria": "Left, a block diagram: VDD, a pMOS header driven by a sleep signal, a virtual VDD rail feeding a logic block with retention flip-flops and isolation cells. Right, a plot of energy against idle time: a rising line for leakage saved crosses a flat 1.5 nanojoule wake cost at 3 microseconds."
+  }
+ }
 }
