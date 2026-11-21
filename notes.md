@@ -670,3 +670,11 @@
 - One convention is used throughout: bolt groups by direct plus moment shear, tilting brackets by W = Pel/Σl² with the principal-stress combination, welds checked on the 0.707h throat with τ = √(σ<sub>b</sub>² + τ₁²), Wahl K on the alternating stress and K<sub>s</sub> on the mean stress (Shigley's K-on-both noted), nipped leaf springs with effective length 2L₁ − l, rimmed flywheels with 0.75σ<sub>t</sub> + 0.25σ<sub>b</sub>.
 - Left out as unverifiable: a 94 MPa weld stress figure, a 15 to 18 MPa bearing-pressure table and fixed S<sub>se</sub> fractions of S<sub>ut</sub>. Kept but not checked against a source this session: the P<sub>i</sub> = 2840d preload rule, the 30 to 40 m/s cast-iron rim speed, the rubber G range and k ≈ 1 in E<sub>c</sub> = E(1 + 2kS²).
 - MIT OCW, NPTEL and OpenStax links were dropped from the sources (university-hosted or not checked); Wikipedia could not be reached.
+
+## ec-optical-u5 (Claude correction pass, 21 Nov 2026)
+
+- Packet left unchanged (owner's rule for the communication subjects). Chapters 5.4 and 5.5 are tagged advanced but carry a whole exam unit on fiber measurements for one course (attenuation, time- and frequency-domain dispersion, cutoff, NA, diameter, reflectance and ORL, field tests), so they are written at about 1250 and 1450 words rather than the 650 to 900 the tag asks for.
+- One course's unit lists "WDM and passive devices" with link design; that belongs with the WDM unit of this subject and is not covered here.
+- Conventions used throughout: t<sub>chrom</sub> = |D|Lσ<sub>λ</sub> with the half-power spectral width, t<sub>mod</sub> = 440L<sup>q</sup>/B<sub>0</sub> ns, t<sub>rx</sub> = 350/B<sub>rx</sub> ns, 0.7T<sub>b</sub> (NRZ) and 0.35T<sub>b</sub> (RZ); dispersion limit from the rise-time budget (L ≈ 0.7/(B|D|σ<sub>λ</sub>) as the fiber-only bound).
+- Kept but not checked against a source this session: the bend-reference cutoff details (2 m sample, 0.1 dB criterion), cable cutoff ≤ 1260 nm, the 5 % far-field level for NA, connector reflectance "−50 dB or lower" for a good connector.
+- NPTEL dropped from the sources (university-hosted); the RP Photonics and FOA links were dropped because the draft's link check only reached a bot page.
