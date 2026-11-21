@@ -1,20 +1,19 @@
 # ce-survey-u6: free-model run
 
-- Book: `books/civil/ce-survey/ce-survey-u6.html`
+- Book: `work/ce-survey-u6/tree/books/civil/ce-survey/ce-survey-u6.html`
 - Status: ok
-- Model calls so far: 25 (90,737 tokens in, 183,416 out), 7.3 minutes
+- Model calls so far: 25 (90,737 tokens in, 183,416 out), 7.4 minutes
 
 ## Checker
 
 ```
-ce-survey-u6.html: 7 chapters, 14043 words, 8 figures, 150 KB
+ce-survey-u6.html: 7 chapters, 21540 words, 9 figures, 210 KB
 OK
 ```
 
 ## For the reviewer
 
-- chapter 4: the figure cannot be drawn: tree is too wide (8 leaves); use fewer leaves or shorter labels
-- chapter 4: the figure could not be drawn; a plain box diagram stands in for it
+- nothing flagged
 
 ## Reviewer notes (after any revision)
 
@@ -48,3 +47,18 @@ OK
 - ch 7 [low] Section 3, NDVI formula note: 'water and cloud are negative' is too strong for cloud. Thick cloud is bright in both red and near-infrared, so its NDVI sits close to zero; only thin or thin-cirrus cloud and some shadowed cloud give clearly negative values. Water is genuinely negative (also snow and shadow).
 - ch 7 [low] Section 2, spatial filter paragraph: With a 3 × 3 kernel of weight 1/9 the output averages the nine values in the window, including the centre pixel — not 'the nine neighbours', which reads as nine other pixels.
 - ch 7 [low] Section 1, resampling: 'Bilinear interpolation averages four neighbours' hides the weighting. The four neighbours are weighted by distance from the output point, which is why the result is smoother than nearest neighbour.
+
+## Claude correction pass (21 Nov 2026)
+
+Every chapter was checked against the draft review notes above and every worked example, quiz and bank number was rerun in Python. All seven figures were redrawn by hand (pipeline/claude_figs/ce_survey_u6.py) from the chapters' own numbers, and every long question has a step-by-step model answer (331 to 501 words, each ending in a numerical check). All the review findings above are fixed. The unit is outside CE25C03 (no exam topics to add).
+
+Changed or added worked examples:
+- EMR and the spectrum: Wien's law added (sun 0.50 µm, earth 9.66 µm, fire 3.62 µm, energy ratio 19.4); band table fixed (NIR 0.7–1.3, SWIR 1.3–3, mid IR 3–8, TIR 8–14 µm); the 5 µm quiz answer now says reflected and emitted energy mix.
+- Energy interactions: the draft's haze example halved the radiance and contradicted its own path-radiance paragraph; rebuilt with T = 0.9 and L<sub>p</sub> = 4.0 (sensor 22.0, uncorrected 0.173, corrected 0.157); mid-IR window 3–5 µm; 1.37 µm cirrus band.
+- Spectral reflectance: NDVI of vegetation, soil and water read from the figure (0.818, 0.100, −0.333), plus the shaded crop showing why the ratio removes illumination.
+- Platforms: orbital period example added (705 km: 98.9 min, 14.56 orbits, 2752 km track spacing; 35 786 km: 86 164 s); the tree figure that fell back to a box diagram replaced.
+- Resolution: 8-bit vs 12-bit quantisation of two close fields (DN 128/128 vs 2049/2056); small-angle GSD and the 2ⁿ − 1 divisor explained.
+- Visual interpretation: photo scale from focal length and flying height (1:20 000) and tower height from shadow (25.2 m); tilted-photo scale sentence corrected.
+- Digital processing: error-matrix example with user's and producer's accuracy and kappa (0.830, κ = 0.725).
+
+Not verified and therefore left out: sensor-specific resolutions and swaths other than Landsat 8 (705 km, 185 km, 16 days).
